@@ -1,0 +1,61 @@
+/* ============================================================
+   Eventa — semantic design tokens
+   Ported verbatim from the static kit (assets/app.css).
+   Values are RGB channels so Tailwind can apply /alpha modifiers.
+   Every token flips in dark mode; components only ever reference
+   the token, never a raw colour.
+   ============================================================ */
+:root {
+  --canvas: 247 248 250;
+  --surface: 255 255 255;
+  --sidebar: 249 250 251;
+  --hair: 229 231 235;
+  --line: 238 240 243;
+  --ink: 19 42 34;
+  --muted: 139 147 164;
+  --brand-soft: 230 246 239;
+}
+
+html.dark {
+  --canvas: 13 17 15;
+  --surface: 23 29 26;
+  --sidebar: 17 22 19;
+  --hair: 39 47 43;
+  --line: 34 42 38;
+  --ink: 232 237 234;
+  --muted: 143 154 162;
+  --brand-soft: 22 46 36;
+  color-scheme: dark;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d7dbe2;
+  border-radius: 8px;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #333b36;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hugeicons font glyphs render as inline-flex so they align in flex rows */
+i[class^='hgi-'],
+i[class*=' hgi-'] {
+  display: inline-flex;
+  line-height: 1;
+  font-style: normal;
+}
