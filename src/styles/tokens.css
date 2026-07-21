@@ -59,3 +59,20 @@ i[class*=' hgi-'] {
   line-height: 1;
   font-style: normal;
 }
+
+/* The Hugeicons stylesheet (loaded unlayered via <link>) sets
+   `.hgi-stroke { position: relative }`. Tailwind's `absolute` utility lives in
+   a cascade layer, so it can't beat that unlayered rule — icons placed inside
+   inputs (IconInput, search boxes) would sit static instead of absolute.
+   Re-assert the opt-in positions here, unlayered and at higher specificity, so
+   the icon-in-field pattern works. `position: relative` stays the harmless
+   default for every other icon. */
+.hgi-stroke.absolute {
+  position: absolute;
+}
+.hgi-stroke.fixed {
+  position: fixed;
+}
+.hgi-stroke.sticky {
+  position: sticky;
+}

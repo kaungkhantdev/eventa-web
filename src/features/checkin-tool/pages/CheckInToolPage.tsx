@@ -21,6 +21,13 @@ export default function CheckInToolPage() {
   const eventRef = useRef(event)
   eventRef.current = event
 
+  // The picker offers the full catalog, but only some events have seeded stats.
+  // Mirror the static kit's `if (!s) return` — keep the last valid stats shown
+  // when switching to an event that has none, so it never renders undefined.
+  const lastStats = useRef<EventStats>(STATS[EVENTS[0]]!)
+  if (statsByEvent[event]) lastStats.current = statsByEvent[event]!
+  const stats = statsByEvent[event] ?? lastStats.current
+
   const checkIn = useCallback((entry: FeedInput) => {
     setFeed((prev) => [{ ...entry, time: 'just now', id: nextId.current++ }, ...prev])
     setStatsByEvent((prev) => {
@@ -41,7 +48,7 @@ export default function CheckInToolPage() {
 
         {/* ===== side rail: counter + live feed ===== */}
         <div className="flex flex-col gap-3 xl:col-span-2">
-          <CheckInStats stats={statsByEvent[event]} />
+          <CheckInStats stats={stats} />
           <CheckInFeed feed={feed} />
         </div>
       </div>

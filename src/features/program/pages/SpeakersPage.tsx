@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, HeaderUser, Icon, PageFooter, PageHeader, usePagination } from '@/components/ui'
+import {
+  Button,
+  EventPicker,
+  HeaderUser,
+  Icon,
+  PageFooter,
+  PageHeader,
+  usePagination,
+} from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { num } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import {
   SPEAKERS,
-  SPEAKER_EVENT_FILTERS,
   SPEAKER_PANEL_EVENTS,
   type Speaker,
   type SpeakerTone,
@@ -213,23 +220,14 @@ export default function SpeakersPage() {
           />
         </div>
         <div className="relative w-full sm:w-56">
-          <Icon
-            name="hgi-calendar-03"
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand"
-          />
-          <select
+          <EventPicker
             value={event}
-            onChange={(e) => {
-              setEvent(e.target.value)
+            onChange={(v) => {
+              setEvent(v)
               pg.reset()
             }}
-            className="select h-10 w-full border-0 bg-surface pl-9 text-[14px] font-semibold"
-          >
-            {SPEAKER_EVENT_FILTERS.map((ev) => (
-              <option key={ev}>{ev}</option>
-            ))}
-          </select>
+            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
+          />
         </div>
         <div className="flex shrink-0 items-center gap-1 self-start rounded-lg bg-surface p-1 sm:self-auto">
           <button

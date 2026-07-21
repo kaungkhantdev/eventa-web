@@ -8,6 +8,7 @@ import {
   Icon,
   Card,
   DataTable,
+  EventPicker,
   Panel,
   PillTabs,
   Paginator,
@@ -145,19 +146,14 @@ export default function DiscountsPage() {
           />
         </div>
         <div className="relative w-full sm:w-56">
-          <i className="hgi-stroke hgi-calendar-03 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand" />
-          <select
+          <EventPicker
             value={eventFilter || 'All events'}
-            onChange={(e) => {
-              setEventFilter(e.target.value === 'All events' ? '' : e.target.value)
+            onChange={(v) => {
+              setEventFilter(v === 'All events' ? '' : v)
               pag.setPage(1)
             }}
-            className="select h-10 w-full border-0 bg-surface pl-9 text-[14px] font-semibold"
-          >
-            {EVENT_PICKER_OPTIONS.map((e) => (
-              <option key={e}>{e}</option>
-            ))}
-          </select>
+            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
+          />
         </div>
       </div>
 

@@ -3,7 +3,7 @@ import { Link, useOutletContext } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import { cn } from '@/lib/cn'
 import { num } from '@/lib/format'
-import { usePagination } from '@/components/ui'
+import { NotificationBell, UserChip, usePagination } from '@/components/ui'
 import {
   ATTENDEES,
   EVT,
@@ -136,23 +136,8 @@ export default function EventDetailPage() {
             <i className="hgi-stroke hgi-share-08 text-[15px]" />
             <span className="hidden sm:inline">Share</span>
           </button>
-          <button
-            type="button"
-            className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface text-muted transition hover:text-ink"
-            title="Notifications"
-          >
-            <i className="hgi-stroke hgi-notification-03 text-[18px]" />
-            <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-surface" />
-          </button>
-          <div className="flex shrink-0 items-center gap-2.5">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand to-emerald-400 text-[12px] font-semibold text-white">
-              HN
-            </div>
-            <div className="hidden leading-tight sm:block">
-              <p className="text-[13px] font-semibold text-ink">Harper Nelson</p>
-              <p className="text-[11px] text-muted">Event Manager</p>
-            </div>
-          </div>
+          <NotificationBell />
+          <UserChip />
         </div>
       </div>
 

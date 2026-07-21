@@ -3,10 +3,13 @@
    Ported verbatim from the static kit (assets/app.css) so the
    React build renders pixel-identically.
 
-   Deliberately UNLAYERED: this matches the static kit, where
-   app.css loaded after the Tailwind CDN and therefore won
-   specificity ties against utilities. Moving these into
-   @layer components would silently change which class wins.
+   Imported into @layer components (see index.css) so Tailwind
+   UTILITIES win over these component classes — the page markup
+   depends on that (e.g. `.select sm:w-52`, `.input pl-9`,
+   `.select w-auto py-0` in paginators). In Tailwind v4 utilities
+   live in their own cascade layer, which outranks @layer
+   components; leaving this file unlayered would invert that and
+   let `.select { width: 100% }` clobber every width utility.
    ============================================================ */
 
 /* ---------- Sidebar (icon rail = modules, labeled panel = sub-nav) ---------- */

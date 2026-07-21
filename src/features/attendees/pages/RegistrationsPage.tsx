@@ -8,6 +8,7 @@ import {
   Card,
   Panel,
   PillTabs,
+  EventPicker,
   Paginator,
   usePagination,
   Label,
@@ -107,17 +108,11 @@ export default function RegistrationsPage() {
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1 sm:flex-none">
-            <i className="hgi-stroke hgi-calendar-03 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand" />
-            <select
+            <EventPicker
               value={eventFilter}
-              onChange={(e) => setEventFilter(e.target.value)}
-              className="select h-10 w-full border-0 bg-surface pl-9 text-[14px] font-semibold sm:w-52"
-            >
-              <option>All events</option>
-              {REG_EVENTS.map((ev) => (
-                <option key={ev}>{ev}</option>
-              ))}
-            </select>
+              onChange={setEventFilter}
+              className="h-10 w-full border-0 bg-surface text-[14px] font-semibold sm:w-52"
+            />
           </div>
           <div className="relative flex-1 sm:flex-none">
             <i className="hgi-stroke hgi-ticket-01 text-[15px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />

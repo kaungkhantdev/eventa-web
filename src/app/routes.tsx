@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router'
 import AdminShell from '@/layouts/AdminShell'
-import NotFoundPage from '@/features/gallery/pages/NotFoundPage'
+import NotFoundPage from '@/features/system/pages/NotFoundPage'
 
 /* Route manifest. Admin screens are nested under the shell and each declares a
    `handle.page` id — the static kit's `data-page` — which drives sidebar
@@ -30,7 +30,8 @@ const adminChildren = [
   {
     path: 'event-form',
     lazy: async () => ({ Component: (await import('@/features/events/pages/EventFormPage')).default }),
-    handle: { page: 'event-form' },
+    // focused create wizard: keep the icon rail, hide the module sub-nav panel
+    handle: { page: 'event-form', focused: true },
   },
   {
     path: 'event-detail',
@@ -233,6 +234,10 @@ export const router = createBrowserRouter([
     lazy: async () => ({ Component: (await import('@/features/auth/pages/ForgotPasswordPage')).default }),
   },
   {
+    path: '/portal/login',
+    lazy: async () => ({ Component: (await import('@/features/portal/pages/PortalLoginPage')).default }),
+  },
+  {
     path: '/portal/discover',
     lazy: async () => ({ Component: (await import('@/features/portal/pages/DiscoverPage')).default }),
   },
@@ -264,26 +269,9 @@ export const router = createBrowserRouter([
     path: '/landing/noir',
     lazy: async () => ({ Component: (await import('@/features/landing/pages/NoirPage')).default }),
   },
-  {
-    path: '/primary-ui/home',
-    lazy: async () => ({ Component: (await import('@/features/primary-ui/pages/PrimaryHomePage')).default }),
-  },
-  {
-    path: '/primary-ui/dashboard',
-    lazy: async () => ({ Component: (await import('@/features/primary-ui/pages/PrimaryDashboardPage')).default }),
-  },
-  {
-    path: '/primary-ui/bk-dashboard',
-    lazy: async () => ({ Component: (await import('@/features/primary-ui/pages/PrimaryBkDashboardPage')).default }),
-  },
-  {
-    path: '/',
-    lazy: async () => ({ Component: (await import('@/features/gallery/pages/GalleryPage')).default }),
-  },
-  {
-    path: '/components',
-    lazy: async () => ({ Component: (await import('@/features/gallery/pages/ComponentsPage')).default }),
-  },
+  // Root → the public event-discovery page (browsing needs no account).
+  // Attendees sign in for "My tickets"; organizers at /auth/login → admin.
+  { path: '/', element: <Navigate to="/portal/discover" replace /> },
   {
     path: '/admin',
     Component: AdminShell,

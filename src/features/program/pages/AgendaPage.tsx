@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router'
-import { HeaderUser, Icon, PageFooter } from '@/components/ui'
+import { EventPicker, HeaderUser, Icon, PageFooter } from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { cn } from '@/lib/cn'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
@@ -120,19 +120,11 @@ export default function AgendaPage() {
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Agenda for</p>
             <div className="relative -mt-0.5 inline-flex max-w-full items-center">
-              <select
+              <EventPicker
                 value={currentEvent}
-                onChange={(e) => setCurrentEvent(e.target.value)}
-                className="max-w-full cursor-pointer appearance-none truncate bg-transparent pr-7 text-[22px] font-bold tracking-tight text-ink focus:outline-none"
-              >
-                {AGENDA_EVENT_NAMES.map((n) => (
-                  <option key={n}>{n}</option>
-                ))}
-              </select>
-              <Icon
-                name="hgi-arrow-down-01"
-                size={20}
-                className="pointer-events-none absolute right-0 text-muted"
+                onChange={setCurrentEvent}
+                allLabel={false}
+                className="w-auto max-w-full cursor-pointer border-0 bg-transparent text-[22px] font-bold tracking-tight text-ink"
               />
             </div>
           </div>

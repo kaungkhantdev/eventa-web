@@ -67,24 +67,30 @@ function PanelGroup({ group, page }: { group: NavGroup; page: string }) {
 }
 
 /** Read the active page id from the deepest route that declares one. */
-function usePageId(): string {
+/** Read the active page id and the `focused` flag from the deepest route that
+ *  declares them. `focused` routes (the create-event wizard) keep the icon rail
+ *  but hide the module sub-nav panel, matching the static kit. */
+function useRouteHandle(): { page: string; focused: boolean } {
   const matches = useMatches()
+  let page = 'dashboard'
+  let focused = false
   for (let i = matches.length - 1; i >= 0; i--) {
-    const handle = matches[i]!.handle as { page?: string } | undefined
-    if (handle?.page) return handle.page
+    const handle = matches[i]!.handle as { page?: string; focused?: boolean } | undefined
+    if (handle?.page && page === 'dashboard') page = handle.page
+    if (handle?.focused) focused = true
   }
-  return 'dashboard'
+  return { page, focused }
 }
 
 export default function AdminShell() {
   const { dark, toggle } = useTheme()
   const location = useLocation()
-  const page = usePageId()
+  const { page, focused } = useRouteHandle()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   const selected = useMemo(() => moduleOfPage(page), [page])
   const mod = useMemo(() => MODULES.find((m) => m.id === selected), [selected])
-  const hasPanel = Boolean(mod?.groups?.length)
+  const hasPanel = Boolean(mod?.groups?.length) && !focused
 
   // Close the mobile drawer whenever the route changes.
   useEffect(() => setDrawerOpen(false), [location.pathname])

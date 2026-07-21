@@ -1,8 +1,9 @@
 import { Link, useOutletContext } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
-import { NotificationBell, UserChip } from '@/components/ui'
+import { EventPicker, NotificationBell, UserChip } from '@/components/ui'
+import { CATALOG_BY_NAME, STATUS_DOT } from '@/lib/eventCatalog'
 import { cn } from '@/lib/cn'
-import { EVENTS, EVENT_META } from '../data/checkin'
+import { EVENT_META, type EventMeta } from '../data/checkin'
 
 /* The event is the headline; this station is bound to one event. The chevron
    select switches events, and the meta row reflects the picked event's date and
@@ -15,7 +16,15 @@ export function CheckInHeader({
   onEventChange: (event: string) => void
 }) {
   const ctx = useOutletContext<AdminOutletContext | null>()
-  const meta = EVENT_META[event]
+  // Prefer the station's richer meta, else derive from the shared catalog so the
+  // full catalog is switchable (mirrors the static kit's EventaEventMeta lookup).
+  const cat = CATALOG_BY_NAME[event]
+  const meta: EventMeta = EVENT_META[event] ?? {
+    name: event,
+    date: cat?.date ?? '',
+    status: cat?.status ?? 'Upcoming',
+    dot: cat ? STATUS_DOT[cat.status] : 'bg-gray-400',
+  }
 
   return (
     <div className="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
@@ -32,20 +41,17 @@ export function CheckInHeader({
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
             Check-in station
           </p>
-          {/* event name = hero; the chevron opens the picker to switch events */}
+          {/* event name = hero; the searchable picker switches events */}
           <div
             className="relative mt-0.5 max-w-[240px] sm:max-w-[360px] lg:max-w-[480px]"
             title="This station is bound to one event — click to switch"
           >
-            <select
+            <EventPicker
               value={event}
-              onChange={(e) => onEventChange(e.target.value)}
-              className="select h-auto w-auto max-w-full cursor-pointer border-0 bg-transparent p-0 pr-8 text-[22px] font-bold leading-tight tracking-tight text-ink focus:outline-none focus:ring-0"
-            >
-              {EVENTS.map((name) => (
-                <option key={name}>{name}</option>
-              ))}
-            </select>
+              onChange={onEventChange}
+              allLabel={false}
+              className="h-auto w-auto max-w-full cursor-pointer border-0 bg-transparent text-[22px] font-bold leading-tight tracking-tight text-ink focus:outline-none focus:ring-0"
+            />
           </div>
           {/* event facts: date · venue · live status */}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12.5px] text-muted">

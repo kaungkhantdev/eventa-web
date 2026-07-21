@@ -12,7 +12,7 @@ import {
   usePagination,
   Label,
   Input,
-  Select,
+  EventPicker,
   Textarea,
   Hint,
   type PillTabItem,
@@ -53,6 +53,7 @@ export default function AttendeesPage() {
   const [tab, setTab] = useState<AttendeeTab>('all')
   const [tag, setTag] = useState('') // '' = All tags
   const [sort, setSort] = useState<AttendeeSort>('activity')
+  const [inviteEvent, setInviteEvent] = useState<string>(ATT_EVENTS[0]) // invite form: required event pick
 
   const counts = useMemo(() => {
     let nw = 0
@@ -430,11 +431,14 @@ export default function AttendeesPage() {
           </div>
           <div>
             <Label>Event</Label>
-            <Select defaultValue={ATT_EVENTS[0]}>
-              {ATT_EVENTS.map((ev) => (
-                <option key={ev}>{ev}</option>
-              ))}
-            </Select>
+            <div className="relative">
+              <EventPicker
+                value={inviteEvent}
+                onChange={setInviteEvent}
+                allLabel={false}
+                className="w-full"
+              />
+            </div>
           </div>
           <div>
             <Label>Personal message</Label>

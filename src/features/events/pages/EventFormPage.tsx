@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useOutletContext } from 'react-router'
+import Quill from 'quill'
+import 'quill/dist/quill.snow.css'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
+import { NotificationBell, UserChip } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import {
   HL_ICONS,
@@ -34,8 +37,26 @@ const SCOPED_CSS = `
 .efrowlab{color:rgba(255,255,255,.5);font-size:10px;font-weight:600;width:14px;text-align:center;flex:none}
 #desc-editor-wrap{ border:1px solid rgb(var(--hair)); border-radius:10px; background:rgb(var(--surface)); transition:box-shadow .15s ease; }
 #desc-editor-wrap:focus-within{ box-shadow:0 0 0 4px rgb(27 167 112 / .15); }
-#desc-editor{ min-height:118px; padding:12px; line-height:1.6; color:rgb(var(--ink)); font-size:13px; outline:none; }
-#desc-editor:empty:before{ content:attr(data-placeholder); color:rgb(var(--muted)); }
+#desc-editor-wrap .ql-toolbar.ql-snow{ border:0; border-bottom:1px solid rgb(var(--line)); border-radius:10px 10px 0 0; padding:7px 8px; }
+#desc-editor-wrap .ql-container.ql-snow{ border:0; border-radius:0 0 10px 10px; font-family:inherit; font-size:13px; }
+#desc-editor-wrap .ql-editor{ min-height:118px; padding:12px; line-height:1.6; color:rgb(var(--ink)); }
+#desc-editor-wrap .ql-editor.ql-blank::before{ left:12px; right:12px; color:rgb(var(--muted)); font-style:normal; }
+#desc-editor-wrap .ql-snow .ql-stroke{ stroke:rgb(var(--muted)); }
+#desc-editor-wrap .ql-snow .ql-fill{ fill:rgb(var(--muted)); }
+#desc-editor-wrap .ql-snow .ql-picker{ color:rgb(var(--ink)); }
+#desc-editor-wrap .ql-snow.ql-toolbar button:hover .ql-stroke,
+#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-stroke,
+#desc-editor-wrap .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke{ stroke:#1ba770; }
+#desc-editor-wrap .ql-snow.ql-toolbar button:hover .ql-fill,
+#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-fill{ fill:#1ba770; }
+#desc-editor-wrap .ql-snow.ql-toolbar button:hover,
+#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active,
+#desc-editor-wrap .ql-snow .ql-picker-label:hover,
+#desc-editor-wrap .ql-snow .ql-picker-item:hover,
+#desc-editor-wrap .ql-snow .ql-picker-item.ql-selected{ color:#1ba770; }
+#desc-editor-wrap .ql-snow .ql-picker-options{ background:rgb(var(--surface)); border-color:rgb(var(--hair))!important; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.14); }
+#desc-editor-wrap .ql-snow .ql-tooltip{ background:rgb(var(--surface)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); box-shadow:0 8px 24px rgba(0,0,0,.16); border-radius:8px; }
+#desc-editor-wrap .ql-snow .ql-tooltip input[type=text]{ background:rgb(var(--canvas)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); border-radius:6px; }
 `
 
 /* ---------- Reserved-seating live preview ---------- */
@@ -69,31 +90,47 @@ function SeatPreview({ rows, cols }: { rows: number; cols: number }) {
   return <div className="flex flex-col items-center gap-1.5 overflow-x-auto">{rowEls}</div>
 }
 
-/* ---------- Description editor (Quill unavailable — styled contentEditable + counter) ---------- */
+/* ---------- Description rich-text editor (Quill 2 · snow) ----------
+   Same toolbar and 250-char cap as the static kit's admin/event-form.html.
+   Quill is instantiated imperatively so it works under React 19 without a
+   wrapper lib; a ref guard makes it survive StrictMode's double-mount. */
 function DescriptionEditor() {
-  const ref = useRef<HTMLDivElement>(null)
+  const hostRef = useRef<HTMLDivElement>(null)
   const [count, setCount] = useState(DESC_INITIAL.length)
 
   useEffect(() => {
-    if (ref.current) ref.current.textContent = DESC_INITIAL
-  }, [])
+    const host = hostRef.current
+    if (!host || host.dataset.quillReady) return
+    host.dataset.quillReady = '1'
 
-  const onInput = () => {
-    const el = ref.current
-    if (!el) return
-    let text = el.textContent ?? ''
-    if (text.length > DESC_MAX) {
-      text = text.slice(0, DESC_MAX)
-      el.textContent = text
-      const sel = window.getSelection()
-      const range = document.createRange()
-      range.selectNodeContents(el)
-      range.collapse(false)
-      sel?.removeAllRanges()
-      sel?.addRange(range)
+    const quill = new Quill(host, {
+      theme: 'snow',
+      placeholder: 'Tell attendees what this event is about…',
+      modules: {
+        toolbar: [
+          [{ header: [false, 1, 2, 3] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          ['blockquote'],
+          [{ list: 'ordered' }, { list: 'bullet' }],
+          [{ indent: '-1' }, { indent: '+1' }],
+          ['link', 'image', 'video'],
+          ['clean'],
+        ],
+      },
+    })
+
+    quill.setText(DESC_INITIAL)
+    const sync = () => {
+      const len = Math.max(0, quill.getLength() - 1)
+      setCount(len)
     }
-    setCount(text.length)
-  }
+    sync()
+    quill.on('text-change', () => {
+      if (quill.getLength() - 1 > DESC_MAX)
+        quill.deleteText(DESC_MAX, quill.getLength(), 'silent')
+      sync()
+    })
+  }, [])
 
   return (
     <div>
@@ -109,14 +146,7 @@ function DescriptionEditor() {
         </span>
       </div>
       <div id="desc-editor-wrap">
-        <div
-          id="desc-editor"
-          ref={ref}
-          contentEditable
-          suppressContentEditableWarning
-          onInput={onInput}
-          data-placeholder="Tell attendees what this event is about…"
-        />
+        <div ref={hostRef} />
       </div>
     </div>
   )
@@ -210,23 +240,8 @@ export default function EventFormPage() {
             <span className="hidden sm:inline">Save as draft</span>
             <span className="sm:hidden">Draft</span>
           </Link>
-          <button
-            type="button"
-            className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface text-muted transition hover:text-ink"
-            title="Notifications"
-          >
-            <i className="hgi-stroke hgi-notification-03 text-[18px]" />
-            <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-surface" />
-          </button>
-          <div className="flex shrink-0 items-center gap-2.5">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand to-emerald-400 text-[12px] font-semibold text-white">
-              HN
-            </div>
-            <div className="hidden leading-tight sm:block">
-              <p className="text-[13px] font-semibold text-ink">Harper Nelson</p>
-              <p className="text-[11px] text-muted">Event Manager</p>
-            </div>
-          </div>
+          <NotificationBell />
+          <UserChip />
         </div>
       </div>
 

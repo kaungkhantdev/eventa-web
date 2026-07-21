@@ -58,12 +58,4 @@ export const CHECKIN_ATTENDEES: CheckinAttendee[] = [
 
 export type CheckinFilter = 'all' | 'in' | 'notyet'
 
-export const CHECKIN_EVENTS = [
-  'Tech Summit 2026',
-  'Bangkok Jazz Night',
-  'Sunrise Yoga Retreat',
-  'Thai Street Food Festival',
-  'UX Bangkok Meetup',
-] as const
-
 export const CHECKIN_TICKETS = ['VIP', 'General Admission', 'Early Bird', 'Student'] as const

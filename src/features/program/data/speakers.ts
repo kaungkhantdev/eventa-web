@@ -38,16 +38,6 @@ export const SPEAKERS: Speaker[] = [
   { name: 'Lily Park', role: 'Meditation Coach · Sabai Wellness', email: 'lily.park@sabaiwellness.com', phone: '(310) 555-0248', ini: 'LP', tone: 'purple', event: 'Sunrise Yoga Retreat', sessions: 2, rating: '5.0' },
 ]
 
-/** Options for the toolbar event filter (includes the "All events" default). */
-export const SPEAKER_EVENT_FILTERS = [
-  'All events',
-  'Tech Summit 2026',
-  'Bangkok Jazz Night',
-  'Sunrise Yoga Retreat',
-  'Thai Street Food Festival',
-  'UX Bangkok Meetup',
-] as const
-
 /** Options for the Add-speaker panel's event select (no "All events"). */
 export const SPEAKER_PANEL_EVENTS = [
   'Tech Summit 2026',

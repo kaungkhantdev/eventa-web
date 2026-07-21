@@ -13,13 +13,14 @@ import {
   Input,
   Select,
   Textarea,
+  EventPicker,
   type PillTabItem,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { baht, num } from '@/lib/format'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { TICKETS, TICKET_STATUS_META, type Ticket } from '../data/tickets'
-import { EVENT_NAMES, EVENT_PICKER_OPTIONS } from '../data/events'
+import { EVENT_NAMES } from '../data/events'
 import type { TicketStatus } from '../types'
 import { ToggleSwitch } from '../components/ToggleSwitch'
 import { TicketQrModal } from '../components/TicketQrModal'
@@ -104,16 +105,11 @@ export default function TicketsPage() {
           />
         </div>
         <div className="relative w-full sm:w-56">
-          <i className="hgi-stroke hgi-calendar-03 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand" />
-          <select
+          <EventPicker
             value={eventFilter || 'All events'}
-            onChange={(e) => setEventFilter(e.target.value === 'All events' ? '' : e.target.value)}
-            className="select h-10 w-full border-0 bg-surface pl-9 text-[14px] font-semibold"
-          >
-            {EVENT_PICKER_OPTIONS.map((e) => (
-              <option key={e}>{e}</option>
-            ))}
-          </select>
+            onChange={(v) => setEventFilter(v === 'All events' ? '' : v)}
+            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
+          />
         </div>
       </div>
 

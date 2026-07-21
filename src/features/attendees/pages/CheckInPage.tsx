@@ -9,13 +9,13 @@ import {
   PillTabs,
   Paginator,
   usePagination,
+  EventPicker,
   type PillTabItem,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import {
   CHECKIN_ATTENDEES,
   TONE,
-  CHECKIN_EVENTS,
   CHECKIN_TICKETS,
   type CheckinAttendee,
   type CheckinFilter,
@@ -30,6 +30,7 @@ function nowTime(): string {
 
 export default function CheckInPage() {
   const [rows, setRows] = useState<Row[]>(() => CHECKIN_ATTENDEES.map((a, i) => ({ ...a, id: i })))
+  const [event, setEvent] = useState<string>('Tech Summit 2026')
   const [filter, setFilter] = useState<CheckinFilter>('all')
   const [q, setQ] = useState('')
   const [ticket, setTicket] = useState('') // '' = all ticket types
@@ -75,15 +76,12 @@ export default function CheckInPage() {
         actions={
           <>
             <div className="relative w-40 sm:w-52">
-              <i className="hgi-stroke hgi-calendar-03 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand" />
-              <select
-                defaultValue={CHECKIN_EVENTS[0]}
-                className="select h-10 w-full border-0 bg-surface pl-9 text-[14px] font-semibold"
-              >
-                {CHECKIN_EVENTS.map((ev) => (
-                  <option key={ev}>{ev}</option>
-                ))}
-              </select>
+              <EventPicker
+                value={event}
+                onChange={setEvent}
+                allLabel={false}
+                className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
+              />
             </div>
             <ButtonLink to="/admin/check-in-tool" variant="primary" className="shrink-0">
               <Icon name="hgi-qr-code-01" />
