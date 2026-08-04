@@ -84,8 +84,19 @@ export default function TicketsPage() {
 ```
 
 Routes are already declared in `src/app/routes.tsx` with the correct
-`handle.page` id — **do not edit routes.tsx**; just replace the placeholder
-page component in place, keeping the same file path and default export name.
+`handle.page` id — **do not edit routes.tsx** when porting a page; just replace
+the placeholder page component in place, keeping the same file path and default
+export name. (Router-level wiring — the shared page loader, the root layout —
+does live there, but that is not part of porting a page.)
+
+Every page also needs a **loading skeleton** registered in
+`src/app/pageSkeletons.tsx`, keyed by its path. It should mirror the page's
+top-level shape — same tile count, same tab count, same table columns — so the
+layout doesn't shift when the real content lands. Compose it from the blocks in
+`@/components/skeletons` (`SkelPageHeader`, `SkelStatTiles`, `SkelTableCard`, …)
+rather than hand-rolling grey boxes; most list pages are one `ListPageSkeleton`
+call. A path with no entry falls back to a generic list page, so a missing
+skeleton is easy to miss — add it with the page.
 
 ## Behaviour
 

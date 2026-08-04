@@ -39,6 +39,17 @@ A feature **never imports another feature's `pages/`** — anything shared goes 
 - `navigation.ts` — the `MODULES` array is the **single source of truth** for the admin icon rail and its
   grouped sub-nav panel. Add/rename admin nav here, not in the shell. `moduleOfPage()` maps a page id → its rail module.
 
+**Skeleton loading is wired at the router, not in the pages.** Every route carries a shared
+`loader` (`PAGE_LOAD_MS` in `routes.tsx` — the stand-in for the fetch each page will one day do), so
+React Router reports `navigation.state === 'loading'` on every visit. Two layouts turn that into a
+placeholder: `AdminShell` swaps its `<Outlet>` for the destination's skeleton on admin→admin moves
+(the rail and sub-nav stay mounted and jump to the destination via `routeStateOfPath`), and
+`RootLayout` replaces the whole screen for first paint (`HydrateFallback`), public routes, and
+crossing into or out of `/admin`. `src/app/pageSkeletons.tsx` maps **path → skeleton**; the
+components live in `@/components/skeletons` and the `Skeleton` primitive in `@/components/ui`.
+**Add a route, add its skeleton** — an unmapped path silently falls back to a generic list page.
+Set `PAGE_LOAD_MS = 0` to drop the artificial delay.
+
 **`src/layouts/AdminShell.tsx` owns the admin chrome (double sidebar: icon rail + labeled panel).** Admin
 pages are `<Outlet>` children rendered *inside* the shell's `<main>` and its `max-w-[1600px]` wrapper — a
 page **must not** re-declare `<main>`, the sidebar, or that wrapper. The shell reads the active route's

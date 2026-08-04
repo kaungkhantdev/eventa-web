@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Outlet, useLocation, useMatches } from 'react-router'
-import { MODULES, moduleOfPage, type NavGroup, type NavModule } from '@/app/navigation'
+import {
+  MODULES,
+  moduleOfPage,
+  routeStateOfPath,
+  type NavGroup,
+  type NavModule,
+} from '@/app/navigation'
+import { AdminPageSkeleton } from '@/app/pageSkeletons'
 import { useTheme } from '@/lib/useTheme'
+import { usePendingPath } from '@/lib/usePendingPath'
 import { cn } from '@/lib/cn'
 
 /* Double sidebar: an icon rail of modules plus a labeled panel of grouped
@@ -85,8 +93,15 @@ function useRouteHandle(): { page: string; focused: boolean } {
 export default function AdminShell() {
   const { dark, toggle } = useTheme()
   const location = useLocation()
-  const { page, focused } = useRouteHandle()
+  const settled = useRouteHandle()
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  /* While the next admin page is loading, show its skeleton in place of the
+     outlet — and move the rail, sub-nav and panel visibility to the
+     destination now, so the chrome doesn't shift once the page lands. */
+  const pending = usePendingPath()
+  const pendingAdmin = pending && pending.startsWith('/admin') ? pending : null
+  const { page, focused } = (pendingAdmin && routeStateOfPath(pendingAdmin)) || settled
 
   const selected = useMemo(() => moduleOfPage(page), [page])
   const mod = useMemo(() => MODULES.find((m) => m.id === selected), [selected])
@@ -173,7 +188,11 @@ export default function AdminShell() {
 
       <main className="min-w-0 flex-1 overflow-y-auto px-5 py-4 lg:px-7">
         <div className="mx-auto w-full max-w-[1600px]">
-          <Outlet context={{ openDrawer: () => setDrawerOpen(true) }} />
+          {pendingAdmin ? (
+            <AdminPageSkeleton path={pendingAdmin} />
+          ) : (
+            <Outlet context={{ openDrawer: () => setDrawerOpen(true) }} />
+          )}
         </div>
       </main>
     </div>

@@ -420,6 +420,42 @@ html.dark .pilltab.tab-active .pilltab-count {
   color: #45c98f;
 }
 
+/* ---------- Skeleton placeholders ----------
+   Not from the static kit — added for route-level loading states. The block
+   colour is `--line` (the same hairline grey used for table rules), so a
+   skeleton reads as "empty structure" against both `--surface` and `--canvas`.
+   The sweep is a white highlight, dialled right down in dark mode. */
+.skeleton {
+  --skeleton-shine: rgb(255 255 255 / 0.7);
+  border-radius: 0.5rem;
+  background-color: rgb(var(--line));
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--skeleton-shine) 50%,
+    transparent 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.5s ease-in-out infinite;
+}
+html.dark .skeleton {
+  --skeleton-shine: rgb(255 255 255 / 0.055);
+}
+@keyframes skeleton-sweep {
+  from {
+    background-position: -125% 0;
+  }
+  to {
+    background-position: 225% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
 /* pill segmented control (chart ranges etc.) */
 .segmented {
   display: inline-flex;

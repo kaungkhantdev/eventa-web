@@ -255,3 +255,35 @@ export function moduleOfPage(page: string): string {
   }
   return 'dashboard'
 }
+
+/* Route URL → page id, derived from the nav model above. Needed because the
+   shell has to highlight the *destination* while a navigation is still in
+   flight — at that point React Router's matches still describe the old route,
+   so `handle.page` isn't available yet. */
+const PAGE_BY_PATH: Record<string, string> = (() => {
+  const map: Record<string, string> = {}
+  for (const m of MODULES) {
+    if (!m.groups?.length) map[m.to] = m.id
+    for (const g of m.groups ?? []) for (const it of g.items) map[it.to] = it.page
+  }
+  // Screens outside the nav model that adopt a leaf's active state, matching
+  // the `handle.page` ids declared for them in routes.tsx.
+  map['/admin'] = 'home'
+  map['/admin/event-detail'] = 'events'
+  map['/admin/feedback-detail'] = 'feedback'
+  return map
+})()
+
+/** Pages whose route sets `handle.focused` — they hide the sub-nav panel. */
+const FOCUSED_PAGES = new Set(['event-form'])
+
+/** Does this URL live inside the organizer console (i.e. under AdminShell)? */
+export function isAdminPath(pathname: string): boolean {
+  return pathname === '/admin' || pathname.startsWith('/admin/')
+}
+
+/** Resolve a URL to the page id and panel mode the shell should show for it. */
+export function routeStateOfPath(pathname: string): { page: string; focused: boolean } | null {
+  const page = PAGE_BY_PATH[pathname.replace(/\/$/, '') || '/admin']
+  return page ? { page, focused: FOCUSED_PAGES.has(page) } : null
+}
