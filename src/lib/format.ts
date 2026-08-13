@@ -39,6 +39,39 @@ export function bangkokDate(instant: string | null): string {
   })
 }
 
+/** A UTC instant → the spelled-out Bangkok day, e.g. `August 27, 2025`. */
+export function bangkokLongDate(instant: string | null): string {
+  if (!instant) return MASKED
+  return new Date(instant).toLocaleDateString('en-US', {
+    timeZone: BANGKOK,
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+/**
+ * A UTC instant → `YYYY-MM-DD` on the Bangkok calendar.
+ *
+ * Grouping by this key rather than by a local `Date` is what keeps an evening
+ * event in the right calendar square: 20:00 UTC is already the next day in
+ * Bangkok, and a viewer in London bucketing by their own midnight would file it
+ * a day early. `en-CA` is used only because it spells a date as `YYYY-MM-DD`.
+ */
+export function bangkokDayKey(instant: string | Date): string {
+  return new Date(instant).toLocaleDateString('en-CA', {
+    timeZone: BANGKOK,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+}
+
+/** The same, to the month: `YYYY-MM` — what the calendar endpoint is asked for. */
+export function bangkokMonthKey(instant: string | Date): string {
+  return bangkokDayKey(instant).slice(0, 'YYYY-MM'.length)
+}
+
 /** A UTC instant → the Bangkok wall clock, e.g. `10:24`. */
 export function bangkokTime(instant: string | null): string {
   if (!instant) return MASKED

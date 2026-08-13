@@ -1,7 +1,9 @@
-import { Link } from 'react-router'
+import { Link, useLoaderData } from 'react-router'
 import { ButtonLink, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import { UP_TONE, UPCOMING, type UpcomingEvent } from '../data/upcoming'
+import { UP_TONE } from '../events.presentation'
+import type { UpcomingData } from '../events.routes'
+import type { UpcomingCard } from '../types'
 
 /* admin/events-upcoming.html — a responsive card grid of the soonest events. */
 
@@ -10,6 +12,8 @@ const hideOnError = (e: React.SyntheticEvent<HTMLImageElement>) => {
 }
 
 export default function UpcomingEventsPage() {
+  const { cards } = useLoaderData() as UpcomingData
+
   return (
     <>
       <PageHeader
@@ -29,7 +33,7 @@ export default function UpcomingEventsPage() {
 
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-[13px] text-muted">
-          Next <span className="font-semibold text-ink tnum">{UPCOMING.length}</span> events, soonest
+          Next <span className="font-semibold text-ink tnum">{cards.length}</span> events, soonest
           first.
         </p>
         <Link to="/admin/events" className="text-[12px] font-semibold text-brand hover:underline">
@@ -37,22 +41,34 @@ export default function UpcomingEventsPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {UPCOMING.map((e) => (
-          <UpcomingCard key={e.name} e={e} />
-        ))}
-      </div>
+      {cards.length === 0 ? (
+        <div className="card flex flex-col items-center justify-center p-12 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-line text-muted">
+            <Icon name="hgi-calendar-03" size={22} />
+          </span>
+          <p className="mt-3 text-[14px] font-semibold text-ink">Nothing coming up</p>
+          <p className="mt-1 text-[12px] text-muted">
+            Events scheduled for the future will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {cards.map((card) => (
+            <UpcomingEventCard key={card.id} e={card} />
+          ))}
+        </div>
+      )}
 
       <PageFooter />
     </>
   )
 }
 
-function UpcomingCard({ e }: { e: UpcomingEvent }) {
+function UpcomingEventCard({ e }: { e: UpcomingCard }) {
   const t = UP_TONE[e.tone]
   return (
     <Link
-      to="/admin/event-detail"
+      to={`/admin/event-detail?id=${e.id}`}
       className={cn(
         'group block w-full overflow-hidden rounded-2xl ring-2 ring-transparent transition hover:ring-brand',
         t.bg,
@@ -67,7 +83,7 @@ function UpcomingCard({ e }: { e: UpcomingEvent }) {
           onError={hideOnError}
         />
         <span className="absolute right-2.5 top-2.5 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-sm">
-          {e.days} days left
+          {e.daysLeft === 0 ? 'Today' : `${e.daysLeft} ${e.daysLeft === 1 ? 'day' : 'days'} left`}
         </span>
         <span
           className={cn(
@@ -82,15 +98,15 @@ function UpcomingCard({ e }: { e: UpcomingEvent }) {
       <div className="px-4 pb-4 pt-7">
         <p className="truncate text-[15px] font-bold tracking-tight text-ink">{e.name}</p>
         <p className="mt-0.5 text-[12px] text-muted">
-          Registrations: <span className="font-semibold text-ink tnum">{e.reg}</span>
+          Registrations: <span className="font-semibold text-ink tnum">{e.registrations}</span>
         </p>
         <div className="mt-3">
           <div className="flex items-center justify-between text-[12px]">
             <span className="text-muted">Filled</span>
-            <span className="font-semibold text-ink tnum">{e.pct}%</span>
+            <span className="font-semibold text-ink tnum">{e.fillPercent}%</span>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/70 dark:bg-white/10">
-            <div className={cn('h-full rounded-full', t.bar)} style={{ width: `${e.pct}%` }} />
+            <div className={cn('h-full rounded-full', t.bar)} style={{ width: `${e.fillPercent}%` }} />
           </div>
         </div>
         <div className="mt-3.5 flex items-center gap-2 border-t border-black/5 pt-3 dark:border-white/10">
@@ -115,7 +131,7 @@ function UpcomingCard({ e }: { e: UpcomingEvent }) {
             ))}
           </div>
           <span className="text-[12px] font-semibold text-ink">
-            <span className="tnum">{e.att}</span> attendees
+            <span className="tnum">{e.sold}</span> attendees
           </span>
         </div>
       </div>

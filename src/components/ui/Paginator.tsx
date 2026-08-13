@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
+import { PAGE_SIZES } from '@/lib/paging'
 import { Icon } from './Icon'
 
 /* Canonical paginator, ported from the static kit: a "Showing X–Y of Z"
    line, a rows-per-page select, and labelled Prev/Next buttons. */
 
-export const PAGE_SIZES = [10, 20, 30, 50] as const
+export { PAGE_SIZES }
 
 /** Slices `rows` for the current page and resets to page 1 whenever the row
  *  set changes size (i.e. a filter was applied). */

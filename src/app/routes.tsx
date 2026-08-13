@@ -1,5 +1,10 @@
 import type { ComponentType } from 'react'
-import { createBrowserRouter, Navigate, type LoaderFunction } from 'react-router'
+import {
+  createBrowserRouter,
+  Navigate,
+  type ActionFunction,
+  type LoaderFunction,
+} from 'react-router'
 import AdminShell from '@/layouts/AdminShell'
 import RootLayout, { RootFallback } from '@/layouts/RootLayout'
 import NotFoundPage from '@/features/system/pages/NotFoundPage'
@@ -50,6 +55,30 @@ const page = (
   lazy: async () => ({ Component: (await load()).default }),
 })
 
+/** A page's data functions, defined beside the feature they belong to. */
+interface RouteData {
+  loader: LoaderFunction
+  action?: ActionFunction
+}
+
+/**
+ * A page wired to the API.
+ *
+ * Its loader and action are fetched with the component rather than declared
+ * here, so neither the feature's API client nor its mappers are pulled into
+ * the initial bundle — `routes.tsx` stays a manifest, and each screen still
+ * arrives as one chunk.
+ */
+const livePage = (
+  load: () => Promise<{ default: ComponentType }>,
+  route: () => Promise<RouteData>,
+) => ({
+  lazy: async () => {
+    const [{ default: Component }, data] = await Promise.all([load(), route()])
+    return { Component, ...data }
+  },
+})
+
 const adminChildren = [
   {
     path: 'home',
@@ -63,12 +92,18 @@ const adminChildren = [
   },
   {
     path: 'events',
-    ...page(() => import('@/features/events/pages/EventsPage')),
+    ...livePage(
+      () => import('@/features/events/pages/EventsPage'),
+      () => import('@/features/events/events.routes').then((m) => m.eventsRoute),
+    ),
     handle: { page: 'events' },
   },
   {
     path: 'events-upcoming',
-    ...page(() => import('@/features/events/pages/UpcomingEventsPage')),
+    ...livePage(
+      () => import('@/features/events/pages/UpcomingEventsPage'),
+      () => import('@/features/events/events.routes').then((m) => m.upcomingRoute),
+    ),
     handle: { page: 'events-upcoming' },
   },
   {
@@ -84,7 +119,10 @@ const adminChildren = [
   },
   {
     path: 'event-categories',
-    ...page(() => import('@/features/events/pages/EventCategoriesPage')),
+    ...livePage(
+      () => import('@/features/events/pages/EventCategoriesPage'),
+      () => import('@/features/events/events.routes').then((m) => m.categoriesRoute),
+    ),
     handle: { page: 'event-categories' },
   },
   {

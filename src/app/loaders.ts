@@ -1,5 +1,5 @@
 import { redirect } from 'react-router'
-import { ApiError, session } from '@/lib/api'
+import { ApiError, NetworkError, messageOf, session } from '@/lib/api'
 import { authApi } from '@/features/auth/api'
 import type { Me } from '@/features/auth/types'
 
@@ -66,6 +66,38 @@ export function pageData<T>(load: (args: LoaderArgs) => Promise<T>) {
       throw cause
     }
   }
+}
+
+/**
+ * Build an action that mutates behind the session guard.
+ *
+ * A refusal comes back as a message instead of an exception, because unlike a
+ * failed load it must be shown *beside the control the person used* — a 409
+ * "cancel it instead to refund attendees" is the product answering them, and
+ * throwing it would replace the whole screen with an error page. Anything that
+ * is not the API talking (a bug, a thrown redirect) still propagates.
+ */
+export function pageAction(run: (args: LoaderArgs) => Promise<unknown>) {
+  return async (args: LoaderArgs): Promise<ActionResult> => {
+    requireSession()
+    try {
+      await run(args)
+      return { ok: true }
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn()
+      if (cause instanceof ApiError || cause instanceof NetworkError) {
+        return { ok: false, error: messageOf(cause) }
+      }
+      throw cause
+    }
+  }
+}
+
+/** What every mutation reports back: it worked, or why the API said no. */
+export interface ActionResult {
+  ok: boolean
+  /** The API's own sentence, shown verbatim — it was written for the reader. */
+  error?: string
 }
 
 export interface LoaderArgs {
