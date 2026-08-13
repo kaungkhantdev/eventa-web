@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
+import { SocialAuth } from '@/features/auth/components/SocialAuth'
 import { authApi } from '@/features/auth/api'
 import { messageOf } from '@/lib/api'
 
@@ -176,26 +177,7 @@ export default function LoginPage() {
         </button>
       </form>
 
-      {!challenge && (
-        <>
-          <div className="my-5 flex items-center gap-3">
-            <div className="h-px flex-1 bg-hair" />
-            <span className="text-[11px] font-medium uppercase tracking-wide text-muted">or</span>
-            <div className="h-px flex-1 bg-hair" />
-          </div>
-
-          <div className="space-y-2.5">
-            <button type="button" className="btn btn-soft w-full">
-              <Icon name="hgi-global" size={16} />
-              Continue with Google
-            </button>
-            <button type="button" className="btn btn-soft w-full">
-              <Icon name="hgi-global" size={16} />
-              Continue with LinkedIn
-            </button>
-          </div>
-        </>
-      )}
+      {!challenge && <SocialAuth mode="sign-in" />}
     </AuthLayout>
   )
 }

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
+import { SocialAuth } from '@/features/auth/components/SocialAuth'
 import { STRENGTH_COLORS, STRENGTH_TEXTS, scorePassword } from '@/features/auth/data/passwordStrength'
 import { authApi } from '@/features/auth/api'
 import { messageOf } from '@/lib/api'
@@ -208,16 +209,9 @@ export default function RegisterPage() {
         </button>
       </form>
 
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-hair" />
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted">or</span>
-        <div className="h-px flex-1 bg-hair" />
-      </div>
-
-      <button type="button" className="btn btn-soft w-full">
-        <Icon name="hgi-global" size={16} />
-        Sign up with Google
-      </button>
+      {/* The kit offered only Google here and both providers on sign-in. Whichever
+          way someone arrives, the same accounts should be on offer. */}
+      <SocialAuth mode="sign-up" />
     </AuthLayout>
   )
 }
