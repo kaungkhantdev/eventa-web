@@ -1,46 +1,86 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { Link, useOutletContext } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
+import { NotificationBell, SignedInChip } from '@/components/ui'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
+import type { ActionResult } from '@/app/loaders'
 import { cn } from '@/lib/cn'
 import { num } from '@/lib/format'
-import { NotificationBell, SignedInChip, usePagination } from '@/components/ui'
+import { PAGE_SIZES, type PageWindow } from '@/lib/paging'
+import { useFilters } from '@/lib/useFilters'
+import { useIsFiltering } from '@/lib/usePendingPath'
 import {
-  ATTENDEES,
-  EVT,
-  INITIAL_AGENDA,
-  INITIAL_TICKETS,
-  REG_FILTERS,
-  REGISTRATIONS,
-  REGSTATUS,
-  SESSION_TONE,
-  SPEAKERS,
-  TONE,
+  endOf,
+  withSeconds,
   type AgendaDay,
+  type AttendeeRow,
   type AvatarTone,
-  type EventTicket,
-  type RegFilter,
-  type Session,
-  type SessionType,
-} from '../data/eventDetail'
+  type EventHeader,
+  type OverviewTiles,
+  type RegistrationRow,
+  type SpeakerCard,
+  type TicketRow,
+} from '../eventDetail.mapper'
+import {
+  EVENT_TABS,
+  REGISTRATION_FILTERS,
+  type EventDetailData,
+  type EventTab,
+  type RegistrationFilter,
+} from '../eventDetail.routes'
+import { LANDING_TEMPLATES } from '../landingTemplates'
+import { STATUS_PILL } from '../events.presentation'
 
 /* ---------- Event detail — admin/event-detail.html ----------
-   Pill tabs switch between Overview, Registrations (filter + pagination),
-   Attendees, Speakers, Agenda (add/remove sessions via slide-over), and
-   Tickets (add/remove via slide-over). A share modal renders a self-contained
-   SVG flyer with a seeded QR code and exports it to PNG. */
+   Pill tabs switch between Overview, Registrations (filter + paging),
+   Attendees, Speakers, Agenda and Tickets. A share modal renders a
+   self-contained SVG flyer with a QR code and exports it to PNG.
 
-type TabId = 'overview' | 'registrations' | 'attendees' | 'speakers' | 'agenda' | 'tickets'
+   Which event and which tab are both in the URL, and only the open tab is
+   fetched — the six panels ask different questions of different tables, and a
+   visit that shows one should not pay for six. */
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'registrations', label: 'Registrations' },
-  { id: 'attendees', label: 'Attendees' },
-  { id: 'speakers', label: 'Speakers' },
-  { id: 'agenda', label: 'Agenda' },
-  { id: 'tickets', label: 'Tickets' },
-]
+const TAB_LABEL: Record<EventTab, string> = {
+  overview: 'Overview',
+  registrations: 'Registrations',
+  attendees: 'Attendees',
+  speakers: 'Speakers',
+  agenda: 'Agenda',
+  tickets: 'Tickets',
+}
 
-const SESSION_TYPES: SessionType[] = ['Keynote', 'Talk', 'Workshop', 'Panel', 'Break']
+const FILTER_LABEL: Record<RegistrationFilter, string> = {
+  all: 'All',
+  paid: 'Paid',
+  pending: 'Pending',
+  refunded: 'Refunded',
+}
+
+/** Payment status → pill classes, copied from the kit. */
+const PAYMENT_PILL: Record<string, string> = {
+  Paid: 'bg-brand-soft text-brand-dark dark:text-brand',
+  Pending: 'bg-amber-50 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300',
+  Refunded: 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300',
+}
+
+/** tone → avatar chip classes (light + dark). */
+const TONE: Record<AvatarTone, string> = {
+  brand: 'bg-brand-soft text-brand-dark dark:text-brand',
+  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+  pink: 'bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300',
+  amber: 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
+  violet: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+}
+
+/** Session type → the avatar tone its agenda pill borrows. */
+const SESSION_TONE: Record<string, AvatarTone> = {
+  Keynote: 'brand',
+  Talk: 'blue',
+  Workshop: 'violet',
+  Panel: 'amber',
+  Break: 'brand',
+}
+
+const SESSION_TYPES = ['Keynote', 'Talk', 'Workshop', 'Panel', 'Break']
 
 /** Close on Escape while `open`. */
 function useEsc(open: boolean, onClose: () => void) {
@@ -54,11 +94,10 @@ function useEsc(open: boolean, onClose: () => void) {
   }, [open, onClose])
 }
 
-/** Initials chip in the list tone palette. */
 function ToneAvatar({
   initials,
   tone,
-  size = 'h-9 w-9',
+  size = 'h-8 w-8',
 }: {
   initials: string
   tone: AvatarTone
@@ -67,7 +106,7 @@ function ToneAvatar({
   return (
     <span
       className={cn(
-        'grid shrink-0 place-items-center rounded-full text-[11px] font-semibold',
+        'grid shrink-0 place-items-center rounded-full text-[11px] font-bold',
         size,
         TONE[tone],
       )}
@@ -79,23 +118,22 @@ function ToneAvatar({
 
 export default function EventDetailPage() {
   const ctx = useOutletContext<AdminOutletContext | null>()
-  const [tab, setTab] = useState<TabId>('overview')
-
-  const [agenda, setAgenda] = useState<AgendaDay[]>(() =>
-    INITIAL_AGENDA.map((d) => ({ ...d, sessions: [...d.sessions] })),
-  )
-  const [tickets, setTickets] = useState<EventTicket[]>(() => INITIAL_TICKETS.map((t) => ({ ...t })))
+  const data = useLoaderData() as EventDetailData
+  const { set } = useFilters()
+  const fetcher = useFetcher<ActionResult>()
 
   const [sessionOpen, setSessionOpen] = useState(false)
   const [ticketOpen, setTicketOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+
+  const { header, overview } = data
+  const publicUrl = overview.publicUrl
 
   return (
     <>
       {/* top controls */}
       <div className="mb-3 flex items-center gap-2">
         <button
-          id="btn-menu"
           type="button"
           onClick={() => ctx?.openDrawer()}
           className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface text-muted hover:text-ink lg:hidden"
@@ -112,14 +150,14 @@ export default function EventDetailPage() {
         </Link>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <Link
-            to="/admin/event-form"
+            to={`/admin/event-form?id=${header.id}`}
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand-soft px-3.5 py-2 text-[13px] font-semibold text-brand transition hover:brightness-95"
           >
             <i className="hgi-stroke hgi-edit-02 text-[15px]" />
             <span className="hidden sm:inline">Edit</span>
           </Link>
           <a
-            href="/landing/aurora?event=tech-summit-2026"
+            href={publicUrl}
             target="_blank"
             rel="noopener"
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[13px] font-semibold text-white transition hover:bg-brand-dark"
@@ -144,7 +182,7 @@ export default function EventDetailPage() {
       {/* hero cover */}
       <div className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-br from-brand to-emerald-500">
         <img
-          src="https://picsum.photos/seed/tech-summit-2026/1280/440"
+          src={`https://picsum.photos/seed/${header.seed}/1280/440`}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
           onError={(e) => e.currentTarget.remove()}
@@ -153,67 +191,63 @@ export default function EventDetailPage() {
         <div className="relative flex min-h-[190px] flex-col justify-end p-5 sm:min-h-[230px] sm:p-6">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <h1 className="text-[24px] font-extrabold tracking-tight text-white sm:text-[30px]">
-              Tech Summit 2026
+              {header.name}
             </h1>
             <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold text-white ring-1 ring-inset ring-white/25 backdrop-blur-sm">
               <i className="hgi-stroke hgi-checkmark-circle-02 text-[12px]" />
-              Registration open
+              {header.status}
             </span>
           </div>
           <p className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-white/85">
-            <span>Sat–Sun, July 18–19, 2026 · 09:00</span>
-            <span className="h-1 w-1 rounded-full bg-white/50" />
-            <span>BITEC, Bangkok</span>
+            <span>{header.when}</span>
+            {header.where && (
+              <>
+                <span className="h-1 w-1 rounded-full bg-white/50" />
+                <span>{header.where}</span>
+              </>
+            )}
           </p>
         </div>
       </div>
 
       {/* tabs */}
       <div className="mb-5 flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-surface p-1">
-        {TABS.map((t) => (
+        {EVENT_TABS.map((id) => (
           <button
-            key={t.id}
+            key={id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => set({ tab: id === 'overview' ? null : id, status: null })}
+            aria-pressed={id === data.tab}
             className={cn(
               'rounded-lg px-3.5 py-2 text-[13px] font-semibold transition',
-              t.id === tab ? 'bg-brand-soft text-brand' : 'text-muted hover:text-ink',
+              id === data.tab ? 'bg-brand-soft text-brand' : 'text-muted hover:text-ink',
             )}
           >
-            {t.label}
+            {TAB_LABEL[id]}
           </button>
         ))}
       </div>
 
-      {/* ============ OVERVIEW ============ */}
-      <div className={cn('space-y-4', tab !== 'overview' && 'hidden')}>
-        <OverviewPanel />
-      </div>
+      {fetcher.data?.error && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg bg-rose-500/10 px-3 py-2.5 text-[13px] text-rose-600 dark:text-rose-400"
+        >
+          {fetcher.data.error}
+        </p>
+      )}
 
-      {/* ============ REGISTRATIONS ============ */}
-      <div className={cn(tab !== 'registrations' && 'hidden')}>
-        <RegistrationsPanel />
-      </div>
-
-      {/* ============ ATTENDEES ============ */}
-      <div className={cn(tab !== 'attendees' && 'hidden')}>
-        <AttendeesPanel />
-      </div>
-
-      {/* ============ SPEAKERS ============ */}
-      <div className={cn(tab !== 'speakers' && 'hidden')}>
-        <SpeakersPanel />
-      </div>
-
-      {/* ============ AGENDA ============ */}
-      <div className={cn(tab !== 'agenda' && 'hidden')}>
-        <AgendaPanel agenda={agenda} setAgenda={setAgenda} onAdd={() => setSessionOpen(true)} />
-      </div>
-
-      {/* ============ TICKETS ============ */}
-      <div className={cn(tab !== 'tickets' && 'hidden')}>
-        <TicketsPanel tickets={tickets} setTickets={setTickets} onAdd={() => setTicketOpen(true)} />
-      </div>
+      <TabPanels
+        data={data}
+        onPage={(page) => set({ page })}
+        onSize={(limit) => set({ limit })}
+        onFilter={(status) => set({ status: status === 'all' ? null : status })}
+        onAddSession={() => setSessionOpen(true)}
+        onAddTicket={() => setTicketOpen(true)}
+        onRemoveSession={(sessionId) =>
+          fetcher.submit({ intent: 'remove-session', sessionId }, { method: 'post' })
+        }
+      />
 
       <p className="mt-4 text-center text-[11px] text-muted/70">
         Eventa · Event registration system · React, Tailwind CSS &amp; Hugeicons
@@ -222,40 +256,108 @@ export default function EventDetailPage() {
       <SessionPanel
         open={sessionOpen}
         onClose={() => setSessionOpen(false)}
-        onAdd={(dayIndex, session) =>
-          setAgenda((prev) =>
-            prev.map((d, i) =>
-              i === dayIndex
-                ? { ...d, sessions: [...d.sessions, session].sort((a, b) => a.time.localeCompare(b.time)) }
-                : d,
-            ),
-          )
-        }
+        onAdd={(values) => fetcher.submit({ intent: 'add-session', ...values }, { method: 'post' })}
       />
       <TicketPanel
         open={ticketOpen}
         onClose={() => setTicketOpen(false)}
-        onAdd={(ticket) => setTickets((prev) => [...prev, ticket])}
+        onAdd={(values) => fetcher.submit({ intent: 'add-ticket', ...values }, { method: 'post' })}
       />
-      <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} />
+      <ShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        event={{ title: header.name, when: header.when, where: header.where, url: publicUrl, seed: header.seed }}
+      />
     </>
   )
 }
 
+/** Renders whichever tab the URL asked for — the loader fetched only that one. */
+function TabPanels({
+  data,
+  onPage,
+  onSize,
+  onFilter,
+  onAddSession,
+  onAddTicket,
+  onRemoveSession,
+}: {
+  data: EventDetailData
+  onPage: (page: number) => void
+  onSize: (size: number) => void
+  onFilter: (status: RegistrationFilter) => void
+  onAddSession: () => void
+  onAddTicket: () => void
+  onRemoveSession: (sessionId: string) => void
+}) {
+  const busy = useIsFiltering()
+  const dim = busy ? 'opacity-60 transition-opacity' : undefined
+
+  if (data.tab === 'registrations') {
+    return (
+      <div className={dim}>
+        <RegistrationsPanel
+          rows={data.rows}
+          range={data.window}
+          counts={data.counts}
+          filter={data.filter}
+          onFilter={onFilter}
+          onPage={onPage}
+          onSize={onSize}
+        />
+      </div>
+    )
+  }
+  if (data.tab === 'attendees') {
+    return (
+      <div className={dim}>
+        <AttendeesPanel rows={data.attendees} range={data.window} onPage={onPage} />
+      </div>
+    )
+  }
+  if (data.tab === 'speakers') {
+    return (
+      <div className={dim}>
+        <SpeakersPanel speakers={data.speakers} />
+      </div>
+    )
+  }
+  if (data.tab === 'agenda') {
+    return (
+      <div className={dim}>
+        <AgendaPanel days={data.days} onAdd={onAddSession} onRemove={onRemoveSession} />
+      </div>
+    )
+  }
+  if (data.tab === 'tickets') {
+    return (
+      <div className={dim}>
+        <TicketsPanel tickets={data.tickets} onAdd={onAddTicket} />
+      </div>
+    )
+  }
+  return (
+    <div className={cn('space-y-4', dim)}>
+      <OverviewPanel header={data.header} overview={data.overview} />
+    </div>
+  )
+}
+
 /* ---------- Overview ---------- */
-function OverviewPanel() {
+function OverviewPanel({ header, overview }: { header: EventHeader; overview: OverviewTiles }) {
   const [copied, setCopied] = useState(false)
 
   const copyLink = async () => {
-    const url = 'https://' + EVT.url
     try {
-      await navigator.clipboard.writeText(url)
+      await navigator.clipboard.writeText(overview.publicUrl)
     } catch {
-      /* ignore */
+      /* the browser refused the clipboard — the link is on screen to copy by hand */
     }
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
+
+  const [sold, capacity] = overview.registrations.split('/')
 
   return (
     <>
@@ -268,9 +370,10 @@ function OverviewPanel() {
           </div>
           <div className="mt-2 flex items-end justify-between">
             <p className="text-[22px] font-bold tracking-tight tnum">
-              312<span className="text-[13px] font-semibold text-muted">/400</span>
+              {sold}
+              {capacity && <span className="text-[13px] font-semibold text-muted">/{capacity}</span>}
             </p>
-            <span className="text-[11px] font-semibold text-brand">78%</span>
+            <span className="text-[11px] font-semibold text-brand">{overview.fillPercent}%</span>
           </div>
         </div>
         <div className="rounded-2xl bg-surface p-4">
@@ -279,11 +382,8 @@ function OverviewPanel() {
             Revenue
           </div>
           <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">฿284k</p>
-            <span className="flex items-center gap-0.5 text-[11px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[12px]" />
-              18%
-            </span>
+            {/* A dash here means "you may not see this", not "nothing was taken". */}
+            <p className="text-[22px] font-bold tracking-tight tnum">{overview.revenue}</p>
           </div>
         </div>
         <div className="rounded-2xl bg-surface p-4">
@@ -292,10 +392,7 @@ function OverviewPanel() {
             Tickets sold
           </div>
           <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">
-              312<span className="text-[13px] font-semibold text-muted">/450</span>
-            </p>
-            <span className="text-[11px] font-medium text-muted">4 types</span>
+            <p className="text-[22px] font-bold tracking-tight tnum">{num(overview.ticketsSold)}</p>
           </div>
         </div>
         <div className="rounded-2xl bg-surface p-4">
@@ -304,8 +401,7 @@ function OverviewPanel() {
             Days left
           </div>
           <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">7</p>
-            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-300">Jul 18</span>
+            <p className="text-[22px] font-bold tracking-tight tnum">{overview.daysLeft}</p>
           </div>
         </div>
       </div>
@@ -316,13 +412,9 @@ function OverviewPanel() {
           <section className="rounded-2xl bg-surface p-4 lg:p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-[16px] font-bold tracking-tight">Landing page</h2>
-              <span className="badge badge-green">
-                <i className="hgi-stroke hgi-checkmark-circle-02 text-[12px]" />
-                Published
-              </span>
+              <span className={cn('badge', STATUS_PILL[header.status])}>{header.status}</span>
             </div>
             <div className="mt-4 flex flex-col gap-4 sm:flex-row">
-              {/* template preview */}
               <div className="w-full shrink-0 sm:w-52">
                 <div className="overflow-hidden rounded-xl bg-canvas p-2">
                   <div className="flex items-center gap-1 px-1 py-1">
@@ -343,22 +435,20 @@ function OverviewPanel() {
                   </div>
                 </div>
               </div>
-              {/* details */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-[14px] font-bold text-ink">Classic</p>
+                  <p className="text-[14px] font-bold text-ink">{LANDING_TEMPLATES[0]!.title}</p>
                   <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
-                    All-purpose
+                    {LANDING_TEMPLATES[0]!.badge}
                   </span>
                 </div>
                 <p className="mt-1 text-[12.5px] leading-snug text-muted">
-                  A clean, all-purpose event page — the title, date, venue, agenda, speakers and
-                  tickets fill in automatically.
+                  {LANDING_TEMPLATES[0]!.description}
                 </p>
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-canvas px-3 py-2">
                   <i className="hgi-stroke hgi-link-01 text-[14px] shrink-0 text-muted" />
                   <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
-                    eventa.co/e/tech-summit-2026
+                    {overview.publicUrl}
                   </span>
                   <button
                     type="button"
@@ -370,7 +460,7 @@ function OverviewPanel() {
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <a
-                    href="/landing/aurora?event=tech-summit-2026"
+                    href={overview.publicUrl}
                     target="_blank"
                     rel="noopener"
                     className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3.5 py-2 text-[12.5px] font-semibold text-white transition hover:bg-brand-dark"
@@ -389,21 +479,6 @@ function OverviewPanel() {
               </div>
             </div>
           </section>
-
-          {/* About */}
-          <section className="rounded-2xl bg-surface p-4 lg:p-5">
-            <h2 className="text-[16px] font-bold tracking-tight">About this event</h2>
-            <p className="mt-2 text-[13px] leading-relaxed text-muted">
-              Tech Summit 2026 brings together founders, engineers and product leaders from across
-              Southeast Asia for two days of keynotes, hands-on workshops and a startup showcase —
-              with plenty of networking over Thai coffee between sessions.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="badge badge-green">Conference</span>
-              <span className="badge badge-gray">Public</span>
-              <span className="badge badge-gray">2 days</span>
-            </div>
-          </section>
         </div>
 
         {/* details */}
@@ -413,29 +488,23 @@ function OverviewPanel() {
             <div className="flex items-start gap-2.5">
               <i className="hgi-stroke hgi-calendar-03 text-[16px] mt-0.5 shrink-0 text-muted" />
               <div>
-                <p className="font-semibold text-ink">Jul 18–19, 2026</p>
-                <p className="text-[12px] text-muted">09:00 – 18:00 · GMT+7</p>
+                <p className="font-semibold text-ink">{header.when}</p>
+                <p className="text-[12px] text-muted">Asia/Bangkok · GMT+7</p>
               </div>
             </div>
-            <div className="flex items-start gap-2.5 border-t border-line pt-3">
-              <i className="hgi-stroke hgi-location-01 text-[16px] mt-0.5 shrink-0 text-muted" />
-              <div>
-                <p className="font-semibold text-ink">BITEC</p>
-                <p className="text-[12px] text-muted">Bang Na, Bangkok</p>
+            {header.where && (
+              <div className="flex items-start gap-2.5 border-t border-line pt-3">
+                <i className="hgi-stroke hgi-location-01 text-[16px] mt-0.5 shrink-0 text-muted" />
+                <div>
+                  <p className="font-semibold text-ink">{header.where}</p>
+                </div>
               </div>
-            </div>
+            )}
             <div className="flex items-start gap-2.5 border-t border-line pt-3">
               <i className="hgi-stroke hgi-user-multiple text-[16px] mt-0.5 shrink-0 text-muted" />
               <div>
-                <p className="font-semibold text-ink">312 registered</p>
-                <p className="text-[12px] text-muted">of 400 capacity</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2.5 border-t border-line pt-3">
-              <i className="hgi-stroke hgi-checkmark-badge-01 text-[16px] mt-0.5 shrink-0 text-muted" />
-              <div>
-                <p className="font-semibold text-ink">Eventa Co.</p>
-                <p className="text-[12px] text-muted">Organizer</p>
+                <p className="font-semibold text-ink">{overview.registrations} registered</p>
+                <p className="text-[12px] text-muted">{overview.fillPercent}% full</p>
               </div>
             </div>
           </div>
@@ -446,57 +515,53 @@ function OverviewPanel() {
 }
 
 /* ---------- Registrations ---------- */
-function RegistrationsPanel() {
-  const [filter, setFilter] = useState<RegFilter>('all')
-
-  const filtered = useMemo(
-    () => (filter === 'all' ? REGISTRATIONS : REGISTRATIONS.filter((r) => r.status === filter)),
-    [filter],
-  )
-  const pg = usePagination(filtered, 10)
-
-  const count = (f: RegFilter) =>
-    f === 'all' ? REGISTRATIONS.length : REGISTRATIONS.filter((r) => r.status === f).length
-
-  const changeFilter = (f: RegFilter) => {
-    if (f === filter) return
-    setFilter(f)
-    pg.setPage(1)
-  }
-
-  const total = pg.total
-
+function RegistrationsPanel({
+  rows,
+  range,
+  counts,
+  filter,
+  onFilter,
+  onPage,
+  onSize,
+}: {
+  rows: RegistrationRow[]
+  range: PageWindow
+  counts: { all: number; paid: number; pending: number; refunded: number }
+  filter: RegistrationFilter
+  onFilter: (status: RegistrationFilter) => void
+  onPage: (page: number) => void
+  onSize: (size: number) => void
+}) {
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h2 className="text-[16px] font-bold tracking-tight">Registrations</h2>
           <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
-            312 total
+            {num(counts.all)} total
           </span>
         </div>
         <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-canvas p-1">
-          {REG_FILTERS.map((f) => {
+          {REGISTRATION_FILTERS.map((f) => {
             const on = f === filter
-            const label = f === 'all' ? 'All' : f
             return (
               <button
                 key={f}
                 type="button"
-                onClick={() => changeFilter(f)}
+                onClick={() => onFilter(f)}
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition',
                   on ? 'bg-brand-soft text-brand' : 'text-muted hover:text-ink',
                 )}
               >
-                {label}
+                {FILTER_LABEL[f]}
                 <span
                   className={cn(
                     'rounded-full px-1.5 py-0.5 text-[10px] tnum',
                     on ? 'bg-brand/15 text-brand' : 'bg-line text-muted',
                   )}
                 >
-                  {count(f)}
+                  {counts[f]}
                 </span>
               </button>
             )
@@ -509,37 +574,43 @@ function RegistrationsPanel() {
           <thead>
             <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted">
               <th className="pb-3 pr-3 font-semibold">Attendee</th>
-              <th className="pb-3 pr-3 font-semibold">Ticket</th>
+              <th className="pb-3 pr-3 font-semibold">Tickets</th>
               <th className="pb-3 pr-3 font-semibold">Amount</th>
               <th className="pb-3 pr-3 font-semibold">Registered</th>
               <th className="pb-3 pr-3 font-semibold">Status</th>
             </tr>
           </thead>
           <tbody className="text-[13px]">
-            {total === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="py-8 text-center text-[12px] text-muted">
                   No registrations
                 </td>
               </tr>
             ) : (
-              pg.slice.map((r, i) => (
-                <tr key={i} className="border-t border-line transition hover:bg-line/50">
+              rows.map((r) => (
+                <tr key={r.reference} className="border-t border-line transition hover:bg-line/50">
                   <td className="py-2.5 pr-3">
                     <div className="flex items-center gap-2.5">
                       <ToneAvatar initials={r.initials} tone={r.tone} />
                       <div className="min-w-0">
                         <p className="truncate text-[13px] font-semibold text-ink">{r.name}</p>
-                        <p className="truncate text-[11px] text-muted">{r.email}</p>
+                        {/* The reference, not an email — this endpoint sends none. */}
+                        <p className="truncate text-[11px] text-muted tnum">{r.reference}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="py-2.5 pr-3 text-[13px] text-muted">{r.ticket}</td>
+                  <td className="py-2.5 pr-3 text-[13px] text-muted tnum">{r.tickets}</td>
                   <td className="py-2.5 pr-3 text-[13px] font-semibold text-ink tnum">{r.amount}</td>
-                  <td className="py-2.5 pr-3 text-[13px] text-muted tnum">{r.date}</td>
+                  <td className="py-2.5 pr-3 text-[13px] text-muted tnum">
+                    {r.date} · {r.time}
+                  </td>
                   <td className="py-2.5 pr-3">
                     <span
-                      className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', REGSTATUS[r.status])}
+                      className={cn(
+                        'rounded-full px-2.5 py-1 text-[11px] font-medium',
+                        PAYMENT_PILL[r.status] ?? 'bg-canvas text-muted',
+                      )}
                     >
                       {r.status}
                     </span>
@@ -551,174 +622,197 @@ function RegistrationsPanel() {
         </table>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[12px] text-muted">
-        <p>
-          {total === 0 ? (
-            'No registrations'
-          ) : (
-            <>
-              Showing{' '}
-              <span className="font-semibold text-ink">
-                {pg.from}–{pg.to}
-              </span>{' '}
-              of <span className="font-semibold text-ink tnum">{num(total)}</span> registrations
-            </>
-          )}
-        </p>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 whitespace-nowrap">
-            Rows per page
-            <select
-              value={pg.size}
-              onChange={(e) => pg.setSize(Number(e.target.value))}
-              className="select h-8 w-auto min-w-[3.75rem] py-0 pl-2.5 pr-7 text-[12px] font-medium text-ink"
-            >
-              <option>10</option>
-              <option>20</option>
-              <option>30</option>
-              <option>50</option>
-            </select>
-          </label>
-          <div className="flex gap-1">
-            <button
-              type="button"
-              className="btn btn-soft btn-sm"
-              aria-label="Previous page"
-              disabled={total === 0 || pg.page <= 1}
-              onClick={() => pg.setPage(pg.page - 1)}
-            >
-              <i className="hgi-stroke hgi-arrow-left-01 text-[14px]" />
-              <span className="hidden sm:inline">Prev</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-soft btn-sm"
-              aria-label="Next page"
-              disabled={total === 0 || pg.page >= pg.pageCount}
-              onClick={() => pg.setPage(pg.page + 1)}
-            >
-              <span className="hidden sm:inline">Next</span>
-              <i className="hgi-stroke hgi-arrow-right-01 text-[14px]" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <TabPager range={range} noun="registrations" onPage={onPage} onSize={onSize} />
     </section>
   )
 }
 
+/** The "showing X–Y of Z" line the workspace's paged tabs share. */
+function TabPager({
+  range,
+  noun,
+  onPage,
+  onSize,
+}: {
+  range: PageWindow
+  noun: string
+  onPage: (page: number) => void
+  onSize?: (size: number) => void
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[12px] text-muted">
+      <p>
+        {range.total === 0 ? (
+          `No ${noun}`
+        ) : (
+          <>
+            Showing{' '}
+            <span className="font-semibold text-ink">
+              {range.from}–{range.to}
+            </span>{' '}
+            of <span className="font-semibold text-ink tnum">{num(range.total)}</span> {noun}
+          </>
+        )}
+      </p>
+      <div className="flex items-center gap-3">
+        {onSize && (
+          <label className="flex items-center gap-2 whitespace-nowrap">
+            Rows per page
+            <select
+              value={range.size}
+              onChange={(e) => onSize(Number(e.target.value))}
+              className="select h-8 w-auto min-w-[3.75rem] py-0 pl-2.5 pr-7 text-[12px] font-medium text-ink"
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div className="flex gap-1">
+          <button
+            type="button"
+            className="btn btn-soft btn-sm"
+            aria-label="Previous page"
+            disabled={range.page <= 1}
+            onClick={() => onPage(range.page - 1)}
+          >
+            <i className="hgi-stroke hgi-arrow-left-01 text-[14px]" />
+            <span className="hidden sm:inline">Prev</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-soft btn-sm"
+            aria-label="Next page"
+            disabled={range.page >= range.pageCount}
+            onClick={() => onPage(range.page + 1)}
+          >
+            <span className="hidden sm:inline">Next</span>
+            <i className="hgi-stroke hgi-arrow-right-01 text-[14px]" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ---------- Attendees ---------- */
-function AttendeesPanel() {
+function AttendeesPanel({
+  rows,
+  range,
+  onPage,
+}: {
+  rows: AttendeeRow[]
+  range: PageWindow
+  onPage: (page: number) => void
+}) {
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h2 className="text-[16px] font-bold tracking-tight">Attendees</h2>
           <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
-            296 confirmed
+            {num(range.total)} confirmed
           </span>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-brand-dark"
-        >
-          <i className="hgi-stroke hgi-mail-send-01 text-[15px]" />
-          <span className="hidden sm:inline">Email all</span>
-        </button>
       </div>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[680px] text-left">
           <thead>
             <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted">
               <th className="pb-3 pr-3 font-semibold">Attendee</th>
-              <th className="pb-3 pr-3 font-semibold">Company</th>
-              <th className="pb-3 pr-3 font-semibold">Role</th>
-              <th className="pb-3 pr-3 font-semibold">Ticket</th>
+              <th className="pb-3 pr-3 font-semibold">Registrations</th>
+              <th className="pb-3 pr-3 font-semibold">Seats</th>
             </tr>
           </thead>
           <tbody className="text-[13px]">
-            {ATTENDEES.map((a, i) => (
-              <tr key={i} className="border-t border-line transition hover:bg-line/50">
-                <td className="py-2.5 pr-3">
-                  <div className="flex items-center gap-2.5">
-                    <ToneAvatar initials={a.initials} tone={a.tone} />
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-semibold text-ink">{a.name}</p>
-                      <p className="truncate text-[11px] text-muted">{a.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="py-2.5 pr-3 text-[13px] font-medium text-ink">{a.company}</td>
-                <td className="py-2.5 pr-3 text-[13px] text-muted">{a.role}</td>
-                <td className="py-2.5 pr-3">
-                  <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-medium text-muted">
-                    {a.ticket}
-                  </span>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="py-8 text-center text-[12px] text-muted">
+                  No confirmed attendees yet
                 </td>
               </tr>
-            ))}
+            ) : (
+              rows.map((a) => (
+                <tr key={a.email} className="border-t border-line transition hover:bg-line/50">
+                  <td className="py-2.5 pr-3">
+                    <div className="flex items-center gap-2.5">
+                      <ToneAvatar initials={a.initials} tone={a.tone} />
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-semibold text-ink">{a.name}</p>
+                        <p className="truncate text-[11px] text-muted">{a.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-2.5 pr-3 text-[13px] text-muted tnum">{a.registrations}</td>
+                  <td className="py-2.5 pr-3 text-[13px] font-medium text-ink tnum">{a.seats}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
+      <TabPager range={range} noun="attendees" onPage={onPage} />
     </section>
   )
 }
 
 /* ---------- Speakers ---------- */
-function SpeakersPanel() {
+function SpeakersPanel({ speakers }: { speakers: SpeakerCard[] }) {
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-[16px] font-bold tracking-tight">Speakers</h2>
-        <button
-          type="button"
+        <Link
+          to="/admin/speakers"
           className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-brand-dark"
         >
           <i className="hgi-stroke hgi-add-01 text-[15px]" />
-          <span className="hidden sm:inline">Add speaker</span>
-        </button>
+          <span className="hidden sm:inline">Manage speakers</span>
+        </Link>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {SPEAKERS.map((s, i) => (
-          <div key={i} className="rounded-2xl bg-canvas p-4">
-            <div className="flex items-center gap-3">
-              <ToneAvatar initials={s.initials} tone={s.tone} size="h-11 w-11" />
-              <div className="min-w-0">
-                <p className="truncate text-[14px] font-bold text-ink">{s.name}</p>
-                <p className="truncate text-[12px] text-muted">{s.role}</p>
+      {speakers.length === 0 ? (
+        <p className="mt-4 rounded-2xl bg-canvas px-4 py-10 text-center text-[13px] text-muted">
+          No speakers on this event yet.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {speakers.map((s) => (
+            <div key={s.id} className="rounded-2xl bg-canvas p-4">
+              <div className="flex items-center gap-3">
+                <ToneAvatar initials={s.initials} tone={s.tone} size="h-11 w-11" />
+                <div className="min-w-0">
+                  <p className="truncate text-[14px] font-bold text-ink">{s.name}</p>
+                  <p className="truncate text-[12px] text-muted">{s.role}</p>
+                </div>
               </div>
+              <p className="mt-3 flex items-start gap-1.5 text-[12.5px] font-medium text-ink">
+                <i className="hgi-stroke hgi-mic-01 text-[14px] mt-0.5 shrink-0 text-brand" />
+                {s.talk || s.sessions}
+              </p>
+              {s.tag && (
+                <span className="mt-3 inline-block rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
+                  {s.tag}
+                </span>
+              )}
             </div>
-            <p className="mt-3 flex items-start gap-1.5 text-[12.5px] font-medium text-ink">
-              <i className="hgi-stroke hgi-mic-01 text-[14px] mt-0.5 shrink-0 text-brand" />
-              {s.talk}
-            </p>
-            <span className="mt-3 inline-block rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-semibold text-brand">
-              {s.tag}
-            </span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
 
 /* ---------- Agenda ---------- */
 function AgendaPanel({
-  agenda,
-  setAgenda,
+  days,
   onAdd,
+  onRemove,
 }: {
-  agenda: AgendaDay[]
-  setAgenda: Dispatch<SetStateAction<AgendaDay[]>>
+  days: AgendaDay[]
   onAdd: () => void
+  onRemove: (sessionId: string) => void
 }) {
-  const removeSession = (di: number, si: number) =>
-    setAgenda((prev) =>
-      prev.map((d, i) =>
-        i === di ? { ...d, sessions: d.sessions.filter((_, j) => j !== si) } : d,
-      ),
-    )
-
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex items-center justify-between gap-2">
@@ -742,16 +836,22 @@ function AgendaPanel({
         </div>
       </div>
       <div className="mt-4 space-y-5">
-        {agenda.map((d, di) => (
-          <div key={di}>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">{d.day}</p>
-            <div className="space-y-2">
-              {d.sessions.length ? (
-                d.sessions.map((s, si) => (
-                  <div key={si} className="flex gap-3 rounded-xl bg-canvas p-3">
+        {days.length === 0 ? (
+          <p className="rounded-xl bg-canvas px-3 py-8 text-center text-[12px] text-muted">
+            No sessions yet — add the first one.
+          </p>
+        ) : (
+          days.map((d) => (
+            <div key={d.day}>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                Day {d.day}
+              </p>
+              <div className="space-y-2">
+                {d.sessions.map((s) => (
+                  <div key={s.id} className="flex gap-3 rounded-xl bg-canvas p-3">
                     <div className="w-12 shrink-0 text-right">
                       <p className="text-[13px] font-bold text-ink tnum">{s.time}</p>
-                      <p className="text-[10px] text-muted">{s.dur}</p>
+                      <p className="text-[10px] text-muted">{s.duration}</p>
                     </div>
                     <div className="flex min-w-0 flex-1 items-start justify-between gap-2 border-l border-hair pl-3">
                       <div className="min-w-0">
@@ -759,21 +859,23 @@ function AgendaPanel({
                           <span
                             className={cn(
                               'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                              TONE[SESSION_TONE[s.type]],
+                              TONE[SESSION_TONE[s.type] ?? 'blue'],
                             )}
                           >
                             {s.type}
                           </span>
                           <p className="text-[13px] font-semibold text-ink">{s.title}</p>
                         </div>
-                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
-                          <i className="hgi-stroke hgi-mic-01 text-[12px]" />
-                          {s.who} · {s.room}
-                        </p>
+                        {(s.who || s.room) && (
+                          <p className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
+                            <i className="hgi-stroke hgi-mic-01 text-[12px]" />
+                            {[s.who, s.room].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeSession(di, si)}
+                        onClick={() => onRemove(s.id)}
                         className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/15"
                         title="Remove session"
                       >
@@ -781,32 +883,18 @@ function AgendaPanel({
                       </button>
                     </div>
                   </div>
-                ))
-              ) : (
-                <p className="rounded-xl bg-canvas px-3 py-5 text-center text-[12px] text-muted">
-                  No sessions on this day.
-                </p>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </section>
   )
 }
 
 /* ---------- Tickets ---------- */
-function TicketsPanel({
-  tickets,
-  setTickets,
-  onAdd,
-}: {
-  tickets: EventTicket[]
-  setTickets: Dispatch<SetStateAction<EventTicket[]>>
-  onAdd: () => void
-}) {
-  const removeTicket = (i: number) => setTickets((prev) => prev.filter((_, j) => j !== i))
-
+function TicketsPanel({ tickets, onAdd }: { tickets: TicketRow[]; onAdd: () => void }) {
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex items-center justify-between gap-3">
@@ -834,56 +922,37 @@ function TicketsPanel({
             No ticket types yet — click “Add ticket” to create one.
           </div>
         ) : (
-          tickets.map((t, i) => {
-            const pct = t.total ? Math.round((t.sold / t.total) * 100) : 0
-            return (
-              <div key={i} className={cn('rounded-2xl p-4', t.featured ? 'bg-brand-soft' : 'bg-canvas')}>
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-[13px] font-bold text-ink">{t.name}</p>
-                  <div className="flex items-center gap-1">
-                    {t.featured && (
-                      <span className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold text-white">
-                        Popular
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeTicket(i)}
-                      className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-muted transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/15"
-                      title="Remove ticket"
-                    >
-                      <i className="hgi-stroke hgi-delete-02 text-[13px]" />
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-1 text-[20px] font-extrabold tracking-tight text-ink tnum">{t.price}</p>
-                <div className="mt-3">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-muted tnum">
-                      {t.sold}/{t.total} sold
-                    </span>
-                    <span className="font-semibold text-ink tnum">{pct}%</span>
-                  </div>
-                  <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/70 dark:bg-white/10">
-                    <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-                <p
-                  className={cn(
-                    'mt-3 border-t pt-2.5 text-[12px] text-muted',
-                    t.featured ? 'border-black/5 dark:border-white/10' : 'border-line',
-                  )}
-                >
-                  Revenue <span className="font-semibold text-ink tnum">{t.revenue}</span>
-                </p>
+          tickets.map((t) => (
+            <div key={t.id} className="rounded-2xl bg-canvas p-4">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[13px] font-bold text-ink">{t.name}</p>
+                <span className="rounded-full bg-line px-2 py-0.5 text-[10px] font-semibold text-muted">
+                  {t.status}
+                </span>
               </div>
-            )
-          })
+              <p className="mt-1 text-[20px] font-extrabold tracking-tight text-ink tnum">
+                {t.price}
+              </p>
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted tnum">{t.allocation} sold</span>
+                  <span className="font-semibold text-ink tnum">{t.soldPercent}%</span>
+                </div>
+                <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/70 dark:bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-brand"
+                    style={{ width: `${t.soldPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))
         )}
       </div>
     </section>
   )
 }
+
 
 /* ---------- Add session slide-over ---------- */
 function SessionPanel({
@@ -893,24 +962,26 @@ function SessionPanel({
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (dayIndex: number, session: Session) => void
+  onAdd: (values: Record<string, string>) => void
 }) {
   useEsc(open, onClose)
   const [title, setTitle] = useState('')
   const [day, setDay] = useState('0')
   const [time, setTime] = useState('09:00')
   const [dur, setDur] = useState('45')
-  const [type, setType] = useState<SessionType>('Keynote')
+  const [type, setType] = useState('Keynote')
   const [who, setWho] = useState('')
   const [room, setRoom] = useState('Hall A')
 
   const add = () => {
-    onAdd(Number(day), {
-      time: time || '09:00',
-      dur: (dur || '45') + 'm',
-      title: title.trim() || 'Untitled session',
+    // The API stores a start and an end, not a duration — the two are the same
+    // fact, and converting here keeps the form the shape organizers think in.
+    onAdd({
+      day: String(Number(day) + 1),
+      startTime: withSeconds(time || '09:00'),
+      endTime: withSeconds(endOf(time || '09:00', Number(dur) || 45)),
+      title: title.trim(),
       type,
-      who: who.trim() || 'TBA',
       room,
     })
     setTitle('')
@@ -942,8 +1013,11 @@ function SessionPanel({
           <div>
             <label className="label">Day</label>
             <select className="select" value={day} onChange={(e) => setDay(e.target.value)}>
-              <option value="0">Day 1 · Sat, Jul 18</option>
-              <option value="1">Day 2 · Sun, Jul 19</option>
+              {[0, 1, 2, 3].map((index) => (
+                <option key={index} value={index}>
+                  Day {index + 1}
+                </option>
+              ))}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -973,7 +1047,7 @@ function SessionPanel({
             <select
               className="select"
               value={type}
-              onChange={(e) => setType(e.target.value as SessionType)}
+              onChange={(e) => setType(e.target.value)}
             >
               {SESSION_TYPES.map((t) => (
                 <option key={t}>{t}</option>
@@ -1021,31 +1095,28 @@ function TicketPanel({
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (ticket: EventTicket) => void
+  onAdd: (values: Record<string, string>) => void
 }) {
   useEsc(open, onClose)
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
   const [qty, setQty] = useState('')
   const [desc, setDesc] = useState('')
-  const [featured, setFeatured] = useState(false)
+  const [isFree, setIsFree] = useState(false)
 
   const add = () => {
-    const priceNum = parseInt(price, 10)
-    const qtyNum = parseInt(qty, 10)
     onAdd({
-      name: name.trim() || 'New Ticket',
-      price: '฿' + (isNaN(priceNum) ? 0 : priceNum).toLocaleString('en-US'),
-      sold: 0,
-      total: isNaN(qtyNum) ? 0 : qtyNum,
-      revenue: '฿0',
-      featured,
+      name: name.trim(),
+      price,
+      total: qty,
+      // A free tier is priced differently by the API, not priced at zero.
+      ...(isFree ? { isFree: 'on' } : {}),
     })
     setName('')
     setPrice('')
     setQty('')
     setDesc('')
-    setFeatured(false)
+    setIsFree(false)
     onClose()
   }
 
@@ -1111,10 +1182,10 @@ function TicketPanel({
             <input
               type="checkbox"
               className="h-4 w-4 accent-[#1ba770]"
-              checked={featured}
-              onChange={(e) => setFeatured(e.target.checked)}
+              checked={isFree}
+              onChange={(e) => setIsFree(e.target.checked)}
             />
-            <span className="text-[13px] font-medium text-ink">Mark as “Popular”</span>
+            <span className="text-[13px] font-medium text-ink">This ticket is free</span>
           </label>
         </div>
         <footer className="flex gap-2 border-t border-hair p-4">
@@ -1132,15 +1203,37 @@ function TicketPanel({
 }
 
 /* ---------- Share modal (channels + self-contained SVG flyer) ---------- */
-const shareUrl = 'https://' + EVT.url
-const shareText = 'Join me at ' + EVT.title + ' — ' + EVT.dateLine.replace('·', '·') + ' at ' + EVT.loc
 
-const CHAN: Record<string, (u: string, t: string) => string> = {
+/** What the flyer and the share links are about. */
+export interface ShareEvent {
+  title: string
+  when: string
+  where: string
+  url: string
+  seed: string
+}
+
+const CHAN: Record<string, (u: string, t: string, title: string) => string> = {
   facebook: (u) => 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(u),
   x: (u, t) => 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(t) + '&url=' + encodeURIComponent(u),
   line: (u) => 'https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(u),
   whatsapp: (u, t) => 'https://wa.me/?text=' + encodeURIComponent(t + ' ' + u),
-  email: (u, t) => 'mailto:?subject=' + encodeURIComponent(EVT.title) + '&body=' + encodeURIComponent(t + '\n\n' + u),
+  email: (u, t, title) =>
+    'mailto:?subject=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(t + '\n\n' + u),
+}
+
+/** Text inside an SVG is markup — an ampersand in an event name breaks it. */
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/** The link as people read it, without the scheme. */
+function bareUrl(url: string): string {
+  return url.replace(/^https?:\/\//, '')
 }
 
 function hashStr(s: string): number {
@@ -1217,8 +1310,11 @@ function flame(x: number, y: number, size: number, fill: string): string {
     '<path d="M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.07 0-3.63-1.67-3.63-3.73l.03-.36C5.21 7.51 4 10.62 4 14c0 4.42 3.58 8 8 8s8-3.58 8-8C20 8.61 17.41 3.8 13.5.67zM11.71 19c-1.78 0-3.22-1.4-3.22-3.14 0-1.62 1.05-2.76 2.81-3.12 1.77-.36 3.6-1.21 4.62-2.58.39 1.29.59 2.65.59 4.04 0 2.65-2.15 4.8-4.8 4.8z"/></g>'
   )
 }
-function posterSVG(): string {
-  const qr = qrRects(EVT.url, 36, 296, 80)
+function posterSVG(event: ShareEvent): string {
+  const qr = qrRects(event.url, 36, 296, 80)
+  const title = escapeXml(event.title.toUpperCase())
+  // One line of a fixed-width poster only holds so much.
+  const headline = title.length > 22 ? title.slice(0, 21) + '…' : title
   return (
     '<svg viewBox="0 0 440 540" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto" font-family="Inter, system-ui, sans-serif">' +
     '<defs><linearGradient id="pbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1aa873"/><stop offset="1" stop-color="#128455"/></linearGradient>' +
@@ -1227,15 +1323,21 @@ function posterSVG(): string {
     '<rect x="0" y="0" width="440" height="540" fill="url(#pbg)"/>' +
     '<circle cx="46" cy="34" r="96" fill="#ffffff" opacity="0.07"/>' +
     '<circle cx="410" cy="150" r="90" fill="#ffffff" opacity="0.06"/>' +
-    '<text x="220" y="104" text-anchor="middle" font-size="18" font-weight="700" letter-spacing="5" fill="#fbf4e6">TECH SUMMIT</text>' +
-    '<text x="220" y="178" text-anchor="middle" font-size="70" font-weight="800" letter-spacing="1" fill="#ffffff">2026</text>' +
-    '<text x="220" y="212" text-anchor="middle" font-size="10.5" font-weight="600" letter-spacing="2.5" fill="#fbf4e6" opacity="0.92">BANGKOK · EST. 2026</text>' +
+    '<text x="220" y="150" text-anchor="middle" font-size="34" font-weight="800" letter-spacing="1" fill="#ffffff">' +
+    headline +
+    '</text>' +
+    '<text x="220" y="196" text-anchor="middle" font-size="12" font-weight="600" letter-spacing="2.5" fill="#fbf4e6" opacity="0.92">' +
+    escapeXml(event.where.toUpperCase()) +
+    '</text>' +
     '<rect x="0" y="266" width="440" height="274" fill="#faf3e4"/>' +
     '<rect x="28" y="288" width="96" height="96" rx="12" fill="#ffffff"/>' +
     qr +
-    '<text x="142" y="315" font-size="13" font-weight="800" fill="#14342a">Sat–Sun · Jul 18–19, 2026</text>' +
-    '<text x="142" y="338" font-size="12" font-weight="500" fill="#6f8078">09:00 · BITEC, Bangkok</text>' +
-    '<text x="142" y="360" font-size="11.5" font-weight="500" fill="#6f8078">By Eventa Events</text>' +
+    '<text x="142" y="315" font-size="13" font-weight="800" fill="#14342a">' +
+    escapeXml(event.when) +
+    '</text>' +
+    '<text x="142" y="338" font-size="12" font-weight="500" fill="#6f8078">' +
+    escapeXml(event.where) +
+    '</text>' +
     '<text x="142" y="387" font-size="11" font-weight="800" letter-spacing="0.5" fill="#128455">SCAN TO REGISTER</text>' +
     '<rect x="28" y="404" width="384" height="46" rx="23" fill="#128455"/>' +
     '<text x="220" y="433" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">Register on Eventa</text>' +
@@ -1243,16 +1345,27 @@ function posterSVG(): string {
     flame(34, 487, 18, '#ffffff') +
     '<text x="66" y="503" font-size="15.5" font-weight="800" fill="#14342a">Eventa</text>' +
     '<text x="412" y="503" text-anchor="end" font-size="11" font-weight="500" fill="#6f8078">' +
-    EVT.url +
+    escapeXml(bareUrl(event.url)) +
     '</text>' +
     '</g></svg>'
   )
 }
 
-const POSTER_SVG = posterSVG()
-
-function ShareModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function ShareModal({
+  open,
+  onClose,
+  event,
+}: {
+  open: boolean
+  onClose: () => void
+  event: ShareEvent
+}) {
   useEsc(open, onClose)
+  const shareUrl = event.url
+  const shareText = `Join me at ${event.title}${event.when ? ` — ${event.when}` : ''}${
+    event.where ? ` at ${event.where}` : ''
+  }`
+  const POSTER_SVG = posterSVG(event)
   const posterRef = useRef<HTMLDivElement>(null)
   const [copyLabel, setCopyLabel] = useState('Copy link')
   const copyTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -1269,7 +1382,7 @@ function ShareModal({ open, onClose }: { open: boolean; onClose: () => void }) {
       else done()
       return
     }
-    const href = CHAN[kind](shareUrl, shareText)
+    const href = CHAN[kind]!(shareUrl, shareText, event.title)
     if (kind === 'email') {
       const a = document.createElement('a')
       a.href = href
@@ -1303,12 +1416,12 @@ function ShareModal({ open, onClose }: { open: boolean; onClose: () => void }) {
         ctx.drawImage(img, 0, 0, W, H)
         const a = document.createElement('a')
         a.href = c.toDataURL('image/png')
-        a.download = 'eventa-flyer-' + EVT.seed + '.png'
+        a.download = 'eventa-flyer-' + event.seed + '.png'
         document.body.appendChild(a)
         a.click()
         a.remove()
-      } catch (err) {
-        console.warn('flyer export blocked', err)
+      } catch {
+        /* a tainted canvas — the flyer is still on screen to save by hand */
       }
     }
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)))

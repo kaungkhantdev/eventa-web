@@ -114,7 +114,10 @@ const adminChildren = [
   },
   {
     path: 'event-detail',
-    ...page(() => import('@/features/events/pages/EventDetailPage')),
+    ...livePage(
+      () => import('@/features/events/pages/EventDetailPage'),
+      () => import('@/features/events/eventDetail.routes').then((m) => m.eventDetailRoute),
+    ),
     handle: { page: 'events' },
   },
   {
