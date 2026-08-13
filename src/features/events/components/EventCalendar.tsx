@@ -16,6 +16,9 @@ import {
 import { CAL_PILL, COVER, MONTHS, WEEK } from '../events.presentation'
 import type { CalendarEvent } from '../types'
 
+/** The 1st, as the day a freshly-opened month selects. */
+const firstDayOf = (month: string): string => `${month}-01`
+
 /* Calendar view of admin/events.html — month grid + day agenda. Same three
    pills per square with a "+N more" roll-up, same selected-day ring and today
    highlight as the source kit.
@@ -38,26 +41,51 @@ export function EventCalendar({ month, events, count, onMonth }: EventCalendarPr
   // the rest of the product means, and it is only recomputed on mount.
   const [today] = useState(() => bangkokDayKey(new Date()))
   const [selected, setSelected] = useState(today)
+  // The month the arrows are stepping from. `month` is loader data, and the
+  // router does not advance it until the fetch lands — so two quick clicks
+  // would both step off August and the second would be thrown away.
+  const [asked, setAsked] = useState(month)
+  const [landed, setLanded] = useState(month)
 
+  // Whenever a month actually lands — including one arrived at by the back
+  // button — that becomes the month the arrows step from again. While a fetch
+  // is still in flight the prop has not moved, so further clicks keep counting
+  // from where the last one left off.
+  if (month !== landed) {
+    setLanded(month)
+    setAsked(month)
+  }
+
+  // Only one month is loaded at a time, so a day outside it has no events to
+  // show — and reporting "0 events scheduled" for a day whose events simply
+  // were not fetched would be a lie. The agenda follows the month across.
+  const shown = monthOfDay(selected) === month ? selected : firstDayOf(month)
   const cells = useMemo(
-    () => monthGrid(month, events, { today, selected }),
-    [month, events, today, selected],
+    () => monthGrid(month, events, { today, selected: shown }),
+    [month, events, today, shown],
   )
-  const agenda = useMemo(() => eventsOnDay(events, selected), [events, selected])
+  const agenda = useMemo(() => eventsOnDay(events, shown), [events, shown])
   const { year, month: index } = parseMonth(month)
+
+  const goToMonth = (next: string) => {
+    setAsked(next)
+    onMonth(next)
+  }
+
+  const step = (by: number) => goToMonth(shiftMonth(asked, by))
 
   const selectDay = (day: string) => {
     setSelected(day)
     // Following a leading or trailing square into its own month is what the
     // kit did; here it also asks the loader for that month's events.
-    if (monthOfDay(day) !== month) onMonth(monthOfDay(day))
+    if (monthOfDay(day) !== month) goToMonth(monthOfDay(day))
   }
 
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <IconButton title="Previous month" onClick={() => onMonth(shiftMonth(month, -1))}>
+          <IconButton title="Previous month" onClick={() => step(-1)}>
             <Icon name="hgi-arrow-left-01" size={18} />
           </IconButton>
           <div className="min-w-[150px] text-center">
@@ -68,12 +96,19 @@ export function EventCalendar({ month, events, count, onMonth }: EventCalendarPr
               {count} {count === 1 ? 'event' : 'events'} this month
             </p>
           </div>
-          <IconButton title="Next month" onClick={() => onMonth(shiftMonth(month, 1))}>
+          <IconButton title="Next month" onClick={() => step(1)}>
             <Icon name="hgi-arrow-right-01" size={18} />
           </IconButton>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="soft" size="sm" onClick={() => onMonth(monthOfDay(today))}>
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={() => {
+              setSelected(today)
+              goToMonth(monthOfDay(today))
+            }}
+          >
             Today
           </Button>
           <ButtonLink to="/admin/event-form" variant="primary" size="sm">
@@ -155,7 +190,7 @@ export function EventCalendar({ month, events, count, onMonth }: EventCalendarPr
 
         <aside className="rounded-xl border border-hair p-4">
           <p className="text-[14px] font-bold tracking-tight text-ink">
-            {(selected === today ? 'Today · ' : '') + dayHeading(selected)}
+            {(shown === today ? 'Today · ' : '') + dayHeading(shown)}
           </p>
           <p className="text-[11px] text-muted">
             {agenda.length} {agenda.length === 1 ? 'event scheduled' : 'events scheduled'}

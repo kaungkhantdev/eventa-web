@@ -36,9 +36,13 @@ export interface PageWindow {
 export function pageWindow(meta: PageMeta): PageWindow {
   const size = meta.limit || 0
   const start = (meta.page - 1) * size
+  // A page past the end holds nothing — after deleting the last row on it, or
+  // from a hand-typed `?page=`. Counting from `start + 1` there would read
+  // "11–10 of 10", which is not a range.
+  const beyondTheEnd = start >= meta.total
   return {
-    from: meta.total === 0 ? 0 : start + 1,
-    to: Math.min(start + size, meta.total),
+    from: beyondTheEnd ? 0 : start + 1,
+    to: beyondTheEnd ? 0 : Math.min(start + size, meta.total),
     total: meta.total,
     page: meta.page,
     pageCount: Math.max(1, meta.totalPages),

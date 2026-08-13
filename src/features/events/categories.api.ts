@@ -1,12 +1,15 @@
 import { api, type Query } from '@/lib/api'
 import type { CategoryWire, Tone } from './types'
 
-/** What the create/edit panel sends. `description` is optional on the API. */
+/**
+ * What the create/edit panel sends. `description` is nullable rather than
+ * optional: `null` clears it, while leaving the key out would mean "unchanged".
+ */
 export interface CategoryInput {
   name: string
   icon: string
   color: Tone
-  description?: string
+  description: string | null
 }
 
 export interface ListCategoriesQuery extends Query {

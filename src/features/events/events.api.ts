@@ -3,6 +3,7 @@ import type {
   CalendarWire,
   EventBucket,
   EventListItemWire,
+  EventWire,
   EventSort,
   EventType,
   EventsSummaryWire,
@@ -44,4 +45,10 @@ export const eventsApi = {
    * and the API's own sentence explains that to the person.
    */
   remove: (id: string, version: number) => api.delete<void>(`/events/${id}`, { body: { version } }),
+
+  /**
+   * Copy an event into a fresh draft (US-EVT-01). The API decides what carries
+   * over — tickets and agenda, not registrations — so there is nothing to pass.
+   */
+  duplicate: (id: string) => api.post<EventWire>(`/events/${id}/duplicate`),
 }

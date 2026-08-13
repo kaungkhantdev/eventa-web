@@ -1,8 +1,9 @@
+import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { bangkokMonthKey } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
-import { categoriesApi } from './categories.api'
+import { categoriesApi, type CategoryInput } from './categories.api'
 import { toCategoryCard } from './categories.mapper'
 import { eventsApi, type ListEventsQuery } from './events.api'
 import { toCalendarEvents, toEventRow, toUpcomingCard } from './events.mapper'
@@ -46,6 +47,20 @@ const DEFAULT_VIEW: EventView = 'overview'
 /** How many cards the upcoming grid asks for — four rows of the widest layout. */
 const UPCOMING_LIMIT = 12
 
+/**
+ * The longest search each endpoint's DTO accepts (`@MaxLength`). Past it the API
+ * answers 400 — and a loader that throws takes the whole screen down with it, so
+ * a pasted URL in the search box is truncated here rather than rejected there.
+ */
+const MAX_EVENT_SEARCH = 120
+const MAX_CATEGORY_SEARCH = 80
+
+/** The `q` to send, or nothing at all when the box is empty. */
+export function searchOf(params: URLSearchParams, max: number): string | undefined {
+  const term = params.get('q')?.trim()
+  return term ? term.slice(0, max) : undefined
+}
+
 /** Which of the two views the URL asks for. */
 export function viewOf(params: URLSearchParams): EventView {
   return enumParam(params, 'view', EVENT_VIEWS, DEFAULT_VIEW)
@@ -70,7 +85,7 @@ export function listQueryOf(params: URLSearchParams): ListEventsQuery {
   return {
     page: intParam(params, 'page', 1),
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
-    q: params.get('q')?.trim() || undefined,
+    q: searchOf(params, MAX_EVENT_SEARCH),
     type: EVENT_TYPES.includes(type as EventType) ? (type as EventType) : undefined,
     bucket: enumParam(params, 'bucket', EVENT_BUCKETS, DEFAULT_BUCKET),
     sort: enumParam(params, 'sort', EVENT_SORTS, DEFAULT_SORT),
@@ -96,10 +111,14 @@ async function loadEvents({ request }: LoaderArgs): Promise<EventsData> {
   }
   // The badges count the whole workspace, so they are fetched beside the page
   // rather than derived from it — a filtered page cannot know the totals.
-  const [page, summary] = await Promise.all([
-    eventsApi.list(listQueryOf(params)),
-    eventsApi.summary(),
-  ])
+  const query = listQueryOf(params)
+  const [page, summary] = await Promise.all([eventsApi.list(query), eventsApi.summary()])
+  // Deleting the last row on page 2 leaves the loader asking for a page that no
+  // longer exists. Send them to the last one that does, rather than showing an
+  // empty table above a count that says there are ten.
+  if (page.meta.total > 0 && query.page! > page.meta.totalPages) {
+    throw redirect(withPage(request.url, page.meta.totalPages))
+  }
   return {
     view: 'overview',
     rows: page.items.map(toEventRow),
@@ -108,12 +127,25 @@ async function loadEvents({ request }: LoaderArgs): Promise<EventsData> {
   }
 }
 
-/** Deleting a draft. Anything else the API refuses, and says why. */
+/** The same URL, pointing at a different page. */
+function withPage(current: string, page: number): string {
+  const url = new URL(current)
+  url.searchParams.set('page', String(page))
+  return url.pathname + url.search
+}
+
+/**
+ * What the row menu can do: duplicate an event, or delete a draft. Anything
+ * else the API refuses, and says why.
+ */
 async function runEventsAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
   const id = String(form.get('id') ?? '')
-  const version = Number(form.get('version'))
-  await eventsApi.remove(id, version)
+  if (form.get('intent') === 'duplicate') {
+    await eventsApi.duplicate(id)
+    return
+  }
+  await eventsApi.remove(id, Number(form.get('version')))
 }
 
 export const eventsRoute = {
@@ -180,12 +212,29 @@ async function loadCategories({ request }: LoaderArgs): Promise<CategoriesData> 
   const params = queryOf(request)
   const page = await categoriesApi.list({
     limit: CATEGORIES_LIMIT,
-    q: params.get('q')?.trim() || undefined,
+    q: searchOf(params, MAX_CATEGORY_SEARCH),
     sort: 'name',
   })
   return {
     cards: sortCategories(page.items.map(toCategoryCard), categorySortOf(params)),
     total: page.meta.total,
+  }
+}
+
+/**
+ * The panel's fields, as the API wants them.
+ *
+ * A cleared description is sent as `null`, never `undefined`: the API applies
+ * only the keys it is given, and `JSON.stringify` drops an undefined one — so
+ * "I deleted the description" would arrive as "I didn't mention it", the save
+ * would report success, and the old text would still be there afterwards.
+ */
+export function categoryInputOf(form: FormData): CategoryInput {
+  return {
+    name: String(form.get('name') ?? '').trim(),
+    icon: String(form.get('icon') ?? ''),
+    color: String(form.get('color') ?? '') as Tone,
+    description: String(form.get('description') ?? '').trim() || null,
   }
 }
 
@@ -200,14 +249,7 @@ async function runCategoriesAction({ request }: LoaderArgs): Promise<void> {
     return
   }
 
-  const input = {
-    name: String(form.get('name') ?? '').trim(),
-    icon: String(form.get('icon') ?? ''),
-    color: String(form.get('color') ?? '') as Tone,
-    // Absent rather than empty: the API stores `null` for "no description",
-    // and sending "" would record a description that is blank.
-    description: String(form.get('description') ?? '').trim() || undefined,
-  }
+  const input = categoryInputOf(form)
 
   if (intent === 'update') {
     await categoriesApi.update(id, { ...input, version: Number(form.get('version')) })

@@ -31,6 +31,9 @@ import type { CategoryCard, Tone } from '../types'
    API, and the list revalidates from the server rather than being patched
    locally, so what is on screen is what was actually stored. */
 
+/** What the API's `q` accepts; longer and it answers 400 instead of a list. */
+const MAX_SEARCH_LENGTH = 80
+
 const SORT_LABEL: Record<(typeof CATEGORY_SORTS)[number], string> = {
   name: 'Name A–Z',
   'count-desc': 'Most events',
@@ -148,6 +151,7 @@ export default function EventCategoriesPage() {
             onChange={(e) => setTerm(e.target.value)}
             className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
             placeholder="Search categories…"
+            maxLength={MAX_SEARCH_LENGTH}
             aria-label="Search categories"
           />
         </div>

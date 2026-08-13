@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { nextParams, type FilterPatch } from './urlFilters'
 
@@ -36,6 +36,17 @@ export function useSearchBox(value: string, commit: (next: string) => void) {
   const [term, setTerm] = useState(value)
   const [seen, setSeen] = useState(value)
 
+  // `commit` is a fresh closure on every render, and these pages re-render
+  // whenever the router's state changes. Held in a ref rather than listed as a
+  // dependency, because otherwise the timer is re-armed on each of those
+  // renders — and since `value` only catches up once the navigation *commits*,
+  // a loader slower than the debounce would re-fire the same search forever,
+  // each one aborting the request before it could answer.
+  const latest = useRef(commit)
+  useEffect(() => {
+    latest.current = commit
+  })
+
   // Adjusted during render rather than in an effect: when the URL changes
   // underneath, the box should already show the new value on this paint, not
   // flash the old one and correct itself afterwards.
@@ -46,9 +57,9 @@ export function useSearchBox(value: string, commit: (next: string) => void) {
 
   useEffect(() => {
     if (term === value) return
-    const timer = setTimeout(() => commit(term), SEARCH_DEBOUNCE_MS)
+    const timer = setTimeout(() => latest.current(term), SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [term, value, commit])
+  }, [term, value])
 
   return [term, setTerm] as const
 }
