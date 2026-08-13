@@ -4,15 +4,50 @@ import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { STRENGTH_COLORS, STRENGTH_TEXTS, scorePassword } from '@/features/auth/data/passwordStrength'
+import { authApi } from '@/features/auth/api'
+import { messageOf } from '@/lib/api'
 
 export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false)
   const [showCpw, setShowCpw] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sentTo, setSentTo] = useState<string | null>(null)
 
   const score = scorePassword(password)
   const cpwMatch = confirm === password
+
+  /**
+   * Registering does NOT sign anyone in: the API emails a confirmation link and
+   * the account stays inert until that token is used. So the page ends on a
+   * "check your email" state rather than navigating into the console.
+   */
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (pending) return
+    if (!cpwMatch) {
+      setError('Those passwords do not match.')
+      return
+    }
+    const form = new FormData(e.currentTarget)
+    const email = String(form.get('email') ?? '')
+    setPending(true)
+    setError(null)
+    try {
+      await authApi.register({
+        name: String(form.get('name') ?? ''),
+        email,
+        password,
+      })
+      setSentTo(email)
+    } catch (cause) {
+      setError(messageOf(cause))
+    } finally {
+      setPending(false)
+    }
+  }
 
   return (
     <AuthLayout
@@ -27,13 +62,32 @@ export default function RegisterPage() {
         </p>
       }
     >
-      <form className="space-y-4" onSubmit={(e: FormEvent<HTMLFormElement>) => e.preventDefault()}>
+      <form className="space-y-4" onSubmit={onSubmit}>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg bg-rose-500/10 px-3 py-2.5 text-[13px] text-rose-600 dark:text-rose-400"
+          >
+            {error}
+          </p>
+        )}
+
+        {sentTo && (
+          <p
+            role="status"
+            className="rounded-lg bg-brand-soft px-3 py-2.5 text-[13px] text-brand-dark"
+          >
+            Check <span className="font-semibold">{sentTo}</span> for a link to confirm your account.
+          </p>
+        )}
+
         <div>
           <label htmlFor="full-name" className="label">
             Full name
           </label>
           <input
             id="full-name"
+            name="name"
             type="text"
             autoComplete="name"
             placeholder="Jordan Lee"
@@ -48,6 +102,7 @@ export default function RegisterPage() {
           </label>
           <input
             id="email"
+            name="email"
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
@@ -148,8 +203,8 @@ export default function RegisterPage() {
           </a>
         </label>
 
-        <button type="submit" className="btn btn-primary w-full">
-          Create account
+        <button type="submit" className="btn btn-primary w-full" disabled={pending || sentTo !== null}>
+          {pending ? 'Creating…' : sentTo ? 'Check your email' : 'Create account'}
         </button>
       </form>
 

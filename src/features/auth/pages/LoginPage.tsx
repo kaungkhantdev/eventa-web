@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { authApi } from '@/features/auth/api'
+import { messageOf } from '@/lib/api'
 
 /** Where an organizer lands once they are in. */
 const HOME = '/admin/dashboard'
@@ -45,7 +46,7 @@ export default function LoginPage() {
     } catch (cause) {
       // The API writes these for the person reading them — show them verbatim
       // rather than inventing a generic "sign-in failed".
-      setError(cause instanceof Error ? cause.message : 'Sign-in failed.')
+      setError(messageOf(cause))
     } finally {
       setPending(false)
     }

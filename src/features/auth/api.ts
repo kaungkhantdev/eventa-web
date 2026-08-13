@@ -44,6 +44,39 @@ export const authApi = {
   },
 
   /**
+   * Start a password reset. Resolves the same way whether or not the address
+   * has an account — the API answers uniformly on purpose, so this endpoint
+   * cannot be used to discover who is registered. The page must show the same
+   * confirmation either way.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    await api.post('/auth/forgot-password', { email, persona: 'admin' }, { anonymous: true })
+  },
+
+  /** Finish a reset with the token from the emailed link. */
+  async resetPassword(token: string, password: string): Promise<void> {
+    await api.post('/auth/reset-password', { token, password }, { anonymous: true })
+  },
+
+  /**
+   * Create a workspace and its first organizer. No session results: the API
+   * emails a confirmation link, and the account is inert until `/auth/verify-email`
+   * is called with that token.
+   */
+  async register(input: {
+    name: string
+    email: string
+    password: string
+    organizationName?: string
+  }): Promise<{ message: string }> {
+    return api.post<{ message: string }>(
+      '/auth/register',
+      { ...input, acceptTerms: true },
+      { anonymous: true },
+    )
+  },
+
+  /**
    * Sign out. The local session is cleared even if the call fails: the person
    * asked to be signed out of THIS browser, and a network problem must not
    * leave them looking at a console they thought they had left. The refresh

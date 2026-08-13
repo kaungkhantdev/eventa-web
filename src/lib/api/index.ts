@@ -7,6 +7,7 @@
  */
 export { api, type Query } from './client'
 export { ApiError, NetworkError } from './ApiError'
+export { messageOf } from './messageOf'
 export { session, type Tokens } from './session'
 export {
   EMPTY_META,
