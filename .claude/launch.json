@@ -5,7 +5,9 @@
       "name": "eventa-react",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev", "--port", "5180"],
-      "port": 5180
+      "port": 5180,
+      "comment": "5180 is not negotiable: eventa-api's CORS_ORIGINS allows exactly http://localhost:5180, so on any other port every request from the browser is blocked.",
+      "autoPort": false
     }
   ]
 }
