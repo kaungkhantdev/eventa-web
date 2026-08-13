@@ -1,8 +1,9 @@
 import type { ComponentType } from 'react'
-import { createBrowserRouter, Navigate } from 'react-router'
+import { createBrowserRouter, Navigate, type LoaderFunction } from 'react-router'
 import AdminShell from '@/layouts/AdminShell'
 import RootLayout, { RootFallback } from '@/layouts/RootLayout'
 import NotFoundPage from '@/features/system/pages/NotFoundPage'
+import { guardedLoader } from '@/app/loaders'
 
 /* Route manifest. Admin screens are nested under the shell and each declares a
    `handle.page` id — the static kit's `data-page` — which drives sidebar
@@ -15,18 +16,17 @@ import NotFoundPage from '@/features/system/pages/NotFoundPage'
 /**
  * Simulated per-page fetch latency, in milliseconds.
  *
- * The prototype keeps every row in memory, so a page has nothing to wait for
- * and the skeletons would flash past in the handful of milliseconds a local
- * chunk takes to load. This delay stands in for the request each page will
- * make once there is a backend.
+ * Applies only to pages NOT YET wired to the API. Those still read from their
+ * feature's `data/` module, so they have nothing to wait for and their
+ * skeletons would flash past in the handful of milliseconds a chunk takes.
+ * A migrated page passes its own loader to `page()` and waits on the real
+ * request instead — see `@/app/loaders`.
  *
- * Set it to 0 to remove the artificial wait entirely — skeletons then appear
- * only for as long as a page genuinely takes to arrive, which is the behaviour
- * you want in production.
+ * When the last page is migrated this constant and `pageLoader` go with it.
  */
 export const PAGE_LOAD_MS = 350
 
-/** Stand-in for the data fetch each page will eventually do. */
+/** Stand-in for the data fetch a not-yet-migrated page will eventually do. */
 const pageLoader = async (): Promise<null> => {
   if (PAGE_LOAD_MS > 0) await new Promise((resolve) => setTimeout(resolve, PAGE_LOAD_MS))
   return null
@@ -41,8 +41,12 @@ const pageLoader = async (): Promise<null> => {
  * that window. Unlike `lazy` (which resolves once and is then cached), the
  * loader runs on every visit, so revisiting a page still shows its skeleton.
  */
-const page = (load: () => Promise<{ default: ComponentType }>) => ({
-  loader: pageLoader,
+const page = (
+  load: () => Promise<{ default: ComponentType }>,
+  /** A migrated page passes its real loader; the rest get the stand-in. */
+  loader: LoaderFunction = pageLoader,
+) => ({
+  loader,
   lazy: async () => ({ Component: (await load()).default }),
 })
 
@@ -321,6 +325,10 @@ export const router = createBrowserRouter([
       {
         path: '/admin',
         Component: AdminShell,
+        // Everything below the shell needs a signed-in organizer. Checked once,
+        // here, rather than in 40 page loaders — and before any of them fetch,
+        // so an expired session redirects instead of firing a wall of 401s.
+        loader: guardedLoader,
         children: [{ index: true, element: <Navigate to="/admin/home" replace /> }, ...adminChildren],
       },
       { path: '*', Component: NotFoundPage },
