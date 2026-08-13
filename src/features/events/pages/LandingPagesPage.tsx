@@ -1,12 +1,9 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLoaderData } from 'react-router'
 import { PageHeader, PageFooter, HeaderUser, ButtonLink, Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import {
-  SAMPLE_EVENTS,
-  LANDING_TEMPLATES,
-  type TemplateId,
-} from '../data/landingTemplates'
+import type { LandingPagesData } from '../events.routes'
+import { LANDING_TEMPLATES, type TemplateId } from '../landingTemplates'
 
 /** The three-dot browser chrome plus the template-specific preview body. */
 function TemplatePreview({ id }: { id: TemplateId }) {
@@ -73,10 +70,14 @@ function TemplatePreview({ id }: { id: TemplateId }) {
 }
 
 export default function LandingPagesPage() {
-  const [sampleEvent, setSampleEvent] = useState('tech-summit-2026')
+  const { events } = useLoaderData() as LandingPagesData
+  // The switcher previews against the workspace's own events now, so there is
+  // nothing to choose from until it has one.
+  const [previewSlug, setPreviewSlug] = useState(events[0]?.slug ?? '')
 
   function preview(id: TemplateId) {
-    window.open(`/landing/${id}?event=${sampleEvent}`, '_blank', 'noopener')
+    if (!previewSlug) return
+    window.open(`/landing/${id}?event=${previewSlug}`, '_blank', 'noopener')
   }
 
   return (
@@ -115,24 +116,28 @@ export default function LandingPagesPage() {
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
               Preview with
             </p>
-            <div className="inline-flex rounded-lg bg-canvas p-0.5 text-[12px] font-semibold">
-              {SAMPLE_EVENTS.map((ev) => {
-                const on = ev.id === sampleEvent
-                return (
+            {events.length ? (
+              <div className="inline-flex max-w-full flex-wrap rounded-lg bg-canvas p-0.5 text-[12px] font-semibold">
+                {events.map((event) => (
                   <button
-                    key={ev.id}
+                    key={event.id}
                     type="button"
-                    onClick={() => setSampleEvent(ev.id)}
+                    onClick={() => setPreviewSlug(event.slug)}
+                    aria-pressed={event.slug === previewSlug}
                     className={cn(
-                      'rounded-md px-3 py-1.5 transition',
-                      on ? 'bg-surface text-ink shadow-sm' : 'text-muted',
+                      'max-w-[12rem] truncate rounded-md px-3 py-1.5 transition',
+                      event.slug === previewSlug ? 'bg-surface text-ink shadow-sm' : 'text-muted',
                     )}
                   >
-                    {ev.label}
+                    {event.name}
                   </button>
-                )
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-muted">
+                Create an event to preview a template against it.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -149,18 +154,20 @@ export default function LandingPagesPage() {
                   {tpl.badge}
                 </span>
               </div>
-              <p className="mt-1 flex-1 text-[12.5px] leading-snug text-muted">{tpl.desc}</p>
+              <p className="mt-1 flex-1 text-[12.5px] leading-snug text-muted">{tpl.description}</p>
               <div className="mt-3 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => preview(tpl.id)}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-3 py-2 text-[12.5px] font-semibold text-brand transition hover:brightness-95"
+                  disabled={!previewSlug}
+                  title={previewSlug ? undefined : 'Create an event first'}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-3 py-2 text-[12.5px] font-semibold text-brand transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Icon name="hgi-play" size={14} />
                   Preview
                 </button>
                 <Link
-                  to="/admin/event-form"
+                  to={`/admin/event-form?template=${tpl.id}`}
                   className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[12.5px] font-semibold text-white transition hover:bg-brand-dark"
                 >
                   Use template

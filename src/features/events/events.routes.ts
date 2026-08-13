@@ -8,6 +8,7 @@ import { toCategoryCard } from './categories.mapper'
 import { eventsApi, type ListEventsQuery } from './events.api'
 import { toCalendarEvents, toEventRow, toUpcomingCard } from './events.mapper'
 import { TYPE_META } from './events.presentation'
+import type { PreviewEvent } from './landingTemplates'
 import type {
   CalendarEvent,
   CategoryCard,
@@ -163,6 +164,31 @@ export const upcomingRoute = {
   loader: pageData(async (): Promise<UpcomingData> => {
     const events = await eventsApi.upcoming(UPCOMING_LIMIT)
     return { cards: events.map(toUpcomingCard) }
+  }),
+}
+
+/* ----------------------------- landing pages ----------------------------- */
+
+/** How many of the workspace's events the "Preview with" switcher offers. */
+const PREVIEW_EVENTS = 3
+
+export interface LandingPagesData {
+  /** The events a template can be previewed against — the newest few. */
+  events: PreviewEvent[]
+}
+
+export const landingPagesRoute = {
+  loader: pageData(async (): Promise<LandingPagesData> => {
+    // The template catalogue is a product constant; the only thing the server
+    // knows here is which events exist to preview one against.
+    const page = await eventsApi.list({ limit: PREVIEW_EVENTS, sort: 'recent' })
+    return {
+      events: page.items.map((event) => ({
+        id: event.id,
+        name: event.name,
+        slug: event.slug,
+      })),
+    }
   }),
 }
 

@@ -127,7 +127,10 @@ const adminChildren = [
   },
   {
     path: 'landing-pages',
-    ...page(() => import('@/features/events/pages/LandingPagesPage')),
+    ...livePage(
+      () => import('@/features/events/pages/LandingPagesPage'),
+      () => import('@/features/events/events.routes').then((m) => m.landingPagesRoute),
+    ),
     handle: { page: 'landing-pages' },
   },
   {
