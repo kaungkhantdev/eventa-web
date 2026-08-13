@@ -1,7 +1,7 @@
 # Eventa React — porting conventions
 
-This app is a 1:1 React/TypeScript port of the static kit at
-`../eventa-ui-kit`. **Visual fidelity is the priority**: a ported page should
+This app is a 1:1 React/TypeScript port of the static kit **eventa-ui-kit**
+(normally checked out beside this repo). **Visual fidelity is the priority**: a ported page should
 render pixel-identically to its HTML source. Refactor the *markup into
 components*, never the *design*.
 
