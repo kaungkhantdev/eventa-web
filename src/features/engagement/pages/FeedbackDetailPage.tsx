@@ -6,7 +6,7 @@ import {
   Icon,
   NotificationBell,
   Panel,
-  UserChip,
+  SignedInChip,
 } from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { num } from '@/lib/format'
@@ -239,7 +239,7 @@ function FeedbackDetailView({ ev }: { ev: FeedbackEvent }) {
             <span className="sm:hidden">New</span>
           </button>
           <NotificationBell />
-          <UserChip />
+          <SignedInChip />
         </div>
       </div>
 

@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react'
-import { Link, useNavigate, useOutletContext } from 'react-router'
+import { Link, useNavigate, useOutletContext, useRouteLoaderData } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
+import { ADMIN_ROUTE_ID } from '@/app/loaders'
+import { authApi } from '@/features/auth/api'
+import { displayRole } from '@/features/auth/permissions'
+import type { Me } from '@/features/auth/types'
 import { useTheme } from '@/lib/useTheme'
 import { UserAvatar } from './Avatar'
 import { Dropdown } from './Dropdown'
@@ -147,16 +151,17 @@ const PROFILE_LINKS = [
 /** Signed-in user chip that opens a profile menu (links, theme toggle, sign
  *  out). Collapses to just the avatar on small screens. */
 export function UserChip({
-  name = 'Harper Nelson',
-  role = 'Event Manager',
-  email = 'harper@eventa.co',
+  name,
+  role,
+  email,
+  onSignOut,
 }: {
-  name?: string
-  role?: string
-  email?: string
+  name: string
+  role: string
+  email: string
+  onSignOut: () => void
 }) {
   const { dark, toggle } = useTheme()
-  const navigate = useNavigate()
 
   return (
     <Dropdown
@@ -222,7 +227,7 @@ export function UserChip({
               type="button"
               onClick={() => {
                 close()
-                navigate('/auth/login')
+                onSignOut()
               }}
               className="flex w-full items-center gap-2.5 px-4 py-2 text-[13px] font-medium text-red-500 transition hover:bg-line"
             >
@@ -236,12 +241,42 @@ export function UserChip({
   )
 }
 
+/**
+ * `UserChip` wired to the real session.
+ *
+ * Reads the signed-in organizer from the admin shell's loader by route id, so
+ * every page shows the real person without threading `me` through as a prop or
+ * fetching it again per page. `UserChip` itself stays presentational — it takes
+ * strings and a callback, which is what makes it usable outside the shell.
+ */
+export function SignedInChip() {
+  const data = useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined
+  const me = data?.me ?? null
+  const navigate = useNavigate()
+
+  async function signOut() {
+    // Clears the local session even if the request fails — the person asked to
+    // leave this browser, and a network problem must not strand them inside.
+    await authApi.logout()
+    navigate('/auth/login', { replace: true })
+  }
+
+  return (
+    <UserChip
+      name={me?.name ?? ''}
+      role={displayRole(me)}
+      email={me?.email ?? ''}
+      onSignOut={() => void signOut()}
+    />
+  )
+}
+
 /** The bell + user pairing used across most admin pages. */
 export function HeaderUser() {
   return (
     <>
       <NotificationBell />
-      <UserChip />
+      <SignedInChip />
     </>
   )
 }

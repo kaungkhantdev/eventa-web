@@ -3,7 +3,7 @@ import { Link, useOutletContext } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import { cn } from '@/lib/cn'
 import { num } from '@/lib/format'
-import { NotificationBell, UserChip, usePagination } from '@/components/ui'
+import { NotificationBell, SignedInChip, usePagination } from '@/components/ui'
 import {
   ATTENDEES,
   EVT,
@@ -137,7 +137,7 @@ export default function EventDetailPage() {
             <span className="hidden sm:inline">Share</span>
           </button>
           <NotificationBell />
-          <UserChip />
+          <SignedInChip />
         </div>
       </div>
 

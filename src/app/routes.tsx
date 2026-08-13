@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate, type LoaderFunction } from 'react-router
 import AdminShell from '@/layouts/AdminShell'
 import RootLayout, { RootFallback } from '@/layouts/RootLayout'
 import NotFoundPage from '@/features/system/pages/NotFoundPage'
-import { guardedLoader } from '@/app/loaders'
+import { ADMIN_ROUTE_ID, adminShellLoader } from '@/app/loaders'
 
 /* Route manifest. Admin screens are nested under the shell and each declares a
    `handle.page` id — the static kit's `data-page` — which drives sidebar
@@ -324,11 +324,13 @@ export const router = createBrowserRouter([
       { path: '/', element: <Navigate to="/portal/discover" replace /> },
       {
         path: '/admin',
+        id: ADMIN_ROUTE_ID,
         Component: AdminShell,
         // Everything below the shell needs a signed-in organizer. Checked once,
         // here, rather than in 40 page loaders — and before any of them fetch,
         // so an expired session redirects instead of firing a wall of 401s.
-        loader: guardedLoader,
+        // The loader also carries `me`, which the chrome reads by route id.
+        loader: adminShellLoader,
         children: [{ index: true, element: <Navigate to="/admin/home" replace /> }, ...adminChildren],
       },
       { path: '*', Component: NotFoundPage },

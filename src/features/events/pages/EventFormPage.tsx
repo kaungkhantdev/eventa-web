@@ -3,7 +3,7 @@ import { Link, useNavigate, useOutletContext } from 'react-router'
 import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
-import { NotificationBell, UserChip } from '@/components/ui'
+import { NotificationBell, SignedInChip } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import {
   HL_ICONS,
@@ -241,7 +241,7 @@ export default function EventFormPage() {
             <span className="sm:hidden">Draft</span>
           </Link>
           <NotificationBell />
-          <UserChip />
+          <SignedInChip />
         </div>
       </div>
 

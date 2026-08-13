@@ -14,6 +14,7 @@ export {
   PageFooter,
   NotificationBell,
   UserChip,
+  SignedInChip,
   HeaderUser,
 } from './PageHeader'
 export { TableWrap, DataTable, EmptyRow } from './DataTable'

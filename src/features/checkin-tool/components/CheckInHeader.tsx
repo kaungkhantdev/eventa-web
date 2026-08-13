@@ -1,6 +1,6 @@
 import { Link, useOutletContext } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
-import { EventPicker, NotificationBell, UserChip } from '@/components/ui'
+import { EventPicker, NotificationBell, SignedInChip } from '@/components/ui'
 import { CATALOG_BY_NAME, STATUS_DOT } from '@/lib/eventCatalog'
 import { cn } from '@/lib/cn'
 import { EVENT_META, type EventMeta } from '../data/checkin'
@@ -78,7 +78,7 @@ export function CheckInHeader({
           <span className="hidden sm:inline">Check-in list</span>
         </Link>
         <NotificationBell />
-        <UserChip />
+        <SignedInChip />
       </div>
     </div>
   )
