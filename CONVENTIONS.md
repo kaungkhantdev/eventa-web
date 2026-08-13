@@ -128,3 +128,18 @@ options, same empty-state copy).
 3. Every interactive control in the source works (tabs switch, panels open,
    pagination pages, filters filter, toggles toggle).
 4. Row counts, totals, labels and copy match the source data exactly.
+
+## Definition of done for a page wired to the API
+
+Everything above, plus — see `AGENTS.md` §"Talking to the API" for the playbook:
+
+5. `pnpm test` green, and the feature's **mapper was written test-first**.
+6. `pnpm lint` reports no *new* problems.
+7. **Loading, empty and error states all render.** The skeleton appears while the
+   loader runs, the empty state shows when the API returns nothing, and an API
+   failure surfaces its message rather than a blank page or a swallowed error.
+8. Filters, search and paging live in the **URL**, so the back button works and a
+   filtered view can be shared. The list is not re-filtered client-side — the
+   API pages server-side and the tab counts would disagree with the rows.
+9. Money the caller may not see renders as "—", **never `฿0`**.
+10. The feature's demo `data/` module is **deleted** in the same commit.
