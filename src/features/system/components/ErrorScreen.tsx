@@ -21,10 +21,14 @@ const ICON: Record<ErrorKind, string> = {
 export function ErrorScreen({
   view,
   onRetry,
+  busy = false,
   children,
 }: {
   view: ErrorView
   onRetry: () => void
+  /** A retry in flight. Revalidation leaves the router idle, so no skeleton
+   *  fires and this is the only thing that tells them anything is happening. */
+  busy?: boolean
   /** Where to go instead — the caller knows which home this person has. */
   children?: React.ReactNode
 }) {
@@ -53,10 +57,16 @@ export function ErrorScreen({
         )}
 
         <div className="mt-7 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
-          {view.canRetry && (
-            <button type="button" onClick={onRetry} className="btn btn-primary w-full sm:w-auto">
+          {view.retry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={busy}
+              aria-busy={busy}
+              className="btn btn-primary w-full disabled:opacity-60 sm:w-auto"
+            >
               <Icon name="hgi-refresh" />
-              Try again
+              {busy ? 'Trying…' : 'Try again'}
             </button>
           )}
           {children}

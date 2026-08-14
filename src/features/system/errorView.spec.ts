@@ -21,7 +21,7 @@ describe('what to tell someone when a page fails to load', () => {
     })
 
     it('does not offer a retry, because trying again cannot help', () => {
-      expect(errorViewOf(apiError(403)).canRetry).toBe(false)
+      expect(errorViewOf(apiError(403)).retry).toBeNull()
     })
   })
 
@@ -30,7 +30,7 @@ describe('what to tell someone when a page fails to load', () => {
       const view = errorViewOf(apiError(404, "That isn't available."))
       expect(view.kind).toBe('missing')
       expect(view.title).toBe('Not found')
-      expect(view.canRetry).toBe(false)
+      expect(view.retry).toBeNull()
     })
   })
 
@@ -38,7 +38,7 @@ describe('what to tell someone when a page fails to load', () => {
     it('says so, and offers to try again', () => {
       const view = errorViewOf(new NetworkError(new TypeError('fetch failed')))
       expect(view.kind).toBe('offline')
-      expect(view.canRetry).toBe(true)
+      expect(view.retry).toBe('revalidate')
     })
 
     it('tells them what they can do about it', () => {
@@ -63,7 +63,7 @@ describe('what to tell someone when a page fails to load', () => {
     it('offers a retry on a 500, because it might have been transient', () => {
       const view = errorViewOf(apiError(500))
       expect(view.kind).toBe('failed')
-      expect(view.canRetry).toBe(true)
+      expect(view.retry).toBe('revalidate')
     })
 
     it('shows the API’s sentence when it wrote one', () => {
@@ -80,6 +80,33 @@ describe('what to tell someone when a page fails to load', () => {
         errors: [{ field: 'startAt', message: 'Start date must be in the future.' }],
       })
       expect(errorViewOf(rejected).detail).toBe('Start date must be in the future.')
+    })
+  })
+
+  describe('the page’s code could not be downloaded', () => {
+    // Every page is a separate chunk. Deploying while a tab is open leaves that
+    // tab asking for a file that no longer exists.
+    const stale = new TypeError(
+      'Failed to fetch dynamically imported module: https://app.example/assets/EventsPage-a1b2.js',
+    )
+
+    it('recovers by reloading the document, not by revalidating', () => {
+      // React Router 8 caches the rejected `lazy()` promise and never evicts it
+      // (lazyRouteFunctionCache has no delete), so revalidating replays the
+      // same failure forever — the button would do nothing at all.
+      expect(errorViewOf(stale).retry).toBe('reload')
+    })
+
+    it.each([
+      ['Chrome', 'Failed to fetch dynamically imported module: /assets/x.js'],
+      ['Firefox', 'error loading dynamically imported module: /assets/x.js'],
+      ['Safari', 'Importing a module script failed.'],
+    ])('recognises how %s words it', (_browser, message) => {
+      expect(errorViewOf(new TypeError(message)).retry).toBe('reload')
+    })
+
+    it('does not put the failed URL in front of the person', () => {
+      expect(errorViewOf(stale).detail).toBeNull()
     })
   })
 
@@ -104,7 +131,7 @@ describe('what to tell someone when a page fails to load', () => {
       const view = errorViewOf(bug)
       expect(view.kind).toBe('failed')
       expect(view.title).toBe('Something went wrong')
-      expect(view.canRetry).toBe(true)
+      expect(view.retry).toBe('revalidate')
     })
   })
 

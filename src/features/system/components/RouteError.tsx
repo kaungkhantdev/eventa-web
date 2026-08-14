@@ -21,8 +21,19 @@ export function RouteError() {
   const view = errorViewOf(error)
   const home = isAdminPath(pathname) ? '/admin/home' : '/portal/discover'
 
+  /**
+   * Revalidating re-runs the loaders, which is the cure for a request that
+   * failed. It is NOT the cure for a page whose code never downloaded: React
+   * Router caches the rejected `lazy()` promise and never evicts it, so every
+   * retry replays the same failure. That one needs the document loaded again.
+   */
+  const retry = () => {
+    if (view.retry === 'reload') window.location.reload()
+    else revalidator.revalidate()
+  }
+
   return (
-    <ErrorScreen view={view} onRetry={() => revalidator.revalidate()}>
+    <ErrorScreen view={view} onRetry={retry} busy={revalidator.state !== 'idle'}>
       <Link to={home} className="btn btn-soft w-full sm:w-auto">
         <Icon name="hgi-home-01" />
         Back to home

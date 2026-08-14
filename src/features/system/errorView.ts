@@ -13,13 +13,20 @@ import { ApiError, NetworkError, messageOf } from '@/lib/api'
 /** Which shape of failure this is — the icon and tone follow from it. */
 export type ErrorKind = 'forbidden' | 'missing' | 'offline' | 'failed'
 
+/**
+ * How to recover — a strategy, not a boolean, because the two ways of failing
+ * need different cures. Re-running the loaders fixes a request that failed;
+ * only a full document load fixes a page whose code never arrived.
+ */
+export type Recovery = 'revalidate' | 'reload'
+
 export interface ErrorView {
   kind: ErrorKind
   title: string
   /** The API's own sentence, or null when the cause is not safe to show. */
   detail: string | null
-  /** Whether trying again could plausibly work. */
-  canRetry: boolean
+  /** How trying again should work, or null when it cannot help. */
+  retry: Recovery | null
 }
 
 const TITLE: Record<ErrorKind, string> = {
@@ -33,7 +40,7 @@ export function errorViewOf(cause: unknown): ErrorView {
   // Its message is ours, not a server's — and "check your connection" is the
   // only actionable thing on that screen. The wrapped cause (a browser
   // `TypeError: Failed to fetch`) stays out of sight.
-  if (cause instanceof NetworkError) return view('offline', cause.message, true)
+  if (cause instanceof NetworkError) return view('offline', cause.message, 'revalidate')
 
   if (cause instanceof ApiError) {
     // `messageOf` rather than `.message`: for a rejected DTO the envelope's
@@ -42,18 +49,35 @@ export function errorViewOf(cause: unknown): ErrorView {
     // the server's wording is written for the reader ("requires an admin
     // account" is more use than "forbidden").
     const detail = messageOf(cause)
-    if (cause.isForbidden) return view('forbidden', detail, false)
-    if (cause.isNotFound) return view('missing', detail, false)
-    return view('failed', detail, true)
+    if (cause.isForbidden) return view('forbidden', detail, null)
+    if (cause.isNotFound) return view('missing', detail, null)
+    return view('failed', detail, 'revalidate')
   }
+
+  // The page's own code never arrived — almost always a deploy that replaced
+  // the chunk this tab was still going to ask for. Only a document load fixes
+  // it, so it is called out before the general case below.
+  if (isModuleLoadFailure(cause)) return view('failed', null, 'reload')
 
   // Anything else is a bug in this app: a TypeError naming one of our own
   // variables, or a value that was never an Error at all. Its message
   // describes our source rather than their problem, so it is not shown —
   // it belongs in an error reporter, not on the screen.
-  return view('failed', null, true)
+  return view('failed', null, 'revalidate')
 }
 
-function view(kind: ErrorKind, detail: string | null, canRetry: boolean): ErrorView {
-  return { kind, title: TITLE[kind], detail, canRetry }
+/**
+ * Whether the browser failed to fetch a code chunk.
+ *
+ * Matched on the message because there is no error type for it — each engine
+ * words it differently, and all three are a `TypeError`.
+ */
+const MODULE_LOAD_FAILURE = /dynamically imported module|importing a module script failed/i
+
+function isModuleLoadFailure(cause: unknown): boolean {
+  return cause instanceof Error && MODULE_LOAD_FAILURE.test(cause.message)
+}
+
+function view(kind: ErrorKind, detail: string | null, retry: Recovery | null): ErrorView {
+  return { kind, title: TITLE[kind], detail, retry }
 }
