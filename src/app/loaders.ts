@@ -80,14 +80,29 @@ export const ADMIN_ROUTE_ID = 'admin'
  * renders against half-loaded data and never has to write an error branch.
  */
 export function pageData<T>(load: (args: LoaderArgs) => Promise<T>) {
+  return guardedData('admin', load)
+}
+
+/**
+ * The same, for a page the attendee portal owns.
+ *
+ * Separate from `pageData` so the persona is stated at the route rather than
+ * inferred: an attendee sent to the organizer's sign-in would be asked for a
+ * workspace they do not have.
+ */
+export function attendeeData<T>(load: (args: LoaderArgs) => Promise<T>) {
+  return guardedData('attendee', load)
+}
+
+function guardedData<T>(persona: Persona, load: (args: LoaderArgs) => Promise<T>) {
   return async (args: LoaderArgs): Promise<T> => {
-    requirePersona('admin')
+    requirePersona(persona)
     try {
       return await load(args)
     } catch (cause) {
       // An expired session that survived the check above — the token was
       // present but the API refused it, and the refresh could not save it.
-      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn('admin')
+      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn(persona)
       throw cause
     }
   }
