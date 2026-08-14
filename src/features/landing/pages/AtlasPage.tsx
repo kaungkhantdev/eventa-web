@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { cn } from '@/lib/cn'
+import type { LandingEvent } from '@/features/landing/types'
 import { getLandingEvent, getLandingHighlights } from '@/features/landing/data/events'
 
 /* Atlas — full-bleed poster landing template. Ported from landing/atlas.html.
@@ -35,9 +36,11 @@ summary { list-style: none; }
 #bar.bar-solid .bar-reg:hover { background: #178a60; }
 `
 
-export default function AtlasPage() {
+export default function AtlasPage({ event }: { event?: LandingEvent } = {}) {
   const [params] = useSearchParams()
-  const ev = getLandingEvent(params)
+  // A real published event is passed in; the wizard's preview has none
+  // and falls back to the demo module plus its query-param overrides.
+  const ev = event ?? getLandingEvent(params)
 
   const reg = ev.registerUrl || '#'
   const isOnline = ev.online === true || params.get('online') === '1'

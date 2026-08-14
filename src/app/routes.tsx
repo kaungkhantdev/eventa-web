@@ -373,6 +373,16 @@ export const router = createBrowserRouter([
         ...page(() => import('@/features/portal/pages/SurveyPage')),
       },
       {
+        // A published event at its own public URL — the canonical shape the
+        // API already builds into every share link and the workspace's
+        // "Copy link". The /landing/* routes below stay previews.
+        path: '/e/:slug',
+        ...livePage(
+          () => import('@/features/landing/pages/PublicEventPage'),
+          () => import('@/features/landing/landing.routes').then((m) => m.publicEventRoute),
+        ),
+      },
+      {
         path: '/landing/atlas',
         ...page(() => import('@/features/landing/pages/AtlasPage')),
       },

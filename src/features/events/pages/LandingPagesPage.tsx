@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Link, useLoaderData } from 'react-router'
+import { Link, useFetcher, useLoaderData } from 'react-router'
 import { PageHeader, PageFooter, HeaderUser, ButtonLink, Icon } from '@/components/ui'
+import type { ActionResult } from '@/app/loaders'
 import { cn } from '@/lib/cn'
 import type { LandingPagesData } from '../events.routes'
-import { LANDING_TEMPLATES, type TemplateId } from '../landingTemplates'
+import { LANDING_TEMPLATES, type PreviewEvent, type TemplateId } from '../landingTemplates'
 
 /** The three-dot browser chrome plus the template-specific preview body. */
 function TemplatePreview({ id }: { id: TemplateId }) {
@@ -69,11 +70,71 @@ function TemplatePreview({ id }: { id: TemplateId }) {
   )
 }
 
+/**
+ * Give the chosen event this design.
+ *
+ * The template used to be settable only while publishing, so changing it meant
+ * unpublishing a live event. It is now a PATCH, and this is where it is made —
+ * beside the design being chosen, against the event the switcher already names.
+ */
+function ApplyTemplate({
+  template,
+  event,
+  inUse,
+}: {
+  template: TemplateId
+  event: PreviewEvent | undefined
+  inUse: boolean
+}) {
+  const fetcher = useFetcher<ActionResult>()
+  const busy = fetcher.state !== 'idle'
+  const refusal = fetcher.data?.ok === false ? fetcher.data.error : null
+
+  if (!event) {
+    return (
+      <Link
+        to="/admin/event-form"
+        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[12.5px] font-semibold text-white transition hover:bg-brand-dark"
+      >
+        Use template
+      </Link>
+    )
+  }
+
+  return (
+    <fetcher.Form method="post" className="flex-1">
+      <input type="hidden" name="id" value={event.id} />
+      <input type="hidden" name="template" value={template} />
+      <button
+        type="submit"
+        disabled={busy || inUse}
+        title={inUse ? `${event.name} already uses this` : `Use this for ${event.name}`}
+        className={cn(
+          'inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-semibold transition',
+          inUse
+            ? 'cursor-default bg-brand-soft text-brand'
+            : 'bg-brand text-white hover:bg-brand-dark disabled:opacity-60',
+        )}
+      >
+        {inUse && <Icon name="hgi-checkmark-circle-02" size={14} />}
+        {inUse ? 'In use' : busy ? 'Applying…' : 'Use template'}
+      </button>
+      {/* The API's own words — a stale version or a refused id is its answer. */}
+      {refusal && (
+        <p role="alert" className="mt-1.5 text-[11.5px] leading-snug text-red-500">
+          {refusal}
+        </p>
+      )}
+    </fetcher.Form>
+  )
+}
+
 export default function LandingPagesPage() {
   const { events } = useLoaderData() as LandingPagesData
   // The switcher previews against the workspace's own events now, so there is
   // nothing to choose from until it has one.
   const [previewSlug, setPreviewSlug] = useState(events[0]?.slug ?? '')
+  const selected = events.find((event) => event.slug === previewSlug)
 
   function preview(id: TemplateId) {
     if (!previewSlug) return
@@ -166,12 +227,11 @@ export default function LandingPagesPage() {
                   <Icon name="hgi-play" size={14} />
                   Preview
                 </button>
-                <Link
-                  to={`/admin/event-form?template=${tpl.id}`}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[12.5px] font-semibold text-white transition hover:bg-brand-dark"
-                >
-                  Use template
-                </Link>
+                <ApplyTemplate
+                  template={tpl.id}
+                  event={selected}
+                  inUse={selected?.landingTemplateId === tpl.id}
+                />
               </div>
             </div>
           </div>

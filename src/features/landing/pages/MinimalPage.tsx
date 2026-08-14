@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { Icon } from '@/components/ui'
+import type { LandingEvent } from '@/features/landing/types'
 import { getLandingEvent, getLandingHighlights } from '@/features/landing/data/events'
 
 /* Port of landing/minimal.html — a centered, editorial single-column event page.
@@ -33,11 +34,13 @@ const PAGE_STYLE = `
   }
 `
 
-export default function MinimalPage() {
+export default function MinimalPage({ event }: { event?: LandingEvent } = {}) {
   const [params] = useSearchParams()
   const [coverError, setCoverError] = useState(false)
 
-  const ev = useMemo(() => getLandingEvent(params), [params])
+  // A real published event is passed in; the wizard's preview has none
+  // and falls back to the demo module plus its query-param overrides.
+  const ev = useMemo(() => event ?? getLandingEvent(params), [event, params])
   const highlights = useMemo(
     () => getLandingHighlights(params, ev.highlights),
     [params, ev.highlights],

@@ -18,6 +18,28 @@ const SATANG_PER_BAHT = 100
 const BANGKOK = 'Asia/Bangkok'
 
 /**
+ * Which zone to render an instant in.
+ *
+ * Almost everything in this product is Bangkok's, and callers say nothing. The
+ * exception is the public event page: it is read from anywhere, and the fact on
+ * screen is the organizer's schedule, not the reader's clock — so it passes the
+ * event's own zone.
+ *
+ * `events.timezone` is free text on the API, and `Intl` throws a RangeError on
+ * a value it cannot use. Unchecked, one bad row would take a whole public page
+ * down, so an unusable zone falls back rather than throws.
+ */
+function zone(timeZone?: string): string {
+  if (!timeZone) return BANGKOK
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone })
+    return timeZone
+  } catch {
+    return BANGKOK
+  }
+}
+
+/**
  * Integer satang → what the organizer reads. This is the ONLY place money
  * crosses from the wire's integer to a string, so the null/zero rule above is
  * enforced once rather than remembered at every call site.
@@ -29,10 +51,10 @@ export function satang(amount: number | null): string {
 }
 
 /** A UTC instant → the Bangkok calendar day, e.g. `Jul 8, 2026`. */
-export function bangkokDate(instant: string | null): string {
+export function bangkokDate(instant: string | null, timeZone?: string): string {
   if (!instant) return MASKED
   return new Date(instant).toLocaleDateString('en-US', {
-    timeZone: BANGKOK,
+    timeZone: zone(timeZone),
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -40,10 +62,10 @@ export function bangkokDate(instant: string | null): string {
 }
 
 /** A UTC instant → the spelled-out Bangkok day, e.g. `August 27, 2025`. */
-export function bangkokLongDate(instant: string | null): string {
+export function bangkokLongDate(instant: string | null, timeZone?: string): string {
   if (!instant) return MASKED
   return new Date(instant).toLocaleDateString('en-US', {
-    timeZone: BANGKOK,
+    timeZone: zone(timeZone),
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -73,10 +95,10 @@ export function bangkokMonthKey(instant: string | Date): string {
 }
 
 /** A UTC instant → the Bangkok wall clock, e.g. `10:24`. */
-export function bangkokTime(instant: string | null): string {
+export function bangkokTime(instant: string | null, timeZone?: string): string {
   if (!instant) return MASKED
   return new Date(instant).toLocaleTimeString('en-GB', {
-    timeZone: BANGKOK,
+    timeZone: zone(timeZone),
     hour: '2-digit',
     minute: '2-digit',
   })

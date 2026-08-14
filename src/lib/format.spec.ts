@@ -111,3 +111,34 @@ describe('Bangkok day and month keys', () => {
     expect(bangkokMonthKey(new Date('2026-09-04T05:30:00Z'))).toBe('2026-09')
   })
 })
+
+describe('an event shown in its own timezone, not the reader’s', () => {
+  // A public event page is read from anywhere. The organizer's schedule is the
+  // fact; the viewer's location is not.
+  const evening = '2026-11-13T23:00:00.000Z'
+
+  it('formats the date in the timezone it is given', () => {
+    // 23:00 UTC on the 13th is already 06:00 on the 14th in Bangkok.
+    expect(bangkokDate(evening, 'Asia/Bangkok')).toBe('Nov 14, 2026')
+    expect(bangkokDate(evening, 'America/New_York')).toBe('Nov 13, 2026')
+  })
+
+  it('formats the clock time in the timezone it is given', () => {
+    expect(bangkokTime(evening, 'Asia/Bangkok')).toBe('06:00')
+    expect(bangkokTime(evening, 'Asia/Singapore')).toBe('07:00')
+  })
+
+  it('still means Bangkok when no timezone is named', () => {
+    // Every existing caller passes nothing and must not change behaviour.
+    expect(bangkokDate(evening)).toBe(bangkokDate(evening, 'Asia/Bangkok'))
+    expect(bangkokTime(evening)).toBe(bangkokTime(evening, 'Asia/Bangkok'))
+  })
+
+  it('falls back to Bangkok rather than throwing on an unusable timezone', () => {
+    // `events.timezone` is free text on the API. Intl throws a RangeError on a
+    // value it cannot use, which would take the whole public page down.
+    expect(bangkokDate(evening, 'Mars/Olympus')).toBe('Nov 14, 2026')
+    expect(bangkokTime(evening, 'not a zone')).toBe('06:00')
+    expect(bangkokLongDate(evening, '')).toBe('November 14, 2026')
+  })
+})

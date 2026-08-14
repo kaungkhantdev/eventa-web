@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
 import { cn } from '@/lib/cn'
+import type { LandingEvent } from '@/features/landing/types'
 import { getLandingEvent, getLandingHighlights } from '@/features/landing/data/events'
 
 /* Aurora — a calm, card-stacked landing template. Ported from landing/aurora.html.
@@ -29,9 +30,11 @@ summary { list-style: none; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
 `
 
-export default function AuroraPage() {
+export default function AuroraPage({ event }: { event?: LandingEvent } = {}) {
   const [params] = useSearchParams()
-  const ev = getLandingEvent(params)
+  // A real published event is passed in; the wizard's preview has none
+  // and falls back to the demo module plus its query-param overrides.
+  const ev = event ?? getLandingEvent(params)
 
   const reg = ev.registerUrl || '#'
   const isOnline = ev.online === true || params.get('online') === '1'

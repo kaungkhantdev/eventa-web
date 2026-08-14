@@ -10,6 +10,19 @@
 
 export type TemplateId = 'aurora' | 'noir' | 'minimal' | 'atlas'
 
+const TEMPLATE_IDS: readonly string[] = ['aurora', 'noir', 'minimal', 'atlas']
+
+/**
+ * Whether a value off the wire names one of the four designs.
+ *
+ * The API types `template` as a plain string. Narrowing here rather than
+ * casting means an id this app does not know renders a real design instead of
+ * an empty page.
+ */
+export function isTemplateId(value: string): value is TemplateId {
+  return TEMPLATE_IDS.includes(value)
+}
+
 export interface LandingTemplate {
   id: TemplateId
   title: string
@@ -52,4 +65,6 @@ export interface PreviewEvent {
   id: string
   name: string
   slug: string
+  /** The design it uses today — null until one has ever been chosen. */
+  landingTemplateId: string | null
 }

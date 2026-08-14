@@ -187,8 +187,23 @@ export const landingPagesRoute = {
         id: event.id,
         name: event.name,
         slug: event.slug,
+        landingTemplateId: event.landingTemplateId ?? null,
       })),
     }
+  }),
+
+  /**
+   * Give an event a different look.
+   *
+   * A plain PATCH, and deliberately so: the template used to be settable only
+   * while publishing, which meant an organizer who wanted a new design had to
+   * unpublish their live event to get one.
+   */
+  action: pageAction(async ({ request }: LoaderArgs) => {
+    const form = await request.formData()
+    await eventsApi.update(String(form.get('id') ?? ''), {
+      landingTemplateId: String(form.get('template') ?? ''),
+    })
   }),
 }
 

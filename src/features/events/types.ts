@@ -54,6 +54,8 @@ export interface EventWire {
   city: string | null
   isOnline: boolean
   capacity: number | null
+  /** The public page's design — null until one has been chosen. */
+  landingTemplateId?: string | null
   version: number
 }
 
