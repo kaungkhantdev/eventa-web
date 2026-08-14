@@ -9,7 +9,7 @@ import AdminShell from '@/layouts/AdminShell'
 import RootLayout, { RootFallback } from '@/layouts/RootLayout'
 import NotFoundPage from '@/features/system/pages/NotFoundPage'
 import { RouteError } from '@/features/system/components/RouteError'
-import { ADMIN_ROUTE_ID, adminShellLoader, attendeeLoader } from '@/app/loaders'
+import { ADMIN_ROUTE_ID, adminShellLoader } from '@/app/loaders'
 
 /* Route manifest. Admin screens are nested under the shell and each declares a
    `handle.page` id — the static kit's `data-page` — which drives sidebar
@@ -362,7 +362,10 @@ export const router = createBrowserRouter([
         path: '/portal/my-events',
         // The one portal route that needs an account. Browsing and registering
         // for an event deliberately do not.
-        ...page(() => import('@/features/portal/pages/MyEventsPage'), attendeeLoader),
+        ...livePage(
+          () => import('@/features/portal/pages/MyEventsPage'),
+          () => import('@/features/portal/myEvents.routes').then((m) => m.myEventsRoute),
+        ),
       },
       {
         path: '/portal/register',
