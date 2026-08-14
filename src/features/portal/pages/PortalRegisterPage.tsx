@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react'
-import type { ChangeEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Icon } from '@/components/ui'
 import { useTheme } from '@/lib/useTheme'
@@ -101,7 +101,6 @@ export default function PortalRegisterPage() {
   const [selected, setSelected] = useState<string[]>([])
   const [qty, setQty] = useState(1)
   const [payMethod, setPayMethod] = useState<'card' | 'promptpay'>('card')
-  const [card, setCard] = useState({ num: '', exp: '', cvc: '', name: '' })
   const [done, setDone] = useState(false)
 
   const count = mode === 'reserved' ? selected.length : qty
@@ -130,18 +129,6 @@ export default function PortalRegisterPage() {
 
   function setQtyClamped(n: number) {
     setQty(Math.max(1, Math.min(MAX, n)))
-  }
-
-  function onCardNum(e: ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value.replace(/\D/g, '').slice(0, 16)
-    setCard((c) => ({ ...c, num: v.replace(/(.{4})(?=.)/g, '$1 ') }))
-  }
-  function onCardExp(e: ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value.replace(/\D/g, '').slice(0, 4)
-    setCard((c) => ({ ...c, exp: v.length > 2 ? v.slice(0, 2) + '/' + v.slice(2) : v }))
-  }
-  function onCardCvc(e: ChangeEvent<HTMLInputElement>) {
-    setCard((c) => ({ ...c, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) }))
   }
 
   function onConfirm() {
@@ -414,60 +401,30 @@ export default function PortalRegisterPage() {
                   })}
                 </div>
 
-                {/* card fields */}
+                {/* Where the card fields were.
+
+                    PCI SAQ-A: this app never renders one. A card number and a
+                    CVC used to live in React state here, bound to inputs with
+                    `autoComplete="cc-number"` and `cc-csc` — which invites a
+                    browser to fill a real stored card into this app's memory on
+                    a page anyone can reach. The rule allows exactly two
+                    endings, Stripe's hosted fields or nothing, and hosted
+                    fields need a payment intent this demo page never creates.
+                    So: nothing, until the real checkout lands.
+
+                    The API is already built for it — `POST /payments/intent`
+                    answers with a `clientSecret` for Card precisely so the
+                    provider's own fields can take over, and never sees a PAN
+                    either. */}
                 {payMethod === 'card' && (
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <label className="label">Card number</label>
-                      <div className="relative">
-                        <i className="hgi-stroke hgi-credit-card pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-muted" />
-                        <input
-                          className="input tnum pl-9"
-                          inputMode="numeric"
-                          autoComplete="cc-number"
-                          maxLength={19}
-                          placeholder="1234 5678 9012 3456"
-                          value={card.num}
-                          onChange={onCardNum}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label">Expiry</label>
-                        <input
-                          className="input tnum"
-                          inputMode="numeric"
-                          autoComplete="cc-exp"
-                          maxLength={5}
-                          placeholder="MM/YY"
-                          value={card.exp}
-                          onChange={onCardExp}
-                        />
-                      </div>
-                      <div>
-                        <label className="label">CVC</label>
-                        <input
-                          className="input tnum"
-                          inputMode="numeric"
-                          autoComplete="cc-csc"
-                          maxLength={4}
-                          placeholder="123"
-                          value={card.cvc}
-                          onChange={onCardCvc}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="label">Name on card</label>
-                      <input
-                        className="input"
-                        autoComplete="cc-name"
-                        placeholder="Anong Pattana"
-                        value={card.name}
-                        onChange={(e) => setCard((c) => ({ ...c, name: e.target.value }))}
-                      />
-                    </div>
+                  <div className="mt-4 rounded-xl border border-hair p-4">
+                    <p className="text-[13px] font-semibold text-ink">
+                      Card details are entered on the secure payment step
+                    </p>
+                    <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                      We never handle your card ourselves — it goes straight to our payment
+                      provider. Choose PromptPay to complete this booking now.
+                    </p>
                   </div>
                 )}
 
