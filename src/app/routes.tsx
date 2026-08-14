@@ -8,6 +8,7 @@ import {
 import AdminShell from '@/layouts/AdminShell'
 import RootLayout, { RootFallback } from '@/layouts/RootLayout'
 import NotFoundPage from '@/features/system/pages/NotFoundPage'
+import { RouteError } from '@/features/system/components/RouteError'
 import { ADMIN_ROUTE_ID, adminShellLoader, attendeeLoader } from '@/app/loaders'
 
 /* Route manifest. Admin screens are nested under the shell and each declares a
@@ -52,8 +53,20 @@ const page = (
   loader: LoaderFunction = pageLoader,
 ) => ({
   loader,
+  errorElement: ERROR_ELEMENT,
   lazy: async () => ({ Component: (await load()).default }),
 })
+
+/**
+ * The unhappy path, given to every page by the two helpers below.
+ *
+ * Declared once here rather than per route because the alternative is a route
+ * that silently has none — and a page without an error element does not fail
+ * quietly, it prints React Router's developer screen and a stack trace at
+ * whoever is using the product. Attached to the *page*, not to the shell, so an
+ * admin failure renders inside the outlet and the rail stays usable.
+ */
+const ERROR_ELEMENT = <RouteError />
 
 /** A page's data functions, defined beside the feature they belong to. */
 interface RouteData {
@@ -73,6 +86,7 @@ const livePage = (
   load: () => Promise<{ default: ComponentType }>,
   route: () => Promise<RouteData>,
 ) => ({
+  errorElement: ERROR_ELEMENT,
   lazy: async () => {
     const [{ default: Component }, data] = await Promise.all([load(), route()])
     return { Component, ...data }
@@ -320,6 +334,9 @@ export const router = createBrowserRouter([
     // for first paint and for navigations that swap the entire page.
     Component: RootLayout,
     HydrateFallback: RootFallback,
+    // The last catch: a failure with no nearer boundary — including one thrown
+    // by a route that has no page of its own.
+    errorElement: ERROR_ELEMENT,
     children: [
       {
         path: '/auth/login',
@@ -383,6 +400,11 @@ export const router = createBrowserRouter([
         // so an expired session redirects instead of firing a wall of 401s.
         // The loader also carries `me`, which the chrome reads by route id.
         loader: adminShellLoader,
+        // The shell's OWN loader failing (`/auth/me` refused for a reason the
+        // refresh could not fix) leaves no chrome to render the error inside,
+        // so this one legitimately replaces the whole screen. A page below
+        // failing is caught by that page's own boundary instead.
+        errorElement: ERROR_ELEMENT,
         children: [{ index: true, element: <Navigate to="/admin/home" replace /> }, ...adminChildren],
       },
       { path: '*', Component: NotFoundPage },
