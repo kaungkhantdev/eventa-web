@@ -26,7 +26,38 @@ export interface ListEventsQuery extends Query {
   sort?: EventSort
 }
 
+/** What `POST /events` accepts — and it rejects anything else. */
+export interface CreateEventBody {
+  name: string
+  type: EventType
+  startAt: string | null
+  description?: string
+}
+
 export const eventsApi = {
+  get: (id: string) => api.get<EventWire>(`/events/${id}`),
+
+  /**
+   * Create the draft. Only these fields; everything else on the wizard is a
+   * PATCH against the id this returns.
+   */
+  create: (body: CreateEventBody) => api.post<EventWire>('/events', body),
+
+  /** Every response carries the row already bumped, so the caller re-reads `version`. */
+  update: (id: string, body: Record<string, unknown>) =>
+    api.patch<EventWire>(`/events/${id}`, body),
+
+  /**
+   * Take the draft live. Refused with 422 unless the event has a title, a
+   * description, a place and a ticket type — the wizard checks the same rules
+   * first so nobody clicks a button that cannot work, but the API decides.
+   */
+  publish: (id: string, body: { visibility?: string; landingTemplateId?: string; confirmPastStart?: boolean; version?: number }) =>
+    api.post<EventWire>(`/events/${id}/publish`, body),
+
+  unpublish: (id: string, version?: number) =>
+    api.post<EventWire>(`/events/${id}/unpublish`, { version }),
+
   list: (query: ListEventsQuery) => api.list<EventListItemWire>('/events', { query }),
 
   /** The Active/Completed badges — live counts for the whole workspace. */

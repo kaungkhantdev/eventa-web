@@ -78,10 +78,14 @@ export function pageData<T>(load: (args: LoaderArgs) => Promise<T>) {
  * is not the API talking (a bug, a thrown redirect) still propagates.
  */
 export function pageAction(run: (args: LoaderArgs) => Promise<unknown>) {
-  return async (args: LoaderArgs): Promise<ActionResult> => {
+  return async (args: LoaderArgs): Promise<ActionResult | Response> => {
     requireSession()
     try {
-      await run(args)
+      const result = await run(args)
+      // An action that answers with a Response is redirecting — creating a
+      // draft moves the wizard to `?id=`. Swallowing it would leave the person
+      // on a URL that no longer describes what they are editing.
+      if (result instanceof Response) return result
       return { ok: true }
     } catch (cause) {
       if (cause instanceof ApiError && cause.isUnauthorized) throw signIn()

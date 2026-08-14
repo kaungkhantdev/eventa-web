@@ -37,4 +37,15 @@ export const ticketingApi = {
 
   add: (eventId: string, input: NewTicket) =>
     api.post<TicketWire>(`/events/${eventId}/tickets`, input),
+
+  update: (eventId: string, ticketId: string, input: NewTicket & { version?: number }) =>
+    api.patch<TicketWire>(`/events/${eventId}/tickets/${ticketId}`, input),
+
+  /**
+   * Remove a tier. The API answers `removed` when it never sold and `retired`
+   * when it did — holders keep their tickets — and the difference has to reach
+   * the organizer rather than being swallowed.
+   */
+  remove: (eventId: string, ticketId: string) =>
+    api.delete<{ outcome: 'removed' | 'retired' }>(`/events/${eventId}/tickets/${ticketId}`),
 }

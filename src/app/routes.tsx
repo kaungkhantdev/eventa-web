@@ -108,7 +108,10 @@ const adminChildren = [
   },
   {
     path: 'event-form',
-    ...page(() => import('@/features/events/pages/EventFormPage')),
+    ...livePage(
+      () => import('@/features/events/pages/EventFormPage'),
+      () => import('@/features/events/eventForm.routes').then((m) => m.eventFormRoute),
+    ),
     // focused create wizard: keep the icon rail, hide the module sub-nav panel
     handle: { page: 'event-form', focused: true },
   },

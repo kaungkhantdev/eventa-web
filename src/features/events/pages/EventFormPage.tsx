@@ -1,19 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useOutletContext } from 'react-router'
+import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
 import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
+import type { ActionResult } from '@/app/loaders'
 import { NotificationBell, SignedInChip } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import {
-  HL_ICONS,
-  INITIAL_HIGHLIGHTS,
-  INITIAL_TICKETS,
-  LETTERS,
-  STEPS,
-  type FormTicket,
-  type Highlight,
-} from '../data/eventForm'
+import { publishGaps, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
+import type { EventFormData } from '../eventForm.routes'
+import { EVENT_TYPES } from '../events.routes'
+import { LANDING_TEMPLATES } from '../landingTemplates'
+import type { EventType } from '../types'
+import { HL_ICONS, LETTERS, STEPS, type Highlight } from '../eventForm.presentation'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
    A five-step flow (Basics · Date & location · Seating · Tickets · Review)
@@ -22,11 +20,30 @@ import {
 
 type LocMode = 'inperson' | 'online'
 type Seating = 'ga' | 'reserved'
-type LandingTpl = 'aurora' | 'noir' | 'minimal'
+type LandingTpl = (typeof LANDING_TEMPLATES)[number]['id']
 
-const DESC_INITIAL =
-  'Join 1,500+ founders, engineers and investors for two days of talks, workshops and networking at BITEC.'
 const DESC_MAX = 250
+
+/** The API's publish requirements, in its own words — see events.service.ts. */
+const PUBLISH_REQUIREMENTS = [
+  'a title',
+  'a description',
+  'a venue or an online link',
+  'at least one ticket type',
+] as const
+
+/** How each reads once it is satisfied. */
+const REQUIREMENT_MET: Record<(typeof PUBLISH_REQUIREMENTS)[number], string> = {
+  'a title': 'Title added',
+  'a description': 'Description added',
+  'a venue or an online link': 'Location added',
+  'at least one ticket type': 'At least one ticket type',
+}
+
+/** A stored status → the word the console uses. */
+function statusLabel(status: string): string {
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
 
 /* Scoped CSS ported verbatim from the source page's inline <style> blocks. */
 const SCOPED_CSS = `
@@ -94,9 +111,23 @@ function SeatPreview({ rows, cols }: { rows: number; cols: number }) {
    Same toolbar and 250-char cap as the static kit's admin/event-form.html.
    Quill is instantiated imperatively so it works under React 19 without a
    wrapper lib; a ref guard makes it survive StrictMode's double-mount. */
-function DescriptionEditor() {
+function DescriptionEditor({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (text: string) => void
+}) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const [count, setCount] = useState(DESC_INITIAL.length)
+  const [count, setCount] = useState(value.length)
+  // Only what it opened with — retyping into a live editor would fight the user.
+  const [initialText] = useState(value)
+  // Quill is imperative and mounts once; the callback is read through a ref so
+  // the effect below never has to re-run and re-create the editor.
+  const latest = useRef(onChange)
+  useEffect(() => {
+    latest.current = onChange
+  })
 
   useEffect(() => {
     const host = hostRef.current
@@ -119,10 +150,13 @@ function DescriptionEditor() {
       },
     })
 
-    quill.setText(DESC_INITIAL)
+    if (initialText) quill.setText(initialText)
     const sync = () => {
       const len = Math.max(0, quill.getLength() - 1)
       setCount(len)
+      // The API stores the description as text, so that is what is reported —
+      // the toolbar's formatting is a writing aid, not something that persists.
+      latest.current(quill.getText().trim())
     }
     sync()
     quill.on('text-change', () => {
@@ -130,7 +164,7 @@ function DescriptionEditor() {
         quill.deleteText(DESC_MAX, quill.getLength(), 'silent')
       sync()
     })
-  }, [])
+  }, [initialText])
 
   return (
     <div>
@@ -154,30 +188,108 @@ function DescriptionEditor() {
 
 export default function EventFormPage() {
   const ctx = useOutletContext<AdminOutletContext | null>()
-  const navigate = useNavigate()
+
+  const { values: initial, template } = useLoaderData() as EventFormData
+  const fetcher = useFetcher<ActionResult>()
+  const saving = fetcher.state !== 'idle'
 
   const [cur, setCur] = useState(0)
-  const [loc, setLoc] = useState<LocMode>('inperson')
-  const [seating, setSeating] = useState<Seating>('ga')
-  const [rows, setRows] = useState('7')
-  const [cols, setCols] = useState('16')
-  const [title, setTitle] = useState('Tech Summit 2026')
-  const [venue, setVenue] = useState('BITEC')
-  const [capacity, setCapacity] = useState('1500')
-  const [tickets, setTickets] = useState<FormTicket[]>(() => INITIAL_TICKETS.map((t) => ({ ...t })))
+  const [loc, setLoc] = useState<LocMode>(initial.isOnline ? 'online' : 'inperson')
+  const [seating, setSeating] = useState<Seating>(initial.seatingMode)
+  const [rows, setRows] = useState(initial.seatRows || '7')
+  const [cols, setCols] = useState(initial.seatsPerRow || '16')
+  const [title, setTitle] = useState(initial.name)
+  const [description, setDescription] = useState(initial.description)
+  const [type, setType] = useState<EventType>(initial.type)
+  const [startDate, setStartDate] = useState(initial.startDate)
+  const [startTime, setStartTime] = useState(initial.startTime)
+  const [endDate, setEndDate] = useState(initial.endDate)
+  const [endTime, setEndTime] = useState(initial.endTime)
+  const [venue, setVenue] = useState(initial.venueName)
+  const [address, setAddress] = useState(initial.venueAddress)
+  const [onlineNote, setOnlineNote] = useState(initial.onlineNote)
+  const [capacity, setCapacity] = useState(initial.capacity)
   const [highlights, setHighlights] = useState<Highlight[]>(() =>
-    INITIAL_HIGHLIGHTS.map((h) => ({ ...h })),
+    initial.highlights.map((h) => ({ icon: h.icon ?? 'hgi-sparkles', label: h.text })),
   )
-  const [requireApproval, setRequireApproval] = useState(false)
-  const [waitlist, setWaitlist] = useState(true)
-  const [landingTpl, setLandingTpl] = useState<LandingTpl>('aurora')
+  const [landingTpl, setLandingTpl] = useState<LandingTpl>(template)
+  const [visibility, setVisibility] = useState('public')
+
+  // Rows start as whatever the API has stored; a row with no id has not been
+  // saved yet, which is also what the publish gate checks.
+  const [tickets, setTickets] = useState<TicketDraft[]>(() => initial.tickets.map((t) => ({ ...t })))
+
+  // When a save lands, the loader revalidates and the rows come back carrying
+  // ids. Re-seeding on that — and only on that, not on every revalidation —
+  // is what lets the publish gate go green without discarding a row being typed.
+  const savedIds = initial.tickets.map((t) => t.id).join(',')
+  const [seenIds, setSeenIds] = useState(savedIds)
+  if (savedIds !== seenIds) {
+    setSeenIds(savedIds)
+    setTickets(initial.tickets.map((t) => ({ ...t })))
+  }
 
   const online = loc === 'online'
+
+  /** Everything the action needs, gathered from the fields on screen. */
+  const collect = (): EventFormValues => ({
+    ...initial,
+    name: title,
+    description,
+    type,
+    startDate,
+    startTime,
+    endDate,
+    endTime,
+    venueName: online ? '' : venue,
+    venueAddress: online ? '' : address,
+    isOnline: online,
+    onlineNote: online ? onlineNote : '',
+    seatingMode: seating,
+    capacity,
+    seatRows: rows,
+    seatsPerRow: cols,
+    highlights: highlights.map((h) => ({ text: h.label, icon: h.icon })),
+    tickets,
+  })
+
+  const submit = (fields: Record<string, string> = {}) =>
+    fetcher.submit({ values: JSON.stringify(collect()), ...fields }, { method: 'post' })
+
+  /** What the API still needs before it will publish this one. */
+  const gaps = publishGaps(collect())
+  const isDraft = initial.status === null || initial.status === 'draft'
   const pct = Math.round(((cur + 1) / STEPS.length) * 100)
   const last = cur === STEPS.length - 1
   const rowsNum = Number(rows) || 0
   const colsNum = Number(cols) || 0
   const seatTotal = rowsNum * colsNum
+
+  /**
+   * `POST /events` needs a name, a type and a start — and the start is asked
+   * for on step 2. So the draft is created on the way out of that step, not the
+   * first one; before then there is nothing the API would accept.
+   */
+  const canCreate = Boolean(title.trim() && startDate)
+
+  /**
+   * Save whatever step is open.
+   *
+   * The first save creates the event and puts its id in the URL, so the work
+   * survives a refresh; each later step sends the call that step owns.
+   */
+  const saveStep = () => {
+    if (!initial.id) {
+      if (canCreate) submit({ intent: 'create' })
+      return
+    }
+    if (cur === 2) submit({ intent: 'seating' })
+    else if (cur === 3) submit({ intent: 'tickets' })
+    else submit({ intent: 'save' })
+  }
+
+  const publish = () =>
+    submit({ intent: 'publish', visibility, template: landingTpl, confirmPastStart: 'on' })
 
   const goTo = (i: number) => {
     setCur(Math.max(0, Math.min(STEPS.length - 1, i)))
@@ -190,11 +302,24 @@ export default function EventFormPage() {
       ? `Reserved · ${rowsNum}×${colsNum}`
       : 'General admission'
 
-  const addTicket = () => setTickets((prev) => [...prev, { name: '', price: '', quantity: '' }])
-  const removeTicket = (i: number) =>
-    setTickets((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : prev))
-  const setTicketField = (i: number, field: keyof FormTicket, value: string) =>
-    setTickets((prev) => prev.map((t, j) => (j === i ? { ...t, [field]: value } : t)))
+  const addTicket = () =>
+    setTickets((prev) => [...prev, { id: null, name: '', price: '', quantity: '', isFree: false }])
+
+  /** A saved tier is removed on the server; an unsaved row just goes. */
+  const removeTicket = (index: number) => {
+    const row = tickets[index]
+    if (row?.id) {
+      fetcher.submit(
+        { intent: 'remove-ticket', ticketId: row.id, values: JSON.stringify(collect()) },
+        { method: 'post' },
+      )
+      return
+    }
+    setTickets((prev) => prev.filter((_, j) => j !== index))
+  }
+
+  const setTicketField = (index: number, field: 'name' | 'price' | 'quantity', value: string) =>
+    setTickets((prev) => prev.map((t, j) => (j === index ? { ...t, [field]: value } : t)))
 
   const addHighlight = () =>
     setHighlights((prev) => [...prev, { icon: 'hgi-sparkles', label: '' }])
@@ -235,15 +360,36 @@ export default function EventFormPage() {
           <i className="hgi-stroke hgi-arrow-left-01 text-[18px]" />
         </Link>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
-          <Link to="/admin/events" className="btn btn-soft">
+          <button
+            type="button"
+            onClick={saveStep}
+            disabled={saving || (!initial.id && !canCreate)}
+            title={
+              initial.id || canCreate
+                ? undefined
+                : 'A title and a start date are needed before this can be saved'
+            }
+            className="btn btn-soft disabled:opacity-60"
+          >
             <i className="hgi-stroke hgi-note-03 text-[16px]" />
-            <span className="hidden sm:inline">Save as draft</span>
+            <span className="hidden sm:inline">{saving ? 'Saving…' : 'Save as draft'}</span>
             <span className="sm:hidden">Draft</span>
-          </Link>
+          </button>
           <NotificationBell />
           <SignedInChip />
         </div>
       </div>
+
+      {/* The API's own sentence when it refuses — a 400 on create, a 409 on a
+          stale version, a 422 listing what publishing still needs. */}
+      {fetcher.data?.error && (
+        <p
+          role="alert"
+          className="mb-4 rounded-lg bg-rose-500/10 px-3 py-2.5 text-[13px] text-rose-600 dark:text-rose-400"
+        >
+          {fetcher.data.error}
+        </p>
+      )}
 
       {/* wizard layout */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[230px_minmax(0,1fr)] xl:grid-cols-[230px_minmax(0,1fr)_270px]">
@@ -329,28 +475,24 @@ export default function EventFormPage() {
                     onChange={(e) => setTitle(e.target.value)}
                   />
                 </div>
-                <DescriptionEditor />
+                <DescriptionEditor value={initial.description} onChange={setDescription} />
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="label">Category</label>
-                    <select className="select" defaultValue="Conference">
-                      <option>Conference</option>
-                      <option>Workshop</option>
-                      <option>Concert &amp; Festival</option>
-                      <option>Meetup</option>
-                      <option>Sports &amp; Wellness</option>
-                      <option>Networking</option>
+                    <label className="label" htmlFor="event-type">
+                      Type
+                    </label>
+                    <select
+                      id="event-type"
+                      className="select"
+                      value={type}
+                      onChange={(e) => setType(e.target.value as EventType)}
+                    >
+                      {EVENT_TYPES.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
                     </select>
-                  </div>
-                  <div>
-                    <label className="label">Tags</label>
-                    <input
-                      className="input"
-                      type="text"
-                      placeholder="tech, ai, networking"
-                      defaultValue="tech, ai, startup"
-                    />
-                    <p className="hint">Comma-separated, used for search &amp; recommendations.</p>
                   </div>
                 </div>
               </div>
@@ -440,30 +582,47 @@ export default function EventFormPage() {
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="label">Start date</label>
-                  <input className="input" type="date" defaultValue="2026-08-18" />
+                  <input
+                    className="input"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
                 </div>
                 <div>
                   <label className="label">Start time</label>
-                  <input className="input" type="time" defaultValue="09:00" />
+                  <input
+                    className="input"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
                 </div>
                 <div>
                   <label className="label">End date</label>
-                  <input className="input" type="date" defaultValue="2026-08-19" />
+                  <input
+                    className="input"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
                 </div>
                 <div>
                   <label className="label">End time</label>
-                  <input className="input" type="time" defaultValue="18:00" />
+                  <input
+                    className="input"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="mt-3">
                 <label className="label">Timezone</label>
-                <select className="select" defaultValue="GMT+7 Bangkok">
-                  <option>GMT+7 Bangkok</option>
-                  <option>GMT+8 Singapore</option>
-                  <option>GMT+9 Tokyo</option>
-                  <option>GMT+1 Berlin</option>
-                  <option>GMT+0 London</option>
-                </select>
+                {/* Every event in this product runs on Bangkok time — the times
+                    above are that wall clock, and offering others would imply a
+                    choice the API does not store. */}
+                <input className="input" type="text" value="GMT+7 Bangkok" readOnly disabled />
               </div>
             </section>
 
@@ -509,7 +668,8 @@ export default function EventFormPage() {
                       className="input"
                       type="text"
                       placeholder="Street, district, city"
-                      defaultValue="88 Bangna-Trad Rd, Bang Na, Bangkok"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
                     />
                   </div>
                 </div>
@@ -523,7 +683,9 @@ export default function EventFormPage() {
                   <input
                     className="input"
                     type="url"
-                    placeholder="https://meet.eventa.io/tech-summit-2026"
+                    placeholder="https://meet.eventa.io/your-event"
+                    value={onlineNote}
+                    onChange={(e) => setOnlineNote(e.target.value)}
                   />
                   <p className="hint">Sent to attendees by email once they register.</p>
                 </div>
@@ -761,62 +923,9 @@ export default function EventFormPage() {
                     value={capacity}
                     onChange={(e) => setCapacity(e.target.value)}
                   />
-                </div>
-                <div>
-                  <label className="label">Registration opens</label>
-                  <input className="input" type="date" defaultValue="2026-07-14" />
-                </div>
-                <div>
-                  <label className="label">Registration closes</label>
-                  <input className="input" type="date" defaultValue="2026-08-17" />
-                </div>
-              </div>
-              <div className="mt-4 space-y-3 border-t border-line pt-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-ink">Require approval</p>
-                    <p className="text-[11px] text-muted">
-                      Manually review each registration before it's confirmed.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setRequireApproval((v) => !v)}
-                    className={cn(
-                      'flex h-5 w-9 shrink-0 items-center rounded-full p-0.5',
-                      requireApproval ? 'bg-brand' : 'bg-line',
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'h-4 w-4 rounded-full bg-white shadow transition-transform',
-                        requireApproval && 'translate-x-4',
-                      )}
-                    />
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-ink">Enable waitlist</p>
-                    <p className="text-[11px] text-muted">
-                      Let attendees join a waitlist once capacity is reached.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setWaitlist((v) => !v)}
-                    className={cn(
-                      'flex h-5 w-9 shrink-0 items-center rounded-full p-0.5',
-                      waitlist ? 'bg-brand' : 'bg-line',
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'h-4 w-4 rounded-full bg-white shadow transition-transform',
-                        waitlist && 'translate-x-4',
-                      )}
-                    />
-                  </button>
+                  <p className="hint">
+                    Total headcount. Each ticket tier carries its own sales window.
+                  </p>
                 </div>
               </div>
             </section>
@@ -931,18 +1040,28 @@ export default function EventFormPage() {
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="label">Status</label>
-                  <select className="select" defaultValue="Draft">
-                    <option>Draft</option>
-                    <option>Published</option>
-                    <option>Archived</option>
-                  </select>
+                  {/* Read-only: the button below is what changes it, and the
+                      lifecycle has no "Archived" — an event is cancelled. */}
+                  <p className="mt-1 text-[13px] font-semibold text-ink">
+                    {initial.status ? statusLabel(initial.status) : 'Not created yet'}
+                  </p>
                 </div>
                 <div>
-                  <label className="label">Visibility</label>
-                  <select className="select" defaultValue="Public">
-                    <option>Public</option>
-                    <option>Private</option>
-                    <option>Unlisted</option>
+                  <label className="label" htmlFor="visibility">
+                    Visibility
+                  </label>
+                  {/* Only settable at publish time — that is the one body the
+                      API takes it in. */}
+                  <select
+                    id="visibility"
+                    className="select"
+                    value={visibility}
+                    onChange={(e) => setVisibility(e.target.value)}
+                    disabled={!isDraft}
+                  >
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                    <option value="unlisted">Unlisted</option>
                   </select>
                 </div>
               </div>
@@ -954,27 +1073,31 @@ export default function EventFormPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
                   Publish checklist
                 </p>
+                {/* The same four rules the API applies, so the checklist and
+                    the Publish button agree with the server before it is asked. */}
                 <ul className="mt-2.5 space-y-2">
-                  <li className="flex items-center gap-2 text-[13px] text-ink">
-                    <i className="hgi-stroke hgi-checkmark-circle-02 text-[15px] text-brand" />
-                    Title &amp; description added
-                  </li>
-                  <li className="flex items-center gap-2 text-[13px] text-ink">
-                    <i className="hgi-stroke hgi-checkmark-circle-02 text-[15px] text-brand" />
-                    Date &amp; time set
-                  </li>
-                  <li className="flex items-center gap-2 text-[13px] text-ink">
-                    <i className="hgi-stroke hgi-checkmark-circle-02 text-[15px] text-brand" />
-                    Location added
-                  </li>
-                  <li className="flex items-center gap-2 text-[13px] text-ink">
-                    <i className="hgi-stroke hgi-checkmark-circle-02 text-[15px] text-brand" />
-                    At least one ticket type
-                  </li>
-                  <li className="flex items-center gap-2 text-[13px] text-muted">
-                    <i className="hgi-stroke hgi-alert-circle text-[15px] text-amber-500 dark:text-amber-300" />
-                    Cover image not uploaded
-                  </li>
+                  {PUBLISH_REQUIREMENTS.map((requirement) => {
+                    const missing = gaps.includes(requirement)
+                    return (
+                      <li
+                        key={requirement}
+                        className={cn(
+                          'flex items-center gap-2 text-[13px]',
+                          missing ? 'text-muted' : 'text-ink',
+                        )}
+                      >
+                        <i
+                          className={cn(
+                            'text-[15px]',
+                            missing
+                              ? 'hgi-stroke hgi-alert-circle text-amber-500 dark:text-amber-300'
+                              : 'hgi-stroke hgi-checkmark-circle-02 text-brand',
+                          )}
+                        />
+                        {missing ? `Still needs ${requirement}` : REQUIREMENT_MET[requirement]}
+                      </li>
+                    )
+                  })}
                 </ul>
               </div>
             </section>
@@ -992,17 +1115,27 @@ export default function EventFormPage() {
             </button>
             <button
               type="button"
-              onClick={() => (last ? navigate('/admin/events') : goTo(cur + 1))}
-              className="btn btn-primary min-w-[132px] justify-center"
+              disabled={saving || (last ? gaps.length > 0 || !isDraft : cur === 1 && !canCreate)}
+              title={last && gaps.length ? `Still needs ${gaps.join(', ')}` : undefined}
+              onClick={() => {
+                // Each Next saves the step it is leaving, so nothing is held in
+                // the browser waiting for a final submit that may never come.
+                if (last) publish()
+                else {
+                  saveStep()
+                  goTo(cur + 1)
+                }
+              }}
+              className="btn btn-primary min-w-[132px] justify-center disabled:opacity-60"
             >
               {last ? (
                 <>
                   <i className="hgi-stroke hgi-checkmark-circle-02 text-[16px]" />
-                  Publish event
+                  {saving ? 'Publishing…' : 'Publish event'}
                 </>
               ) : (
                 <>
-                  Next
+                  {saving ? 'Saving…' : 'Next'}
                   <i className="hgi-stroke hgi-arrow-right-01 text-[15px]" />
                 </>
               )}
