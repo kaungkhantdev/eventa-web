@@ -1,4 +1,4 @@
-import { bangkokDate, initials, satang } from '@/lib/format'
+import { MASKED, bangkokDate, initials, satang } from '@/lib/format'
 import type {
   Registration,
   RegistrationEntry,
@@ -34,6 +34,7 @@ export function toRegistrationRow(entry: RegistrationEntry): Registration {
     name: entry.buyerName,
     email: entry.buyerEmail,
     event: entry.eventName,
+    ticket: entry.ticketTypeName ?? MASKED,
     seats: entry.seats,
     date: bangkokDate(entry.registeredAt),
     amount: satang(entry.totalSatang),

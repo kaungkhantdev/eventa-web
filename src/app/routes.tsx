@@ -161,7 +161,10 @@ const adminChildren = [
   },
   {
     path: 'registrations',
-    ...page(() => import('@/features/attendees/pages/RegistrationsPage')),
+    ...livePage(
+      () => import('@/features/attendees/pages/RegistrationsPage'),
+      () => import('@/features/attendees/registrations.routes').then((m) => m.registrationsRoute),
+    ),
     handle: { page: 'registrations' },
   },
   {

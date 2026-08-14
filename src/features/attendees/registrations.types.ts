@@ -32,6 +32,12 @@ export interface RegistrationEntry {
   status: RegistrationWireStatus
   paymentStatus: string
   seats: number
+  /**
+   * The tier bought, or every tier comma-joined on a mixed order. Null once the
+   * tier has been hard-deleted — NOT a masked field: what someone bought is not
+   * the same privilege as what they paid, so it is shown without `finView`.
+   */
+  ticketTypeName: string | null
   /** Integer satang, or null when the caller lacks `finView` (US-REG-01). */
   totalSatang: number | null
   /** The API's own rendering. We derive from `totalSatang` instead — see mapper. */
@@ -63,6 +69,8 @@ export interface Registration {
   name: string
   email: string
   event: string
+  /** The tier bought — `VIP`, `Early Bird, VIP`, or `—` if it was deleted. */
+  ticket: string
   seats: number
   date: string
   /** `฿2,400`, `Free`, or `—` when withheld. Never `฿0`. */

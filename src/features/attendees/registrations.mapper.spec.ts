@@ -13,6 +13,7 @@ const entry = (o: Partial<RegistrationEntry> = {}): RegistrationEntry => ({
   status: 'confirmed',
   paymentStatus: 'paid',
   seats: 2,
+  ticketTypeName: 'VIP',
   totalSatang: 240_000,
   amountLabel: '฿2,400',
   registeredAt: '2026-07-08T03:00:00Z',
@@ -44,6 +45,23 @@ describe('a registration row, as the queue shows it (US-REG-01)', () => {
 
   it('shows the registration date in Bangkok', () => {
     expect(toRegistrationRow(entry()).date).toBe('Jul 8, 2026')
+  })
+
+  describe('the tier they bought', () => {
+    it('names it', () => {
+      expect(toRegistrationRow(entry()).ticket).toBe('VIP')
+    })
+
+    it('lists every tier of a mixed order, as the API joined them', () => {
+      const row = toRegistrationRow(entry({ ticketTypeName: 'Early Bird, VIP' }))
+      expect(row.ticket).toBe('Early Bird, VIP')
+    })
+
+    it('shows a dash when the tier no longer exists, never an empty cell', () => {
+      // The API answers null once a tier has been hard-deleted; the order is
+      // still real, so the row must stay readable rather than losing a column.
+      expect(toRegistrationRow(entry({ ticketTypeName: null })).ticket).toBe(MASKED)
+    })
   })
 
   describe('the amount', () => {
