@@ -1,9 +1,11 @@
+import type { Persona } from '@/lib/persona'
+
 /** The signed-in person, as `/auth/login` and `/auth/me` describe them. */
 export interface Me {
   id: string
   name: string
   email: string
-  persona: 'admin' | 'attendee'
+  persona: Persona
   status: 'Active' | 'Invited' | 'Suspended'
   twoFactorEnabled: boolean
   organization: {
@@ -30,7 +32,12 @@ export type LoginResult =
 export interface Credentials {
   email: string
   password: string
-  /** The organizer workspace. Attendees sign in without one. */
+  /** Which audience is signing in — the two never share a login. */
+  persona: Persona
+  /**
+   * The organizer workspace. Absent for an attendee, who has one platform-wide
+   * realm: sending it is refused with a 422, not ignored.
+   */
   orgSlug?: string
   rememberMe?: boolean
 }

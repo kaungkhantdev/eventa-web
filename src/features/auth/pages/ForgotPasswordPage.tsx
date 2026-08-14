@@ -1,12 +1,18 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { authApi } from '@/features/auth/api'
+import { personaOfSearch, signInPathFor } from '@/features/auth/personas'
 import { messageOf } from '@/lib/api'
 
 export default function ForgotPasswordPage() {
+  const [params] = useSearchParams()
+  // One page serves both audiences, and the API looks the address up in that
+  // persona's realm — so an attendee arriving here without the flag would be
+  // searched for among organizers and never found.
+  const persona = personaOfSearch(params)
   const [email, setEmail] = useState('')
   const [sentEmail, setSentEmail] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
@@ -25,7 +31,7 @@ export default function ForgotPasswordPage() {
     setPending(true)
     setError(null)
     try {
-      await authApi.forgotPassword(email)
+      await authApi.forgotPassword(email, persona)
       setSentEmail(email || 'that email')
     } catch (cause) {
       setError(messageOf(cause))
@@ -41,7 +47,7 @@ export default function ForgotPasswordPage() {
       footer={
         <p className="mt-6 text-center text-[13px]">
           <Link
-            to="/auth/login"
+            to={signInPathFor(persona)}
             className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
           >
             <Icon name="hgi-arrow-left-01" size={14} />

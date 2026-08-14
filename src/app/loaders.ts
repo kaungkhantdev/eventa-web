@@ -1,6 +1,8 @@
 import { redirect } from 'react-router'
 import { ApiError, NetworkError, messageOf, session } from '@/lib/api'
+import type { Persona } from '@/lib/persona'
 import { authApi } from '@/features/auth/api'
+import { signInPathFor } from '@/features/auth/personas'
 import type { Me } from '@/features/auth/types'
 
 /**
@@ -16,7 +18,7 @@ import type { Me } from '@/features/auth/types'
 
 /** A page that reads nothing — the loader exists only to gate on the session. */
 export const guardedLoader = async () => {
-  requireSession()
+  requirePersona('admin')
   return null
 }
 
@@ -28,16 +30,39 @@ export const guardedLoader = async () => {
  * (ADMIN_ROUTE_ID)` reads it anywhere below the shell without a context or a
  * store — the router already holds it, and it revalidates on navigation.
  */
-export const adminShellLoader = async (): Promise<{ me: Me }> => {
-  requireSession()
+export const adminShellLoader = () => shellLoader('admin')
+
+/**
+ * The attendee portal's guard, for the one route that needs a session.
+ *
+ * Browsing and registering for an event never require an account, so this is
+ * deliberately not applied to the rest of `/portal/*`.
+ */
+export const attendeeLoader = () => shellLoader('attendee')
+
+/**
+ * Gate on the session, then load who is signed in — and check the API agrees.
+ *
+ * The stored label only tidies the UI; `me.persona` is the answer that counts,
+ * because the label is written by this app and the token is validated by the
+ * server. If they disagree, the storage is wrong: end it rather than render a
+ * console for someone the API will refuse on every subsequent request.
+ */
+async function shellLoader(persona: Persona): Promise<{ me: Me }> {
+  requirePersona(persona)
   try {
-    return { me: await authApi.me() }
+    const me = await authApi.me()
+    if (me.persona !== persona) {
+      session.end()
+      throw signIn(persona)
+    }
+    return { me }
   } catch (cause) {
     // The token was present but the API rejected it and the refresh could not
     // save it — end the session rather than looping the shell against a 401.
     if (cause instanceof ApiError && cause.isUnauthorized) {
       session.end()
-      throw signIn()
+      throw signIn(persona)
     }
     throw cause
   }
@@ -56,13 +81,13 @@ export const ADMIN_ROUTE_ID = 'admin'
  */
 export function pageData<T>(load: (args: LoaderArgs) => Promise<T>) {
   return async (args: LoaderArgs): Promise<T> => {
-    requireSession()
+    requirePersona('admin')
     try {
       return await load(args)
     } catch (cause) {
       // An expired session that survived the check above — the token was
       // present but the API refused it, and the refresh could not save it.
-      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn()
+      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn('admin')
       throw cause
     }
   }
@@ -79,7 +104,7 @@ export function pageData<T>(load: (args: LoaderArgs) => Promise<T>) {
  */
 export function pageAction(run: (args: LoaderArgs) => Promise<unknown>) {
   return async (args: LoaderArgs): Promise<ActionResult | Response> => {
-    requireSession()
+    requirePersona('admin')
     try {
       const result = await run(args)
       // An action that answers with a Response is redirecting — creating a
@@ -88,7 +113,7 @@ export function pageAction(run: (args: LoaderArgs) => Promise<unknown>) {
       if (result instanceof Response) return result
       return { ok: true }
     } catch (cause) {
-      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn()
+      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn('admin')
       if (cause instanceof ApiError || cause instanceof NetworkError) {
         return { ok: false, error: messageOf(cause) }
       }
@@ -109,19 +134,25 @@ export interface LoaderArgs {
   params: Record<string, string | undefined>
 }
 
-/** Refuse before fetching: an unauthenticated call would only 401 anyway. */
-function requireSession() {
-  if (!session.isSignedIn()) throw signIn()
+/**
+ * Refuse before fetching: an unauthenticated call would only 401 anyway.
+ *
+ * The persona has to match, not merely exist. A browser holding an attendee
+ * session would otherwise pass a bare "is signed in" check, and every admin
+ * request behind it would 403 — an error screen where a sign-in was meant.
+ */
+function requirePersona(persona: Persona) {
+  if (session.persona() !== persona) throw signIn(persona)
 }
 
 /**
- * Send them to sign in, remembering where they were headed so the login can
- * return them there rather than dumping everyone on the dashboard.
+ * Send them to sign in — at their OWN login, remembering where they were headed
+ * so it can return them there rather than dumping everyone on a dashboard.
  */
-function signIn(): Response {
+function signIn(persona: Persona): Response {
   const from = window.location.pathname + window.location.search
   const to = from && from !== '/' ? `?from=${encodeURIComponent(from)}` : ''
-  return redirect(`/auth/login${to}`)
+  return redirect(`${signInPathFor(persona)}${to}`)
 }
 
 /** Read the paging and filter parameters a list page was asked for. */

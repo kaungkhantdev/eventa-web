@@ -1,4 +1,6 @@
 import { api, session } from '@/lib/api'
+import type { Persona } from '@/lib/persona'
+import { personaOfSession } from './personas'
 import type { Credentials, LoginResult, Me } from './types'
 
 /** What the API actually returns — flattened into `LoginResult` below. */
@@ -21,11 +23,9 @@ interface RawLogin {
  */
 export const authApi = {
   async login(credentials: Credentials): Promise<LoginResult> {
-    const raw = await api.post<RawLogin>(
-      '/auth/login',
-      { ...credentials, persona: 'admin' },
-      { anonymous: true },
-    )
+    // The persona travels inside `credentials`, built by `credentialsOf` — the
+    // one place that also knows an attendee must not name a workspace.
+    const raw = await api.post<RawLogin>('/auth/login', credentials, { anonymous: true })
     return establish(raw)
   },
 
@@ -49,8 +49,11 @@ export const authApi = {
    * cannot be used to discover who is registered. The page must show the same
    * confirmation either way.
    */
-  async forgotPassword(email: string): Promise<void> {
-    await api.post('/auth/forgot-password', { email, persona: 'admin' }, { anonymous: true })
+  async forgotPassword(email: string, persona: Persona): Promise<void> {
+    // Stated rather than defaulted: the API looks the address up in that
+    // persona's realm, so an attendee sent as an organizer is never found and
+    // the uniform "check your inbox" would be a lie.
+    await api.post('/auth/forgot-password', { email, persona }, { anonymous: true })
   },
 
   /** Finish a reset with the token from the emailed link. */
@@ -100,10 +103,13 @@ function establish(raw: RawLogin): LoginResult {
     }
   }
   // The API always sends all three together on a completed sign-in; the DTO
-  // marks them optional only because the two-factor branch omits them.
+  // marks them optional only because the two-factor branch omits them. The
+  // persona is read off the user the SERVER returned, so the session is
+  // labelled with who it actually is rather than who the form asked for.
   session.start({
     accessToken: raw.accessToken ?? '',
     refreshToken: raw.refreshToken ?? '',
+    persona: personaOfSession(raw.user) ?? 'admin',
   })
   return {
     twoFactorRequired: false,

@@ -1,57 +1,13 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
+import { useState } from 'react'
+import { Link } from 'react-router'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { SocialAuth } from '@/features/auth/components/SocialAuth'
-import { authApi } from '@/features/auth/api'
-import { messageOf } from '@/lib/api'
-
-/** Where an organizer lands once they are in. */
-const HOME = '/admin/dashboard'
+import { useSignIn } from '@/features/auth/useSignIn'
 
 export default function LoginPage() {
-  const navigate = useNavigate()
-  const [params] = useSearchParams()
   const [showPw, setShowPw] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  /** Set when the password was right but a code is still owed (US-ACC-05). */
-  const [challenge, setChallenge] = useState<string | null>(null)
-
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    if (pending) return
-    const form = new FormData(e.currentTarget)
-    setPending(true)
-    setError(null)
-    try {
-      const result = challenge
-        ? await authApi.completeTwoFactor(challenge, String(form.get('code') ?? ''))
-        : await authApi.login({
-            email: String(form.get('email') ?? ''),
-            password: String(form.get('password') ?? ''),
-            orgSlug: String(form.get('orgSlug') ?? '').trim() || undefined,
-            rememberMe: form.get('rememberMe') === 'on',
-          })
-      if (result.twoFactorRequired) {
-        setChallenge(result.challengeToken)
-        return
-      }
-      // Back where they were headed when the guard stopped them. Only a
-      // same-site path is honoured — a `from` of `//evil.example` would
-      // otherwise turn this into an open redirect.
-      const from = params.get('from')
-      navigate(from?.startsWith('/') && !from.startsWith('//') ? from : HOME, {
-        replace: true,
-      })
-    } catch (cause) {
-      // The API writes these for the person reading them — show them verbatim
-      // rather than inventing a generic "sign-in failed".
-      setError(messageOf(cause))
-    } finally {
-      setPending(false)
-    }
-  }
+  const { pending, error, challenge, submit: onSubmit } = useSignIn('admin')
 
   return (
     <AuthLayout

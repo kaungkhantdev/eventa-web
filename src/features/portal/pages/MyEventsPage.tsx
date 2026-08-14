@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLoaderData, useNavigate } from 'react-router'
 import { Badge, Icon, PillTabs, Paginator, usePagination, type PillTabItem } from '@/components/ui'
+import { authApi } from '@/features/auth/api'
+import type { Me } from '@/features/auth/types'
 import { useTheme } from '@/lib/useTheme'
 import { useDisclosure } from '@/lib/useDisclosure'
-import { baht, num } from '@/lib/format'
+import { baht, initials, num } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { TicketModal } from '../components/TicketModal'
 import type { FlyerTicket } from '../lib/ticketFlyer'
@@ -101,7 +103,10 @@ function UpcomingCard({ ev, onTicket }: { ev: UpcomingEvent; onTicket: (t: Flyer
           </p>
         </div>
         <div className="mt-3.5 flex items-center gap-2 border-t border-hair pt-3.5">
-          <Link to="/admin/event-detail" className="btn btn-soft btn-sm flex-1">
+          {/* An attendee's "Details" pointed into the organizer console, which
+              they may not open — the API answers 403. Their own event page is
+              the public one. */}
+          <Link to="/portal/discover" className="btn btn-soft btn-sm flex-1">
             <Icon name="hgi-eye" size={14} />
             Details
           </Link>
@@ -177,8 +182,17 @@ function PastCard({ ev }: { ev: PastEvent }) {
 }
 
 export default function MyEventsPage() {
+  // Who is signed in is real; the tickets and transactions below are still the
+  // demo modules, and migrating them is US-DISC-07/09/10 — a separate change.
+  const { me } = useLoaderData() as { me: Me }
+  const navigate = useNavigate()
   const { dark, toggle } = useTheme()
   const [tab, setTabState] = useState<Tab>('events')
+
+  async function signOut() {
+    await authApi.logout()
+    navigate('/portal/login', { replace: true })
+  }
 
   const modal = useDisclosure()
   const [ticket, setTicket] = useState<FlyerTicket | null>(null)
@@ -241,13 +255,21 @@ export default function MyEventsPage() {
               title="Account"
             >
               <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-brand to-emerald-400 text-[11px] font-semibold text-white">
-                AP
+                {initials(me.name)}
               </span>
-              <span className="hidden text-[13px] font-semibold sm:inline">Anong</span>
+              <span className="hidden text-[13px] font-semibold sm:inline">{me.name}</span>
             </button>
-            <Link to="/portal/login" className="btn-icon bg-surface" title="Sign out">
+            {/* A real sign-out. This used to be a Link, which navigated away and
+                left the tokens in localStorage — so "signed out" was a change of
+                page rather than of session. */}
+            <button
+              type="button"
+              onClick={signOut}
+              className="btn-icon bg-surface"
+              title="Sign out"
+            >
               <Icon name="hgi-logout-03" size={18} />
-            </Link>
+            </button>
           </div>
         </div>
       </header>
