@@ -96,7 +96,10 @@ const livePage = (
 const adminChildren = [
   {
     path: 'home',
-    ...page(() => import('@/features/overview/pages/HomePage')),
+    ...livePage(
+      () => import('@/features/overview/pages/HomePage'),
+      () => import('@/features/overview/overview.routes').then((m) => m.homeRoute),
+    ),
     handle: { page: 'home' },
   },
   {
