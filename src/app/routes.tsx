@@ -104,7 +104,10 @@ const adminChildren = [
   },
   {
     path: 'dashboard',
-    ...page(() => import('@/features/overview/pages/DashboardPage')),
+    ...livePage(
+      () => import('@/features/overview/pages/DashboardPage'),
+      () => import('@/features/overview/dashboard.routes').then((m) => m.dashboardRoute),
+    ),
     handle: { page: 'dashboard' },
   },
   {

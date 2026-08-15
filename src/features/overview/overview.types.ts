@@ -97,6 +97,70 @@ export interface MeetingWire {
   mode: string
 }
 
+/** How a figure moved against the comparable previous period. */
+export interface ChangeWire {
+  direction: 'up' | 'down' | 'flat'
+  /** Null when there is no baseline to compare against. */
+  percent: number | null
+  /** Null when flat — "better" has no meaning without a movement. */
+  improved: boolean | null
+}
+
+export interface KpiWire {
+  /** Null is the empty state, never a misleading zero. */
+  value: number | null
+  change: ChangeWire
+}
+
+export interface KpisWire {
+  registrations: KpiWire
+  /** Null without finance access — the card is not shown at all. */
+  revenueSatang: KpiWire | null
+  upcomingEvents: KpiWire
+  checkInRate: KpiWire
+  capacityFilled: KpiWire
+}
+
+export type RevenueRange = 'week' | 'month' | 'year'
+
+export interface RevenuePointWire {
+  at: string
+  /** Integer satang, net of VAT and refunds. */
+  netSatang: number
+}
+
+export interface RevenueTrendWire {
+  range: RevenueRange
+  totalSatang: number
+  change: ChangeWire
+  points: RevenuePointWire[]
+}
+
+export interface TierSliceWire {
+  ticketTypeName: string
+  count: number
+  percent: number
+}
+
+export interface SellingFastWire {
+  ticketTypeId: string
+  ticketTypeName: string
+  eventId: string
+  eventName: string
+  remaining: number
+  total: number
+}
+
+export interface AnalyticsWire {
+  kpis: KpisWire
+  /** Absent entirely without finance access. */
+  revenue: RevenueTrendWire | null
+  recent: FeedItemWire[]
+  tierMix: TierSliceWire[]
+  sellingFast: SellingFastWire[]
+  generatedAt: string
+}
+
 /* ── view models ──────────────────────────────────────────────────────── */
 
 export interface RegistrationRow {
@@ -141,6 +205,56 @@ export interface ShareSlice {
   name: string
   percent: number
   color: string
+}
+
+/** An arrow and a colour for a movement — or neither, when there is none. */
+export interface Delta {
+  text: string
+  icon: string | null
+  tone: string
+}
+
+export interface StatCard {
+  id: string
+  icon: string
+  label: string
+  value: string
+  delta: Delta
+}
+
+export interface RevenueChart {
+  total: string
+  delta: Delta
+  labels: string[]
+  values: number[]
+  max: number
+}
+
+export interface TierRow {
+  name: string
+  count: number
+  percent: number
+  color: string
+}
+
+export interface SellingFastRow {
+  id: string
+  name: string
+  event: string
+  left: string
+  tone: string
+  iconTint: string
+}
+
+export interface RecentRow {
+  id: string
+  initials: string
+  name: string
+  event: string
+  amount: string
+  status: string
+  statusTone: string
+  time: string
 }
 
 export interface TodayRegistrations {

@@ -1,9 +1,11 @@
 import { api } from '@/lib/api'
 import type {
   ActiveEventWire,
+  AnalyticsWire,
   HomeWire,
   Language,
   MeetingWire,
+  RevenueRange,
   UpcomingEventWire,
 } from './overview.types'
 
@@ -32,4 +34,7 @@ export const overviewApi = {
 
   todayMeetings: () =>
     api.list<MeetingWire>('/meetings', { query: { bucket: 'today', limit: MEETING_PREVIEW } }),
+
+  /** The whole analytics dashboard — one read, one period, no disagreement. */
+  analytics: (range: RevenueRange) => api.get<AnalyticsWire>('/dashboard', { query: { range } }),
 }
