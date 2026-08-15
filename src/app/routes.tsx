@@ -233,7 +233,10 @@ const adminChildren = [
   },
   {
     path: 'payments',
-    ...page(() => import('@/features/finance/pages/PaymentsPage')),
+    ...livePage(
+      () => import('@/features/finance/pages/PaymentsPage'),
+      () => import('@/features/finance/payments.routes').then((m) => m.paymentsRoute),
+    ),
     handle: { page: 'payments' },
   },
   {

@@ -52,6 +52,27 @@ export const api = {
 
   delete: <T>(path: string, options: RequestOptions = {}) =>
     request<T>('DELETE', path, options),
+
+  /**
+   * A file endpoint — the CSV exports and the SVG invoices.
+   *
+   * Fetched rather than linked to with an `<a href>`, because these routes are
+   * behind the same bearer token as everything else and a plain link sends no
+   * Authorization header: the browser would follow it to a 401 and show the
+   * organizer a blank page instead of their spreadsheet. Refresh-and-replay
+   * applies here as well, so an export never fails just because the access
+   * token aged out while the page was open.
+   */
+  async download(path: string, options: RequestOptions = {}): Promise<Blob> {
+    const response = await dispatch('GET', path, options)
+    if (response.ok) return response.blob()
+    if (response.status === 401 && session.refreshToken() && (await renewAccess())) {
+      const replay = await dispatch('GET', path, options)
+      if (replay.ok) return replay.blob()
+      throw await toError(replay)
+    }
+    throw await toError(response)
+  },
 }
 
 async function request<T>(

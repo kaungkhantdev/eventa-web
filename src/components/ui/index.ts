@@ -1,5 +1,6 @@
 export { Icon } from './Icon'
 export { Button, ButtonLink, IconButton } from './Button'
+export { DownloadButton } from './DownloadButton'
 export { Badge, type BadgeTone } from './Badge'
 export { Card } from './Card'
 export { Label, Hint, Input, Select, Textarea, IconInput, IconSelect } from './Field'
