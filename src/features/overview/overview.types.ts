@@ -6,6 +6,9 @@
  * actually use, so an unused rename never breaks a build here.
  */
 
+/* The meeting DTO is declared once, by the feature that owns meetings. */
+export type { MeetingWire } from '@/features/meetings/meetings.types'
+
 /** A user-facing sentence the API writes in both product languages. */
 export interface Bilingual {
   en: string
@@ -84,17 +87,6 @@ export interface ActiveEventWire {
   name: string
   slug: string
   registrations: number
-}
-
-export interface MeetingWire {
-  id: string
-  title: string
-  /** e.g. `Today · 10:00 – 10:30`, already on the Bangkok wall clock. */
-  timeLabel: string
-  type: string
-  role: string | null
-  person: string
-  mode: string
 }
 
 /** How a figure moved against the comparable previous period. */

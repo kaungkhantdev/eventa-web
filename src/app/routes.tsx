@@ -228,7 +228,10 @@ const adminChildren = [
   },
   {
     path: 'meetings',
-    ...page(() => import('@/features/meetings/pages/MeetingsPage')),
+    ...livePage(
+      () => import('@/features/meetings/pages/MeetingsPage'),
+      () => import('@/features/meetings/meetings.routes').then((m) => m.meetingsRoute),
+    ),
     handle: { page: 'meetings' },
   },
   {
