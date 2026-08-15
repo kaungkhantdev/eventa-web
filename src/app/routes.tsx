@@ -343,12 +343,18 @@ const adminChildren = [
   },
   {
     path: 'settings-security',
-    ...page(() => import('@/features/settings/pages/SettingsSecurityPage')),
+    ...livePage(
+      () => import('@/features/settings/pages/SettingsSecurityPage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.securityRoute),
+    ),
     handle: { page: 'settings-security' },
   },
   {
     path: 'settings-notifications',
-    ...page(() => import('@/features/settings/pages/SettingsNotificationsPage')),
+    ...livePage(
+      () => import('@/features/settings/pages/SettingsNotificationsPage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.notificationsRoute),
+    ),
     handle: { page: 'settings-notifications' },
   },
   {
@@ -363,12 +369,18 @@ const adminChildren = [
   },
   {
     path: 'users',
-    ...page(() => import('@/features/settings/pages/UsersPage')),
+    ...livePage(
+      () => import('@/features/settings/pages/UsersPage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.usersRoute),
+    ),
     handle: { page: 'users' },
   },
   {
     path: 'roles',
-    ...page(() => import('@/features/settings/pages/RolesPage')),
+    ...livePage(
+      () => import('@/features/settings/pages/RolesPage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.rolesRoute),
+    ),
     handle: { page: 'roles' },
   },
 ]

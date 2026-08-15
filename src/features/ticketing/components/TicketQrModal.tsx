@@ -43,7 +43,13 @@ export function TicketQrModal({
   const copyTimer = useRef<number | undefined>(undefined)
   const subtitle = eventName ? `${ticketName} · ${eventName}` : ticketName
 
-  useEffect(() => setCopied(false), [share?.registrationUrl])
+  // "Copied" belongs to one link. Reset it during render when the modal moves
+  // to a different ticket, rather than in an effect that renders twice.
+  const [copiedUrl, setCopiedUrl] = useState(share?.registrationUrl)
+  if (share?.registrationUrl !== copiedUrl) {
+    setCopiedUrl(share?.registrationUrl)
+    setCopied(false)
+  }
 
   useEffect(() => {
     if (!open) return
