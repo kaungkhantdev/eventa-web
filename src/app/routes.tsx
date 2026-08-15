@@ -161,8 +161,20 @@ const adminChildren = [
   },
   {
     path: 'tickets',
-    ...page(() => import('@/features/ticketing/pages/TicketsPage')),
+    ...livePage(
+      () => import('@/features/ticketing/pages/TicketsPage'),
+      () => import('@/features/ticketing/tickets.routes').then((m) => m.ticketsRoute),
+    ),
     handle: { page: 'tickets' },
+  },
+  {
+    // A resource route: the share link and QR for ONE tier, fetched when the
+    // modal opens. Loading ten of them with the ten cards would be ten requests
+    // to answer a question nobody asked.
+    path: 'tickets/share',
+    lazy: async () => ({
+      loader: (await import('@/features/ticketing/tickets.routes')).ticketShareRoute.loader,
+    }),
   },
   {
     path: 'discounts',

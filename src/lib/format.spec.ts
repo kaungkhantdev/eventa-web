@@ -3,11 +3,27 @@ import {
   MASKED,
   bangkokDate,
   bangkokDayKey,
+  bangkokInstant,
   bangkokLongDate,
   bangkokMonthKey,
   bangkokTime,
   satang,
 } from './format'
+
+describe('a Bangkok date → the instant the API stores', () => {
+  it('reads a date as Bangkok midnight, not the browser’s', () => {
+    expect(bangkokInstant('2026-08-20')).toBe('2026-08-19T17:00:00.000Z')
+  })
+
+  it('takes a wall time when one was given', () => {
+    expect(bangkokInstant('2026-08-20', '09:30')).toBe('2026-08-20T02:30:00.000Z')
+  })
+
+  // A deadline nobody filled in is not midnight today.
+  it('is null when there is no date', () => {
+    expect(bangkokInstant('')).toBeNull()
+  })
+})
 
 describe('satang → what the organizer reads', () => {
   it('formats a price in baht', () => {

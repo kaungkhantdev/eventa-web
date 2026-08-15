@@ -94,6 +94,22 @@ export function bangkokMonthKey(instant: string | Date): string {
   return bangkokDayKey(instant).slice(0, 'YYYY-MM'.length)
 }
 
+/** Bangkok is UTC+7 all year — Thailand has never observed daylight saving. */
+const BANGKOK_OFFSET = '+07:00'
+
+/**
+ * A Bangkok date (and optional wall time) → the UTC instant the API stores.
+ *
+ * Built by stating the offset rather than by `new Date(date + 'T' + time)`,
+ * which reads the pair in the *browser's* zone and would move every deadline by
+ * the organizer's distance from Thailand. Empty in, null out: a date nobody
+ * filled in is not midnight today.
+ */
+export function bangkokInstant(date: string, time = '00:00'): string | null {
+  if (!date) return null
+  return new Date(`${date}T${time || '00:00'}:00${BANGKOK_OFFSET}`).toISOString()
+}
+
 /** A UTC instant → the Bangkok wall clock, e.g. `10:24`. */
 export function bangkokTime(instant: string | null, timeZone?: string): string {
   if (!instant) return MASKED

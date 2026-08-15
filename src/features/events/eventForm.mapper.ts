@@ -1,4 +1,4 @@
-import { bangkokDayKey, bangkokTime } from '@/lib/format'
+import { bangkokDayKey, bangkokInstant, bangkokTime } from '@/lib/format'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
 import type { EventType, EventWire, EventWireStatus } from './types'
 
@@ -58,8 +58,6 @@ export interface EventFormValues {
 }
 
 const DEFAULT_TYPE: EventType = 'Conference'
-/** Bangkok is UTC+7 all year — Thailand has never observed daylight saving. */
-const BANGKOK_OFFSET = '+07:00'
 
 /** What a fresh wizard starts with. */
 function emptyValues(): EventFormValues {
@@ -138,25 +136,13 @@ export function toEventFormValues(
   }
 }
 
-/**
- * A Bangkok date and time → the UTC instant the API stores.
- *
- * Built by stating the offset rather than by `new Date(date + 'T' + time)`,
- * which would read the pair in the *browser's* zone and move every event by
- * the viewer's distance from Thailand.
- */
-function instantOf(date: string, time: string): string | null {
-  if (!date) return null
-  return new Date(`${date}T${time || '00:00'}:00${BANGKOK_OFFSET}`).toISOString()
-}
-
 /** The body `POST /events` accepts — and nothing else, since it rejects extras. */
 export function toCreateBody(values: EventFormValues) {
   const description = values.description.trim()
   return {
     name: values.name.trim(),
     type: values.type,
-    startAt: instantOf(values.startDate, values.startTime),
+    startAt: bangkokInstant(values.startDate, values.startTime),
     ...(description ? { description } : {}),
   }
 }
@@ -174,8 +160,8 @@ export function toUpdateBody(values: EventFormValues) {
     name: values.name.trim(),
     description: values.description.trim(),
     type: values.type,
-    startAt: instantOf(values.startDate, values.startTime),
-    endAt: instantOf(values.endDate, values.endTime),
+    startAt: bangkokInstant(values.startDate, values.startTime),
+    endAt: bangkokInstant(values.endDate, values.endTime),
     venueName: values.venueName.trim(),
     venueAddress: values.venueAddress.trim(),
     city: values.city.trim(),
