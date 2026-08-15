@@ -3,6 +3,7 @@ import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { programApi } from '@/features/program/program.api'
+import { sessionTypeOf } from '@/features/program/program.mapper'
 import { ticketingApi } from '@/features/ticketing/ticketing.api'
 import { eventDetailApi } from './eventDetail.api'
 import {
@@ -132,7 +133,7 @@ async function loadTab(
   }
 
   if (tab === 'speakers') {
-    const page = await programApi.speakers(id, SPEAKER_LIMIT)
+    const page = await programApi.speakers(id, { limit: SPEAKER_LIMIT })
     return { tab, speakers: page.items.map(toSpeakerCard) }
   }
 
@@ -158,12 +159,12 @@ async function runEventDetailAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
 
   if (form.get('intent') === 'add-session') {
-    await programApi.addSession(id, {
+    await programApi.createSession(id, {
       day: Number(form.get('day')) || 1,
       startTime: String(form.get('startTime') ?? ''),
       endTime: String(form.get('endTime') ?? '') || undefined,
       title: String(form.get('title') ?? '').trim(),
-      type: String(form.get('type') ?? ''),
+      type: sessionTypeOf(form.get('type')),
       room: String(form.get('room') ?? '') || undefined,
     })
     return

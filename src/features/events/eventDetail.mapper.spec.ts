@@ -177,11 +177,18 @@ const speaker = (over: Partial<SpeakerWire> = {}): SpeakerWire => ({
   eventId: 'evt-1',
   name: 'Dr. Anna Wong',
   role: 'Head of AI, Nimbus',
+  email: 'anna@nimbus.co',
+  phone: '02 555 0110',
   talkTitle: 'The State of AI in Southeast Asia',
   tag: 'Keynote',
+  initials: 'AW',
+  tone: 'green',
+  rating: '4.8',
+  sessionCount: 2,
   bio: null,
   photoUrl: null,
-  sessionCount: 2,
+  website: null,
+  version: 1,
   ...over,
 })
 
@@ -222,10 +229,11 @@ const session = (over: Partial<SessionWire> = {}): SessionWire => ({
   title: 'Opening Keynote',
   type: 'Keynote',
   room: 'Hall A',
-  color: 'brand',
-  description: null,
+  color: 'green',
+  description: '',
   sortOrder: 0,
   speakers: [{ id: 'spk-1', name: 'Dr. Anna Wong' }],
+  version: 1,
   ...over,
 })
 
@@ -257,7 +265,7 @@ describe('the agenda', () => {
   })
 
   it('leaves the length blank rather than guessing when there is no end time', () => {
-    const day = toSessionDay([session({ endTime: null })])
+    const day = toSessionDay([session({ endTime: '' })])
     expect(day[0]!.sessions[0]!.duration).toBe('')
   })
 
@@ -278,8 +286,8 @@ describe('the agenda', () => {
     expect(day[0]!.sessions[0]!.who).toBe('Mei Lin +2')
   })
 
-  it('says nothing rather than "null" when no room is set', () => {
-    expect(toSessionDay([session({ room: null })])[0]!.sessions[0]!.room).toBe('')
+  it('says nothing when no room is set', () => {
+    expect(toSessionDay([session({ room: '' })])[0]!.sessions[0]!.room).toBe('')
   })
 })
 

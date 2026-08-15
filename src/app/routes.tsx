@@ -186,12 +186,18 @@ const adminChildren = [
   },
   {
     path: 'agenda',
-    ...page(() => import('@/features/program/pages/AgendaPage')),
+    ...livePage(
+      () => import('@/features/program/pages/AgendaPage'),
+      () => import('@/features/program/program.routes').then((m) => m.agendaRoute),
+    ),
     handle: { page: 'agenda' },
   },
   {
     path: 'speakers',
-    ...page(() => import('@/features/program/pages/SpeakersPage')),
+    ...livePage(
+      () => import('@/features/program/pages/SpeakersPage'),
+      () => import('@/features/program/program.routes').then((m) => m.speakersRoute),
+    ),
     handle: { page: 'speakers' },
   },
   {
