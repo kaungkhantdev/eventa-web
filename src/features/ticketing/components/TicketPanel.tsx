@@ -34,10 +34,14 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
 
   // Reset the paid/free choice to whatever is being edited each time it opens,
-  // so a previous edit's answer is not inherited by the next one.
-  useEffect(() => {
+  // so a previous edit's answer is not inherited by the next one. Adjusted
+  // during render rather than in an effect, so the toggle is already right on
+  // the paint that opens the panel instead of correcting itself afterwards.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
     if (open) setIsFree(editing?.isFree ?? false)
-  }, [open, editing])
+  }
 
   // The save succeeded and the loader has already revalidated; close.
   useEffect(() => {

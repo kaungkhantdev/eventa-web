@@ -178,7 +178,10 @@ const adminChildren = [
   },
   {
     path: 'discounts',
-    ...page(() => import('@/features/ticketing/pages/DiscountsPage')),
+    ...livePage(
+      () => import('@/features/ticketing/pages/DiscountsPage'),
+      () => import('@/features/ticketing/discounts.routes').then((m) => m.discountsRoute),
+    ),
     handle: { page: 'discounts' },
   },
   {
