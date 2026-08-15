@@ -210,7 +210,10 @@ const adminChildren = [
   },
   {
     path: 'attendees',
-    ...page(() => import('@/features/attendees/pages/AttendeesPage')),
+    ...livePage(
+      () => import('@/features/attendees/pages/AttendeesPage'),
+      () => import('@/features/attendees/directory.routes').then((m) => m.directoryRoute),
+    ),
     handle: { page: 'attendees' },
   },
   {
