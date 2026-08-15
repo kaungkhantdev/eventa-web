@@ -1,345 +1,286 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useOutletContext } from 'react-router'
+import { useEffect, useState } from 'react'
+import { useFetcher, useLoaderData } from 'react-router'
 import {
-  PageFooter,
-  HeaderUser,
+  Badge,
   Button,
   Card,
+  DataTable,
+  DownloadButton,
+  HeaderUser,
   Icon,
-  PillTabs,
+  Input,
+  Label,
+  PageFooter,
+  PageHeader,
   Paginator,
-  usePagination,
-  EventPicker,
+  PillTabs,
   type PillTabItem,
 } from '@/components/ui'
-import type { AdminOutletContext } from '@/layouts/AdminShell'
-import { useDisclosure } from '@/lib/useDisclosure'
 import { cn } from '@/lib/cn'
-import {
-  INVOICES,
-  INVOICE_STATUS_BADGE,
-  type Invoice,
-  type InvoiceStatus,
-  statusOf,
-  shortD,
-  ageText,
-  payText,
-  fmtBaht,
-} from '../data/invoices'
-import { downloadInvoicePDF } from '../lib/invoicePdf'
+import { useDisclosure } from '@/lib/useDisclosure'
+import { useFilters, useSearchBox } from '@/lib/useFilters'
+import { useIsFiltering } from '@/lib/usePendingPath'
+import type { ActionResult } from '@/app/loaders'
+import type { InvoiceTab, InvoicesData, TabCounts } from '../finance.routes'
+import type { InvoiceRow } from '../finance.types'
 
-type InvTab = 'all' | InvoiceStatus
+/**
+ * Tax invoices (US-FIN-06..10). Layout ported from invoices.html.
+ *
+ * Whether an invoice may be voided is the API's answer — a paid one cannot be,
+ * and a voided one is already gone. The reason travels with the verdict so a
+ * disabled control explains itself.
+ */
+
+const ALL_EVENTS = 'All events'
+const MAX_SEARCH_LENGTH = 120
 
 export default function InvoicesPage() {
-  const ctx = useOutletContext<AdminOutletContext | null>()
-  const modal = useDisclosure()
-  const [selected, setSelected] = useState<Invoice | null>(null)
-
-  const [q, setQ] = useState('')
-  const [tab, setTab] = useState<InvTab>('all')
-  const [eventFilter, setEventFilter] = useState('All events')
-
-  // status tab counts, computed from the data
-  const counts = useMemo(() => {
-    const base = { all: INVOICES.length, Paid: 0, Issued: 0, Overdue: 0, Void: 0 }
-    for (const iv of INVOICES) base[statusOf(iv)]++
-    return base
-  }, [])
-
-  const tabs: PillTabItem<InvTab>[] = [
-    { value: 'all', label: 'All', count: counts.all },
-    { value: 'Paid', label: 'Paid', count: counts.Paid },
-    { value: 'Issued', label: 'Issued', count: counts.Issued },
-    { value: 'Overdue', label: 'Overdue', count: counts.Overdue },
-    { value: 'Void', label: 'Void', count: counts.Void },
-  ]
-
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase()
-    const evAll = !eventFilter || /all events/i.test(eventFilter)
-    return INVOICES.filter((iv) => {
-      const matchesQ =
-        !query || iv.no.toLowerCase().includes(query) || iv.buyer.toLowerCase().includes(query)
-      const matchesEvent = evAll || iv.ev === eventFilter
-      const matchesStatus = tab === 'all' || statusOf(iv) === tab
-      return matchesQ && matchesEvent && matchesStatus
-    })
-  }, [q, tab, eventFilter])
-
-  const pager = usePagination(filtered)
-  const { setPage } = pager
-  useEffect(() => setPage(1), [q, tab, eventFilter, setPage])
-
-  function openInvoice(iv: Invoice) {
-    setSelected(iv)
-    modal.onOpen()
-  }
+  const data = useLoaderData() as InvoicesData
+  const { params, set } = useFilters()
+  const filtering = useIsFiltering()
+  const voiding = useDisclosure()
+  const [target, setTarget] = useState<InvoiceRow | null>(null)
+  const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
   return (
     <>
-      {/* header */}
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={() => ctx?.openDrawer()}
-            title="Open menu"
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface text-muted hover:text-ink lg:hidden"
-          >
-            <Icon name="hgi-menu-01" size={18} />
-          </button>
-          <div className="min-w-0">
-            <h1 className="text-[22px] font-bold tracking-tight">Invoices</h1>
-            <p className="mt-0.5 hidden text-[12px] text-muted sm:block">
-              Bills issued to buyers — who still owes you. Looking for a charge or refund?{' '}
-              <Link to="/admin/payments" className="font-medium text-brand hover:underline">
-                See Payments
-              </Link>
-            </p>
+      <PageHeader
+        title="Invoices"
+        subtitle="Tax invoices issued for your events."
+        actions={
+          <>
+            <DownloadButton
+              path="/invoices/export.csv"
+              query={data.exportQuery}
+              filename="eventa-invoices.csv"
+            />
+            <HeaderUser />
+          </>
+        }
+      />
+
+      <PillTabs<InvoiceTab>
+        items={tabItems(data.tabs)}
+        value={(params.get('tab') as InvoiceTab) ?? 'all'}
+        onChange={(tab) => set({ tab: tab === 'all' ? null : tab })}
+      />
+
+      <div className={cn('mt-3', filtering && 'opacity-60 transition-opacity')}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full flex-1">
+            <Icon
+              name="hgi-search-01"
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+            />
+            <input
+              type="text"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+              placeholder="Search invoice number, buyer or order…"
+              maxLength={MAX_SEARCH_LENGTH}
+              aria-label="Search invoices"
+            />
           </div>
+          <select
+            value={params.get('eventId') ?? ''}
+            onChange={(e) => set({ eventId: e.target.value || null })}
+            className="select h-10 border-0 bg-surface font-medium sm:w-52"
+            aria-label="Filter by event"
+          >
+            <option value="">{ALL_EVENTS}</option>
+            {data.events.map((event) => (
+              <option key={event.id} value={event.id}>
+                {event.name}
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost">
-            <Icon name="hgi-download-01" size={16} />
-            <span className="hidden sm:inline">Export</span>
-          </Button>
-          <Button variant="ghost">
-            <Icon name="hgi-refresh" size={16} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-          <HeaderUser />
-        </div>
-      </div>
 
-      {/* pill tabs (out of table) */}
-      <PillTabs items={tabs} value={tab} onChange={setTab} />
-
-      {/* search + filter (out of table) */}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full flex-1">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search invoice no. or buyer…"
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-          />
-        </div>
-        <div className="relative w-full sm:w-52">
-          <EventPicker
-            value={eventFilter}
-            onChange={setEventFilter}
-            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
-          />
-        </div>
-      </div>
-
-      {/* table */}
-      <Card className="mt-3 p-4">
-        <div className="overflow-x-auto">
-          <table className="data-table min-w-[860px]">
-            <thead>
-              <tr>
-                <th>Invoice</th>
-                <th>Buyer</th>
-                <th>Event</th>
-                <th className="text-right">Amount</th>
-                <th>Due</th>
-                <th>Status</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-[13px]">
-              {pager.slice.map((iv) => {
-                const st = statusOf(iv)
-                const s = INVOICE_STATUS_BADGE[st]
-                const age = ageText(iv)
-                const ageCls = st === 'Overdue' ? 'text-red-500' : 'text-muted'
-                return (
-                  <tr key={iv.no}>
-                    <td className="whitespace-nowrap font-mono text-[12.5px] font-semibold text-ink">
-                      {iv.no}
-                    </td>
-                    <td className="font-medium text-ink">{iv.buyer}</td>
-                    <td className="text-muted">{iv.ev}</td>
-                    <td className="text-right font-semibold text-ink tnum">{fmtBaht(iv.amt)}</td>
-                    <td className="whitespace-nowrap">
-                      <span className="text-ink tnum">{shortD(iv.due)}</span>
-                      {age && (
-                        <span className={cn('ml-1.5 text-[11px] font-medium', ageCls)}>{age}</span>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <span className="inline-flex items-center gap-2">
-                        <span className={s.cls}>
-                          <i className={cn('hgi-stroke', s.icon, 'text-[12px]')} />
-                          {st}
-                        </span>
-                        {st === 'Paid' && (
-                          <span className="text-[11px] text-muted">{payText(iv)}</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          className="btn-icon"
-                          title="View invoice"
-                          onClick={() => openInvoice(iv)}
-                        >
-                          <i className="hgi-stroke hgi-view text-[16px]" />
-                        </button>
-                        <button
-                          className="btn-icon"
-                          title="Download PDF"
-                          onClick={() => downloadInvoicePDF(iv)}
-                        >
-                          <i className="hgi-stroke hgi-download-01 text-[16px]" />
-                        </button>
-                        <button className="btn-icon" title="Resend to buyer">
-                          <i className="hgi-stroke hgi-mail-01 text-[16px]" />
-                        </button>
+        <Card className="mt-3 p-4">
+          <div className="overflow-x-auto">
+            <DataTable className="min-w-[960px]">
+              <thead>
+                <tr>
+                  <th>Invoice</th>
+                  <th>Buyer</th>
+                  <th>Event</th>
+                  <th>VAT</th>
+                  <th>Total</th>
+                  <th>Status</th>
+                  <th>Due</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="text-[13px]">
+                {data.rows.map((row) => (
+                  <InvoiceTableRow
+                    key={row.id}
+                    row={row}
+                    onVoid={() => {
+                      setTarget(row)
+                      voiding.onOpen()
+                    }}
+                  />
+                ))}
+                {data.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={8}>
+                      <div className="py-10 text-center text-[13px] text-muted">
+                        No invoices match these filters.
                       </div>
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </DataTable>
+          </div>
 
-        {pager.total === 0 && (
-          <p className="py-8 text-center text-[13px] text-muted">No invoices match your filters.</p>
-        )}
-
-        <Paginator
-          from={pager.from}
-          to={pager.to}
-          total={pager.total}
-          page={pager.page}
-          pageCount={pager.pageCount}
-          size={pager.size}
-          onPage={pager.setPage}
-          onSize={pager.setSize}
-          noun="invoices"
-        />
-      </Card>
+          <Paginator
+            {...data.window}
+            noun="invoices"
+            onPage={(page) => set({ page })}
+            onSize={(size) => set({ limit: size, page: null })}
+          />
+        </Card>
+      </div>
 
       <PageFooter />
 
-      {/* Invoice detail modal */}
-      <InvoiceModal open={modal.open} onClose={modal.onClose} iv={selected} />
+      <VoidModal open={voiding.open} onClose={voiding.onClose} target={target} />
     </>
   )
 }
 
-/* Invoice detail — figures derive from the invoice's own amount (VAT-inclusive),
-   so subtotal + 7% VAT always equals the total shown in the row. */
-function InvoiceModal({
+function tabItems(counts: TabCounts): PillTabItem<InvoiceTab>[] {
+  return [
+    { value: 'all', label: 'All', count: counts.all },
+    { value: 'issued', label: 'Issued', count: counts.issued },
+    { value: 'paid', label: 'Paid', count: counts.paid },
+    { value: 'overdue', label: 'Overdue', count: counts.overdue },
+    { value: 'void', label: 'Void', count: counts.void },
+  ]
+}
+
+function InvoiceTableRow({ row, onVoid }: { row: InvoiceRow; onVoid: () => void }) {
+  return (
+    <tr>
+      <td className="tnum font-medium text-ink">{row.number}</td>
+      <td>
+        <div className="min-w-0 leading-tight">
+          <p className="truncate font-medium text-ink">{row.buyer}</p>
+          <p className="truncate text-[11px] text-muted">{row.buyerEmail}</p>
+        </div>
+      </td>
+      <td className="text-muted">{row.event}</td>
+      <td className="tnum text-muted">{row.vat}</td>
+      <td className="tnum font-semibold text-ink">{row.amount}</td>
+      <td>
+        <Badge tone={row.statusTone}>{row.statusLabel}</Badge>
+      </td>
+      <td className="text-muted">
+        <span className="tnum">{row.due}</span>
+        <span
+          className={cn(
+            'ml-1.5 block text-[11px]',
+            row.status === 'overdue' ? 'text-red-500' : 'text-muted',
+          )}
+        >
+          {row.dueNote}
+        </span>
+      </td>
+      <td className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          {/* The API renders the invoice itself, as an SVG — labelled for what
+              it actually is rather than "PDF", which it is not. */}
+          <DownloadButton
+            path={`/invoices/${row.id}/invoice.svg`}
+            filename={`${row.number}.svg`}
+            label="Invoice"
+          />
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={onVoid}
+            disabled={!row.canVoid}
+            title={row.canVoid ? 'Void invoice' : (row.voidBlockedReason ?? 'Cannot be voided')}
+          >
+            <Icon name="hgi-cancel-circle" size={16} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+/**
+ * Voiding an invoice (US-FIN-10).
+ *
+ * A void is not a delete: the number stays, marked void, because a tax invoice
+ * that simply disappeared is a hole in the sequence the Revenue Department
+ * expects to be continuous.
+ */
+function VoidModal({
   open,
   onClose,
-  iv,
+  target,
 }: {
   open: boolean
   onClose: () => void
-  iv: Invoice | null
+  target: InvoiceRow | null
 }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const fetcher = useFetcher<ActionResult>()
+  const error = fetcher.data?.ok === false ? fetcher.data.error : null
+  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
 
-  const sub = iv ? Math.round(iv.amt / 1.07) : 0
-  const vat = iv ? iv.amt - sub : 0
-  const st = iv ? statusOf(iv) : 'Issued'
-  const s = INVOICE_STATUS_BADGE[st]
-  const dueText = iv ? iv.due + (ageText(iv) ? ' · ' + ageText(iv) : '') : '—'
+  useEffect(() => {
+    if (done && open) onClose()
+  }, [done, open, onClose])
 
   return (
     <>
       <div className={cn('panel-overlay', open && 'open')} onClick={onClose} />
       <div className={cn('modal', open && 'open')} role="dialog" aria-modal="true">
-        <div className="p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">
-                <i className="hgi-stroke hgi-invoice-01 text-[20px]" />
-              </span>
-              <div className="min-w-0">
-                <h3 className="text-[15px] font-bold tracking-tight">
-                  Invoice <span className="font-mono">{iv?.no ?? '—'}</span>
-                </h3>
-                <p className="truncate text-[12px] text-muted">
-                  Order <span className="font-mono text-ink">{iv?.ref ?? '—'}</span>
-                </p>
-              </div>
-            </div>
-            <span className={cn(s.cls, 'shrink-0')}>
-              <i className={cn('hgi-stroke', s.icon, 'text-[12px]')} />
-              {st}
-            </span>
+        <fetcher.Form method="post" className="p-5">
+          <input type="hidden" name="invoiceId" value={target?.id ?? ''} />
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-red-50 text-red-500 dark:bg-red-500/15 dark:text-red-300">
+            <Icon name="hgi-cancel-circle" size={18} />
           </div>
+          <h3 className="mt-3 text-[15px] font-bold tracking-tight">Void this invoice?</h3>
+          <p className="mt-1 text-[13px] text-muted">
+            {target ? `${target.number} · ${target.buyer} · ${target.amount}` : ''}
+          </p>
+          <p className="mt-2 text-[12px] text-muted">
+            The number stays in the sequence, marked void. It is not deleted.
+          </p>
 
-          <div className="mt-4 rounded-xl border border-hair p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Billed to</p>
-            <p className="mt-1 text-[14px] font-semibold text-ink">{iv?.buyer ?? '—'}</p>
-            <p className="truncate text-[12px] text-muted">{iv?.sub ?? '—'}</p>
-          </div>
-
-          <div className="mt-3 rounded-xl border border-hair">
-            <div className="flex items-center justify-between gap-3 border-b border-line p-3">
-              <div className="min-w-0">
-                <p className="text-[13px] font-medium text-ink">Event ticket</p>
-                <p className="truncate text-[11px] text-muted">{iv?.ev ?? '—'}</p>
-              </div>
-              <span className="shrink-0 text-[13px] font-semibold text-ink tnum">
-                {iv ? fmtBaht(iv.amt) : '—'}
-              </span>
-            </div>
-            <div className="space-y-1.5 p-3 text-[12px]">
-              <div className="flex justify-between">
-                <span className="text-muted">Subtotal (excl. VAT)</span>
-                <span className="text-ink tnum">{iv ? fmtBaht(sub) : '—'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">VAT 7%</span>
-                <span className="text-ink tnum">{iv ? fmtBaht(vat) : '—'}</span>
-              </div>
-              <div className="mt-1 flex justify-between border-t border-line pt-2">
-                <span className="font-semibold text-ink">Total</span>
-                <span className="text-[14px] font-bold text-ink tnum">
-                  {iv ? fmtBaht(iv.amt) : '—'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 space-y-1 text-[11px] text-muted">
-            <div className="flex justify-between gap-3">
-              <span>Issued</span>
-              <span className="text-ink">{iv?.issued ?? '—'}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span>Due</span>
-              <span className="text-ink">{dueText}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span>Payment</span>
-              <span className="text-ink">{iv ? payText(iv) : '—'}</span>
-            </div>
-          </div>
+          {error && (
+            <p role="alert" className="mt-3 text-[13px] text-red-500">
+              {error}
+            </p>
+          )}
 
           <div className="mt-4">
-            <button className="btn btn-soft w-full" onClick={onClose}>
-              Close
-            </button>
+            <Label htmlFor="void-reason">Reason</Label>
+            <Input id="void-reason" name="reason" type="text" placeholder="Optional note" />
           </div>
-        </div>
+
+          <div className="mt-4 flex gap-2">
+            <Button variant="soft" className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              type="submit"
+              disabled={fetcher.state !== 'idle'}
+            >
+              {fetcher.state === 'idle' ? 'Void invoice' : 'Voiding…'}
+            </Button>
+          </div>
+        </fetcher.Form>
       </div>
     </>
   )

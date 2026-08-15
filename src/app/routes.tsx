@@ -241,17 +241,26 @@ const adminChildren = [
   },
   {
     path: 'payouts',
-    ...page(() => import('@/features/finance/pages/PayoutsPage')),
+    ...livePage(
+      () => import('@/features/finance/pages/PayoutsPage'),
+      () => import('@/features/finance/finance.routes').then((m) => m.payoutsRoute),
+    ),
     handle: { page: 'payouts' },
   },
   {
     path: 'invoices',
-    ...page(() => import('@/features/finance/pages/InvoicesPage')),
+    ...livePage(
+      () => import('@/features/finance/pages/InvoicesPage'),
+      () => import('@/features/finance/finance.routes').then((m) => m.invoicesRoute),
+    ),
     handle: { page: 'invoices' },
   },
   {
     path: 'taxes',
-    ...page(() => import('@/features/finance/pages/TaxesPage')),
+    ...livePage(
+      () => import('@/features/finance/pages/TaxesPage'),
+      () => import('@/features/finance/finance.routes').then((m) => m.taxesRoute),
+    ),
     handle: { page: 'taxes' },
   },
   {
