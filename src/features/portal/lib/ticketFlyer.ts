@@ -4,9 +4,10 @@
    preview image and the PNG download. Only the helpers actually reached by
    buildFlyer are carried over — the static file left several unused. */
 
-import qrcode from 'qrcode-generator'
+import { makeQR, type QRCode } from './qr'
 
-type QRCode = ReturnType<typeof qrcode>
+export { makeQR }
+
 type Ctx = CanvasRenderingContext2D
 
 export type FlyerTicket = {
@@ -17,17 +18,6 @@ export type FlyerTicket = {
   type: string
   attendee: string
   payload: string
-}
-
-export function makeQR(text: string): QRCode | null {
-  try {
-    const q = qrcode(0, 'M')
-    q.addData(text)
-    q.make()
-    return q
-  } catch {
-    return null
-  }
 }
 
 export function drawQR(

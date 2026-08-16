@@ -429,7 +429,10 @@ export const router = createBrowserRouter([
       },
       {
         path: '/portal/register',
-        ...page(() => import('@/features/portal/pages/PortalRegisterPage')),
+        ...livePage(
+          () => import('@/features/portal/pages/PortalRegisterPage'),
+          () => import('@/features/portal/register.routes').then((m) => m.registerRoute),
+        ),
       },
       {
         path: '/portal/survey',

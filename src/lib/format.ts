@@ -110,6 +110,53 @@ export function bangkokInstant(date: string, time = '00:00'): string | null {
   return new Date(`${date}T${time || '00:00'}:00${BANGKOK_OFFSET}`).toISOString()
 }
 
+/**
+ * A pair of instants → the dates as a public page spells them, e.g.
+ * `Sat–Sun, Jul 18–19, 2026`.
+ *
+ * Compared on the calendar day in the event's own zone, never on the raw
+ * instants: an event ending at 18:00 local is `11:00Z`, and an evening start is
+ * already tomorrow in UTC. Comparing instants would split single days and merge
+ * separate ones depending on where the reader happens to be sitting.
+ */
+export function bangkokDateRange(
+  startAt: string,
+  endAt: string | null,
+  timeZone?: string,
+): string {
+  const where = zone(timeZone)
+  const start = new Date(startAt)
+  const end = endAt === null ? null : new Date(endAt)
+  if (end === null || dayIn(start, where) === dayIn(end, where)) {
+    return `${weekday(start, where)}, ${monthDay(start, where)}, ${year(start, where)}`
+  }
+  if (dayIn(start, where).slice(0, 7) === dayIn(end, where).slice(0, 7)) {
+    return (
+      `${weekday(start, where)}–${weekday(end, where)}, ` +
+      `${monthDay(start, where)}–${dayOfMonth(end, where)}, ${year(end, where)}`
+    )
+  }
+  return `${monthDay(start, where)} – ${monthDay(end, where)}, ${year(end, where)}`
+}
+
+/** `YYYY-MM-DD` in the given zone. `en-CA` only because it spells it that way. */
+function dayIn(at: Date, timeZone: string): string {
+  return at.toLocaleDateString('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+}
+
+const part = (options: Intl.DateTimeFormatOptions) => (at: Date, timeZone: string) =>
+  at.toLocaleDateString('en-US', { timeZone, ...options })
+
+const weekday = part({ weekday: 'short' })
+const monthDay = part({ month: 'short', day: 'numeric' })
+const dayOfMonth = part({ day: 'numeric' })
+const year = part({ year: 'numeric' })
+
 /** A UTC instant → the Bangkok wall clock, e.g. `10:24`. */
 export function bangkokTime(instant: string | null, timeZone?: string): string {
   if (!instant) return MASKED

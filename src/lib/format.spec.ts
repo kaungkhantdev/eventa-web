@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MASKED,
   bangkokDate,
+  bangkokDateRange,
   bangkokDayKey,
   bangkokInstant,
   bangkokLongDate,
@@ -156,5 +157,44 @@ describe('an event shown in its own timezone, not the reader’s', () => {
     expect(bangkokDate(evening, 'Mars/Olympus')).toBe('Nov 14, 2026')
     expect(bangkokTime(evening, 'not a zone')).toBe('06:00')
     expect(bangkokLongDate(evening, '')).toBe('November 14, 2026')
+  })
+})
+
+describe('bangkokDateRange', () => {
+  const day = '2026-07-18T02:00:00.000Z'
+
+  it('spells a single day when there is no end', () => {
+    expect(bangkokDateRange(day, null, 'Asia/Bangkok')).toBe('Sat, Jul 18, 2026')
+  })
+
+  it('collapses a range inside one month', () => {
+    expect(bangkokDateRange(day, '2026-07-19T11:00:00.000Z', 'Asia/Bangkok')).toBe(
+      'Sat\u2013Sun, Jul 18\u201319, 2026',
+    )
+  })
+
+  it('spells both months when the event crosses one', () => {
+    expect(
+      bangkokDateRange('2026-07-30T02:00:00.000Z', '2026-08-02T02:00:00.000Z', 'Asia/Bangkok'),
+    ).toBe('Jul 30 \u2013 Aug 2, 2026')
+  })
+
+  // 20:00 UTC is already tomorrow in Bangkok.
+  it('reads the calendar day in the zone it is given', () => {
+    expect(bangkokDateRange('2026-07-18T20:00:00.000Z', null, 'Asia/Bangkok')).toBe(
+      'Sun, Jul 19, 2026',
+    )
+  })
+
+  it('treats an end on the same day as a single day', () => {
+    expect(bangkokDateRange(day, '2026-07-18T11:00:00.000Z', 'Asia/Bangkok')).toBe(
+      'Sat, Jul 18, 2026',
+    )
+  })
+
+  // `events.timezone` is free text; Intl throws on a value it cannot use, and
+  // one bad row must not take a public page down.
+  it('falls back to Bangkok rather than throwing on an unusable timezone', () => {
+    expect(bangkokDateRange(day, null, 'Mars/Olympus')).toBe('Sat, Jul 18, 2026')
   })
 })

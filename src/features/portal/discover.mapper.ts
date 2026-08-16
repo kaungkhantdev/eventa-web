@@ -1,4 +1,4 @@
-import { MASKED, bangkokDayKey, num } from '@/lib/format'
+import { MASKED, bangkokDateRange, num } from '@/lib/format'
 import { BADGE_LABEL, lookOfType } from './discover.presentation'
 import type { CardBadge, CardPrice, DiscoverCard, EventCardWire } from './discover.types'
 
@@ -21,7 +21,7 @@ export function toDiscoverCard(row: EventCardWire): DiscoverCard {
     href: `/landing/${look.template}?event=${encodeURIComponent(row.slug)}`,
     category: row.categoryName ?? row.type,
     accent: look.colour,
-    when: dateRange(row.startAt, row.endAt, row.timezone),
+    when: bangkokDateRange(row.startAt, row.endAt, row.timezone),
     where: placeOf(row),
     organizer: row.organizerName,
     rating: row.rating === null ? null : row.rating.toFixed(1),
@@ -54,38 +54,3 @@ function placeOf(row: EventCardWire): string {
   if (place) return place
   return row.isOnline ? 'Online' : MASKED
 }
-
-/**
- * The dates, spelled the way the kit's cards spell them.
- *
- * Compared on the Bangkok calendar day, never on the raw instants: an event
- * that ends at 18:00 local is `11:00Z`, and an evening start is already
- * tomorrow in UTC. Comparing instants would split single days and merge
- * separate ones depending on where the reader happens to be sitting.
- */
-function dateRange(startAt: string, endAt: string | null, timeZone: string): string {
-  const start = new Date(startAt)
-  const end = endAt === null ? null : new Date(endAt)
-  if (end === null || bangkokDayKey(start) === bangkokDayKey(end)) {
-    return `${weekday(start, timeZone)}, ${monthDay(start, timeZone)}, ${year(start, timeZone)}`
-  }
-  if (sameMonth(start, end)) {
-    return (
-      `${weekday(start, timeZone)}–${weekday(end, timeZone)}, ` +
-      `${monthDay(start, timeZone)}–${day(end, timeZone)}, ${year(end, timeZone)}`
-    )
-  }
-  return `${monthDay(start, timeZone)} – ${monthDay(end, timeZone)}, ${year(end, timeZone)}`
-}
-
-function sameMonth(start: Date, end: Date): boolean {
-  return bangkokDayKey(start).slice(0, 'YYYY-MM'.length) === bangkokDayKey(end).slice(0, 'YYYY-MM'.length)
-}
-
-const part = (options: Intl.DateTimeFormatOptions) => (at: Date, timeZone: string) =>
-  at.toLocaleDateString('en-US', { timeZone, ...options })
-
-const weekday = part({ weekday: 'short' })
-const monthDay = part({ month: 'short', day: 'numeric' })
-const day = part({ day: 'numeric' })
-const year = part({ year: 'numeric' })
