@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { cn } from '@/lib/cn'
 import type { LandingEvent } from '@/features/landing/types'
-import { getLandingEvent, getLandingHighlights } from '@/features/landing/data/events'
 
 /* Atlas — full-bleed poster landing template. Ported from landing/atlas.html.
-   The static kit filled every slot imperatively from landing-data.js; here the
-   event is resolved from ?event=<slug> (with the same query-param overrides) and
-   the sections render from derived state. The sticky bar starts transparent over
-   the hero and turns solid once you scroll ~0.72 viewports down. */
+   The static kit filled every slot imperatively from landing-data.js; the event
+   is now passed in, already mapped from the API, and every section renders only
+   when it has something in it — a real event has no agenda or speakers far more
+   often than the kit's demo one did. The sticky bar starts transparent over the
+   hero and turns solid once you scroll ~0.72 viewports down. */
 
 /* Page-scoped CSS from the source <style> block (focus rings, FAQ chevron, the
    reveal keyframe and the transparent→solid sticky bar). */
@@ -36,16 +36,17 @@ summary { list-style: none; }
 #bar.bar-solid .bar-reg:hover { background: #178a60; }
 `
 
-export default function AtlasPage({ event }: { event?: LandingEvent } = {}) {
+export default function AtlasPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()
-  // A real published event is passed in; the wizard's preview has none
-  // and falls back to the demo module plus its query-param overrides.
-  const ev = event ?? getLandingEvent(params)
+  const ev = event
 
   const reg = ev.registerUrl || '#'
   const isOnline = ev.online === true || params.get('online') === '1'
   const whereText = isOnline ? 'Online event' : [ev.venue, ev.city].filter(Boolean).join(', ')
-  const heroCover = ev.image || 'https://picsum.photos/seed/' + ev.slug + '/1600/900'
+  // No cover, no photograph. The kit filled the hero from picsum; a stock
+  // image of somebody else's crowd on a real organizer's page is a claim
+  // about their event. The gradient beneath shows through instead.
+  const heroCover = ev.image
 
   // Sticky bar solidifies once the hero is mostly scrolled past.
   const [solid, setSolid] = useState(false)
@@ -77,7 +78,7 @@ export default function AtlasPage({ event }: { event?: LandingEvent } = {}) {
     { icon: 'hgi-user-multiple', v: ev.attendeesText },
   ].filter((f) => f.v)
 
-  const highlights = getLandingHighlights(params, ev.highlights || [])
+  const highlights = ev.highlights
 
   const priceVal = ev.priceFrom || ''
   const lowered = priceVal.toLowerCase()
@@ -134,14 +135,16 @@ export default function AtlasPage({ event }: { event?: LandingEvent } = {}) {
       {/* 1 · Full-bleed poster hero */}
       <section id="top" className="relative flex min-h-[92vh] items-end overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-brand to-emerald-600" />
-        <img
-          src={heroCover}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
+        {heroCover && (
+          <img
+            src={heroCover}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/25" />
         <div className="relative mx-auto w-full max-w-6xl px-4 pb-14 pt-28 sm:px-6 sm:pb-20">
           {ev.category && (
@@ -173,12 +176,16 @@ export default function AtlasPage({ event }: { event?: LandingEvent } = {}) {
             >
               Get tickets <i className="hgi-stroke hgi-arrow-right-01 text-[16px]" />
             </a>
-            <a
-              href="#s-speakers"
-              className="inline-flex items-center gap-2 rounded-full bg-white/10 px-6 py-3.5 text-[14px] font-semibold text-white ring-1 ring-inset ring-white/30 backdrop-blur transition hover:bg-white/20"
-            >
-              See the line-up
-            </a>
+            {/* Only offered when there is a line-up to jump to — an anchor to a
+                section this event does not have goes nowhere. */}
+            {ev.speakers.length > 0 && (
+              <a
+                href="#s-speakers"
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 px-6 py-3.5 text-[14px] font-semibold text-white ring-1 ring-inset ring-white/30 backdrop-blur transition hover:bg-white/20"
+              >
+                See the line-up
+              </a>
+            )}
           </div>
         </div>
         <a
@@ -200,261 +207,273 @@ export default function AtlasPage({ event }: { event?: LandingEvent } = {}) {
       </section>
 
       {/* 3 · Highlights (green band) */}
-      <section id="s-highlights" className="scroll-mt-20 bg-brand">
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
-          <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
-            On the night
-          </p>
-          <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-white sm:text-[32px]">
-            What to expect
-          </h2>
-          <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {highlights.map((h, i) => (
-              <div key={i} className="rounded-2xl bg-surface p-5">
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand">
-                  <i className={cn('hgi-stroke', h.icon || 'hgi-star', 'text-[22px]')} />
-                </span>
-                <div className="mt-3 text-[14px] font-semibold text-ink">{h.label}</div>
-              </div>
-            ))}
+      {highlights.length > 0 && (
+        <section id="s-highlights" className="scroll-mt-20 bg-brand">
+          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-white/70">
+              On the night
+            </p>
+            <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-white sm:text-[32px]">
+              What to expect
+            </h2>
+            <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {highlights.map((h, i) => (
+                <div key={i} className="rounded-2xl bg-surface p-5">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand">
+                    <i className={cn('hgi-stroke', h.icon || 'hgi-star', 'text-[22px]')} />
+                  </span>
+                  <div className="mt-3 text-[14px] font-semibold text-ink">{h.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 4 · About */}
-      <section id="s-about" className="scroll-mt-20">
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
-          <div className="grid gap-8 md:grid-cols-[1.5fr_1fr] md:gap-12">
-            <div>
-              <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">The show</p>
-              <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
-                About the night
-              </h2>
-              <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">{ev.about}</p>
-            </div>
-            <div>
-              <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Details
-              </h3>
-              <dl className="rounded-2xl bg-surface px-4">
-                {aboutRows.map((r) => (
-                  <div
-                    key={r.label}
-                    className="flex items-center gap-3 border-t border-line py-3 first:border-t-0"
-                  >
-                    <i className={cn('hgi-stroke', r.icon, 'text-[16px] text-brand')} />
-                    <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted">
-                      {r.label}
-                    </dt>
-                    <dd className="ml-auto text-right text-[13px] font-semibold text-ink">
-                      {r.value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+      {ev.about && (
+        <section id="s-about" className="scroll-mt-20">
+          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+            <div className="grid gap-8 md:grid-cols-[1.5fr_1fr] md:gap-12">
+              <div>
+                <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">The show</p>
+                <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
+                  About the night
+                </h2>
+                <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">{ev.about}</p>
+              </div>
+              <div>
+                <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Details
+                </h3>
+                <dl className="rounded-2xl bg-surface px-4">
+                  {aboutRows.map((r) => (
+                    <div
+                      key={r.label}
+                      className="flex items-center gap-3 border-t border-line py-3 first:border-t-0"
+                    >
+                      <i className={cn('hgi-stroke', r.icon, 'text-[16px] text-brand')} />
+                      <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted">
+                        {r.label}
+                      </dt>
+                      <dd className="ml-auto text-right text-[13px] font-semibold text-ink">
+                        {r.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 5 · Set times / Agenda */}
-      <section id="s-agenda" className="scroll-mt-20 bg-surface">
-        <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-16">
-          <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">Running order</p>
-          <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
-            {ev.agendaTitle}
-          </h2>
-          <ol className="mt-6 grid gap-3 sm:grid-cols-2">
-            {(ev.agenda || []).map((a, i) => (
-              <li
-                key={i}
-                className="flex items-center gap-3.5 rounded-2xl bg-canvas p-4 ring-1 ring-line transition hover:ring-brand/40"
-              >
-                <span className="grid shrink-0 place-items-center rounded-xl bg-brand px-3 py-2 text-center text-[13px] font-extrabold leading-tight tnum text-white">
-                  {a.time}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[15px] font-bold tracking-tight text-ink">{a.title}</div>
-                  <div className="mt-0.5 text-[13px] font-medium text-muted">{a.desc}</div>
-                </div>
-                <i className="hgi-stroke hgi-music-note-01 text-[18px] shrink-0 text-brand/30" />
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+      {ev.agenda.length > 0 && (
+        <section id="s-agenda" className="scroll-mt-20 bg-surface">
+          <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-16">
+            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">Running order</p>
+            <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
+              {ev.agendaTitle}
+            </h2>
+            <ol className="mt-6 grid gap-3 sm:grid-cols-2">
+              {(ev.agenda || []).map((a, i) => (
+                <li
+                  key={i}
+                  className="flex items-center gap-3.5 rounded-2xl bg-canvas p-4 ring-1 ring-line transition hover:ring-brand/40"
+                >
+                  <span className="grid shrink-0 place-items-center rounded-xl bg-brand px-3 py-2 text-center text-[13px] font-extrabold leading-tight tnum text-white">
+                    {a.time}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-bold tracking-tight text-ink">{a.title}</div>
+                    <div className="mt-0.5 text-[13px] font-medium text-muted">{a.desc}</div>
+                  </div>
+                  <i className="hgi-stroke hgi-music-note-01 text-[18px] shrink-0 text-brand/30" />
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+      )}
 
       {/* 6 · Line-up / Speakers */}
-      <section id="s-speakers" className="scroll-mt-20">
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
-          <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">
-            Who&#39;s playing
-          </p>
-          <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
-            {ev.speakersTitle}
-          </h2>
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(ev.speakers || []).map((s, i) => {
-              const lead = i === 0
-              return (
-                <div
-                  key={i}
-                  className={cn(
-                    'flex items-center gap-4 rounded-2xl p-5',
-                    lead ? 'bg-brand text-white' : 'bg-surface',
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'grid h-16 w-16 shrink-0 place-items-center rounded-full text-[17px] font-bold',
-                      lead ? 'bg-white/15 text-white ring-2 ring-white/30' : 'bg-brand-soft text-brand',
-                    )}
-                    aria-hidden="true"
-                  >
-                    {s.initials}
-                  </div>
-                  <div className="min-w-0">
-                    <div
-                      className={cn(
-                        'truncate text-[17px] font-bold tracking-tight',
-                        lead ? 'text-white' : 'text-ink',
-                      )}
-                    >
-                      {s.name}
-                    </div>
-                    <div
-                      className={cn(
-                        'mt-0.5 truncate text-[12px] font-semibold uppercase tracking-wide',
-                        lead ? 'text-white/85' : 'text-brand',
-                      )}
-                    >
-                      {s.role}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* 7 · Tickets */}
-      <section id="s-tickets" className="scroll-mt-20 bg-surface">
-        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
-          <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">
-            Get in the door
-          </p>
-          <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
-            {ev.ticketsTitle}
-          </h2>
-          {ev.seatsLeft ? (
-            <p className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-fire text-[15px]" /> Going fast — only {ev.seatsLeft} left
+      {ev.speakers.length > 0 && (
+        <section id="s-speakers" className="scroll-mt-20">
+          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">
+              Who&#39;s playing
             </p>
-          ) : null}
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:items-start">
-            {(ev.tickets || []).map((t, i) => {
-              const feat = !!t.featured
-              return (
-                <div
-                  key={i}
-                  className={cn(
-                    'flex flex-col gap-4 rounded-2xl p-6',
-                    feat ? 'bg-brand text-white shadow-lg md:-translate-y-2' : 'bg-canvas ring-1 ring-line',
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span
-                      className={cn(
-                        'text-[12px] font-semibold uppercase tracking-[0.08em]',
-                        feat ? 'text-white/80' : 'text-ink',
-                      )}
-                    >
-                      {t.name}
-                    </span>
-                    {t.note ? (
-                      feat ? (
-                        <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white">
-                          {t.note}
-                        </span>
-                      ) : (
-                        <span className="badge badge-green">{t.note}</span>
-                      )
-                    ) : null}
-                  </div>
+            <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
+              {ev.speakersTitle}
+            </h2>
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(ev.speakers || []).map((s, i) => {
+                const lead = i === 0
+                return (
                   <div
+                    key={i}
                     className={cn(
-                      'text-[30px] font-extrabold tracking-tight tnum',
-                      feat ? 'text-white' : 'text-ink',
+                      'flex items-center gap-4 rounded-2xl p-5',
+                      lead ? 'bg-brand text-white' : 'bg-surface',
                     )}
                   >
-                    {t.price}
-                  </div>
-                  <ul className="flex flex-col gap-2.5">
-                    {(t.features || []).map((f, j) => (
-                      <li
-                        key={j}
+                    <div
+                      className={cn(
+                        'grid h-16 w-16 shrink-0 place-items-center rounded-full text-[17px] font-bold',
+                        lead ? 'bg-white/15 text-white ring-2 ring-white/30' : 'bg-brand-soft text-brand',
+                      )}
+                      aria-hidden="true"
+                    >
+                      {s.initials}
+                    </div>
+                    <div className="min-w-0">
+                      <div
                         className={cn(
-                          'flex items-start gap-2 text-[13px]',
-                          feat ? 'text-white/90' : 'text-muted',
+                          'truncate text-[17px] font-bold tracking-tight',
+                          lead ? 'text-white' : 'text-ink',
                         )}
                       >
-                        <i
-                          className={cn(
-                            'hgi-stroke hgi-tick-02 text-[15px] mt-0.5',
-                            feat ? 'text-white' : 'text-brand',
-                          )}
-                        />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {feat ? (
-                    <a
-                      href={reg}
-                      className="on-brand mt-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:bg-white/90"
-                    >
-                      Get tickets
-                    </a>
-                  ) : (
-                    <a
-                      href={reg}
-                      className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-brand-soft px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:brightness-95"
-                    >
-                      Get tickets
-                    </a>
-                  )}
-                </div>
-              )
-            })}
+                        {s.name}
+                      </div>
+                      <div
+                        className={cn(
+                          'mt-0.5 truncate text-[12px] font-semibold uppercase tracking-wide',
+                          lead ? 'text-white/85' : 'text-brand',
+                        )}
+                      >
+                        {s.role}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* 7 · Tickets */}
+      {ev.tickets.length > 0 && (
+        <section id="s-tickets" className="scroll-mt-20 bg-surface">
+          <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">
+              Get in the door
+            </p>
+            <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
+              {ev.ticketsTitle}
+            </h2>
+            {ev.seatsLeft ? (
+              <p className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-semibold text-brand">
+                <i className="hgi-stroke hgi-fire text-[15px]" /> Going fast — only {ev.seatsLeft} left
+              </p>
+            ) : null}
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3 md:items-start">
+              {(ev.tickets || []).map((t, i) => {
+                const feat = !!t.featured
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'flex flex-col gap-4 rounded-2xl p-6',
+                      feat ? 'bg-brand text-white shadow-lg md:-translate-y-2' : 'bg-canvas ring-1 ring-line',
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span
+                        className={cn(
+                          'text-[12px] font-semibold uppercase tracking-[0.08em]',
+                          feat ? 'text-white/80' : 'text-ink',
+                        )}
+                      >
+                        {t.name}
+                      </span>
+                      {t.note ? (
+                        feat ? (
+                          <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                            {t.note}
+                          </span>
+                        ) : (
+                          <span className="badge badge-green">{t.note}</span>
+                        )
+                      ) : null}
+                    </div>
+                    <div
+                      className={cn(
+                        'text-[30px] font-extrabold tracking-tight tnum',
+                        feat ? 'text-white' : 'text-ink',
+                      )}
+                    >
+                      {t.price}
+                    </div>
+                    <ul className="flex flex-col gap-2.5">
+                      {(t.features || []).map((f, j) => (
+                        <li
+                          key={j}
+                          className={cn(
+                            'flex items-start gap-2 text-[13px]',
+                            feat ? 'text-white/90' : 'text-muted',
+                          )}
+                        >
+                          <i
+                            className={cn(
+                              'hgi-stroke hgi-tick-02 text-[15px] mt-0.5',
+                              feat ? 'text-white' : 'text-brand',
+                            )}
+                          />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {feat ? (
+                      <a
+                        href={reg}
+                        className="on-brand mt-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:bg-white/90"
+                      >
+                        Get tickets
+                      </a>
+                    ) : (
+                      <a
+                        href={reg}
+                        className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-brand-soft px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:brightness-95"
+                      >
+                        Get tickets
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 8 · FAQ */}
-      <section id="s-faq" className="scroll-mt-20">
-        <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-16">
-          <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">Before you go</p>
-          <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
-            Know before the show
-          </h2>
-          <div className="mt-4">
-            {(ev.faqs || []).map((f, i) => (
-              <details
-                key={i}
-                open={i === 0}
-                className="faq border-t border-line py-1 first:border-t-0"
-              >
-                <summary className="flex cursor-pointer items-center justify-between gap-4 py-3 text-[15px] font-semibold text-ink">
-                  <span>{f.q}</span>
-                  <i className="hgi-stroke hgi-arrow-down-01 text-[17px] faq-chev shrink-0 text-muted transition-transform duration-200" />
-                </summary>
-                <div className="pb-3 pr-8 text-[13px] leading-relaxed text-muted">{f.a}</div>
-              </details>
-            ))}
+      {ev.faqs.length > 0 && (
+        <section id="s-faq" className="scroll-mt-20">
+          <div className="mx-auto max-w-4xl px-4 py-14 sm:px-6 sm:py-16">
+            <p className="text-[12px] font-bold uppercase tracking-[0.2em] text-brand">Before you go</p>
+            <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
+              Know before the show
+            </h2>
+            <div className="mt-4">
+              {(ev.faqs || []).map((f, i) => (
+                <details
+                  key={i}
+                  open={i === 0}
+                  className="faq border-t border-line py-1 first:border-t-0"
+                >
+                  <summary className="flex cursor-pointer items-center justify-between gap-4 py-3 text-[15px] font-semibold text-ink">
+                    <span>{f.q}</span>
+                    <i className="hgi-stroke hgi-arrow-down-01 text-[17px] faq-chev shrink-0 text-muted transition-transform duration-200" />
+                  </summary>
+                  <div className="pb-3 pr-8 text-[13px] leading-relaxed text-muted">{f.a}</div>
+                </details>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 9 · Final CTA (green band) */}
       <section className="bg-brand text-white">

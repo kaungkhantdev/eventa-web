@@ -78,6 +78,26 @@ describe('the price the page leads with', () => {
     expect(toLandingEvent(page({ tickets: [] })).priceFrom).toBe('—')
   })
 
+  // A sold-out free tier beside a paid one made the page lead with "Free"
+  // when nothing free could be had. The headline is what somebody can buy.
+  it('ignores a tier nobody can register for', () => {
+    const p = page({
+      tickets: [
+        ticket({ id: 'a', isFree: true, priceSatang: 0, priceLabel: 'Free', soldOut: true, canRegister: false }),
+        ticket({ id: 'b', priceSatang: 150_000, priceLabel: '฿1,500' }),
+      ],
+    })
+    expect(toLandingEvent(p).priceFrom).toBe('฿1,500')
+  })
+
+  // Sold out is still a price the page should name; "—" would read as unpriced.
+  it('falls back to the cheapest tier when none can be registered for', () => {
+    const p = page({
+      tickets: [ticket({ priceSatang: 150_000, priceLabel: '฿1,500', soldOut: true, canRegister: false })],
+    })
+    expect(toLandingEvent(p).priceFrom).toBe('฿1,500')
+  })
+
   it('carries each tier’s price straight from the API’s own label', () => {
     // The server already applies the Free / RSVP sentinels the templates
     // branch on; re-deriving them here would be a second source of truth.

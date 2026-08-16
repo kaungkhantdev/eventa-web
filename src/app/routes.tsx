@@ -412,6 +412,16 @@ export const router = createBrowserRouter([
         ...page(() => import('@/features/portal/pages/PortalLoginPage')),
       },
       {
+        // One route for the four designs: `/landing/aurora?event=<slug>` shows
+        // a real event, and the create-event wizard opens it with no slug to
+        // preview a draft it has not saved yet.
+        path: '/landing/:template',
+        ...livePage(
+          () => import('@/features/landing/pages/PublicEventPage'),
+          () => import('@/features/landing/landing.routes').then((m) => m.templatePreviewRoute),
+        ),
+      },
+      {
         path: '/portal/discover',
         ...livePage(
           () => import('@/features/portal/pages/DiscoverPage'),
@@ -447,22 +457,6 @@ export const router = createBrowserRouter([
           () => import('@/features/landing/pages/PublicEventPage'),
           () => import('@/features/landing/landing.routes').then((m) => m.publicEventRoute),
         ),
-      },
-      {
-        path: '/landing/atlas',
-        ...page(() => import('@/features/landing/pages/AtlasPage')),
-      },
-      {
-        path: '/landing/aurora',
-        ...page(() => import('@/features/landing/pages/AuroraPage')),
-      },
-      {
-        path: '/landing/minimal',
-        ...page(() => import('@/features/landing/pages/MinimalPage')),
-      },
-      {
-        path: '/landing/noir',
-        ...page(() => import('@/features/landing/pages/NoirPage')),
       },
       // Root → the public event-discovery page (browsing needs no account).
       // Attendees sign in for "My tickets"; organizers at /auth/login → admin.

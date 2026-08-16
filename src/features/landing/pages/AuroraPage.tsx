@@ -2,11 +2,10 @@ import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
 import { cn } from '@/lib/cn'
 import type { LandingEvent } from '@/features/landing/types'
-import { getLandingEvent, getLandingHighlights } from '@/features/landing/data/events'
 
 /* Aurora — a calm, card-stacked landing template. Ported from landing/aurora.html.
-   The event is resolved from ?event=<slug> (with the same query-param overrides
-   as the static kit) and each card renders from derived state. */
+   The event is passed in, already mapped from the API, and each card renders
+   only when it has content — an empty heading is worse than no section. */
 
 /* Page-scoped CSS from the source <style> block: the 1080px content column,
    brand focus rings, the FAQ chevron, and the gentle staggered load-in. */
@@ -30,16 +29,17 @@ summary { list-style: none; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
 `
 
-export default function AuroraPage({ event }: { event?: LandingEvent } = {}) {
+export default function AuroraPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()
-  // A real published event is passed in; the wizard's preview has none
-  // and falls back to the demo module plus its query-param overrides.
-  const ev = event ?? getLandingEvent(params)
+  const ev = event
 
   const reg = ev.registerUrl || '#'
   const isOnline = ev.online === true || params.get('online') === '1'
   const whereText = isOnline ? 'Online event' : [ev.venue, ev.city].filter(Boolean).join(', ')
-  const heroCover = ev.image || 'https://picsum.photos/seed/' + ev.slug + '/1600/700'
+  // No cover, no photograph. The kit filled the hero from picsum; a stock
+  // image of somebody else's crowd on a real organizer's page is a claim
+  // about their event. The gradient beneath shows through instead.
+  const heroCover = ev.image
 
   useEffect(() => {
     if (ev.title) document.title = ev.title + ' — ' + (ev.category || 'Event')
@@ -52,7 +52,7 @@ export default function AuroraPage({ event }: { event?: LandingEvent } = {}) {
     { icon: 'hgi-user-multiple', v: ev.attendeesText },
   ].filter((f) => f.v)
 
-  const highlights = getLandingHighlights(params, ev.highlights || [])
+  const highlights = ev.highlights
 
   const priceVal = ev.priceFrom || ''
   const lowered = priceVal.toLowerCase()
@@ -108,14 +108,16 @@ export default function AuroraPage({ event }: { event?: LandingEvent } = {}) {
         {/* 2 · Hero */}
         <section className="reveal overflow-hidden rounded-2xl bg-surface" aria-labelledby="hero-title">
           <div className="relative min-h-[240px] bg-gradient-to-br from-brand to-emerald-500 sm:min-h-[300px]">
-            <img
-              src={heroCover}
-              alt=""
-              className="absolute inset-0 h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
+            {heroCover && (
+              <img
+                src={heroCover}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-black/5" />
             <div className="relative flex min-h-[240px] flex-col justify-end px-6 py-7 sm:min-h-[300px] sm:px-9 sm:py-9">
               {ev.category && (
@@ -165,206 +167,218 @@ export default function AuroraPage({ event }: { event?: LandingEvent } = {}) {
         </section>
 
         {/* 3 · Highlights */}
-        <section className="reveal d1" aria-labelledby="lbl-highlights">
-          <h2 id="lbl-highlights" className="mb-3 text-[18px] font-bold tracking-tight text-ink">
-            Highlights
-          </h2>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {highlights.map((h, i) => (
-              <div key={i} className="rounded-2xl bg-surface p-5">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand">
-                  <i className={cn('hgi-stroke', h.icon || 'hgi-star', 'text-[20px]')} />
-                </span>
-                <div className="mt-3 text-[14px] font-semibold text-ink">{h.label}</div>
-              </div>
-            ))}
-          </div>
-        </section>
+        {highlights.length > 0 && (
+          <section className="reveal d1" aria-labelledby="lbl-highlights">
+            <h2 id="lbl-highlights" className="mb-3 text-[18px] font-bold tracking-tight text-ink">
+              Highlights
+            </h2>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {highlights.map((h, i) => (
+                <div key={i} className="rounded-2xl bg-surface p-5">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand">
+                    <i className={cn('hgi-stroke', h.icon || 'hgi-star', 'text-[20px]')} />
+                  </span>
+                  <div className="mt-3 text-[14px] font-semibold text-ink">{h.label}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* 4 · About */}
-        <section className="reveal rounded-2xl bg-surface p-6 sm:p-8" aria-labelledby="lbl-about">
-          <div className="grid gap-8 md:grid-cols-[1.5fr_1fr] md:gap-10">
-            <div>
-              <h2 id="lbl-about" className="text-[18px] font-bold tracking-tight text-ink">
-                About the event
-              </h2>
-              <p className="mt-3 max-w-[58ch] text-[14px] leading-relaxed text-muted">{ev.about}</p>
+        {ev.about && (
+          <section className="reveal rounded-2xl bg-surface p-6 sm:p-8" aria-labelledby="lbl-about">
+            <div className="grid gap-8 md:grid-cols-[1.5fr_1fr] md:gap-10">
+              <div>
+                <h2 id="lbl-about" className="text-[18px] font-bold tracking-tight text-ink">
+                  About the event
+                </h2>
+                <p className="mt-3 max-w-[58ch] text-[14px] leading-relaxed text-muted">{ev.about}</p>
+              </div>
+              <div>
+                <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Details
+                </h3>
+                <dl className="rounded-xl bg-canvas px-4">
+                  {aboutRows.map((r) => (
+                    <div
+                      key={r.label}
+                      className="flex items-center gap-3 border-t border-line py-3 first:border-t-0"
+                    >
+                      <i className={cn('hgi-stroke', r.icon, 'text-[16px] text-brand')} />
+                      <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted">
+                        {r.label}
+                      </dt>
+                      <dd className="ml-auto text-right text-[13px] font-semibold text-ink">
+                        {r.value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
             </div>
-            <div>
-              <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Details
-              </h3>
-              <dl className="rounded-xl bg-canvas px-4">
-                {aboutRows.map((r) => (
-                  <div
-                    key={r.label}
-                    className="flex items-center gap-3 border-t border-line py-3 first:border-t-0"
-                  >
-                    <i className={cn('hgi-stroke', r.icon, 'text-[16px] text-brand')} />
-                    <dt className="text-[12px] font-medium uppercase tracking-[0.08em] text-muted">
-                      {r.label}
-                    </dt>
-                    <dd className="ml-auto text-right text-[13px] font-semibold text-ink">
-                      {r.value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* 5 · Agenda */}
-        <section className="reveal rounded-2xl bg-surface p-6 sm:p-8" aria-labelledby="agenda-title">
-          <h2 id="agenda-title" className="text-[18px] font-bold tracking-tight text-ink">
-            {ev.agendaTitle}
-          </h2>
-          <ol className="mt-5">
-            {agenda.map((a, i) => {
-              const last = i === agenda.length - 1
-              return (
-                <li key={i} className="flex gap-4">
-                  <div className="w-16 shrink-0 pt-0.5 text-right text-[13px] font-semibold tnum text-brand">
-                    {a.time}
-                  </div>
-                  <div className={cn('relative flex-1 border-l border-line pl-5', last ? 'pb-0' : 'pb-6')}>
-                    <span className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand ring-4 ring-brand-soft" />
-                    <div className="text-[15px] font-semibold text-ink">{a.title}</div>
-                    <div className="mt-0.5 text-[13px] text-muted">{a.desc}</div>
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-        </section>
+        {agenda.length > 0 && (
+          <section className="reveal rounded-2xl bg-surface p-6 sm:p-8" aria-labelledby="agenda-title">
+            <h2 id="agenda-title" className="text-[18px] font-bold tracking-tight text-ink">
+              {ev.agendaTitle}
+            </h2>
+            <ol className="mt-5">
+              {agenda.map((a, i) => {
+                const last = i === agenda.length - 1
+                return (
+                  <li key={i} className="flex gap-4">
+                    <div className="w-16 shrink-0 pt-0.5 text-right text-[13px] font-semibold tnum text-brand">
+                      {a.time}
+                    </div>
+                    <div className={cn('relative flex-1 border-l border-line pl-5', last ? 'pb-0' : 'pb-6')}>
+                      <span className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand ring-4 ring-brand-soft" />
+                      <div className="text-[15px] font-semibold text-ink">{a.title}</div>
+                      <div className="mt-0.5 text-[13px] text-muted">{a.desc}</div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          </section>
+        )}
 
         {/* 6 · Speakers */}
-        <section className="reveal rounded-2xl bg-surface p-6 sm:p-8" aria-labelledby="speakers-title">
-          <h2 id="speakers-title" className="text-[18px] font-bold tracking-tight text-ink">
-            {ev.speakersTitle}
-          </h2>
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {(ev.speakers || []).map((s, i) => (
-              <div key={i} className="flex items-center gap-3 rounded-xl bg-canvas p-4">
-                <div
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-soft text-[14px] font-semibold text-brand"
-                  aria-hidden="true"
-                >
-                  {s.initials}
+        {ev.speakers.length > 0 && (
+          <section className="reveal rounded-2xl bg-surface p-6 sm:p-8" aria-labelledby="speakers-title">
+            <h2 id="speakers-title" className="text-[18px] font-bold tracking-tight text-ink">
+              {ev.speakersTitle}
+            </h2>
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {(ev.speakers || []).map((s, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-xl bg-canvas p-4">
+                  <div
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand-soft text-[14px] font-semibold text-brand"
+                    aria-hidden="true"
+                  >
+                    {s.initials}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-[14px] font-semibold text-ink">{s.name}</div>
+                    <div className="truncate text-[12px] text-muted">{s.role}</div>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <div className="truncate text-[14px] font-semibold text-ink">{s.name}</div>
-                  <div className="truncate text-[12px] text-muted">{s.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* 7 · Tickets */}
-        <section className="reveal" aria-labelledby="tickets-title">
-          <h2 id="tickets-title" className="mb-4 text-[18px] font-bold tracking-tight text-ink">
-            {ev.ticketsTitle}
-          </h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-start">
-            {(ev.tickets || []).map((t, i) => {
-              const feat = !!t.featured
-              return (
-                <div
-                  key={i}
-                  className={cn(
-                    'flex flex-col gap-4 rounded-2xl p-6',
-                    feat ? 'bg-brand text-white md:-translate-y-2' : 'bg-surface',
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span
-                      className={cn(
-                        'text-[12px] font-semibold uppercase tracking-[0.08em]',
-                        feat ? 'text-white/80' : 'text-ink',
-                      )}
-                    >
-                      {t.name}
-                    </span>
-                    {t.note ? (
-                      feat ? (
-                        <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white">
-                          {t.note}
-                        </span>
-                      ) : (
-                        <span className="badge badge-green">{t.note}</span>
-                      )
-                    ) : null}
-                  </div>
+        {ev.tickets.length > 0 && (
+          <section className="reveal" aria-labelledby="tickets-title">
+            <h2 id="tickets-title" className="mb-4 text-[18px] font-bold tracking-tight text-ink">
+              {ev.ticketsTitle}
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:items-start">
+              {(ev.tickets || []).map((t, i) => {
+                const feat = !!t.featured
+                return (
                   <div
+                    key={i}
                     className={cn(
-                      'text-[28px] font-extrabold tracking-tight tnum',
-                      feat ? 'text-white' : 'text-ink',
+                      'flex flex-col gap-4 rounded-2xl p-6',
+                      feat ? 'bg-brand text-white md:-translate-y-2' : 'bg-surface',
                     )}
                   >
-                    {t.price}
-                  </div>
-                  <ul className="flex flex-col gap-2.5">
-                    {(t.features || []).map((f, j) => (
-                      <li
-                        key={j}
+                    <div className="flex items-center justify-between gap-3">
+                      <span
                         className={cn(
-                          'flex items-start gap-2 text-[13px]',
-                          feat ? 'text-white/90' : 'text-muted',
+                          'text-[12px] font-semibold uppercase tracking-[0.08em]',
+                          feat ? 'text-white/80' : 'text-ink',
                         )}
                       >
-                        <i
+                        {t.name}
+                      </span>
+                      {t.note ? (
+                        feat ? (
+                          <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                            {t.note}
+                          </span>
+                        ) : (
+                          <span className="badge badge-green">{t.note}</span>
+                        )
+                      ) : null}
+                    </div>
+                    <div
+                      className={cn(
+                        'text-[28px] font-extrabold tracking-tight tnum',
+                        feat ? 'text-white' : 'text-ink',
+                      )}
+                    >
+                      {t.price}
+                    </div>
+                    <ul className="flex flex-col gap-2.5">
+                      {(t.features || []).map((f, j) => (
+                        <li
+                          key={j}
                           className={cn(
-                            'hgi-stroke hgi-tick-02 text-[15px] mt-0.5',
-                            feat ? 'text-white' : 'text-brand',
+                            'flex items-start gap-2 text-[13px]',
+                            feat ? 'text-white/90' : 'text-muted',
                           )}
-                        />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  {feat ? (
-                    <a
-                      href={reg}
-                      className="on-brand mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:bg-white/90"
-                    >
-                      Register
-                    </a>
-                  ) : (
-                    <a
-                      href={reg}
-                      className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:brightness-95"
-                    >
-                      Register
-                    </a>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </section>
+                        >
+                          <i
+                            className={cn(
+                              'hgi-stroke hgi-tick-02 text-[15px] mt-0.5',
+                              feat ? 'text-white' : 'text-brand',
+                            )}
+                          />
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {feat ? (
+                      <a
+                        href={reg}
+                        className="on-brand mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-white px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:bg-white/90"
+                      >
+                        Register
+                      </a>
+                    ) : (
+                      <a
+                        href={reg}
+                        className="mt-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:brightness-95"
+                      >
+                        Register
+                      </a>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {/* 8 · FAQ */}
-        <section className="reveal rounded-2xl bg-surface p-6 sm:p-8" aria-labelledby="lbl-faq">
-          <h2 id="lbl-faq" className="text-[18px] font-bold tracking-tight text-ink">
-            Frequently asked
-          </h2>
-          <div className="mt-3">
-            {(ev.faqs || []).map((f, i) => (
-              <details
-                key={i}
-                open={i === 0}
-                className="faq border-t border-line py-1 first:border-t-0"
-              >
-                <summary className="flex cursor-pointer items-center justify-between gap-4 py-3 text-[14px] font-semibold text-ink">
-                  <span>{f.q}</span>
-                  <i className="hgi-stroke hgi-arrow-down-01 text-[17px] faq-chev shrink-0 text-muted transition-transform duration-200" />
-                </summary>
-                <div className="pb-3 pr-8 text-[13px] leading-relaxed text-muted">{f.a}</div>
-              </details>
-            ))}
-          </div>
-        </section>
+        {ev.faqs.length > 0 && (
+          <section className="reveal rounded-2xl bg-surface p-6 sm:p-8" aria-labelledby="lbl-faq">
+            <h2 id="lbl-faq" className="text-[18px] font-bold tracking-tight text-ink">
+              Frequently asked
+            </h2>
+            <div className="mt-3">
+              {(ev.faqs || []).map((f, i) => (
+                <details
+                  key={i}
+                  open={i === 0}
+                  className="faq border-t border-line py-1 first:border-t-0"
+                >
+                  <summary className="flex cursor-pointer items-center justify-between gap-4 py-3 text-[14px] font-semibold text-ink">
+                    <span>{f.q}</span>
+                    <i className="hgi-stroke hgi-arrow-down-01 text-[17px] faq-chev shrink-0 text-muted transition-transform duration-200" />
+                  </summary>
+                  <div className="pb-3 pr-8 text-[13px] leading-relaxed text-muted">{f.a}</div>
+                </details>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       {/* 9 · Footer */}

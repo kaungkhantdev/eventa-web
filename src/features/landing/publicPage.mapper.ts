@@ -54,7 +54,7 @@ export function toLandingEvent(page: PublicPageWire): LandingEvent {
     venue: event.venueName ?? '',
     city: event.city ?? '',
     address: event.venueAddress ?? '',
-    priceFrom: tickets[0]?.priceLabel ?? MASKED,
+    priceFrom: priceFromOf(tickets),
     organizer: event.organizerName,
     registerUrl: `/portal/register?event=${encodeURIComponent(event.slug)}`,
     highlights: page.highlights.map((h) => ({
@@ -73,6 +73,21 @@ export function toLandingEvent(page: PublicPageWire): LandingEvent {
     onlineNote: event.onlineNote ?? '',
     image: event.coverImage ?? undefined,
   }
+}
+
+/**
+ * The price the page leads with — the cheapest tier somebody can actually buy.
+ *
+ * A sold-out free tier beside a paid one would otherwise headline the page with
+ * "Free" when nothing free can be had. When nothing at all is available the
+ * cheapest tier still names the price: an event that sold out had one, and "—"
+ * would read as not yet priced.
+ *
+ * `tickets` arrives sorted by price ascending.
+ */
+function priceFromOf(tickets: PublicTicketWire[]): string {
+  const available = tickets.find((ticket) => ticket.canRegister)
+  return (available ?? tickets[0])?.priceLabel ?? MASKED
 }
 
 /**

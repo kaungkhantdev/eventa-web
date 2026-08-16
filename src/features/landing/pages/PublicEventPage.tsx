@@ -11,13 +11,17 @@ import type { LandingEvent } from '../types'
 /**
  * A published event, at its own public URL.
  *
- * The four designs already exist — they were built against the demo module and
- * are reused verbatim, taking the real event as a prop. This component's whole
- * job is choosing between them, which is the organizer's decision, stored on
- * the event and returned by the API.
+ * The four designs already exist — they were built against a demo module and
+ * are reused verbatim, now taking the real event as a required prop. This
+ * component's whole job is choosing between them, which is the organizer's
+ * decision, stored on the event and returned by the API.
+ *
+ * Also serves `/landing/<template>`, where the design is named by the path
+ * rather than by the event — the landing-page switcher and the create-event
+ * wizard both preview one that way.
  */
 
-const TEMPLATES: Record<TemplateId, (props: { event?: LandingEvent }) => React.ReactElement> = {
+const TEMPLATES: Record<TemplateId, (props: { event: LandingEvent }) => React.ReactElement> = {
   aurora: AuroraPage,
   noir: NoirPage,
   minimal: MinimalPage,
