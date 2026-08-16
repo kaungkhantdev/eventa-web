@@ -7,7 +7,8 @@ export { Label, Hint, Input, Select, Textarea, IconInput, IconSelect } from './F
 export { Panel, Modal } from './Panel'
 export { Dropdown } from './Dropdown'
 export { EventPicker, type EventPickerProps } from './EventPicker'
-export { Paginator, usePagination, PAGE_SIZES } from './Paginator'
+export { Paginator } from './Paginator'
+export { usePagination } from './usePagination'
 export { PillTabs, Tabs, Segmented, type PillTabItem } from './Tabs'
 export { Avatar, UserAvatar } from './Avatar'
 export {

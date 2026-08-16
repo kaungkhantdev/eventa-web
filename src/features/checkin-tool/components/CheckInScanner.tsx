@@ -95,12 +95,16 @@ export function CheckInScanner({
   const realIdxRef = useRef(0)
   const seenCodesRef = useRef<Record<string, SeenCode>>({})
 
-  // keep event + callback fresh for the stable RAF/scan handlers
+  // Keep event + callback fresh for the stable RAF/scan handlers. Written in an
+  // effect rather than during render: a render React discards would otherwise
+  // leave the ref pointing at a value that was never shown.
   const eventRef = useRef(event)
-  eventRef.current = event
-  streamingRef.current = streaming
   const onCheckInRef = useRef(onCheckIn)
-  onCheckInRef.current = onCheckIn
+  useEffect(() => {
+    eventRef.current = event
+    streamingRef.current = streaming
+    onCheckInRef.current = onCheckIn
+  })
 
   // switching events resets the demo cursors, exactly like the source
   useEffect(() => {

@@ -1,40 +1,8 @@
-import { useMemo, useState } from 'react'
 import { PAGE_SIZES } from '@/lib/paging'
 import { Icon } from './Icon'
 
 /* Canonical paginator, ported from the static kit: a "Showing X–Y of Z"
    line, a rows-per-page select, and labelled Prev/Next buttons. */
-
-export { PAGE_SIZES }
-
-/** Slices `rows` for the current page and resets to page 1 whenever the row
- *  set changes size (i.e. a filter was applied). */
-export function usePagination<T>(rows: T[], initialSize = 10) {
-  const [size, setSize] = useState(initialSize)
-  const [page, setPage] = useState(1)
-
-  const pageCount = Math.max(1, Math.ceil(rows.length / size))
-  const current = Math.min(page, pageCount)
-  const start = (current - 1) * size
-
-  const slice = useMemo(() => rows.slice(start, start + size), [rows, start, size])
-
-  return {
-    slice,
-    page: current,
-    setPage,
-    size,
-    setSize: (n: number) => {
-      setSize(n)
-      setPage(1)
-    },
-    total: rows.length,
-    pageCount,
-    from: rows.length === 0 ? 0 : start + 1,
-    to: Math.min(start + size, rows.length),
-    reset: () => setPage(1),
-  }
-}
 
 export type PaginatorProps = {
   from: number

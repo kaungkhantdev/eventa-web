@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageFooter } from '@/components/ui'
 import { CheckInHeader } from '../components/CheckInHeader'
 import { CheckInScanner } from '../components/CheckInScanner'
@@ -17,16 +17,21 @@ export default function CheckInToolPage() {
   const [feed, setFeed] = useState<FeedItem[]>(() => INITIAL_FEED.map((e, i) => ({ ...e, id: i })))
   const nextId = useRef(INITIAL_FEED.length)
 
-  // read the live event inside the stable checkIn callback
+  // Read the live event inside the stable checkIn callback. Written in an
+  // effect rather than during render: a render React discards would otherwise
+  // leave the ref pointing at a value that was never shown.
   const eventRef = useRef(event)
-  eventRef.current = event
+  useEffect(() => {
+    eventRef.current = event
+  })
 
   // The picker offers the full catalog, but only some events have seeded stats.
   // Mirror the static kit's `if (!s) return` — keep the last valid stats shown
   // when switching to an event that has none, so it never renders undefined.
-  const lastStats = useRef<EventStats>(STATS[EVENTS[0]]!)
-  if (statsByEvent[event]) lastStats.current = statsByEvent[event]!
-  const stats = statsByEvent[event] ?? lastStats.current
+  // Held as state, not a ref: it is read while rendering, so it is state.
+  const [lastStats, setLastStats] = useState<EventStats>(STATS[EVENTS[0]]!)
+  const stats = statsByEvent[event] ?? lastStats
+  if (statsByEvent[event] && stats !== lastStats) setLastStats(stats)
 
   const checkIn = useCallback((entry: FeedInput) => {
     setFeed((prev) => [{ ...entry, time: 'just now', id: nextId.current++ }, ...prev])
