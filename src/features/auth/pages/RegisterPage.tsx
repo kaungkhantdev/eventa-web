@@ -4,7 +4,12 @@ import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { SocialAuth } from '@/features/auth/components/SocialAuth'
-import { STRENGTH_COLORS, STRENGTH_TEXTS, scorePassword } from '@/features/auth/data/passwordStrength'
+import {
+  MIN_PASSWORD_LENGTH,
+  STRENGTH_COLORS,
+  STRENGTH_TEXTS,
+  scorePassword,
+} from '@/features/auth/passwordStrength'
 import { authApi } from '@/features/auth/api'
 import { messageOf } from '@/lib/api'
 
@@ -41,6 +46,7 @@ export default function RegisterPage() {
         name: String(form.get('name') ?? ''),
         email,
         password,
+        acceptTerms: form.get('acceptTerms') === 'on',
       })
       setSentTo(email)
     } catch (cause) {
@@ -124,6 +130,7 @@ export default function RegisterPage() {
               placeholder="••••••••"
               className="input pr-10"
               required
+              minLength={MIN_PASSWORD_LENGTH}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -190,6 +197,7 @@ export default function RegisterPage() {
         <label className="flex cursor-pointer items-start gap-2 text-[13px] text-muted">
           <input
             id="terms"
+            name="acceptTerms"
             type="checkbox"
             className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-hair accent-brand"
             required

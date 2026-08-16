@@ -71,12 +71,14 @@ export const authApi = {
     email: string
     password: string
     organizationName?: string
+    /**
+     * Whether the box was actually ticked — passed through rather than
+     * hard-coded. Asserting somebody's consent on their behalf is not this
+     * app's to make, and the API is what refuses when it is missing.
+     */
+    acceptTerms: boolean
   }): Promise<{ message: string }> {
-    return api.post<{ message: string }>(
-      '/auth/register',
-      { ...input, acceptTerms: true },
-      { anonymous: true },
-    )
+    return api.post<{ message: string }>('/auth/register', input, { anonymous: true })
   },
 
   /**
