@@ -413,7 +413,10 @@ export const router = createBrowserRouter([
       },
       {
         path: '/portal/discover',
-        ...page(() => import('@/features/portal/pages/DiscoverPage')),
+        ...livePage(
+          () => import('@/features/portal/pages/DiscoverPage'),
+          () => import('@/features/portal/discover.routes').then((m) => m.discoverRoute),
+        ),
       },
       {
         path: '/portal/my-events',
