@@ -338,7 +338,10 @@ const adminChildren = [
   },
   {
     path: 'settings-profile',
-    ...page(() => import('@/features/settings/pages/SettingsProfilePage')),
+    ...livePage(
+      () => import('@/features/settings/pages/SettingsProfilePage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.profileRoute),
+    ),
     handle: { page: 'settings-profile' },
   },
   {
@@ -359,12 +362,18 @@ const adminChildren = [
   },
   {
     path: 'settings-organization',
-    ...page(() => import('@/features/settings/pages/SettingsOrganizationPage')),
+    ...livePage(
+      () => import('@/features/settings/pages/SettingsOrganizationPage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.organizationRoute),
+    ),
     handle: { page: 'settings-organization' },
   },
   {
     path: 'settings-payments',
-    ...page(() => import('@/features/settings/pages/SettingsPaymentsPage')),
+    ...livePage(
+      () => import('@/features/settings/pages/SettingsPaymentsPage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.paymentsRoute),
+    ),
     handle: { page: 'settings-payments' },
   },
   {

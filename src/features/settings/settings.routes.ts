@@ -3,6 +3,11 @@ import { api, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { intParam } from '@/lib/urlFilters'
 import {
+  toOrganizationForm,
+  toPaymentSettingsCard,
+  toProfileCard,
+} from './account.mapper'
+import {
   toMemberRow,
   toNotificationRow,
   toPermissionOption,
@@ -20,6 +25,12 @@ import type {
   PermissionWire,
   RoleCard,
   RoleWire,
+  OrganizationForm,
+  OrganizationWire,
+  PaymentSettingsCard,
+  PaymentSettingsWire,
+  ProfileCard,
+  ProfileWire,
   SessionRow,
   TwoFactorWire,
 } from './settings.types'
@@ -256,4 +267,115 @@ async function runNotificationsAction({ request }: LoaderArgs): Promise<void> {
 export const notificationsRoute = {
   loader: pageData(loadNotifications),
   action: pageAction(runNotificationsAction),
+}
+
+/* ── profile, organization and payments ───────────────────────────────── */
+
+export interface ProfileData {
+  profile: ProfileCard
+}
+
+export const profileRoute = {
+  loader: pageData(async (): Promise<ProfileData> => ({
+    profile: toProfileCard(await accountApi.profile()),
+  })),
+
+  action: pageAction(async ({ request }: LoaderArgs) => {
+    const form = await request.formData()
+    if (form.get('intent') === 'email') {
+      return accountApi.changeEmail(field(form, 'email'))
+    }
+    return accountApi.saveProfile({
+      name: field(form, 'name'),
+      phone: nullable(form, 'phone'),
+      city: nullable(form, 'city'),
+      timezone: nullable(form, 'timezone'),
+      locale: field(form, 'locale') === 'th' ? 'th' : 'en',
+      bio: nullable(form, 'bio'),
+    })
+  }),
+}
+
+export interface OrganizationData {
+  organization: OrganizationForm
+}
+
+export const organizationRoute = {
+  loader: pageData(async (): Promise<OrganizationData> => ({
+    organization: toOrganizationForm(await accountApi.organization()),
+  })),
+
+  action: pageAction(async ({ request }: LoaderArgs) => {
+    const form = await request.formData()
+    return accountApi.saveOrganization({
+      name: field(form, 'name'),
+      address: nullable(form, 'address'),
+      website: nullable(form, 'website'),
+      taxId: nullable(form, 'taxId'),
+      timezone: field(form, 'timezone'),
+      statementDescriptor: nullable(form, 'statementDescriptor'),
+      // Sent back untouched so the API can refuse a form that was opened
+      // before somebody else's edit, rather than let it overwrite theirs.
+      version: Number(form.get('version') ?? 0),
+    })
+  }),
+}
+
+export interface PaymentsData {
+  payments: PaymentSettingsCard
+}
+
+export const paymentsRoute = {
+  loader: pageData(async (): Promise<PaymentsData> => ({
+    payments: toPaymentSettingsCard(await accountApi.paymentSettings()),
+  })),
+
+  action: pageAction(async ({ request }: LoaderArgs) => {
+    const form = await request.formData()
+    const intent = form.get('intent')
+    if (intent === 'disconnect') return accountApi.disconnectPayments()
+    if (intent === 'test') return accountApi.testPayments()
+    if (intent === 'method') {
+      return accountApi.setPaymentMethod(field(form, 'method'), form.get('enabled') === 'true')
+    }
+    return accountApi.savePaymentPreferences({
+      statementDescriptor: nullable(form, 'statementDescriptor'),
+      saveCards: form.get('saveCards') === 'true',
+      emailReceipts: form.get('emailReceipts') === 'true',
+    })
+  }),
+}
+
+function field(form: FormData, name: string): string {
+  return String(form.get(name) ?? '').trim()
+}
+
+/** An emptied optional field means "clear it", which the API spells `null`. */
+function nullable(form: FormData, name: string): string | null {
+  return field(form, name) || null
+}
+
+/**
+ * The account screens' own calls.
+ *
+ * PCI SAQ-A: none of these carries a card. Connecting a provider hands over an
+ * account reference the provider issued; the card details never reach this app.
+ */
+const accountApi = {
+  profile: () => api.get<ProfileWire>('/me/profile'),
+  saveProfile: (body: Record<string, unknown>) => api.patch<ProfileWire>('/me/profile', body),
+  /** Confirms at the new address before it replaces the old one. */
+  changeEmail: (email: string) => api.post<unknown>('/me/profile/email', { email }),
+
+  organization: () => api.get<OrganizationWire>('/organization'),
+  saveOrganization: (body: Record<string, unknown>) =>
+    api.patch<OrganizationWire>('/organization', body),
+
+  paymentSettings: () => api.get<PaymentSettingsWire>('/payment-settings'),
+  savePaymentPreferences: (body: Record<string, unknown>) =>
+    api.patch<PaymentSettingsWire>('/payment-settings', body),
+  setPaymentMethod: (method: string, enabled: boolean) =>
+    api.patch<unknown>(`/payment-settings/methods/${method}`, { enabled }),
+  testPayments: () => api.post<unknown>('/payment-settings/test'),
+  disconnectPayments: () => api.post<unknown>('/payment-settings/disconnect'),
 }

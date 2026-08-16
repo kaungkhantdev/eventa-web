@@ -124,3 +124,106 @@ export interface NotificationRow {
   smsEnabled: boolean
   smsAvailable: boolean
 }
+
+/* ── profile, organization and payments ───────────────────────────────── */
+
+/** `GET /me/profile` — the signed-in person's own record. */
+export interface ProfileWire {
+  id: string
+  name: string
+  email: string
+  /** An address awaiting confirmation; the old one is still in use. */
+  pendingEmail: string | null
+  emailVerified: boolean
+  phone: string | null
+  timezone: string | null
+  locale: 'en' | 'th' | null
+  avatarUrl: string | null
+  city: string | null
+  dateOfBirth: string | null
+  bio: string | null
+  displayCurrency: string | null
+}
+
+export interface ProfileCard {
+  name: string
+  email: string
+  initials: string
+  avatarUrl: string | null
+  emailVerified: boolean
+  /** The address awaiting confirmation, or `null` when none is. */
+  pendingEmail: string | null
+  phone: string
+  timezone: string
+  locale: 'en' | 'th'
+  city: string
+  bio: string
+}
+
+/** `GET /organization` — the workspace itself. */
+export interface OrganizationWire {
+  id: number
+  name: string
+  slug: string
+  logoUrl: string | null
+  address: string | null
+  website: string | null
+  taxId: string | null
+  currency: string
+  country: string
+  timezone: string
+  locale: string
+  vatRatePercent: number
+  statementDescriptor: string | null
+  /** Echoed back on PATCH so a stale form cannot overwrite a newer edit. */
+  version: number
+}
+
+export interface OrganizationForm {
+  name: string
+  slug: string
+  logoUrl: string | null
+  address: string
+  website: string
+  taxId: string
+  currency: string
+  country: string
+  timezone: string
+  /** Already rendered — `7%`, not `7`. */
+  vatRate: string
+  statementDescriptor: string
+  version: number
+}
+
+/** `GET /payment-settings` — how money reaches this workspace. */
+export interface PaymentSettingsWire {
+  provider: 'stripe'
+  mode: 'test' | 'live'
+  status: 'disconnected' | 'connected'
+  accountId: string | null
+  publishableKey: string | null
+  connectedAt: string | null
+  defaultCurrency: string
+  statementDescriptor: string | null
+  saveCards: boolean
+  emailReceipts: boolean
+  testMode: boolean
+  warnings?: string[]
+}
+
+export interface PaymentSettingsCard {
+  provider: string
+  connected: boolean
+  /** `Connected · live` or `Not connected`. */
+  statusLabel: string
+  statusTone: BadgeTone
+  /** Masked to the last four; the full id is not needed on screen. */
+  accountRef: string
+  connectedOn: string
+  defaultCurrency: string
+  statementDescriptor: string
+  saveCards: boolean
+  emailReceipts: boolean
+  testMode: boolean
+  warnings: string[]
+}

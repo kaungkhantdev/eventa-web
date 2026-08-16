@@ -1,339 +1,205 @@
-import { useState } from 'react'
-import { Button, Label, Hint, Input, Select, Icon, Segmented } from '@/components/ui'
-import { cn } from '@/lib/cn'
+import { useFetcher, useLoaderData } from 'react-router'
+import { Badge, Button, Card, Hint, Icon, Input, Label } from '@/components/ui'
+import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
 import { Toggle } from '../components/Toggle'
+import type { PaymentsData } from '../settings.routes'
+import type { PaymentSettingsCard } from '../settings.types'
 
-type Mode = 'test' | 'live'
-
-/** The two key sets the mode toggle swaps between — Live keys are unset until
- *  the merchant pastes them, so switching to Live clears the fields. */
-const KEYS: Record<Mode, { pub: string; secret: string }> = {
-  test: { pub: 'pk_test_51P9xEventa0aB3kY7cQ', secret: 'sk_test_51P9xEventa7hV6tL1pX' },
-  live: { pub: '', secret: '' },
-}
-
+/**
+ * How money reaches this workspace (US-FIN-01, US-DISC-05).
+ *
+ * PCI SAQ-A: there is no card field on this screen, and there never will be.
+ * What is configured here is the *connection* to the payment provider — which
+ * account, which mode, what appears on a statement. Card numbers are entered
+ * on the provider's own hosted fields and never enter this app.
+ *
+ * Connecting an account is deliberately not a form here either: it is an
+ * OAuth hand-off the provider owns, and pasting an account id into this page
+ * would be a worse version of it.
+ */
 export default function SettingsPaymentsPage() {
-  const [mode, setMode] = useState<Mode>('test')
-  const [pub, setPub] = useState(KEYS.test.pub)
-  const [secret, setSecret] = useState(KEYS.test.secret)
-  const [showSecret, setShowSecret] = useState(false)
-
-  const [methods, setMethods] = useState({
-    cards: true,
-    promptpay: true,
-    applepay: true,
-    googlepay: false,
-    bank: false,
-  })
-  const [prefs, setPrefs] = useState({ saveCards: true, receipts: true })
-
-  const onMode = (next: Mode) => {
-    setMode(next)
-    setPub(KEYS[next].pub)
-    setSecret(KEYS[next].secret)
-    setShowSecret(false)
-  }
-
-  const connected = pub.trim() !== ''
-  const modeLabel = mode === 'test' ? 'Test mode' : 'Live mode'
+  const { payments } = useLoaderData() as PaymentsData
 
   return (
     <>
       <SettingsHeader
         title="Payments"
-        subtitle="Payment provider, API keys and checkout preferences."
+        subtitle="How you take money, and what buyers see on their statement."
       />
 
-      <div className="space-y-3">
-        {/* test-mode banner */}
-        {mode === 'test' && (
-          <div className="flex items-center gap-2.5 rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-2.5 text-[12px] font-medium text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300">
-            <Icon name="hgi-alert-circle" size={16} />
-            <span>
-              You're using <b>Test keys</b> — no real charges are processed. Add your Live keys to
-              accept payments.
-            </span>
-          </div>
-        )}
-
-        {/* connection status (full width — it's the header/context) */}
-        <section className="card p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#635BFF] text-white shadow-sm">
-                <Icon name="hgi-credit-card" size={20} />
-              </span>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-[15px] font-bold tracking-tight">Stripe</h2>
-                  <span className={cn('badge', connected ? 'badge-green' : 'badge-gray')}>
-                    <Icon
-                      name={connected ? 'hgi-checkmark-badge-01' : 'hgi-alert-circle'}
-                      size={12}
-                    />
-                    {connected ? 'Connected' : 'Not connected'}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-[12px] text-muted">
-                  Your payment gateway for cards, PromptPay and wallets.
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <Segmented
-                items={[
-                  { value: 'test', label: 'Test' },
-                  { value: 'live', label: 'Live' },
-                ]}
-                value={mode}
-                onChange={onMode}
-              />
-              <button
-                type="button"
-                className="btn btn-sm border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400"
-              >
-                Disconnect
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* API keys (paste from Stripe) */}
-        <section className="card p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[15px] font-bold tracking-tight">
-              API keys{' '}
-              <span className="ml-1 align-middle text-[11px] font-medium text-muted">
-                {modeLabel}
-              </span>
-            </h2>
-            <a
-              href="#"
-              className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
-            >
-              Where do I find these?
-              <Icon name="hgi-arrow-up-right-01" size={13} />
-            </a>
-          </div>
-          <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-hair bg-canvas px-3 py-2.5 text-[12px] text-muted">
-            <Icon name="hgi-idea-01" size={15} className="mt-px shrink-0 text-brand" />
-            <span>
-              In your <b className="text-ink">Stripe Dashboard</b> go to{' '}
-              <b className="text-ink">Developers → API keys</b>, copy the two keys, and paste them
-              below.
-            </span>
-          </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <Label>Publishable key</Label>
-              <Input
-                className="font-mono text-[12px]"
-                placeholder="pk_test_..."
-                value={pub}
-                onChange={(e) => setPub(e.target.value)}
-              />
-              <Hint>
-                Starts with <span className="font-mono">pk_test_</span> (test) or{' '}
-                <span className="font-mono">pk_live_</span> (live).
-              </Hint>
-            </div>
-            <div>
-              <Label>Secret key</Label>
-              <div className="relative">
-                <Input
-                  className="pr-10 font-mono text-[12px]"
-                  type={showSecret ? 'text' : 'password'}
-                  placeholder="sk_test_..."
-                  value={secret}
-                  onChange={(e) => setSecret(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSecret((s) => !s)}
-                  className="btn-icon absolute right-1 top-1/2 -translate-y-1/2"
-                  title="Reveal"
-                >
-                  <Icon name={showSecret ? 'hgi-view-off' : 'hgi-view'} size={16} />
-                </button>
-              </div>
-              <Hint>
-                Starts with <span className="font-mono">sk_</span>. Stored encrypted — never shown to
-                attendees.
-              </Hint>
-            </div>
-          </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-hair pt-3">
-            <p className="text-[11px] text-muted">Last saved Jul 9, 2026 · 14:22</p>
-            <div className="flex gap-2">
-              <Button variant="soft" size="sm">
-                <Icon name="hgi-plug-socket" size={14} />
-                Test connection
-              </Button>
-              <Button variant="primary" size="sm">
-                Save keys
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        {/* config: methods + checkout preferences side by side */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
-          {/* payment methods */}
-          <section className="card p-4">
-            <h2 className="text-[15px] font-bold tracking-tight">Payment methods</h2>
-            <p className="mt-0.5 text-[12px] text-muted">
-              Choose which methods to offer your attendees at checkout.
-            </p>
-            <div className="mt-2 divide-y divide-line">
-              <div className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-1">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">
-                    <Icon name="hgi-credit-card" size={16} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-ink">Cards</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1">
-                      <span className="rounded bg-line px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink">
-                        VISA
-                      </span>
-                      <span className="rounded bg-line px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink">
-                        MC
-                      </span>
-                      <span className="rounded bg-line px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink">
-                        AMEX
-                      </span>
-                      <span className="rounded bg-line px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink">
-                        JCB
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <Toggle
-                  on={methods.cards}
-                  onChange={(v) => setMethods((m) => ({ ...m, cards: v }))}
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
-                    <Icon name="hgi-qr-code-01" size={16} />
-                  </span>
-                  <div>
-                    <p className="text-[13px] font-semibold text-ink">PromptPay</p>
-                    <p className="text-[11px] text-muted">Thailand QR bank transfer</p>
-                  </div>
-                </div>
-                <Toggle
-                  on={methods.promptpay}
-                  onChange={(v) => setMethods((m) => ({ ...m, promptpay: v }))}
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-line text-ink">
-                    <Icon name="hgi-apple" size={16} />
-                  </span>
-                  <div>
-                    <p className="text-[13px] font-semibold text-ink">Apple Pay</p>
-                    <p className="text-[11px] text-muted">One-tap checkout on Apple devices</p>
-                  </div>
-                </div>
-                <Toggle
-                  on={methods.applepay}
-                  onChange={(v) => setMethods((m) => ({ ...m, applepay: v }))}
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-line text-muted">
-                    <Icon name="hgi-wallet-01" size={16} />
-                  </span>
-                  <div>
-                    <p className="text-[13px] font-semibold text-ink">Google Pay</p>
-                    <p className="text-[11px] text-muted">One-tap checkout on Android &amp; Chrome</p>
-                  </div>
-                </div>
-                <Toggle
-                  on={methods.googlepay}
-                  onChange={(v) => setMethods((m) => ({ ...m, googlepay: v }))}
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-3 py-3 last:pb-1">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-line text-muted">
-                    <Icon name="hgi-bank" size={16} />
-                  </span>
-                  <div>
-                    <p className="text-[13px] font-semibold text-ink">Bank transfer</p>
-                    <p className="text-[11px] text-muted">Pay by direct bank transfer</p>
-                  </div>
-                </div>
-                <Toggle
-                  on={methods.bank}
-                  onChange={(v) => setMethods((m) => ({ ...m, bank: v }))}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* checkout preferences */}
-          <section className="card p-4">
-            <h2 className="text-[15px] font-bold tracking-tight">Checkout preferences</h2>
-            <div className="mt-3 grid grid-cols-1 gap-4">
-              <div>
-                <Label>Default currency</Label>
-                <Select defaultValue="Thai Baht (฿ THB)">
-                  <option>Thai Baht (฿ THB)</option>
-                  <option>US Dollar ($ USD)</option>
-                  <option>Euro (€ EUR)</option>
-                  <option>Singapore Dollar (S$ SGD)</option>
-                </Select>
-              </div>
-              <div>
-                <Label>Statement descriptor</Label>
-                <Input defaultValue="EVENTA TICKETS" maxLength={22} />
-                <Hint>Appears on your attendee's card statement.</Hint>
-              </div>
-            </div>
-            <div className="mt-3 space-y-1 border-t border-hair pt-2">
-              <label className="flex items-center justify-between gap-3 py-2">
-                <span>
-                  <span className="block text-[13px] font-medium text-ink">
-                    Save cards for faster checkout
-                  </span>
-                  <span className="block text-[11px] text-muted">
-                    Let returning attendees reuse a saved card
-                  </span>
-                </span>
-                <Toggle
-                  on={prefs.saveCards}
-                  onChange={(v) => setPrefs((p) => ({ ...p, saveCards: v }))}
-                />
-              </label>
-              <label className="flex items-center justify-between gap-3 py-2">
-                <span>
-                  <span className="block text-[13px] font-medium text-ink">Email receipts</span>
-                  <span className="block text-[11px] text-muted">
-                    Send a receipt after each successful payment
-                  </span>
-                </span>
-                <Toggle
-                  on={prefs.receipts}
-                  onChange={(v) => setPrefs((p) => ({ ...p, receipts: v }))}
-                />
-              </label>
-            </div>
-            <div className="mt-3 flex justify-end border-t border-hair pt-3">
-              <Button variant="primary">Save changes</Button>
-            </div>
-          </section>
-        </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <PreferencesCard payments={payments} />
+        <ProviderCard payments={payments} />
       </div>
     </>
+  )
+}
+
+function ProviderCard({ payments }: { payments: PaymentSettingsCard }) {
+  const act = useFetcher<ActionResult>()
+  const error = act.data?.ok === false ? act.data.error : null
+
+  return (
+    <Card className="h-fit p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-[13px] font-bold tracking-tight">{payments.provider}</p>
+          <p className="mt-0.5 text-[12px] text-muted">Your payment provider.</p>
+        </div>
+        <Badge tone={payments.statusTone}>{payments.statusLabel}</Badge>
+      </div>
+
+      {payments.testMode && (
+        <Hint className="mt-3">
+          Test mode — no real money moves, and these payments are not settled.
+        </Hint>
+      )}
+
+      {payments.warnings.map((warning) => (
+        <p key={warning} role="alert" className="mt-2 text-[12px] text-amber-600">
+          {warning}
+        </p>
+      ))}
+
+      <div className="mt-4 space-y-2 border-t border-hair pt-4 text-[12px]">
+        <p className="flex items-center justify-between gap-2">
+          <span className="text-muted">Account</span>
+          <span className="tnum font-semibold text-ink">{payments.accountRef}</span>
+        </p>
+        <p className="flex items-center justify-between gap-2">
+          <span className="text-muted">Connected</span>
+          <span className="font-semibold text-ink">{payments.connectedOn}</span>
+        </p>
+        <p className="flex items-center justify-between gap-2">
+          <span className="text-muted">Settles in</span>
+          <span className="font-semibold text-ink">{payments.defaultCurrency}</span>
+        </p>
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-3 text-[13px] text-red-500">
+          {error}
+        </p>
+      )}
+
+      {payments.connected ? (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-hair pt-4">
+          <act.Form method="post">
+            <input type="hidden" name="intent" value="test" />
+            <Button variant="soft" size="sm" type="submit" disabled={act.state !== 'idle'}>
+              <Icon name="hgi-connect" size={15} />
+              Test connection
+            </Button>
+          </act.Form>
+          <act.Form method="post">
+            <input type="hidden" name="intent" value="disconnect" />
+            <Button variant="danger" size="sm" type="submit" disabled={act.state !== 'idle'}>
+              Disconnect
+            </Button>
+          </act.Form>
+        </div>
+      ) : (
+        <Hint className="mt-4 border-t border-hair pt-4">
+          Connecting an account happens on {payments.provider}, not here. Contact support to start
+          the hand-off.
+        </Hint>
+      )}
+    </Card>
+  )
+}
+
+function PreferencesCard({ payments }: { payments: PaymentSettingsCard }) {
+  const save = useFetcher<ActionResult>()
+  const error = save.data?.ok === false ? save.data.error : null
+  const saved = save.state === 'idle' && save.data?.ok === true
+
+  const setFlag = (field: 'saveCards' | 'emailReceipts', value: boolean) =>
+    save.submit(
+      {
+        statementDescriptor: payments.statementDescriptor,
+        saveCards: String(field === 'saveCards' ? value : payments.saveCards),
+        emailReceipts: String(field === 'emailReceipts' ? value : payments.emailReceipts),
+      },
+      { method: 'post' },
+    )
+
+  return (
+    <Card className="p-5">
+      <h3 className="text-[14px] font-bold tracking-tight">Checkout preferences</h3>
+      <p className="mt-0.5 text-[12px] text-muted">
+        What buyers see, and what happens after they pay.
+      </p>
+
+      <save.Form method="post" key={payments.statementDescriptor}>
+        <input type="hidden" name="saveCards" value={String(payments.saveCards)} />
+        <input type="hidden" name="emailReceipts" value={String(payments.emailReceipts)} />
+        <div className="mt-4">
+          <Label htmlFor="pay-descriptor">Statement descriptor</Label>
+          <Input
+            id="pay-descriptor"
+            name="statementDescriptor"
+            maxLength={22}
+            defaultValue={payments.statementDescriptor}
+            placeholder="ACME EVENTS"
+          />
+          <Hint>Up to 22 characters — what appears on a buyer's bank statement.</Hint>
+        </div>
+        <div className="mt-4 flex justify-end border-t border-hair pt-4">
+          <Button variant="primary" size="sm" type="submit" disabled={save.state !== 'idle'}>
+            <Icon name="hgi-tick-02" size={15} />
+            {save.state === 'idle' ? 'Save' : 'Saving…'}
+          </Button>
+        </div>
+      </save.Form>
+
+      <div className="mt-2 divide-y divide-line border-t border-hair">
+        <PreferenceRow
+          title="Let buyers save a card"
+          description="Their card is stored by the provider, never by Eventa."
+          on={payments.saveCards}
+          busy={save.state !== 'idle'}
+          onChange={(next) => setFlag('saveCards', next)}
+        />
+        <PreferenceRow
+          title="Email a receipt"
+          description="Sent automatically once a payment clears."
+          on={payments.emailReceipts}
+          busy={save.state !== 'idle'}
+          onChange={(next) => setFlag('emailReceipts', next)}
+        />
+      </div>
+
+      {error && (
+        <p role="alert" className="mt-3 text-[13px] text-red-500">
+          {error}
+        </p>
+      )}
+      {saved && <p className="mt-3 text-[13px] text-brand">Saved.</p>}
+    </Card>
+  )
+}
+
+function PreferenceRow({
+  title,
+  description,
+  on,
+  busy,
+  onChange,
+}: {
+  title: string
+  description: string
+  on: boolean
+  busy: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3.5">
+      <div className="min-w-0">
+        <p className="text-[13.5px] font-semibold text-ink">{title}</p>
+        <p className="mt-0.5 text-[12px] text-muted">{description}</p>
+      </div>
+      <Toggle on={on} disabled={busy} onChange={onChange} label={title} />
+    </div>
   )
 }
