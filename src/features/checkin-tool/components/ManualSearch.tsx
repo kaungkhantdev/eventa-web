@@ -1,124 +1,90 @@
-import { useMemo, useState } from 'react'
-import { IconInput, Paginator, usePagination } from '@/components/ui'
-import { cn } from '@/lib/cn'
-import { ATTENDEES, type Attendee, type FeedInput } from '../data/checkin'
+import { useEffect, useState } from 'react'
+import { useFetcher } from 'react-router'
+import { Icon } from '@/components/ui'
+import { SEARCH_DEBOUNCE_MS } from '@/lib/useFilters'
+import type { AttendanceRow } from '../door.types'
 
-/* Manual fallback for when a ticket can't be scanned: a collapsible search over
-   the attendee list, paginated, with an inline "Check in" action per row. */
-export function ManualSearch({ onCheckIn }: { onCheckIn: (entry: FeedInput) => void }) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [attendees, setAttendees] = useState<Attendee[]>(() => ATTENDEES.map((a) => ({ ...a })))
+/**
+ * Finding somebody when the code will not read (US-REG-13).
+ *
+ * Its own fetcher against a resource route, so nothing is asked of the API
+ * until somebody actually types — the station sits idle most of the evening,
+ * and a search on every keystroke of an empty box is a request for nothing.
+ */
+export function ManualSearch({ eventId }: { eventId: string }) {
+  const [term, setTerm] = useState('')
+  const results = useFetcher<{ rows: AttendanceRow[] }>()
+  const admit = useFetcher()
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return attendees.filter(
-      (a) =>
-        !q ||
-        a.name.toLowerCase().includes(q) ||
-        a.email.toLowerCase().includes(q) ||
-        a.ticket.toLowerCase().includes(q),
+  const load = results.load
+  useEffect(() => {
+    const query = term.trim()
+    if (!eventId || !query) return
+    const timer = setTimeout(
+      () =>
+        load(
+          `/admin/check-in/search?eventId=${encodeURIComponent(eventId)}&q=${encodeURIComponent(query)}`,
+        ),
+      SEARCH_DEBOUNCE_MS,
     )
-  }, [attendees, query])
+    return () => clearTimeout(timer)
+  }, [term, eventId, load])
 
-  const pager = usePagination(filtered, 10)
-  const total = filtered.length
-
-  function checkInRow(a: Attendee) {
-    onCheckIn({ name: a.name, ini: a.ini, ticket: a.ticket, badge: a.badge })
-    setAttendees((prev) => prev.map((x) => (x === a ? { ...x, checkedIn: true } : x)))
-  }
+  const rows = term.trim() ? (results.data?.rows ?? []) : []
 
   return (
-    <div className="border-t border-hair px-5 py-4">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between text-left"
-      >
-        <span className="flex items-center gap-2 text-[13px] font-semibold text-ink">
-          <i className="hgi-stroke hgi-search-01 text-[15px] text-muted" />
-          Can't scan? Find attendee manually
-        </span>
-        <i
-          className={cn(
-            'hgi-stroke hgi-arrow-down-01 text-[16px] text-muted transition-transform',
-            open && 'rotate-180',
-          )}
-        />
-      </button>
+    <div className="card mt-4 p-5">
+      <h2 className="text-[15px] font-bold tracking-tight">Find by name</h2>
+      <p className="mt-0.5 text-[12.5px] text-muted">
+        When a badge will not scan, look them up and let them in by hand.
+      </p>
 
-      <div className={cn('mt-3', !open && 'hidden')}>
-        <IconInput
-          icon="hgi-search-01"
+      <div className="relative mt-3">
+        <i className="hgi-stroke hgi-search-01 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-muted" />
+        <input
           type="text"
-          placeholder="Search name, email, or ticket ID"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            pager.setPage(1)
-          }}
-        />
-
-        <div className="mb-1 mt-3 flex items-center justify-between">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Matching attendees
-          </p>
-          <p className="text-[11px] text-muted">
-            {total} {total === 1 ? 'result' : 'results'}
-          </p>
-        </div>
-
-        <div>
-          {pager.slice.map((a) => (
-            <div
-              key={a.email}
-              className="flex items-center gap-3 border-t border-line py-3 first:border-t-0"
-            >
-              <span className="avatar h-9 w-9 shrink-0 text-[11px]">{a.ini}</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold text-ink">{a.name}</p>
-                <p className="truncate text-[11px] text-muted">
-                  {a.ticket} · {a.email}
-                </p>
-              </div>
-              {a.checkedIn ? (
-                <span className="badge badge-green shrink-0">
-                  <i className="hgi-stroke hgi-tick-02 text-[12px]" />
-                  Checked in
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => checkInRow(a)}
-                  className="btn btn-primary btn-sm shrink-0"
-                >
-                  <i className="hgi-stroke hgi-tick-02 text-[14px]" />
-                  Check in
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        {total === 0 && (
-          <div className="py-6 text-center text-[12px] text-muted">
-            No attendees match your search.
-          </div>
-        )}
-
-        <Paginator
-          from={pager.from}
-          to={pager.to}
-          total={pager.total}
-          page={pager.page}
-          pageCount={pager.pageCount}
-          size={pager.size}
-          onPage={pager.setPage}
-          onSize={pager.setSize}
-          noun="attendees"
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          disabled={!eventId}
+          aria-label="Find an attendee"
+          placeholder="Name or email…"
+          className="input h-11 w-full pl-9"
         />
       </div>
+
+      {rows.length === 0 ? (
+        <p className="mt-3 text-[13px] text-muted">
+          {term.trim() && results.state === 'idle' ? 'Nobody by that name.' : 'Start typing to search.'}
+        </p>
+      ) : (
+        <ul className="mt-3 divide-y divide-line">
+          {rows.map((row) => (
+            <li key={row.ticketId} className="flex items-center gap-3 py-2.5">
+              <span className="avatar h-8 w-8 text-[11px]">{row.initials}</span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-ink">{row.name}</p>
+                <p className="truncate text-[11.5px] text-muted">{row.ticketType}</p>
+              </div>
+              {row.checkedIn ? (
+                <span className="badge badge-green shrink-0">In at {row.time}</span>
+              ) : (
+                <admit.Form method="post" className="shrink-0">
+                  <input type="hidden" name="eventId" value={eventId} />
+                  <input type="hidden" name="ticketId" value={row.ticketId} />
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={admit.state !== 'idle'}
+                  >
+                    <Icon name="hgi-tick-02" size={14} />
+                    Check in
+                  </button>
+                </admit.Form>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

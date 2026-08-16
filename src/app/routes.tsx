@@ -177,6 +177,14 @@ const adminChildren = [
     }),
   },
   {
+    // A resource route: the station's manual search, asked only once somebody
+    // types into it.
+    path: 'check-in/search',
+    lazy: async () => ({
+      loader: (await import('@/features/checkin-tool/door.routes')).checkInSearchRoute.loader,
+    }),
+  },
+  {
     path: 'discounts',
     ...livePage(
       () => import('@/features/ticketing/pages/DiscountsPage'),
@@ -218,12 +226,18 @@ const adminChildren = [
   },
   {
     path: 'check-in',
-    ...page(() => import('@/features/attendees/pages/CheckInPage')),
+    ...livePage(
+      () => import('@/features/checkin-tool/pages/CheckInPage'),
+      () => import('@/features/checkin-tool/door.routes').then((m) => m.checkInQueueRoute),
+    ),
     handle: { page: 'checkin' },
   },
   {
     path: 'check-in-tool',
-    ...page(() => import('@/features/checkin-tool/pages/CheckInToolPage')),
+    ...livePage(
+      () => import('@/features/checkin-tool/pages/CheckInToolPage'),
+      () => import('@/features/checkin-tool/door.routes').then((m) => m.checkInStationRoute),
+    ),
     handle: { page: 'checkin-tool' },
   },
   {
