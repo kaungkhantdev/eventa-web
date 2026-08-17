@@ -168,6 +168,7 @@ export function toPaymentStep(intent: PaymentIntentWire): PaymentStep {
     state: stateOf(intent),
     amount: intent.amountLabel,
     promptPayQr: intent.promptPayQr,
+    checkoutUrl: intent.checkoutUrl,
     declineReason: intent.declineReason,
   }
 }

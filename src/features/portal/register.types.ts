@@ -195,6 +195,8 @@ export interface PaymentIntentWire {
   amountLabel: string
   /** Where the provider's own hosted fields take over, for Card. */
   clientSecret: string | null
+  /** Card only — the provider's own payment page. */
+  checkoutUrl: string | null
   promptPayQr: string | null
   expiresAt: string | null
   declineReason: string | null
@@ -211,5 +213,13 @@ export interface PaymentStep {
   state: 'scan' | 'provider' | 'failed'
   amount: string
   promptPayQr: string | null
+  /**
+   * Where the buyer is sent to pay (card only).
+   *
+   * A page on the provider's own domain — so this app needs no key, no
+   * connected-account id and no SDK, which is what keeps a multi-tenant
+   * checkout simple as well as SAQ-A.
+   */
+  checkoutUrl: string | null
   declineReason: string | null
 }

@@ -514,6 +514,27 @@ function BuyerFields() {
   )
 }
 
+/**
+ * What the button promises.
+ *
+ * A card does NOT get paid on this page — the next thing that happens is a
+ * hand-off to the provider, so the button says so. PromptPay really is settled
+ * from here: its QR appears in place.
+ */
+function payLabel(input: {
+  booking: boolean
+  paymentRequired: boolean
+  method: 'Card' | 'PromptPay'
+  total: string | undefined
+}): string {
+  if (input.booking) return 'Booking…'
+  if (!input.paymentRequired) return 'Confirm registration'
+  const total = input.total ?? ''
+  return input.method === 'Card'
+    ? `Continue to pay ${total}`.trim()
+    : `Pay ${total}`.trim()
+}
+
 const METHODS = [
   { method: 'Card' as const, icon: 'hgi-credit-card', title: 'Card', sub: 'Visa · Mastercard' },
   { method: 'PromptPay' as const, icon: 'hgi-qr-code-01', title: 'PromptPay', sub: 'Thai QR · banking app' },
@@ -575,11 +596,13 @@ function PaymentMethods({
           and the hand-off happens after the order exists. */}
       {method === 'Card' && (
         <div className="mt-4 rounded-xl border border-hair p-4">
-          <p className="text-[13px] font-semibold text-ink">
-            Card details are entered on the secure payment step
+          <p className="flex items-center gap-1.5 text-[13px] font-semibold text-ink">
+            <Icon name="hgi-square-lock-02" size={15} className="text-brand" />
+            You'll pay on our provider's secure page
           </p>
           <p className="mt-1 text-[12px] leading-relaxed text-muted">
-            We never handle your card ourselves — it goes straight to our payment provider.
+            We take you there after this step, and bring you straight back to your tickets. Your
+            card details are never typed into Eventa.
           </p>
         </div>
       )}
@@ -716,11 +739,12 @@ function StickyBar({
           )}
           <button type="submit" disabled={!ready || booking} className="btn btn-primary">
             <Icon name={checkout.paymentRequired ? 'hgi-square-lock-02' : 'hgi-ticket-02'} size={16} />
-            {booking
-              ? 'Booking…'
-              : checkout.paymentRequired
-                ? `Pay ${summary?.total ?? ''}`.trim()
-                : 'Confirm registration'}
+            {payLabel({
+              booking,
+              paymentRequired: checkout.paymentRequired,
+              method,
+              total: summary?.total,
+            })}
           </button>
         </fetcher.Form>
       </div>
@@ -731,28 +755,53 @@ function StickyBar({
 /**
  * What happened, once the order exists.
  *
- * "Registered" and "paid" are separate facts, and this never conflates them: a
- * free registration is finished, a PromptPay one ends in a QR somebody still
- * has to scan, and a card one is completed by the provider's own fields.
+ * "Registered" and "paid" are separate facts and this must never conflate
+ * them. Only a settled order is a registration: a free one is finished on the
+ * spot, but anything owing money is held, not booked, until the payment
+ * clears — so the headline says so rather than congratulating somebody who has
+ * not paid yet.
  */
+interface OverlayHead {
+  title: string
+  icon: string
+  /** Amber while the money is outstanding: not done, not wrong. */
+  tone: string
+}
+
+function headOf(order: PlacedOrder, payment: PaymentStep | null): OverlayHead {
+  if (payment?.state === 'failed') {
+    return {
+      title: 'Payment could not be started',
+      icon: 'hgi-alert-02',
+      tone: 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300',
+    }
+  }
+  if (!order.paymentRequired || payment === null) {
+    return {
+      title: "You're registered!",
+      icon: 'hgi-checkmark-circle-02',
+      tone: 'bg-brand-soft text-brand',
+    }
+  }
+  return {
+    title: 'Almost there — your seats are held',
+    icon: 'hgi-time-quarter-pass',
+    tone: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  }
+}
+
 function SuccessOverlay({ order, payment }: { order: PlacedOrder; payment: PaymentStep | null }) {
+  const head = headOf(order, payment)
+  /** Nothing is owed — so the tickets exist and the order is a registration. */
+  const settled = !order.paymentRequired || payment === null
+
   return (
     <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-black/50 p-4">
       <div className="w-full max-w-sm rounded-2xl bg-surface p-6 text-center shadow-xl">
-        <span
-          className={cn(
-            'mx-auto grid h-14 w-14 place-items-center rounded-full',
-            payment?.state === 'failed' ? 'bg-red-100 text-red-600' : 'bg-brand-soft text-brand',
-          )}
-        >
-          <Icon
-            name={payment?.state === 'failed' ? 'hgi-alert-02' : 'hgi-checkmark-circle-02'}
-            size={30}
-          />
+        <span className={cn('mx-auto grid h-14 w-14 place-items-center rounded-full', head.tone)}>
+          <Icon name={head.icon} size={30} />
         </span>
-        <h3 className="mt-4 text-[18px] font-bold tracking-tight">
-          {payment?.state === 'failed' ? 'Payment could not be started' : "You're registered!"}
-        </h3>
+        <h3 className="mt-4 text-[18px] font-bold tracking-tight">{head.title}</h3>
         {/* No claim about an email: whether one is actually delivered is the
             worker's business and not something this screen can know. The order
             link below is the thing that always works. */}
@@ -767,9 +816,14 @@ function SuccessOverlay({ order, payment }: { order: PlacedOrder; payment: Payme
         <div className="mt-5 flex flex-col gap-2">
           {/* The guest's own copy — reached by the order id, so somebody who
               registered without an account is not sent to sign in to one. */}
-          <Link to={`/my/tickets/orders/${order.orderId}`} className="btn btn-primary w-full">
+          {/* Not "my tickets" until there are some: an unpaid order has none
+              yet, and the page it opens says so. */}
+          <Link
+            to={`/my/tickets/orders/${order.orderId}`}
+            className={cn('w-full', settled ? 'btn btn-primary' : 'btn btn-soft')}
+          >
             <Icon name="hgi-ticket-02" size={16} />
-            View my tickets
+            {settled ? 'View my tickets' : 'View my order'}
           </Link>
           <Link to="/portal/discover" className="btn btn-soft w-full">
             Back to Eventa
@@ -819,12 +873,53 @@ function PaymentNext({ order, payment }: { order: PlacedOrder; payment: PaymentS
     )
   }
 
-  // Card: the provider owns the fields and the card number, so the buyer
-  // finishes there. This app has never seen either (PCI SAQ-A).
+  // Card: the provider owns the page, the fields and the card number, so the
+  // buyer finishes there. This app has never seen any of it (PCI SAQ-A).
+  return <CardHandoff payment={payment} />
+}
+
+/** Long enough to read what was booked, short enough not to feel stuck. */
+const HANDOFF_MS = 1_200
+
+/**
+ * Off to the provider's own payment page.
+ *
+ * Auto-forwarded after a beat AND given a visible link: a redirect nobody
+ * asked for is disorienting on its own, and a link alone is a step somebody
+ * will miss. The link is also the way out if the redirect is blocked.
+ *
+ * There is nothing to fall back to if the provider gave us no page — saying so
+ * beats sending somebody to a blank screen. The order still exists and is
+ * still payable, which is what the tickets link below is for.
+ */
+function CardHandoff({ payment }: { payment: PaymentStep }) {
+  const url = payment.checkoutUrl
+
+  useEffect(() => {
+    if (!url) return
+    const timer = window.setTimeout(() => window.location.assign(url), HANDOFF_MS)
+    return () => window.clearTimeout(timer)
+  }, [url])
+
+  if (!url) {
+    return (
+      <p role="alert" className="mt-2 text-[13px] text-red-500">
+        The payment page could not be opened. Your order is saved — open it below and try again.
+      </p>
+    )
+  }
+
   return (
-    <p className="mt-2 text-[13px] text-muted">
-      {payment.amount} is being taken by our payment provider — check your email to finish it. Your
-      tickets are issued the moment it clears.
-    </p>
+    <div className="mt-3">
+      <p className="text-[13px] text-muted">
+        Taking you to our payment provider to pay{' '}
+        <span className="font-semibold text-ink">{payment.amount}</span> securely. Your tickets are
+        issued the moment it clears.
+      </p>
+      <a href={url} className="btn btn-primary mt-2 w-full">
+        <Icon name="hgi-lock" size={16} />
+        Continue to payment
+      </a>
+    </div>
   )
 }

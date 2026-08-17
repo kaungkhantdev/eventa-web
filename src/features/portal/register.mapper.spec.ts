@@ -297,6 +297,7 @@ const INTENT: PaymentIntentWire = {
   amountSatang: 315_000,
   amountLabel: '฿3,150',
   clientSecret: null,
+  checkoutUrl: null,
   promptPayQr: 'data:image/png;base64,abc',
   expiresAt: '2026-08-16T12:00:00.000Z',
   declineReason: null,
@@ -310,16 +311,33 @@ describe('toPaymentStep', () => {
       state: 'scan',
       amount: '฿3,150',
       promptPayQr: 'data:image/png;base64,abc',
+      checkoutUrl: null,
       declineReason: null,
     })
   })
 
-  // Card is completed by the provider's own fields, which this app never
-  // renders — the buyer finishes elsewhere, so saying "paid" would be false.
-  it('sends a card buyer to the provider', () => {
-    expect(step({ method: 'Card', promptPayQr: null, clientSecret: 'seti_123' })).toMatchObject({
+  // Card is paid on the provider's OWN page. Carrying its URL is the whole of
+  // what this app needs — no key, no account id, no SDK (PCI SAQ-A).
+  it('carries the hosted page the buyer is sent to', () => {
+    expect(
+      step({
+        method: 'Card',
+        promptPayQr: null,
+        checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_1',
+      }),
+    ).toMatchObject({
       state: 'provider',
       promptPayQr: null,
+      checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_1',
+    })
+  })
+
+  // A card attempt the provider could not start has nowhere to send anybody,
+  // and the page must say so rather than forward them to a blank screen.
+  it('has no page when the provider refused outright', () => {
+    expect(step({ method: 'Card', status: 'failed', checkoutUrl: null })).toMatchObject({
+      state: 'failed',
+      checkoutUrl: null,
     })
   })
 
