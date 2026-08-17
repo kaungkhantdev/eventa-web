@@ -445,6 +445,15 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // The buyer's own copy of their order — no account, the id is the
+        // capability. Matches the link ticket-links.ts puts in the email.
+        path: '/my/tickets/orders/:orderId',
+        ...livePage(
+          () => import('@/features/portal/pages/GuestOrderPage'),
+          () => import('@/features/portal/guestOrder.routes').then((m) => m.guestOrderRoute),
+        ),
+      },
+      {
         path: '/portal/discover',
         ...livePage(
           () => import('@/features/portal/pages/DiscoverPage'),

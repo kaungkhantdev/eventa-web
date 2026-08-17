@@ -753,17 +753,21 @@ function SuccessOverlay({ order, payment }: { order: PlacedOrder; payment: Payme
         <h3 className="mt-4 text-[18px] font-bold tracking-tight">
           {payment?.state === 'failed' ? 'Payment could not be started' : "You're registered!"}
         </h3>
+        {/* No claim about an email: whether one is actually delivered is the
+            worker's business and not something this screen can know. The order
+            link below is the thing that always works. */}
         <p className="mt-1 text-[13px] text-muted">
           {order.ticketCount} {order.ticketCount === 1 ? 'ticket' : 'tickets'} for{' '}
           <span className="font-semibold text-ink">{order.eventName}</span>, held under{' '}
-          <span className="font-semibold text-ink">{order.reference}</span>. We have emailed{' '}
-          {order.buyerEmail}.
+          <span className="font-semibold text-ink">{order.reference}</span>.
         </p>
 
         <PaymentNext order={order} payment={payment} />
 
         <div className="mt-5 flex flex-col gap-2">
-          <Link to="/portal/my-events" className="btn btn-primary w-full">
+          {/* The guest's own copy — reached by the order id, so somebody who
+              registered without an account is not sent to sign in to one. */}
+          <Link to={`/my/tickets/orders/${order.orderId}`} className="btn btn-primary w-full">
             <Icon name="hgi-ticket-02" size={16} />
             View my tickets
           </Link>

@@ -142,6 +142,7 @@ export function toSummaryLines(summary: OrderSummaryWire): SummaryLines {
  */
 export function toPlacedOrder(order: OrderPlacedWire): PlacedOrder {
   return {
+    orderId: order.orderId,
     reference: order.reference,
     eventName: order.eventName,
     buyerEmail: order.buyerEmail,

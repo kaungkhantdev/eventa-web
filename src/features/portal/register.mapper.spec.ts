@@ -265,6 +265,9 @@ describe('toPlacedOrder', () => {
 
   it('reports what was booked', () => {
     expect(placed()).toEqual({
+      // Carried so the "You're registered" screen can link to the buyer's own
+      // copy of the order rather than to a sign-in they have no account for.
+      orderId: 'order-1',
       reference: 'EVT-2026-0001',
       eventName: 'Founders Coffee Connect',
       buyerEmail: 'anan@example.com',

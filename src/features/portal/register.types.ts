@@ -174,6 +174,8 @@ export interface SummaryLines {
 
 /** What the success step says once the order exists. */
 export interface PlacedOrder {
+  /** Where the buyer's own copy of this order lives — no account needed. */
+  orderId: string
   reference: string
   eventName: string
   buyerEmail: string
