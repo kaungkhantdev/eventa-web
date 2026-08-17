@@ -37,6 +37,8 @@ export interface GuestOrderWire {
   tickets: IssuedTicketWire[]
   paymentRequired: boolean
   placedAt: string
+  /** When the seats stop being held — the deadline to pay. */
+  holdExpiresAt: string | null
 }
 
 /* ── what the page renders ────────────────────────────────────────────── */
@@ -80,4 +82,19 @@ export interface GuestOrder {
   tickets: GuestTicket[]
   /** True while the money is still owed, so the page can say so plainly. */
   awaitingPayment: boolean
+  /**
+   * The instant the seats stop being held, ISO — `null` when none are.
+   *
+   * Raw rather than formatted because the page counts down against it, and a
+   * deadline that only exists as "3:42 PM" cannot be subtracted from.
+   */
+  holdExpiresAt: string | null
+  /**
+   * True while a payment can still be started.
+   *
+   * Deliberately not just "unpaid": once the hold lapses the seats are back on
+   * sale, and taking money for an order we can no longer honour only creates a
+   * refund. The button goes away with the inventory.
+   */
+  payable: boolean
 }

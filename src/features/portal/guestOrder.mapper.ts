@@ -20,7 +20,22 @@ import type {
 
 const UNTITLED_TICKET = 'Admission'
 
-export function toGuestOrder(wire: GuestOrderWire): GuestOrder {
+/**
+ * Nobody paid and the clock ran out.
+ *
+ * Exported because the page needs the same words when the countdown reaches
+ * zero while somebody is looking at it — the server still says `pending` for a
+ * few seconds after that, and the copy must not depend on which of the two got
+ * there first.
+ */
+export const EXPIRED_STATE: OrderState = {
+  label: 'Expired',
+  tone: 'gray',
+  detail: 'The seats were released because the payment was not completed in time.',
+}
+
+export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
+  const holdLive = isHoldLive(wire, now)
   return {
     orderId: wire.orderId,
     reference: wire.reference,
@@ -28,7 +43,7 @@ export function toGuestOrder(wire: GuestOrderWire): GuestOrder {
     buyerName: wire.buyerName,
     buyerEmail: wire.buyerEmail,
     placedOn: bangkokDate(wire.placedAt),
-    state: stateOf(wire),
+    state: stateOf(wire, holdLive),
     lines: wire.lines.map(toLine),
     subtotal: satang(wire.subtotalSatang),
     // Nothing taken off is not a discount of zero: the row is simply absent.
@@ -36,8 +51,27 @@ export function toGuestOrder(wire: GuestOrderWire): GuestOrder {
     vat: satang(wire.vatSatang),
     total: satang(wire.totalSatang),
     tickets: wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName)),
-    awaitingPayment: wire.paymentRequired && wire.paymentStatus !== 'paid',
+    awaitingPayment: isOwed(wire),
+    holdExpiresAt: wire.holdExpiresAt,
+    payable: isOwed(wire) && wire.status === 'pending' && holdLive,
   }
+}
+
+/** Money still outstanding — placed, priced, and nothing has cleared. */
+function isOwed(wire: GuestOrderWire): boolean {
+  return wire.paymentRequired && wire.paymentStatus !== 'paid'
+}
+
+/**
+ * Are the seats still reserved?
+ *
+ * `null` is not "forever" — it means no hold was ever taken (an organizer
+ * entered this registration by hand) or the last one is already gone. Either
+ * way there is nothing holding inventory, so nothing to count down to.
+ */
+function isHoldLive(wire: GuestOrderWire, now: Date): boolean {
+  if (!wire.holdExpiresAt) return false
+  return new Date(wire.holdExpiresAt).getTime() > now.getTime()
 }
 
 function toLine(line: GuestOrderLineWire) {
@@ -65,18 +99,23 @@ function toTicket(ticket: IssuedTicketWire, buyerName: string): GuestTicket {
  * Order first, money second: a cancelled order is cancelled whatever was paid,
  * and a refund is a fact about the money that outlives the booking.
  */
-function stateOf(wire: GuestOrderWire): OrderState {
+function stateOf(wire: GuestOrderWire, holdLive: boolean): OrderState {
   if (wire.status === 'cancelled') {
     return { label: 'Cancelled', tone: 'red', detail: 'This registration was cancelled.' }
   }
   if (wire.paymentStatus === 'refunded') {
     return { label: 'Refunded', tone: 'gray', detail: 'The payment has been returned.' }
   }
-  if (wire.paymentRequired && wire.paymentStatus !== 'paid') {
+  // Expired covers two moments that look identical to the buyer: the API has
+  // swept the order, or the hold has lapsed and the sweep is seconds behind.
+  // Both mean the seats went back on sale, so both have to say so — waiting for
+  // the server to agree would leave the page promising tickets that are gone.
+  if (isOwed(wire) && (wire.status === 'expired' || !holdLive)) return EXPIRED_STATE
+  if (isOwed(wire)) {
     return {
       label: 'Awaiting payment',
       tone: 'amber',
-      detail: 'Your tickets are issued the moment the payment clears.',
+      detail: 'Your seats are held until the countdown ends.',
     }
   }
   return { label: 'Confirmed', tone: 'green', detail: 'Show the code below at the door.' }

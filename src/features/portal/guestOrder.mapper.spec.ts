@@ -28,9 +28,21 @@ const WIRE: GuestOrderWire = {
   ],
   paymentRequired: false,
   placedAt: '2026-08-17T04:50:58.000Z',
+  holdExpiresAt: null,
 }
 
-const order = (patch: Partial<GuestOrderWire> = {}) => toGuestOrder({ ...WIRE, ...patch })
+const NOW = new Date('2026-08-17T05:00:00.000Z')
+/** The commonest unpaid shape: placed, nothing cleared, seats still held. */
+const UNPAID: Partial<GuestOrderWire> = {
+  status: 'pending',
+  paymentStatus: 'pending',
+  paymentRequired: true,
+  tickets: [],
+  holdExpiresAt: '2026-08-17T05:08:00.000Z',
+}
+
+const order = (patch: Partial<GuestOrderWire> = {}, now = NOW) =>
+  toGuestOrder({ ...WIRE, ...patch }, now)
 
 describe('toGuestOrder', () => {
   it('carries the order through', () => {
@@ -66,10 +78,8 @@ describe('toGuestOrder', () => {
 
     // The one the buyer sees most often, and the one the kit never had a
     // screen for: placed, but nothing has cleared yet.
-    it('says the money is still owed while the order is pending', () => {
-      expect(
-        order({ status: 'pending', paymentStatus: 'pending', paymentRequired: true }),
-      ).toMatchObject({
+    it('says the money is still owed while the seats are held', () => {
+      expect(order(UNPAID)).toMatchObject({
         awaitingPayment: true,
         state: { label: 'Awaiting payment', tone: 'amber' },
       })
@@ -87,6 +97,55 @@ describe('toGuestOrder', () => {
         label: 'Refunded',
         tone: 'gray',
       })
+    })
+
+    // Nobody paid and the clock ran out. Distinct from Cancelled, which is a
+    // decision somebody made — and the copy has to tell them what to do next,
+    // because refreshing this page will never change it.
+    it('says the order expired once the API has swept it', () => {
+      expect(order({ ...UNPAID, status: 'expired', holdExpiresAt: null }).state).toMatchObject({
+        label: 'Expired',
+        tone: 'gray',
+      })
+    })
+
+    /**
+     * The gap between the hold lapsing and the sweep closing the order. The
+     * server still says `pending`, but the seats went back on sale the moment
+     * `holdExpiresAt` passed — so this must not keep promising tickets.
+     */
+    it('reads a lapsed hold as expired before the server has caught up', () => {
+      expect(order({ ...UNPAID, holdExpiresAt: '2026-08-17T04:59:00.000Z' }).state).toMatchObject({
+        label: 'Expired',
+        tone: 'gray',
+      })
+    })
+  })
+
+  describe('payable', () => {
+    it('is true while the money is owed and the seats are still held', () => {
+      expect(order(UNPAID)).toMatchObject({
+        payable: true,
+        holdExpiresAt: '2026-08-17T05:08:00.000Z',
+      })
+    })
+
+    it('is false once the hold has lapsed — the seats are gone', () => {
+      expect(order({ ...UNPAID, holdExpiresAt: '2026-08-17T04:59:00.000Z' }).payable).toBe(false)
+    })
+
+    // Taking money for an order we can no longer honour would mean refunding it.
+    it('is false once the API has expired the order', () => {
+      expect(order({ ...UNPAID, status: 'expired' }).payable).toBe(false)
+    })
+
+    it('is false when there is nothing left to pay', () => {
+      expect(order().payable).toBe(false)
+    })
+
+    // An organizer-entered registration is on no clock at all (US-REG-03).
+    it('is false when no hold was ever taken', () => {
+      expect(order({ ...UNPAID, holdExpiresAt: null }).payable).toBe(false)
     })
   })
 

@@ -2,7 +2,10 @@ import { Link, useLoaderData } from 'react-router'
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useTheme } from '@/lib/useTheme'
+import { ExpiredNotice, PayNowPanel } from '../components/PayNowPanel'
+import { EXPIRED_STATE } from '../guestOrder.mapper'
 import type { GuestOrder, GuestTicket, OrderState } from '../guestOrder.types'
+import { useCountdown } from '../lib/countdown'
 
 /**
  * What a guest sees after registering (US-DISC-06/07).
@@ -24,9 +27,24 @@ const TONES: Record<OrderState['tone'], string> = {
   gray: 'bg-line text-muted',
 }
 
+/** Where somebody whose order lapsed can start again. */
+const DISCOVER = '/portal/discover'
+
+/** An expired order is owed nothing — it was never charged and never will be. */
+function receiptHeading({ canPay, lapsed }: { canPay: boolean; lapsed: boolean }): string {
+  if (lapsed) return 'Order total'
+  return canPay ? 'What you owe' : 'What you paid'
+}
+
 export default function GuestOrderPage() {
   const { order } = useLoaderData() as { order: GuestOrder }
   const { dark, toggle } = useTheme()
+  // The hold can lapse while this page is open, so the clock — not the status
+  // the loader fetched — decides whether paying is still on offer.
+  const countdown = useCountdown(order.holdExpiresAt)
+  const canPay = order.payable && !countdown.lapsed
+  const lapsed = order.awaitingPayment && !canPay
+  const state = lapsed ? EXPIRED_STATE : order.state
 
   return (
     <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
@@ -43,9 +61,14 @@ export default function GuestOrderPage() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8 lg:px-6">
-        <Summary order={order} />
+        <Summary order={order} state={state} />
 
-        {order.tickets.length > 0 ? (
+        {canPay && (
+          <PayNowPanel orderId={order.orderId} total={order.total} countdown={countdown} />
+        )}
+        {lapsed && <ExpiredNotice backTo={DISCOVER} />}
+
+        {order.tickets.length > 0 && (
           <section className="mt-4">
             <h2 className="text-[15px] font-bold tracking-tight">
               {order.tickets.length === 1 ? 'Your ticket' : 'Your tickets'}
@@ -56,11 +79,13 @@ export default function GuestOrderPage() {
               ))}
             </div>
           </section>
-        ) : (
-          <NoTicketsYet awaiting={order.awaitingPayment} />
         )}
+        {/* Only the genuinely odd case. An unpaid order is explained by the
+            panel above it, and saying "no tickets yet" underneath would be a
+            second, vaguer answer to a question already answered. */}
+        {order.tickets.length === 0 && !order.awaitingPayment && <NothingToShow />}
 
-        <Receipt order={order} />
+        <Receipt order={order} heading={receiptHeading({ canPay, lapsed })} />
         <KeepThem order={order} />
 
         <p className="mt-8 text-center text-[11px] text-muted/70">
@@ -71,7 +96,7 @@ export default function GuestOrderPage() {
   )
 }
 
-function Summary({ order }: { order: GuestOrder }) {
+function Summary({ order, state }: { order: GuestOrder; state: OrderState }) {
   return (
     <section className="card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -87,13 +112,13 @@ function Summary({ order }: { order: GuestOrder }) {
         <span
           className={cn(
             'shrink-0 rounded-full px-3 py-1 text-[12px] font-semibold',
-            TONES[order.state.tone],
+            TONES[state.tone],
           )}
         >
-          {order.state.label}
+          {state.label}
         </span>
       </div>
-      <p className="mt-3 text-[13px] text-muted">{order.state.detail}</p>
+      <p className="mt-3 text-[13px] text-muted">{state.detail}</p>
     </section>
   )
 }
@@ -120,28 +145,30 @@ function TicketCard({ ticket }: { ticket: GuestTicket }) {
   )
 }
 
-function NoTicketsYet({ awaiting }: { awaiting: boolean }) {
+function NothingToShow() {
   return (
     <section className="card mt-4 p-6 text-center">
       <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-line text-muted">
         <Icon name="hgi-ticket-02" size={24} />
       </span>
-      <p className="mt-3 text-[14px] font-semibold">
-        {awaiting ? 'No tickets yet' : 'Nothing to show'}
-      </p>
-      <p className="mt-1 text-[13px] text-muted">
-        {awaiting
-          ? 'They appear here as soon as the payment clears — no need to book again.'
-          : 'This order has no tickets attached to it.'}
-      </p>
+      <p className="mt-3 text-[14px] font-semibold">Nothing to show</p>
+      <p className="mt-1 text-[13px] text-muted">This order has no tickets attached to it.</p>
     </section>
   )
 }
 
-function Receipt({ order }: { order: GuestOrder }) {
+/**
+ * The figures, under a heading that is actually true.
+ *
+ * Three different facts wear the same numbers: money that changed hands, money
+ * still due, and money that never will because the order died. "What you paid"
+ * above an unpaid order — which is what this said — is the kind of small lie
+ * that makes somebody check their bank statement.
+ */
+function Receipt({ order, heading }: { order: GuestOrder; heading: string }) {
   return (
     <section className="card mt-4 p-5">
-      <h2 className="text-[15px] font-bold tracking-tight">What you paid</h2>
+      <h2 className="text-[15px] font-bold tracking-tight">{heading}</h2>
       <dl className="mt-3 space-y-1.5 text-[13px]">
         {order.lines.map((line) => (
           <div key={line.name} className="flex justify-between gap-4">
