@@ -5,7 +5,7 @@ import type {
   OrderPlacedWire,
   OrderSummaryWire,
   PaymentIntentWire,
-} from './register.types'
+} from './checkout.types'
 
 /**
  * Every call registering for an event makes (US-DISC-04/05/06).
@@ -27,7 +27,7 @@ export interface Buyer {
   phone?: string
 }
 
-export const registerApi = {
+export const checkoutApi = {
   view: (slug: string) => api.get<CheckoutViewWire>(`/public/checkout/${slug}`),
 
   /** The live total, worked out by the API — never in the browser. */

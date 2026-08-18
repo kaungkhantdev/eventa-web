@@ -2,9 +2,9 @@ import { ApiError, NetworkError, api, messageOf } from '@/lib/api'
 import type { LoaderArgs } from '@/app/loaders'
 import { toGuestOrder } from './guestOrder.mapper'
 import type { GuestOrder, GuestOrderWire } from './guestOrder.types'
-import { registerApi } from './register.api'
-import { toPaymentStep } from './register.mapper'
-import type { PaymentStep } from './register.types'
+import { checkoutApi } from './checkout.api'
+import { toPaymentStep } from './checkout.mapper'
+import type { PaymentStep } from './checkout.types'
 
 /**
  * The buyer's own copy of their order (US-DISC-06/07).
@@ -53,7 +53,7 @@ export const guestOrderRoute = {
     const method = (await request.formData()).get('method')
     if (!isMethod(method)) return { error: 'Choose a payment method.' }
     try {
-      const intent = await registerApi.pay({
+      const intent = await checkoutApi.pay({
         orderId: String(params.orderId),
         method,
         idempotencyKey: crypto.randomUUID(),

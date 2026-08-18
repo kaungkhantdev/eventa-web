@@ -3,6 +3,19 @@ import type { Persona } from '@/lib/persona'
 import { personaOfSession } from './personas'
 import type { Credentials, LoginResult, Me } from './types'
 
+/**
+ * A confirmed account, and where it signs in.
+ *
+ * `orgSlug` is the workspace for an organizer. For an attendee it is the
+ * platform organization and must never be sent to `/auth/login` — attendee
+ * sign-in refuses an orgSlug outright (US-DISC-08).
+ */
+export interface VerifiedEmail {
+  verified: boolean
+  orgSlug: string
+  persona: Persona
+}
+
 /** What the API actually returns — flattened into `LoginResult` below. */
 interface RawLogin {
   twoFactorRequired: boolean
@@ -62,15 +75,21 @@ export const authApi = {
   },
 
   /**
-   * Create a workspace and its first organizer. No session results: the API
-   * emails a confirmation link, and the account is inert until `/auth/verify-email`
-   * is called with that token.
+   * Create an account. No session results: the API emails a confirmation link,
+   * and the account is inert until `/auth/verify-email` is called with that
+   * token.
+   *
+   * An organizer gets a workspace and its first owner; an attendee gets one
+   * account in the platform organization and no workspace at all (US-DISC-08).
+   * Which one is stated, never inferred — the same rule as sign-in.
    */
   async register(input: {
     name: string
     email: string
     password: string
     organizationName?: string
+    /** Omitted means organizer, matching the API's own default. */
+    persona?: Persona
     /**
      * Whether the box was actually ticked — passed through rather than
      * hard-coded. Asserting somebody's consent on their behalf is not this
@@ -79,6 +98,17 @@ export const authApi = {
     acceptTerms: boolean
   }): Promise<{ message: string }> {
     return api.post<{ message: string }>('/auth/register', input, { anonymous: true })
+  },
+
+  /**
+   * Open the confirmation link from a sign-up email and activate the account.
+   *
+   * Anonymous: the person is by definition not signed in yet, and the token in
+   * the link is the whole authorisation. The persona comes back because the two
+   * audiences sign in at different pages.
+   */
+  verifyEmail(token: string): Promise<VerifiedEmail> {
+    return api.post<VerifiedEmail>('/auth/verify-email', { token }, { anonymous: true })
   },
 
   /**

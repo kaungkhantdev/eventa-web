@@ -4,7 +4,12 @@ import type { BadgeTone } from '@/components/ui'
 
 /* ── members ──────────────────────────────────────────────────────────── */
 
-export type MemberStatus = 'Active' | 'Invited' | 'Suspended'
+/**
+ * `Invited` — an admin created this account and it is waiting to be accepted.
+ * `Unconfirmed` — they signed themselves up; the email is not proven yet.
+ * Different facts, different follow-up, so never one value (US-ACC-01/02).
+ */
+export type MemberStatus = 'Active' | 'Invited' | 'Unconfirmed' | 'Suspended'
 
 export interface MemberWire {
   /** Membership id — not the user's. Suspending addresses the membership. */

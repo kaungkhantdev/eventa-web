@@ -208,6 +208,14 @@ function Receipt({ order, heading }: { order: GuestOrder; heading: string }) {
  * They have already given their name and email, so signing up is a password —
  * and their saved events merge on the way in, which is why the shortlist kept
  * locally while browsing is not lost.
+ *
+ * `?persona=attendee` is what makes this an ATTENDEE account: the same sign-up
+ * without it creates an organizer workspace, which cannot sign in at the portal
+ * login this card offers beside it (US-DISC-08).
+ *
+ * The name and email travel in the router's history state, never the query
+ * string — they are personal data, and a URL is copied into server logs,
+ * browser history and `Referer` headers.
  */
 function KeepThem({ order }: { order: GuestOrder }) {
   return (
@@ -225,7 +233,11 @@ function KeepThem({ order }: { order: GuestOrder }) {
         >
           Sign in
         </Link>
-        <Link to="/auth/register" className="btn btn-primary">
+        <Link
+          to="/portal/register"
+          state={{ name: order.buyerName, email: order.buyerEmail }}
+          className="btn btn-primary"
+        >
           Create account
         </Link>
       </div>

@@ -18,12 +18,26 @@ const HOME_PATH: Record<Persona, string> = {
   attendee: '/portal/my-events',
 }
 
+/**
+ * Where sign-up ends. Not a banner over the form: the account already exists,
+ * nothing on that form can usefully be edited any more, and the only thing left
+ * to do happens in an email client.
+ */
+const CHECK_EMAIL_PATH: Record<Persona, string> = {
+  admin: '/auth/register/check-email',
+  attendee: '/portal/register/check-email',
+}
+
 export function signInPathFor(persona: Persona): string {
   return SIGN_IN_PATH[persona]
 }
 
 export function homeFor(persona: Persona): string {
   return HOME_PATH[persona]
+}
+
+export function checkEmailPathFor(persona: Persona): string {
+  return CHECK_EMAIL_PATH[persona]
 }
 
 /**

@@ -25,7 +25,7 @@ import {
   PayoutsSkeleton,
   PortalDiscoverSkeleton,
   PortalMyEventsSkeleton,
-  PortalRegisterSkeleton,
+  PortalCheckoutSkeleton,
   PortalSurveySkeleton,
   ReportSubPageSkeleton,
   ReportsOverviewSkeleton,
@@ -197,10 +197,18 @@ const PUBLIC: Record<string, () => ReactNode> = {
   '/auth/login': () => <AuthSkeleton />,
   '/auth/register': () => <AuthSkeleton fields={4} social={1} />,
   '/auth/forgot-password': () => <AuthSkeleton fields={1} social={0} divider={false} />,
+  // No form to stand in for — the loader is confirming the account, and what
+  // follows is a short verdict and one button.
+  '/verify-email': () => <AuthSkeleton fields={0} social={0} divider={false} />,
   '/portal/login': () => <AuthSkeleton />,
   '/portal/discover': () => <PortalDiscoverSkeleton />,
   '/portal/my-events': () => <PortalMyEventsSkeleton />,
-  '/portal/register': () => <PortalRegisterSkeleton />,
+  '/portal/checkout': () => <PortalCheckoutSkeleton />,
+  '/portal/register': () => <AuthSkeleton fields={4} social={0} divider={false} />,
+  // Both "check your email" screens: an icon, two lines and one button — no
+  // form to stand in for.
+  '/portal/register/check-email': () => <AuthSkeleton fields={0} social={0} divider={false} />,
+  '/auth/register/check-email': () => <AuthSkeleton fields={0} social={0} divider={false} />,
   '/portal/survey': () => <PortalSurveySkeleton />,
   '/landing/atlas': () => <LandingSkeleton variant="atlas" />,
   '/landing/aurora': () => <LandingSkeleton variant="aurora" />,

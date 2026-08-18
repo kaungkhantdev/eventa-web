@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Icon } from '@/components/ui'
 import { qrDataUrl } from '../lib/qr'
-import type { PaymentStep } from '../register.types'
+import type { PaymentStep } from '../checkout.types'
 
 /**
  * How the buyer actually pays, once the API has started a payment.

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { homeFor, personaOfSearch, personaOfSession, signInPathFor } from './personas'
+import {
+  checkEmailPathFor,
+  homeFor,
+  personaOfSearch,
+  personaOfSession,
+  signInPathFor,
+} from './personas'
 
 describe('two personas, never one login', () => {
   it('sends each persona to its own sign-in page', () => {
@@ -10,6 +16,14 @@ describe('two personas, never one login', () => {
   it('lands each persona on its own home', () => {
     expect(homeFor('admin')).toBe('/admin/dashboard')
     expect(homeFor('attendee')).toBe('/portal/my-events')
+  })
+
+  // Sign-up ends on a page rather than a banner over the form it just filled
+  // in: the account exists and nothing on that form can be usefully edited any
+  // more, so the flow moves on.
+  it('ends each persona’s sign-up on its own “check your email” page', () => {
+    expect(checkEmailPathFor('admin')).toBe('/auth/register/check-email')
+    expect(checkEmailPathFor('attendee')).toBe('/portal/register/check-email')
   })
 })
 

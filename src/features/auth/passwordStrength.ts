@@ -2,17 +2,21 @@
  * The strength meter on the sign-up and reset-password forms.
  *
  * Ported from auth/register.html's inline script, with one correction: the kit
- * scored from eight characters and told people "Use 8+ characters", while
- * `RegisterDto` and `ResetPasswordDto` both refuse anything under ten. A meter
- * that calls a password acceptable and then watches the API reject it is worse
- * than no meter, so the floor is stated once here and shown in the copy.
+ * scored and advertised a different floor from the one the API enforced. A
+ * meter that calls a password acceptable and then watches the API reject it is
+ * worse than no meter, so the floor is stated once here and shown in the copy.
  *
  * This only tidies the form. The API enforces the rule, and its refusal is
  * what counts.
  */
 
-/** Matches `@MinLength` on the API's register and reset DTOs. */
-export const MIN_PASSWORD_LENGTH = 10
+/**
+ * Must equal `PASSWORD_MIN_LENGTH` in eventa-api's `auth-password.policy.ts`,
+ * which is what `RegisterDto`, `ResetPasswordDto` and `ChangePasswordDto` all
+ * enforce. Two repos, one number — change both together or the meter starts
+ * lying again.
+ */
+export const MIN_PASSWORD_LENGTH = 6
 
 /** A comfortable length, above which a symbol earns the last point. */
 const STRONG_LENGTH = 12

@@ -287,7 +287,7 @@ describe('the rest of the page', () => {
   })
 
   it('sends registration to the portal for this event', () => {
-    expect(toLandingEvent(page()).registerUrl).toBe('/portal/register?event=bangkok-trail-run-2026')
+    expect(toLandingEvent(page()).registerUrl).toBe('/portal/checkout?event=bangkok-trail-run-2026')
   })
 
   it('replaces a missing highlight icon rather than rendering tofu', () => {

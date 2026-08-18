@@ -14,7 +14,7 @@ import type {
   SeatRow,
   SummaryLines,
   TierOption,
-} from './register.types'
+} from './checkout.types'
 
 /**
  * The public checkout → what the register page renders (US-DISC-04/05/06).

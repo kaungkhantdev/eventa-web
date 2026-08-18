@@ -1,13 +1,19 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { SocialAuth } from '@/features/auth/components/SocialAuth'
 import { useSignIn } from '@/features/auth/useSignIn'
+import { ORG_PARAM } from '@/features/auth/verifiedSignIn'
 
 export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
   const { pending, error, challenge, submit: onSubmit } = useSignIn('admin')
+  // Filled in for someone arriving from their confirmation email: the slug was
+  // generated at sign-up, so they have never seen it and cannot be expected to
+  // remember it. Still editable — it is a default, not a lock.
+  const [params] = useSearchParams()
+  const workspace = params.get(ORG_PARAM) ?? ''
 
   return (
     <AuthLayout
@@ -65,6 +71,7 @@ export default function LoginPage() {
                 placeholder="acme"
                 className="input"
                 required
+                defaultValue={workspace}
               />
             </div>
 

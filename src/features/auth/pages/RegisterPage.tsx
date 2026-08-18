@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
@@ -10,51 +10,24 @@ import {
   STRENGTH_TEXTS,
   scorePassword,
 } from '@/features/auth/passwordStrength'
-import { authApi } from '@/features/auth/api'
-import { messageOf } from '@/lib/api'
+import { useSignUp } from '@/features/auth/useSignUp'
 
+/**
+ * Organizer sign-up — a workspace and its first owner (US-ACC-01).
+ *
+ * The attendee's own sign-up is a separate page at `/portal/register`, the same
+ * arrangement as the two logins: different audience, different promise, and a
+ * different realm on the API. The flow they share lives in `useSignUp`.
+ */
 export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false)
   const [showCpw, setShowCpw] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [sentTo, setSentTo] = useState<string | null>(null)
+  const { pending, error, submit } = useSignUp('admin')
 
   const score = scorePassword(password)
   const cpwMatch = confirm === password
-
-  /**
-   * Registering does NOT sign anyone in: the API emails a confirmation link and
-   * the account stays inert until that token is used. So the page ends on a
-   * "check your email" state rather than navigating into the console.
-   */
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    if (pending) return
-    if (!cpwMatch) {
-      setError('Those passwords do not match.')
-      return
-    }
-    const form = new FormData(e.currentTarget)
-    const email = String(form.get('email') ?? '')
-    setPending(true)
-    setError(null)
-    try {
-      await authApi.register({
-        name: String(form.get('name') ?? ''),
-        email,
-        password,
-        acceptTerms: form.get('acceptTerms') === 'on',
-      })
-      setSentTo(email)
-    } catch (cause) {
-      setError(messageOf(cause))
-    } finally {
-      setPending(false)
-    }
-  }
 
   return (
     <AuthLayout
@@ -69,22 +42,13 @@ export default function RegisterPage() {
         </p>
       }
     >
-      <form className="space-y-4" onSubmit={onSubmit}>
+      <form className="space-y-4" onSubmit={(e) => submit(e, password, confirm)}>
         {error && (
           <p
             role="alert"
             className="rounded-lg bg-rose-500/10 px-3 py-2.5 text-[13px] text-rose-600 dark:text-rose-400"
           >
             {error}
-          </p>
-        )}
-
-        {sentTo && (
-          <p
-            role="status"
-            className="rounded-lg bg-brand-soft px-3 py-2.5 text-[13px] text-brand-dark"
-          >
-            Check <span className="font-semibold">{sentTo}</span> for a link to confirm your account.
           </p>
         )}
 
@@ -212,8 +176,8 @@ export default function RegisterPage() {
           </a>
         </label>
 
-        <button type="submit" className="btn btn-primary w-full" disabled={pending || sentTo !== null}>
-          {pending ? 'Creating…' : sentTo ? 'Check your email' : 'Create account'}
+        <button type="submit" className="btn btn-primary w-full" disabled={pending}>
+          {pending ? 'Creating…' : 'Create account'}
         </button>
       </form>
 

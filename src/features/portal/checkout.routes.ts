@@ -1,8 +1,8 @@
 import { queryOf, type LoaderArgs } from '@/app/loaders'
 import { ApiError, NetworkError, messageOf } from '@/lib/api'
-import { registerApi, type Buyer, type Selection } from './register.api'
-import { toCheckoutView, toPaymentStep, toPlacedOrder, toSummaryLines } from './register.mapper'
-import type { CheckoutView, PaymentStep, PlacedOrder, SummaryLines } from './register.types'
+import { checkoutApi, type Buyer, type Selection } from './checkout.api'
+import { toCheckoutView, toPaymentStep, toPlacedOrder, toSummaryLines } from './checkout.mapper'
+import type { CheckoutView, PaymentStep, PlacedOrder, SummaryLines } from './checkout.types'
 
 /**
  * Registering for an event (US-DISC-04/05/06).
@@ -12,13 +12,13 @@ import type { CheckoutView, PaymentStep, PlacedOrder, SummaryLines } from './reg
  * page is reached from a landing template that carries it that way.
  */
 
-export interface RegisterData {
+export interface CheckoutData {
   slug: string
   checkout: CheckoutView
 }
 
 /** What the page gets back from a quote or a booking. */
-export type RegisterResult =
+export type CheckoutResult =
   | { ok: true; intent: 'quote'; summary: SummaryLines }
   | { ok: true; intent: 'book'; order: PlacedOrder; payment: PaymentStep | null }
   | { ok: false; error: string }
@@ -29,14 +29,14 @@ export function slugOf(params: URLSearchParams): string {
   return params.get('event')?.trim() ?? ''
 }
 
-export const registerRoute = {
-  loader: async ({ request }: LoaderArgs): Promise<RegisterData> => {
+export const checkoutRoute = {
+  loader: async ({ request }: LoaderArgs): Promise<CheckoutData> => {
     const slug = slugOf(queryOf(request))
     if (!slug) throw new Response(MISSING_EVENT, { status: 404 })
-    return { slug, checkout: toCheckoutView(await registerApi.view(slug)) }
+    return { slug, checkout: toCheckoutView(await checkoutApi.view(slug)) }
   },
 
-  action: async ({ request }: LoaderArgs): Promise<RegisterResult> => {
+  action: async ({ request }: LoaderArgs): Promise<CheckoutResult> => {
     const form = await request.formData()
     try {
       return form.get('intent') === 'book' ? await book(form) : await quote(form)
@@ -52,8 +52,8 @@ export const registerRoute = {
   },
 }
 
-async function quote(form: FormData): Promise<RegisterResult> {
-  const summary = await registerApi.quote({
+async function quote(form: FormData): Promise<CheckoutResult> {
+  const summary = await checkoutApi.quote({
     ...selectionOf(form),
     ...optional('discountCode', form),
   })
@@ -70,15 +70,15 @@ async function quote(form: FormData): Promise<RegisterResult> {
  * a QR to scan, or the provider's hosted fields — and learns separately that
  * the money arrived. Nothing here may claim the order is paid.
  */
-async function book(form: FormData): Promise<RegisterResult> {
+async function book(form: FormData): Promise<CheckoutResult> {
   const selection = selectionOf(form)
-  const { holdIds } = await registerApi.hold(selection)
+  const { holdIds } = await checkoutApi.hold(selection)
   const order = await confirmOrRelease(form, selection, holdIds)
 
   const placed = toPlacedOrder(order)
   if (!order.paymentRequired) return { ok: true, intent: 'book', order: placed, payment: null }
 
-  const intent = await registerApi.pay({
+  const intent = await checkoutApi.pay({
     orderId: order.orderId,
     method: form.get('method') === 'PromptPay' ? 'PromptPay' : 'Card',
     idempotencyKey: `${idempotencyKeyOf(form)}-pay`,
@@ -88,7 +88,7 @@ async function book(form: FormData): Promise<RegisterResult> {
 
 async function confirmOrRelease(form: FormData, selection: Selection, holdIds: number[]) {
   try {
-    return await registerApi.confirm({
+    return await checkoutApi.confirm({
       ...selection,
       holdIds,
       buyer: buyerOf(form),
@@ -96,7 +96,7 @@ async function confirmOrRelease(form: FormData, selection: Selection, holdIds: n
       ...optional('discountCode', form),
     })
   } catch (cause) {
-    await registerApi.release(selection.eventId, holdIds).catch(() => undefined)
+    await checkoutApi.release(selection.eventId, holdIds).catch(() => undefined)
     throw cause
   }
 }

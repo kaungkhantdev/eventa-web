@@ -20,6 +20,7 @@ import type {
 const STATUS_TONE: Record<MemberStatus, BadgeTone> = {
   Active: 'green',
   Invited: 'amber',
+  Unconfirmed: 'amber',
   Suspended: 'red',
 }
 
@@ -35,6 +36,11 @@ export function toMemberRow(wire: MemberWire): MemberRow {
     statusTone: STATUS_TONE[wire.status],
     // The two states an admin acts on differently: an invitation can be sent
     // again, and a suspended member is reactivated rather than suspended.
+    //
+    // `Invited` only — NOT `Unconfirmed`. Someone who signed themselves up has
+    // no invitation to resend; offering the button would send them a token for
+    // a workspace invite that never existed. Their own confirmation link is
+    // re-sent by trying to sign in.
     invited: wire.status === 'Invited',
     suspended: wire.status === 'Suspended',
   }

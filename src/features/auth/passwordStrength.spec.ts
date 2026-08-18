@@ -8,9 +8,14 @@ describe('scorePassword', () => {
 
   // The API refuses anything shorter, so the meter must not encourage it: a
   // password this page called "weak" but acceptable was rejected on submit.
+  // Written against the constant rather than a literal, so moving the floor
+  // moves the test with it instead of quietly leaving it behind.
   it('scores a password shorter than the API accepts as too short', () => {
-    expect(scorePassword('Passw0rd')).toBe(0)
     expect(scorePassword('a'.repeat(MIN_PASSWORD_LENGTH - 1))).toBe(0)
+  })
+
+  it('accepts the floor itself', () => {
+    expect(scorePassword('a'.repeat(MIN_PASSWORD_LENGTH))).toBe(1)
   })
 
   it('says so in words', () => {

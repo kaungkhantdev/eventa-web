@@ -56,7 +56,7 @@ export function toLandingEvent(page: PublicPageWire): LandingEvent {
     address: event.venueAddress ?? '',
     priceFrom: priceFromOf(tickets),
     organizer: event.organizerName,
-    registerUrl: `/portal/register?event=${encodeURIComponent(event.slug)}`,
+    registerUrl: `/portal/checkout?event=${encodeURIComponent(event.slug)}`,
     highlights: page.highlights.map((h) => ({
       // An empty or unknown slug renders as a CJK box, not as nothing.
       icon: h.icon?.startsWith('hgi-') ? h.icon : DEFAULT_HIGHLIGHT_ICON,

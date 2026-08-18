@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { toCheckoutView, toPaymentStep, toPlacedOrder, toSummaryLines } from './register.mapper'
+import { toCheckoutView, toPaymentStep, toPlacedOrder, toSummaryLines } from './checkout.mapper'
 import type {
   CheckoutTierWire,
   CheckoutViewWire,
   OrderPlacedWire,
   OrderSummaryWire,
   PaymentIntentWire,
-} from './register.types'
+} from './checkout.types'
 
 const TIER: CheckoutTierWire = {
   id: 'tier-ga',

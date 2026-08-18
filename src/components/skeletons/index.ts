@@ -54,6 +54,6 @@ export {
   NotFoundSkeleton,
   PortalDiscoverSkeleton,
   PortalMyEventsSkeleton,
-  PortalRegisterSkeleton,
+  PortalCheckoutSkeleton,
   PortalSurveySkeleton,
 } from './public'

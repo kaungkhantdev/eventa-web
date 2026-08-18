@@ -427,8 +427,22 @@ export const router = createBrowserRouter([
         ...page(() => import('@/features/auth/pages/RegisterPage')),
       },
       {
+        path: '/auth/register/check-email',
+        ...page(() => import('@/features/auth/pages/CheckEmailPage')),
+      },
+      {
         path: '/auth/forgot-password',
         ...page(() => import('@/features/auth/pages/ForgotPasswordPage')),
+      },
+      {
+        // Where every sign-up email's confirmation link lands — the API builds
+        // it as `${PUBLIC_WEB_URL}/verify-email?token=…`, so this path is fixed
+        // by that and is not under /auth. Serves both personas.
+        path: '/verify-email',
+        ...livePage(
+          () => import('@/features/auth/pages/VerifyEmailPage'),
+          () => import('@/features/auth/verifyEmail.routes').then((m) => m.verifyEmailRoute),
+        ),
       },
       {
         path: '/portal/login',
@@ -470,11 +484,25 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/portal/register',
+        // Buying tickets — named for what it does. It was `/portal/register`,
+        // which collided with registering an ACCOUNT next door; "register" now
+        // means one thing in this app.
+        path: '/portal/checkout',
         ...livePage(
-          () => import('@/features/portal/pages/PortalRegisterPage'),
-          () => import('@/features/portal/register.routes').then((m) => m.registerRoute),
+          () => import('@/features/portal/pages/PortalCheckoutPage'),
+          () => import('@/features/portal/checkout.routes').then((m) => m.checkoutRoute),
         ),
+      },
+      {
+        // The attendee's own sign-up, paired with /portal/login. Separate from
+        // the organizer's at /auth/register for the same reason the logins are
+        // separate: different audience, different copy, different realm.
+        path: '/portal/register',
+        ...page(() => import('@/features/portal/pages/PortalRegisterPage')),
+      },
+      {
+        path: '/portal/register/check-email',
+        ...page(() => import('@/features/portal/pages/PortalCheckEmailPage')),
       },
       {
         path: '/portal/survey',
