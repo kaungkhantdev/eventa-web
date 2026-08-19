@@ -130,7 +130,7 @@ export default function AdminShell() {
         )}
       >
         {/* icon rail — modules */}
-        <aside className="relative z-30 flex w-16 shrink-0 flex-col items-center bg-[#0e0f12] py-4 dark:bg-[#101613]">
+        <aside className="relative z-30 flex w-16 shrink-0 flex-col items-center bg-[#0e0f12] py-4 dark:bg-[#101613]"> 
           <div className="group relative flex justify-center">
             <Link
               to="/admin/dashboard"
