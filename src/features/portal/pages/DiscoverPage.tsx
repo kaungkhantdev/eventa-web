@@ -41,7 +41,7 @@ export default function DiscoverPage() {
   const saved = new Set(data.saved)
 
   return (
-    <div className="h-full bg-surface font-sans text-ink antialiased">
+    <div className="min-h-screen bg-surface font-sans text-ink antialiased">
       <TopBar value={term} onSearch={setTerm} />
 
       <main className="mx-auto max-w-5xl px-4 pb-16 pt-7 lg:px-6">

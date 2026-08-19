@@ -74,7 +74,7 @@ export default function SurveyPage() {
   }
 
   return (
-    <div className="h-full bg-canvas font-sans text-ink antialiased">
+    <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
       <button
         type="button"
         onClick={toggle}

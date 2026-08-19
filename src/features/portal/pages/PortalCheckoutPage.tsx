@@ -81,7 +81,7 @@ export default function PortalCheckoutPage() {
   }, [eventId, mode, chosenTierId, quantity, seatIds, discountCode, count])
 
   return (
-    <div className="h-full bg-canvas font-sans text-ink antialiased">
+    <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
       <style>{SEAT_CSS}</style>
       <TopBar backTo={checkout.header.backTo} />
 
