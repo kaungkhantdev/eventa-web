@@ -65,22 +65,32 @@ describe('toAttendanceRow', () => {
 
 describe('toDoorCounts', () => {
   it('carries the API’s own figures', () => {
-    expect(toDoorCounts({ total: 200, checkedIn: 50, expected: 150 })).toMatchObject({
+    expect(toDoorCounts({ total: 200, checkedIn: 50, expected: 150, onSite: 42, late: 8 })).toMatchObject({
       total: 200,
       checkedIn: 50,
       expected: 150,
     })
   })
 
+  // The kit's stats card reads "On-site N · Late N · Remaining N". Late is the
+  // API's, counted across the whole event — never derived from the page on
+  // screen, which shows eight arrivals out of a thousand.
+  it('carries the on-site and late split the stats card shows', () => {
+    expect(toDoorCounts({ total: 200, checkedIn: 50, expected: 150, onSite: 42, late: 8 })).toMatchObject({
+      onSite: 42,
+      late: 8,
+    })
+  })
+
   it('works out the share of the room that has arrived', () => {
-    expect(toDoorCounts({ total: 200, checkedIn: 50, expected: 150 }).percent).toBe(25)
-    expect(toDoorCounts({ total: 3, checkedIn: 1, expected: 2 }).percent).toBe(33)
+    expect(toDoorCounts({ total: 200, checkedIn: 50, expected: 150, onSite: 42, late: 8 }).percent).toBe(25)
+    expect(toDoorCounts({ total: 3, checkedIn: 1, expected: 2, onSite: 1, late: 0 }).percent).toBe(33)
   })
 
   // An event nobody has booked is not 100% checked in, and must not divide by
   // zero on the way to saying so.
   it('is nought percent when nobody is expected', () => {
-    expect(toDoorCounts({ total: 0, checkedIn: 0, expected: 0 }).percent).toBe(0)
+    expect(toDoorCounts({ total: 0, checkedIn: 0, expected: 0, onSite: 0, late: 0 }).percent).toBe(0)
   })
 })
 

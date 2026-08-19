@@ -21,6 +21,10 @@ export interface AttendanceCountsWire {
   total: number
   checkedIn: number
   expected: number
+  /** Inside, and arrived before the event started. */
+  onSite: number
+  /** Inside, but walked in after it had started. */
+  late: number
 }
 
 /** `POST .../scan` and `POST ...` — what the door saw. */
@@ -51,6 +55,10 @@ export interface DoorCounts {
   total: number
   /** Whole percent, for the progress strip. `0` when nobody is expected. */
   percent: number
+  /** Inside and on time — the stats card's "On-site". */
+  onSite: number
+  /** Inside but after the start — the stats card's "Late". */
+  late: number
 }
 
 /** What the station shows after reading a code. */

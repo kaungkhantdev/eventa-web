@@ -39,6 +39,10 @@ export function toDoorCounts(counts: AttendanceCountsWire): DoorCounts {
     checkedIn: counts.checkedIn,
     expected: counts.expected,
     total: counts.total,
+    // Both the API's, counted over the whole event. Never worked out from the
+    // rows on screen: the station shows eight arrivals out of a thousand.
+    onSite: counts.onSite,
+    late: counts.late,
     // An event nobody has booked is not a full house.
     percent: counts.total === 0 ? 0 : Math.round((counts.checkedIn / counts.total) * 100),
   }

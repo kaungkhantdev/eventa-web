@@ -1,180 +1,218 @@
-import { useEffect, useRef } from 'react'
-import { Link, useFetcher, useLoaderData } from 'react-router'
-import { Icon } from '@/components/ui'
-import { cn } from '@/lib/cn'
+import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
+import { HeaderUser, Icon, PageFooter } from '@/components/ui'
+import type { AdminOutletContext } from '@/layouts/AdminShell'
+import { CameraStage, CameraStatus } from '../components/CameraStage'
 import { EventChooser } from '../components/EventChooser'
 import { ManualSearch } from '../components/ManualSearch'
 import { ScanResult } from '../components/ScanResult'
+import { useQrCamera } from '../useQrCamera'
 import type { StationData } from '../door.routes'
 import type { AttendanceRow, DoorCounts, ScanFeedback } from '../door.types'
 
 /**
  * The door station (US-REG-12/13). Ported from checkin-tool.html.
  *
- * The kit simulated a camera: a canned queue of outcomes played back on a
- * timer, so the screen always "worked" and never told the truth. This reads
- * real codes and shows what the API actually said about each one.
+ * Two ways in, both real. The camera decodes with the platform's own
+ * BarcodeDetector; the manual fallback searches name, email or ticket code —
+ * which is where a hardware reader types. Whichever finds the person, the API
+ * decides what it means.
  *
- * The code box IS the scanner. A USB or Bluetooth QR reader types what it
- * reads and presses Enter, which is exactly this — and the same box takes a
- * code keyed in by hand when a badge will not read. Camera capture needs a
- * decoder this app does not have yet, and is not faked in the meantime.
+ * The kit simulated all of this: a canned queue of outcomes on a timer, so the
+ * page always "worked" and never told the truth. Its "Simulate scan" button
+ * has no counterpart here on purpose.
+ *
+ * No `<main>`, no header bar of its own: this renders inside AdminShell's
+ * `<main>` and its max-w-[1600px] wrapper, like every other admin page.
  */
 
 type ScanAction = { scan: ScanFeedback } | { ok: false; error: string }
 
 export default function CheckInToolPage() {
   const data = useLoaderData() as StationData
+  const ctx = useOutletContext<AdminOutletContext | null>()
   const scan = useFetcher<ScanAction>()
   const feedback = scan.data && 'scan' in scan.data ? scan.data.scan : null
   const error = scan.data && 'ok' in scan.data && !scan.data.ok ? scan.data.error : null
+  const busy = scan.state !== 'idle'
+  const eventId = data.event?.id ?? ''
+
+  // A decoded code goes through exactly the same action as a manual admit, so
+  // the camera cannot become a second, subtly different way of letting someone
+  // in.
+  const camera = useQrCamera((code) => {
+    if (!eventId) return
+    scan.submit({ eventId, qrToken: code }, { method: 'post' })
+  })
 
   return (
-    <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
-      <header className="sticky top-0 z-30 border-b border-hair bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 lg:px-6">
-          <Link
-            to={`/admin/check-in${data.event ? `?eventId=${data.event.id}` : ''}`}
-            className="flex items-center gap-2 text-[13px] font-medium text-muted transition hover:text-ink"
+    <>
+      {/* The EVENT is the headline; this is a station bound to it. */}
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 items-start gap-3">
+          <button
+            type="button"
+            onClick={() => ctx?.openDrawer()}
+            title="Open menu"
+            className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface text-muted hover:text-ink lg:hidden"
           >
-            <Icon name="hgi-arrow-left-01" size={16} />
-            <span className="hidden sm:inline">Back to check-in</span>
-          </Link>
-          <EventChooser
-            events={data.events}
-            value={data.event?.id ?? ''}
-            onChange={(eventId) => {
-              window.location.search = `?eventId=${encodeURIComponent(eventId)}`
-            }}
-          />
+            <Icon name="hgi-menu-01" size={18} />
+          </button>
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+              Check-in station
+            </p>
+            <EventChooser
+              events={data.events}
+              value={eventId}
+              onChange={(chosen) => {
+                window.location.search = `?eventId=${encodeURIComponent(chosen)}`
+              }}
+            />
+            {/* Event facts. The kit's "Main Hall · Station 1" is not ported —
+                it hard-coded a venue and a station identity that this product
+                does not have, and inventing one would be worse than omitting
+                it. */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[12.5px] text-muted">
+              {data.event?.when && (
+                <>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="hgi-calendar-03" size={14} />
+                    <span className="tnum">{data.event.when}</span>
+                  </span>
+                  <span className="h-1 w-1 shrink-0 rounded-full bg-muted/40" />
+                </>
+              )}
+              <span className="inline-flex items-center gap-1.5 font-medium text-ink">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+                Live
+              </span>
+            </div>
+          </div>
         </div>
-      </header>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            to={`/admin/check-in${eventId ? `?eventId=${eventId}` : ''}`}
+            className="btn btn-ghost shrink-0"
+          >
+            <Icon name="hgi-menu-square" size={16} />
+            <span className="hidden sm:inline">Check-in list</span>
+          </Link>
+          <HeaderUser />
+        </div>
+      </div>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 lg:px-6">
-        <Stats counts={data.counts} />
-
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div>
-            <CodeBox eventId={data.event?.id ?? ''} fetcher={scan} />
-            {feedback && <ScanResult feedback={feedback} />}
-            {error && (
-              <p
-                role="alert"
-                className="mt-3 rounded-xl bg-red-50 p-3 text-[13px] text-red-600 dark:bg-red-500/15 dark:text-red-300"
-              >
-                {error}
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
+        <section className="card overflow-hidden p-0 xl:col-span-3">
+          <div className="flex items-center justify-between px-5 pb-2 pt-4">
+            <div>
+              <h2 className="text-[15px] font-bold tracking-tight">Scan tickets</h2>
+              <p className="mt-0.5 text-[12px] text-muted">
+                Every valid scan checks the attendee in instantly.
               </p>
-            )}
-            <ManualSearch eventId={data.event?.id ?? ''} />
+            </div>
+            <CameraStatus camera={camera} />
           </div>
 
+          <CameraStage camera={camera} busy={busy} />
+
+          {feedback && <ScanResult feedback={feedback} />}
+          {error && (
+            <p
+              role="alert"
+              className="mx-5 mb-4 rounded-xl bg-red-50 p-3 text-[13px] text-red-600 dark:bg-red-500/15 dark:text-red-300"
+            >
+              {error}
+            </p>
+          )}
+
+          <ManualSearch eventId={eventId} />
+        </section>
+
+        <div className="flex flex-col gap-3 xl:col-span-2">
+          <Stats counts={data.counts} />
           <Feed feed={data.feed} />
         </div>
-      </main>
-    </div>
-  )
-}
+      </div>
 
-function Stats({ counts }: { counts: DoorCounts }) {
-  const cards = [
-    { label: 'Checked in', value: String(counts.checkedIn), brand: true },
-    { label: 'Still expected', value: String(counts.expected), brand: false },
-    { label: 'Tickets issued', value: String(counts.total), brand: false },
-    { label: 'Of the room', value: `${counts.percent}%`, brand: true },
-  ]
-
-  return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      {cards.map((card) => (
-        <div key={card.label} className="card p-4">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-            {card.label}
-          </p>
-          <p
-            className={cn(
-              'tnum mt-1 text-[26px] font-extrabold',
-              card.brand ? 'text-brand' : 'text-ink',
-            )}
-          >
-            {card.value}
-          </p>
-        </div>
-      ))}
-    </div>
+      <PageFooter />
+    </>
   )
 }
 
 /**
- * Where the code arrives.
+ * The room at a glance. One card, not four: the share that has arrived is the
+ * number an organizer reads across a hall, and it only means anything next to
+ * the bar it fills.
  *
- * Cleared and refocused after every read, so a hardware scanner can fire one
- * code after another without anybody touching the keyboard.
+ * On-site and Late are the API's own totals for the whole event — never
+ * counted from the feed, which shows the last eight arrivals of a thousand.
  */
-function CodeBox({
-  eventId,
-  fetcher,
-}: {
-  eventId: string
-  fetcher: ReturnType<typeof useFetcher<ScanAction>>
-}) {
-  const box = useRef<HTMLInputElement>(null)
-  const busy = fetcher.state !== 'idle'
-
-  useEffect(() => {
-    if (busy || !box.current) return
-    box.current.value = ''
-    box.current.focus()
-  }, [busy, fetcher.data])
-
+function Stats({ counts }: { counts: DoorCounts }) {
   return (
-    <div className="card p-5">
-      <h2 className="text-[15px] font-bold tracking-tight">Scan a ticket</h2>
-      <p className="mt-0.5 text-[12.5px] text-muted">
-        Point a QR reader at this page, or key the code in by hand.
+    <section className="card p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">Checked in</p>
+        <span className="tnum text-[13px] font-bold text-brand">{counts.percent}%</span>
+      </div>
+      <p className="mt-1 flex items-baseline gap-1.5">
+        <span className="tnum text-[26px] font-bold leading-none text-ink">{counts.checkedIn}</span>
+        <span className="text-[14px] text-muted">
+          / <span className="tnum">{counts.total}</span>
+        </span>
       </p>
-      <fetcher.Form method="post" className="mt-4 flex gap-2">
-        <input type="hidden" name="eventId" value={eventId} />
-        <input
-          ref={box}
-          name="qrToken"
-          type="text"
-          required
-          autoFocus
-          autoComplete="off"
-          disabled={!eventId || busy}
-          aria-label="Ticket code"
-          placeholder="Ticket code"
-          className="input h-12 flex-1 text-[15px]"
+      <div className="mt-2.5 h-2 w-full rounded-full bg-line">
+        <div
+          className="h-2 rounded-full bg-brand transition-all"
+          style={{ width: `${counts.percent}%` }}
         />
-        <button type="submit" className="btn btn-primary h-12 px-5" disabled={!eventId || busy}>
-          <Icon name="hgi-qr-code-01" size={18} />
-          {busy ? 'Checking…' : 'Check in'}
-        </button>
-      </fetcher.Form>
-    </div>
+      </div>
+      <div className="mt-3 flex items-center gap-4 text-[11px] text-muted">
+        <span>
+          On-site <b className="tnum text-ink">{counts.onSite}</b>
+        </span>
+        <span>
+          Late <b className="tnum text-red-500">{counts.late}</b>
+        </span>
+        <span className="ml-auto">
+          Remaining <b className="tnum text-ink">{counts.expected}</b>
+        </span>
+      </div>
+    </section>
   )
 }
 
 function Feed({ feed }: { feed: AttendanceRow[] }) {
   return (
-    <div className="card h-fit p-5">
-      <h2 className="text-[15px] font-bold tracking-tight">Just arrived</h2>
+    <section className="card flex min-h-0 flex-1 flex-col p-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[15px] font-bold tracking-tight">Just checked in</h2>
+        <span className="flex items-center gap-1 text-[11px] font-medium text-brand">
+          <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+          Live
+        </span>
+      </div>
       {feed.length === 0 ? (
         <p className="mt-3 text-[13px] text-muted">Nobody has come through yet.</p>
       ) : (
-        <ul className="mt-3 divide-y divide-line">
+        <div className="mt-2">
           {feed.map((row) => (
-            <li key={row.ticketId} className="flex items-center gap-3 py-2.5">
-              <span className="avatar h-8 w-8 text-[11px]">{row.initials}</span>
+            <div
+              key={row.ticketId}
+              className="flex items-center gap-2.5 border-t border-line py-2.5 first:border-t-0 first:pt-0"
+            >
+              <span className="avatar h-8 w-8 shrink-0 text-[10px]">{row.initials}</span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-semibold text-ink">{row.name}</p>
-                <p className="truncate text-[11.5px] text-muted">{row.ticketType}</p>
+                {/* One tone for every tier: the kit coloured VIP purple and
+                    General green by hand, and a real catalogue has no such
+                    fixed palette to read from. */}
+                <span className="badge badge-green mt-0.5">{row.ticketType}</span>
               </div>
-              <span className="tnum shrink-0 text-[12px] text-muted">{row.time}</span>
-            </li>
+              <span className="tnum shrink-0 text-[11px] text-muted">{row.time}</span>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
-    </div>
+    </section>
   )
 }

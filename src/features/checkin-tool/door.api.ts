@@ -41,5 +41,7 @@ export function countsOf(meta: Record<string, unknown>): AttendanceCountsWire {
     total: counts?.total ?? 0,
     checkedIn: counts?.checkedIn ?? 0,
     expected: counts?.expected ?? 0,
+    onSite: counts?.onSite ?? 0,
+    late: counts?.late ?? 0,
   }
 }

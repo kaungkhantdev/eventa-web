@@ -22,7 +22,9 @@ import type { EventStatus, EventWire, EventWireStatus } from './types'
  * a count the API did not send is not reconstructed from the ones it did.
  */
 
-const STATUS_LABEL: Record<EventWireStatus, EventStatus> = {
+/** Wire status → the word the console shows. Shared: the door station's event
+ *  picker paints its status dot from the same mapping. */
+export const STATUS_LABEL: Record<EventWireStatus, EventStatus> = {
   draft: 'Draft',
   planned: 'Planned',
   upcoming: 'Upcoming',

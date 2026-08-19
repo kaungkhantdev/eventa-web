@@ -1,6 +1,9 @@
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { eventsApi } from '@/features/events/events.api'
+import { STATUS_LABEL } from '@/features/events/eventDetail.mapper'
+import type { EventStatus } from '@/features/events/types'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
+import { bangkokDate } from '@/lib/format'
 import { intParam } from '@/lib/urlFilters'
 import { countsOf, doorApi } from './door.api'
 import { toAttendanceRow, toDoorCounts, toScanFeedback } from './door.mapper'
@@ -22,11 +25,20 @@ export const FEED_SIZE = 8
 export interface EventChoice {
   id: string
   name: string
+  /** `Jul 18, 2026` on the Bangkok clock — the kit's header line. */
+  when: string
+  /** Paints the picker's status dot. */
+  status: EventStatus
 }
 
 async function eventChoices(): Promise<EventChoice[]> {
   const page = await eventsApi.list({ limit: EVENT_OPTIONS, sort: 'recent' })
-  return page.items.map((event) => ({ id: event.id, name: event.name }))
+  return page.items.map((event) => ({
+    id: event.id,
+    name: event.name,
+    when: event.startAt ? bangkokDate(event.startAt) : '',
+    status: STATUS_LABEL[event.status],
+  }))
 }
 
 /** The event being worked, from the URL, else the most recent. */
@@ -47,7 +59,14 @@ export interface QueueData {
   window: PageWindow
 }
 
-const EMPTY_COUNTS: DoorCounts = { checkedIn: 0, expected: 0, total: 0, percent: 0 }
+const EMPTY_COUNTS: DoorCounts = {
+  checkedIn: 0,
+  expected: 0,
+  total: 0,
+  percent: 0,
+  onSite: 0,
+  late: 0,
+}
 
 /** A page with nothing on it — the shape `pageWindow` needs to say "0 of 0". */
 const EMPTY_META = {
