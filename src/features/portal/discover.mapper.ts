@@ -8,9 +8,15 @@ import type { CardBadge, CardPrice, DiscoverCard, EventCardWire } from './discov
  * Everything the kit invented from the slug — a rating, a cover photo, three
  * attendee faces — is either the API's answer or absent. A fabricated 4.7 next
  * to a real organizer's name is a claim this product is not entitled to make.
+ *
+ * The going-cluster is the one thing kept in shape but not in substance: the
+ * circles are drawn from the real count and carry no faces, because the feed is
+ * public and the attendance port exposes nothing but a number.
  */
 
 const FREE = 'Free'
+/** The kit drew three; a card with two people should not claim a third. */
+const MAX_FACES = 3
 
 export function toDiscoverCard(row: EventCardWire): DiscoverCard {
   const look = lookOfType(row.type)
@@ -26,6 +32,7 @@ export function toDiscoverCard(row: EventCardWire): DiscoverCard {
     organizer: row.organizerName,
     rating: row.rating === null ? null : row.rating.toFixed(1),
     going: num(row.goingCount),
+    faces: Math.min(row.goingCount, MAX_FACES),
     price: priceOf(row.priceFrom),
     badge: badgeOf(row.badge),
     cover: row.coverImage,

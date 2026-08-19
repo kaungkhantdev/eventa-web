@@ -159,11 +159,11 @@ const PROFILE_LINKS = [
  */
 export function UserChip({
   name,
-  role,
   email,
   onSignOut,
 }: {
   name: string
+  /** Still passed by callers; the trigger currently shows the avatar alone. */
   role: string
   email: string
   onSignOut: () => void
@@ -182,10 +182,10 @@ export function UserChip({
           className="flex shrink-0 cursor-pointer items-center gap-2.5"
         >
           <UserAvatar name={name} />
-          <div className="hidden leading-tight sm:block">
+          {/* <div className="hidden leading-tight sm:block">
             <p className="text-[13px] font-semibold text-ink">{name}</p>
             <p className="text-[11px] text-muted">{role}</p>
-          </div>
+          </div> */}
         </button>
       )}
     >

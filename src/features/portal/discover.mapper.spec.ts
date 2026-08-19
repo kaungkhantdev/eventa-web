@@ -36,6 +36,29 @@ describe('toDiscoverCard', () => {
     })
   })
 
+  /**
+   * The kit drew three faces on every card, photographs picsum invented from
+   * the slug. The cluster is kept because it reads as "people are going" at a
+   * glance, but it is tied to the count the API actually sent: no arrivals, no
+   * circles, and never more circles than people.
+   */
+  describe('going cluster', () => {
+    it('draws one circle per person, up to three', () => {
+      expect(card({ goingCount: 1 }).faces).toBe(1)
+      expect(card({ goingCount: 2 }).faces).toBe(2)
+      expect(card({ goingCount: 3 }).faces).toBe(3)
+    })
+
+    it('stops at three however full the room is', () => {
+      expect(card({ goingCount: 1240 }).faces).toBe(3)
+    })
+
+    // An event nobody has booked shows no crowd.
+    it('draws nothing when nobody is going', () => {
+      expect(card({ goingCount: 0 }).faces).toBe(0)
+    })
+  })
+
   describe('price', () => {
     it('shows the API’s own label, prefixed by the card as "From"', () => {
       expect(card().price).toEqual({ label: '฿1,250', isFree: false })

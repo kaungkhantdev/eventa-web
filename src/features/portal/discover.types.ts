@@ -72,6 +72,15 @@ export interface DiscoverCard {
   /** `null` until the event has been rated — the star is hidden, never faked. */
   rating: string | null
   going: string
+  /**
+   * How many circles the going-cluster draws, 0–3.
+   *
+   * The kit drew three photographs on every card, invented from the slug. These
+   * carry no faces — the API exposes nothing but a count, on purpose — but the
+   * cluster still says "people are going" at a glance, so it is kept and tied
+   * to the real number: none when nobody has booked.
+   */
+  faces: number
   /** `null` when nothing is left to buy: the card shows "—", never "฿0". */
   price: CardPrice | null
   badge: CardBadge | null

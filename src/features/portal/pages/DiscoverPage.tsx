@@ -343,7 +343,10 @@ function EventCard({ card, saved }: { card: DiscoverCard; saved: boolean }) {
             )}
           </p>
           <div className="mt-2.5 flex items-center justify-between">
-            <span className="text-[12px] text-muted">{card.going} going</span>
+            <span className="flex items-center gap-2 text-[12px] text-muted">
+              <GoingCluster faces={card.faces} accent={card.accent} />
+              {card.going} going
+            </span>
             <Price price={card.price} />
           </div>
         </div>
@@ -370,6 +373,38 @@ function EventCard({ card, saved }: { card: DiscoverCard; saved: boolean }) {
     </div>
   )
 }
+
+/**
+ * The kit's overlapping circles beside the going count (discover.html:124-133).
+ *
+ * Its three were photographs picsum invented from the slug. These carry no
+ * faces: the feed is public and the attendance port returns a count and nothing
+ * else, so a face here would be a real person's likeness published without their
+ * say-so. The cluster is drawn from the count itself — the crowd is real even
+ * though no one in it is named.
+ *
+ * `aria-hidden`, because the sentence beside it already says how many are going.
+ */
+function GoingCluster({ faces, accent }: { faces: number; accent: string }) {
+  if (faces === 0) return null
+
+  return (
+    <span className="flex -space-x-2" aria-hidden="true">
+      {Array.from({ length: faces }, (_, i) => (
+        <span
+          key={i}
+          className="relative inline-block h-6 w-6 shrink-0 overflow-hidden rounded-full ring-2 ring-canvas"
+          // Each circle a shade further from the type's colour, so the stack
+          // reads as several people rather than one shape repeated.
+          style={{ backgroundImage: `linear-gradient(135deg, ${accent}, ${accent}${TINTS[i]})` }}
+        />
+      ))}
+    </span>
+  )
+}
+
+/** Alpha suffixes, lightening each circle in the stack. */
+const TINTS = ['dd', '99', '55'] as const
 
 /** No price is not a free price — nothing is left to buy. */
 function Price({ price }: { price: DiscoverCard['price'] }) {
