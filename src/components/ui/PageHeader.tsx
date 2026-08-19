@@ -148,8 +148,15 @@ const PROFILE_LINKS = [
   { to: '/admin/settings-security', icon: 'hgi-shield-key', label: 'Security' },
 ]
 
-/** Signed-in user chip that opens a profile menu (links, theme toggle, sign
- *  out). Collapses to just the avatar on small screens. */
+/**
+ * Signed-in user chip that opens a profile menu (links, theme toggle, sign
+ * out). Collapses to just the avatar on small screens.
+ *
+ * Deliberately bare at rest — no hover fill, no padding, no chevron. The kit
+ * paints nothing on this chip across all 46 admin pages; `shell.js` gives it
+ * only `cursor-pointer` and a click handler. It is a real `<button>` here
+ * rather than the kit's `<div onClick>`, so it keeps its focus ring.
+ */
 export function UserChip({
   name,
   role,
@@ -172,18 +179,13 @@ export function UserChip({
           type="button"
           onClick={toggleMenu}
           aria-expanded={open}
-          className="flex shrink-0 items-center gap-2.5 rounded-lg py-0.5 pl-0.5 pr-1 transition hover:bg-line"
+          className="flex shrink-0 cursor-pointer items-center gap-2.5"
         >
           <UserAvatar name={name} />
           <div className="hidden leading-tight sm:block">
             <p className="text-[13px] font-semibold text-ink">{name}</p>
             <p className="text-[11px] text-muted">{role}</p>
           </div>
-          <Icon
-            name="hgi-arrow-down-01"
-            size={15}
-            className="hidden text-muted sm:block"
-          />
         </button>
       )}
     >
