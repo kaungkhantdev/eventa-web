@@ -13,6 +13,17 @@ const SIGN_IN_PATH: Record<Persona, string> = {
   attendee: '/portal/login',
 }
 
+/**
+ * Where each audience opens an account. The portal's "Create an event" reaches
+ * for the organizer's: an attendee account is the wrong thing entirely, and
+ * signing one up would strand a would-be organizer outside /admin holding
+ * credentials that look correct.
+ */
+const SIGN_UP_PATH: Record<Persona, string> = {
+  admin: '/auth/register',
+  attendee: '/portal/register',
+}
+
 const HOME_PATH: Record<Persona, string> = {
   admin: '/admin/dashboard',
   attendee: '/portal/my-events',
@@ -30,6 +41,10 @@ const CHECK_EMAIL_PATH: Record<Persona, string> = {
 
 export function signInPathFor(persona: Persona): string {
   return SIGN_IN_PATH[persona]
+}
+
+export function signUpPathFor(persona: Persona): string {
+  return SIGN_UP_PATH[persona]
 }
 
 export function homeFor(persona: Persona): string {

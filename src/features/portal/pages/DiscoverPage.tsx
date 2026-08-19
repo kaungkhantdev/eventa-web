@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { MASKED } from '@/lib/format'
 import type { PageWindow } from '@/lib/paging'
 import type { ActionResult } from '@/app/loaders'
+import { signUpPathFor } from '@/features/auth/personas'
 import { ALL_CATEGORIES, lookOfCategory } from '../discover.presentation'
 import type { DiscoverData } from '../discover.routes'
 import type { DiscoverCard } from '../discover.types'
@@ -83,6 +84,9 @@ export default function DiscoverPage() {
   )
 }
 
+/** Where "Create an event" leads — the organizer's sign-up, not the attendee's. */
+const ORGANIZER_SIGN_UP = signUpPathFor('admin')
+
 function TopBar({ value, onSearch }: { value: string; onSearch: (next: string) => void }) {
   const { dark, toggle } = useTheme()
 
@@ -119,6 +123,16 @@ function TopBar({ value, onSearch }: { value: string; onSearch: (next: string) =
           >
             <i className="hgi-stroke hgi-ticket-02 text-[15px]" />
             My tickets
+          </Link>
+          {/* The console's only door from the public side. An organizer
+              arriving here would otherwise find just the attendee sign-in and
+              no way through — the two personas never share a login. */}
+          <Link
+            to={ORGANIZER_SIGN_UP}
+            className="hidden rounded-lg px-3 py-1.5 text-[13px] font-medium text-muted transition hover:bg-line hover:text-ink md:inline-flex md:items-center md:gap-1.5"
+          >
+            <i className="hgi-stroke hgi-calendar-add-01 text-[15px]" />
+            Create an event
           </Link>
           <button
             type="button"

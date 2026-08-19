@@ -5,12 +5,21 @@ import {
   personaOfSearch,
   personaOfSession,
   signInPathFor,
+  signUpPathFor,
 } from './personas'
 
 describe('two personas, never one login', () => {
   it('sends each persona to its own sign-in page', () => {
     expect(signInPathFor('admin')).toBe('/auth/login')
     expect(signInPathFor('attendee')).toBe('/portal/login')
+  })
+
+  // The portal's "Create an event" is the console's only door from the public
+  // side, and it must open on the organizer's sign-up — never the attendee's,
+  // which creates an account that cannot reach /admin at all.
+  it('sends each persona to its own sign-up page', () => {
+    expect(signUpPathFor('admin')).toBe('/auth/register')
+    expect(signUpPathFor('attendee')).toBe('/portal/register')
   })
 
   it('lands each persona on its own home', () => {
