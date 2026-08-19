@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLoaderData } from 'react-router'
-import { Icon } from '@/components/ui'
+import { EmptyState, Icon, NoResults, PastEnd } from '@/components/ui'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useTheme } from '@/lib/useTheme'
 import { cn } from '@/lib/cn'
@@ -31,7 +31,7 @@ const SAVE_ON =
 
 export default function DiscoverPage() {
   const data = useLoaderData() as DiscoverData
-  const { params, set } = useFilters()
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (next) =>
     // Replace, not push: a search is typed, and every keystroke does not
     // deserve its own entry in the back button's history.
@@ -39,6 +39,13 @@ export default function DiscoverPage() {
   )
   const category = params.get('category') ?? ALL_CATEGORIES
   const saved = new Set(data.saved)
+
+  // An empty feed is three different things, and the visitor is owed the right
+  // one: a search that matched nothing is theirs to undo, a page past the end
+  // is a link that went stale, and a diary with nothing coming up is neither of
+  // those and no move of theirs will fix it. The URL tells them apart — `q`,
+  // `category` and the page number are all that can narrow this feed.
+  const nothingUpcoming = data.cards.length === 0 && emptyReason === 'first-run'
 
   return (
     <div className="min-h-screen bg-surface font-sans text-ink antialiased">
@@ -54,27 +61,69 @@ export default function DiscoverPage() {
           </p>
         </div>
 
-        <CategoryStrip
-          categories={data.categories}
-          active={category}
-          onPick={(next) => set({ category: next === ALL_CATEGORIES ? null : next, page: null })}
-        />
+        {nothingUpcoming ? (
+          /* The category strip, the count and the pager go with the grid:
+             there is nothing to narrow, nothing to count and nowhere to page
+             to, so offering all three would be three dead controls. The one
+             thing that can fill this page is somebody scheduling an event.
 
-        <p className="mb-3 text-[12px] font-medium text-muted">
-          {data.window.total} {data.window.total === 1 ? 'event' : 'events'}
-        </p>
-
-        {data.cards.length > 0 ? (
-          <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-            {data.cards.map((card) => (
-              <EventCard key={card.id} card={card} saved={saved.has(card.id)} />
-            ))}
-          </div>
+             The copy says "coming up", not "published": the feed is public,
+             published *and* still ahead of now (the API's `browsable`), so a
+             platform with a full back catalogue and nothing on the calendar
+             lands here too — and telling it that it has never published
+             anything would simply be untrue. */
+          <EmptyState
+            icon="hgi-calendar-03"
+            title="Nothing on just yet"
+            actions={[
+              { label: 'Create an event', to: ORGANIZER_SIGN_UP, icon: 'hgi-calendar-add-01' },
+            ]}
+          >
+            Nothing is coming up right now. Conferences, concerts, workshops and festivals appear
+            here as organizers schedule them — check back soon.
+          </EmptyState>
         ) : (
-          <EmptyState />
-        )}
+          <>
+            <CategoryStrip
+              categories={data.categories}
+              active={category}
+              onPick={(next) =>
+                set({ category: next === ALL_CATEGORIES ? null : next, page: null })
+              }
+            />
 
-        <Pager window={data.window} onPage={(page) => set({ page })} />
+            <p className="mb-3 text-[12px] font-medium text-muted">
+              {data.window.total} {data.window.total === 1 ? 'event' : 'events'}
+            </p>
+
+            {data.cards.length > 0 ? (
+              <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+                {data.cards.map((card) => (
+                  <EventCard key={card.id} card={card} saved={saved.has(card.id)} />
+                ))}
+              </div>
+            ) : emptyReason === 'past-end' ? (
+              /* A bookmarked `?page=9` outlives the ninth page — an organizer
+                 unpublishes a few events and the feed is eight pages long.
+                 Often no filter is set at all, so "No events match / Clear
+                 filters" would name choices the visitor never made and offer a
+                 button that clears nothing. Page one, keeping whatever search
+                 they *did* make: dropping it as well is not what "Back to the
+                 first page" says it does. */
+              <PastEnd noun="events" onFirstPage={() => set({ page: null })}>
+                That page is past the end of what's on — start again from the first page.
+              </PastEnd>
+            ) : (
+              /* The search box and the strip stay on screen — they are what
+                 has to change, and "Clear filters" puts both back. */
+              <NoResults noun="events" onClear={clear}>
+                Try a different search or category.
+              </NoResults>
+            )}
+
+            <Pager window={data.window} onPage={(page) => set({ page })} />
+          </>
+        )}
 
         <p className="mt-10 text-center text-[11px] text-muted/70">
           Eventa · Event registration system · React, Tailwind CSS &amp; Hugeicons
@@ -451,17 +500,5 @@ function Pager({ window: page, onPage }: { window: PageWindow; onPage: (page: nu
         <Icon name="hgi-arrow-right-01" size={16} />
       </button>
     </nav>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="py-16 text-center">
-      <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-line text-muted">
-        <Icon name="hgi-search-remove" size={26} />
-      </span>
-      <p className="mt-3 text-[15px] font-semibold">No events found</p>
-      <p className="mt-1 text-[13px] text-muted">Try a different search or category.</p>
-    </div>
   )
 }

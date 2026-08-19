@@ -5,8 +5,10 @@ import {
   Button,
   Card,
   DataTable,
+  EmptyState,
   HeaderUser,
   Icon,
+  NoResults,
   PageFooter,
   PageHeader,
   Paginator,
@@ -36,13 +38,28 @@ const COPY_RESET_MS = 1200
 
 export default function DiscountsPage() {
   const data = useLoaderData() as DiscountsData
-  const { params, set } = useFilters()
+  // Nothing here is written as a default — an absent `tab` is "all" — so any
+  // parameter in the URL is a choice the organizer made.
+  const { params, set, clear, filtered } = useFilters()
   const filtering = useIsFiltering()
   const panel = useDisclosure()
   const del = useDisclosure()
   const [deleting, setDeleting] = useState<DiscountRow | null>(null)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
   const mutate = useFetcher<ActionResult>()
+
+  // Before the first code exists the tabs, filters and table have nothing to
+  // describe, so first run replaces the whole working area. Not `emptyReason`:
+  // the loader redirects a page past the end back to the last real one whenever
+  // any row matches, so landing here with `page=2` still means the list is
+  // empty for these filters — "they are still there" would be the one
+  // explanation that is false.
+  const firstRun = data.rows.length === 0 && !filtered
+
+  // Whether the workspace has an event to point a code at. `> 0` is the
+  // direction that proves something; `=== 0` only ever picks the more cautious
+  // copy, it never asserts the workspace is empty.
+  const hasEvents = data.events.length > 0
 
   return (
     <>
@@ -61,104 +78,157 @@ export default function DiscountsPage() {
         }
       />
 
-      <PillTabs<DiscountTab>
-        items={TABS}
-        value={(params.get('tab') as DiscountTab) ?? 'all'}
-        onChange={(tab) => set({ tab: tab === 'all' ? null : tab })}
-      />
-
-      <div className={cn('mt-3', filtering && 'opacity-60 transition-opacity')}>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative w-full flex-1">
-            <Icon
-              name="hgi-search-01"
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            />
-            <input
-              type="text"
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-              placeholder="Search codes…"
-              maxLength={MAX_SEARCH_LENGTH}
-              aria-label="Search discount codes"
-            />
-          </div>
-          <div className="relative w-full sm:w-56">
-            <Icon
-              name="hgi-calendar-03"
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand"
-            />
-            <select
-              value={params.get('eventId') ?? ''}
-              onChange={(e) => set({ eventId: e.target.value || null })}
-              className="select h-10 w-full border-0 bg-surface pl-9 font-medium"
-              aria-label="Filter by event"
-            >
-              <option value="">{ALL_EVENTS}</option>
-              {data.events.map((event) => (
-                <option key={event.id} value={event.id}>
-                  {event.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <Card className="mt-3 p-4">
-          <div className="overflow-x-auto">
-            <DataTable className="min-w-[860px]">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Type</th>
-                  <th>Applies to</th>
-                  <th>Used / Limit</th>
-                  <th>Valid</th>
-                  <th>Status</th>
-                  <th className="text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="text-[13px]">
-                {data.rows.map((row) => (
-                  <DiscountTableRow
-                    key={row.id}
-                    row={row}
-                    onDelete={() => {
-                      setDeleting(row)
-                      del.onOpen()
-                    }}
-                    onToggle={() =>
-                      mutate.submit(
-                        { intent: row.status === 'disabled' ? 'enable' : 'disable', id: row.id },
-                        { method: 'post' },
-                      )
-                    }
-                  />
-                ))}
-                {data.rows.length === 0 && (
-                  <tr>
-                    <td colSpan={7}>
-                      <div className="py-10 text-center text-[13px] text-muted">
-                        No discount codes match these filters.
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </DataTable>
-          </div>
-
-          <Paginator
-            {...data.window}
-            noun="discount codes"
-            onPage={(page) => set({ page })}
-            onSize={(size) => set({ limit: size, page: null })}
-          />
+      {firstRun ? (
+        <Card>
+          {/* The kit's copy says a code "needs an event with tickets to apply
+              to". That is not this product's contract: `eventId` is nullable —
+              "Omit or null to apply the code to every event" — and the panel
+              offers "All events", so a code applies workspace-wide when none is
+              chosen. Repeating the kit verbatim would state a requirement the
+              API does not have, and would send an organizer who already has
+              events to the event wizard. The wording only differs where that
+              claim was; the shape and the fallback branch are the kit's. */}
+          <EmptyState
+            icon="hgi-discount-tag-01"
+            title="No discount codes yet"
+            actions={
+              hasEvents
+                ? [
+                    { label: 'New code', onClick: panel.onOpen, icon: 'hgi-add-01' },
+                    { label: 'Set up ticket types', to: '/admin/tickets' },
+                  ]
+                : [
+                    {
+                      label: 'Create an event first',
+                      to: '/admin/event-form',
+                      icon: 'hgi-calendar-add-01',
+                    },
+                    { label: 'Set up ticket types', to: '/admin/tickets' },
+                  ]
+            }
+          >
+            {hasEvents ? (
+              <>
+                A code takes a percentage or a fixed ฿ amount off a ticket price — for one event, or
+                for every event at once. Set one up, then share it with the people you want to give
+                the discount to.
+              </>
+            ) : (
+              <>
+                A code takes a percentage or a fixed ฿ amount off a ticket price, so there has to be
+                a ticket on sale for it to come off. Create an event and its ticket types first,
+                then come back and set up a code.
+              </>
+            )}
+          </EmptyState>
         </Card>
-      </div>
+      ) : (
+        <>
+          <PillTabs<DiscountTab>
+            items={TABS}
+            value={(params.get('tab') as DiscountTab) ?? 'all'}
+            onChange={(tab) => set({ tab: tab === 'all' ? null : tab })}
+          />
+
+          <div className={cn('mt-3', filtering && 'opacity-60 transition-opacity')}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full flex-1">
+                <Icon
+                  name="hgi-search-01"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                />
+                <input
+                  type="text"
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+                  placeholder="Search codes…"
+                  maxLength={MAX_SEARCH_LENGTH}
+                  aria-label="Search discount codes"
+                />
+              </div>
+              <div className="relative w-full sm:w-56">
+                <Icon
+                  name="hgi-calendar-03"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand"
+                />
+                <select
+                  value={params.get('eventId') ?? ''}
+                  onChange={(e) => set({ eventId: e.target.value || null })}
+                  className="select h-10 w-full border-0 bg-surface pl-9 font-medium"
+                  aria-label="Filter by event"
+                >
+                  <option value="">{ALL_EVENTS}</option>
+                  {data.events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <Card className="mt-3 p-4">
+              <div className="overflow-x-auto">
+                <DataTable className="min-w-[860px]">
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Type</th>
+                      <th>Applies to</th>
+                      <th>Used / Limit</th>
+                      <th>Valid</th>
+                      <th>Status</th>
+                      <th className="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-[13px]">
+                    {data.rows.map((row) => (
+                      <DiscountTableRow
+                        key={row.id}
+                        row={row}
+                        onDelete={() => {
+                          setDeleting(row)
+                          del.onOpen()
+                        }}
+                        onToggle={() =>
+                          mutate.submit(
+                            {
+                              intent: row.status === 'disabled' ? 'enable' : 'disable',
+                              id: row.id,
+                            },
+                            { method: 'post' },
+                          )
+                        }
+                      />
+                    ))}
+                    {/* The filters stay above — putting them back is the way out. */}
+                    {data.rows.length === 0 && (
+                      <tr>
+                        <td colSpan={7}>
+                          <NoResults noun="discount codes" onClear={clear}>
+                            Nothing matches the current search, status tab and event filter. Try
+                            widening them to see more codes.
+                          </NoResults>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </DataTable>
+              </div>
+
+              <Paginator
+                {...data.window}
+                noun="discount codes"
+                onPage={(page) => set({ page })}
+                onSize={(size) => set({ limit: size, page: null })}
+              />
+            </Card>
+          </div>
+        </>
+      )}
 
       {mutate.data?.ok === false && (
         <p role="alert" className="mt-3 text-[13px] text-red-500">

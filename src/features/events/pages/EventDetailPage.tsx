@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
-import { NotificationBell, SignedInChip } from '@/components/ui'
+import { EmptyState, NoResults, NotificationBell, PastEnd, SignedInChip } from '@/components/ui'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import type { ActionResult } from '@/app/loaders'
 import { cn } from '@/lib/cn'
 import { num } from '@/lib/format'
 import { PAGE_SIZES, type PageWindow } from '@/lib/paging'
+import type { ListEmptyReason } from '@/lib/urlFilters'
 import { useFilters } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
 import {
@@ -119,7 +120,9 @@ function ToneAvatar({
 export default function EventDetailPage() {
   const ctx = useOutletContext<AdminOutletContext | null>()
   const data = useLoaderData() as EventDetailData
-  const { set } = useFilters()
+  // `id` says which event this is and `tab` which panel is open — both are page
+  // state, not a narrowing the organizer chose. Only `status` and `page` filter.
+  const { set, clear, filtered, emptyReason } = useFilters({ ignore: ['id', 'tab'] })
   const fetcher = useFetcher<ActionResult>()
 
   const [sessionOpen, setSessionOpen] = useState(false)
@@ -128,6 +131,9 @@ export default function EventDetailPage() {
 
   const { header, overview } = data
   const publicUrl = overview.publicUrl
+
+  /** Open a tab. The payment filter goes with it — it means nothing on the agenda. */
+  const goTab = (tab: EventTab) => set({ tab: tab === 'overview' ? null : tab, status: null })
 
   return (
     <>
@@ -216,7 +222,7 @@ export default function EventDetailPage() {
           <button
             key={id}
             type="button"
-            onClick={() => set({ tab: id === 'overview' ? null : id, status: null })}
+            onClick={() => goTab(id)}
             aria-pressed={id === data.tab}
             className={cn(
               'rounded-lg px-3.5 py-2 text-[13px] font-semibold transition',
@@ -239,9 +245,13 @@ export default function EventDetailPage() {
 
       <TabPanels
         data={data}
+        filtered={filtered}
+        emptyReason={emptyReason}
         onPage={(page) => set({ page })}
         onSize={(limit) => set({ limit })}
         onFilter={(status) => set({ status: status === 'all' ? null : status })}
+        onClear={clear}
+        onTab={goTab}
         onAddSession={() => setSessionOpen(true)}
         onAddTicket={() => setTicketOpen(true)}
         onRemoveSession={(sessionId) =>
@@ -275,17 +285,25 @@ export default function EventDetailPage() {
 /** Renders whichever tab the URL asked for — the loader fetched only that one. */
 function TabPanels({
   data,
+  filtered,
+  emptyReason,
   onPage,
   onSize,
   onFilter,
+  onClear,
+  onTab,
   onAddSession,
   onAddTicket,
   onRemoveSession,
 }: {
   data: EventDetailData
+  filtered: boolean
+  emptyReason: ListEmptyReason
   onPage: (page: number) => void
   onSize: (size: number) => void
   onFilter: (status: RegistrationFilter) => void
+  onClear: () => void
+  onTab: (tab: EventTab) => void
   onAddSession: () => void
   onAddTicket: () => void
   onRemoveSession: (sessionId: string) => void
@@ -301,7 +319,12 @@ function TabPanels({
           range={data.window}
           counts={data.counts}
           filter={data.filter}
+          filtered={filtered}
+          emptyReason={emptyReason}
+          event={data.header}
           onFilter={onFilter}
+          onClear={onClear}
+          onTab={onTab}
           onPage={onPage}
           onSize={onSize}
         />
@@ -311,21 +334,31 @@ function TabPanels({
   if (data.tab === 'attendees') {
     return (
       <div className={dim}>
-        <AttendeesPanel rows={data.attendees} range={data.window} onPage={onPage} />
+        <AttendeesPanel
+          rows={data.attendees}
+          range={data.window}
+          onTab={onTab}
+          onPage={onPage}
+        />
       </div>
     )
   }
   if (data.tab === 'speakers') {
     return (
       <div className={dim}>
-        <SpeakersPanel speakers={data.speakers} />
+        <SpeakersPanel speakers={data.speakers} eventId={data.header.id} onTab={onTab} />
       </div>
     )
   }
   if (data.tab === 'agenda') {
     return (
       <div className={dim}>
-        <AgendaPanel days={data.days} onAdd={onAddSession} onRemove={onRemoveSession} />
+        <AgendaPanel
+          days={data.days}
+          eventId={data.header.id}
+          onAdd={onAddSession}
+          onRemove={onRemoveSession}
+        />
       </div>
     )
   }
@@ -520,7 +553,12 @@ function RegistrationsPanel({
   range,
   counts,
   filter,
+  filtered,
+  emptyReason,
+  event,
   onFilter,
+  onClear,
+  onTab,
   onPage,
   onSize,
 }: {
@@ -528,101 +566,165 @@ function RegistrationsPanel({
   range: PageWindow
   counts: { all: number; paid: number; pending: number; refunded: number }
   filter: RegistrationFilter
+  filtered: boolean
+  emptyReason: ListEmptyReason
+  event: EventHeader
   onFilter: (status: RegistrationFilter) => void
+  onClear: () => void
+  onTab: (tab: EventTab) => void
   onPage: (page: number) => void
   onSize: (size: number) => void
 }) {
+  /* Nobody has registered for this event at all — `statusCounts.all` counts the
+     whole event, not the page. The payment pills, the table and the pager would
+     be controls over an empty set, so they go and the panel says what fills it.
+     A filter in the URL still wins: it may be hiding rows, and offering
+     onboarding to someone who filtered is telling the wrong person to start. */
+  const firstRun = counts.all === 0 && !filtered
+  /* Why it is empty depends on the event: a draft cannot be registered for at
+     all, while a published one is simply waiting. Only `Draft` is unpublished —
+     `planned`/`upcoming`/`live` are the API's public statuses. */
+  const draft = event.status === 'Draft'
+
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h2 className="text-[16px] font-bold tracking-tight">Registrations</h2>
-          <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
-            {num(counts.all)} total
-          </span>
+          {!firstRun && (
+            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
+              {num(counts.all)} total
+            </span>
+          )}
         </div>
-        <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-canvas p-1">
-          {REGISTRATION_FILTERS.map((f) => {
-            const on = f === filter
-            return (
-              <button
-                key={f}
-                type="button"
-                onClick={() => onFilter(f)}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition',
-                  on ? 'bg-brand-soft text-brand' : 'text-muted hover:text-ink',
-                )}
-              >
-                {FILTER_LABEL[f]}
-                <span
+        {!firstRun && (
+          <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-canvas p-1">
+            {REGISTRATION_FILTERS.map((f) => {
+              const on = f === filter
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => onFilter(f)}
                   className={cn(
-                    'rounded-full px-1.5 py-0.5 text-[10px] tnum',
-                    on ? 'bg-brand/15 text-brand' : 'bg-line text-muted',
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold transition',
+                    on ? 'bg-brand-soft text-brand' : 'text-muted hover:text-ink',
                   )}
                 >
-                  {counts[f]}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+                  {FILTER_LABEL[f]}
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-0.5 text-[10px] tnum',
+                      on ? 'bg-brand/15 text-brand' : 'bg-line text-muted',
+                    )}
+                  >
+                    {counts[f]}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left">
-          <thead>
-            <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-              <th className="pb-3 pr-3 font-semibold">Attendee</th>
-              <th className="pb-3 pr-3 font-semibold">Tickets</th>
-              <th className="pb-3 pr-3 font-semibold">Amount</th>
-              <th className="pb-3 pr-3 font-semibold">Registered</th>
-              <th className="pb-3 pr-3 font-semibold">Status</th>
-            </tr>
-          </thead>
-          <tbody className="text-[13px]">
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-8 text-center text-[12px] text-muted">
-                  No registrations
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => (
-                <tr key={r.reference} className="border-t border-line transition hover:bg-line/50">
-                  <td className="py-2.5 pr-3">
-                    <div className="flex items-center gap-2.5">
-                      <ToneAvatar initials={r.initials} tone={r.tone} />
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-semibold text-ink">{r.name}</p>
-                        {/* The reference, not an email — this endpoint sends none. */}
-                        <p className="truncate text-[11px] text-muted tnum">{r.reference}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-2.5 pr-3 text-[13px] text-muted tnum">{r.tickets}</td>
-                  <td className="py-2.5 pr-3 text-[13px] font-semibold text-ink tnum">{r.amount}</td>
-                  <td className="py-2.5 pr-3 text-[13px] text-muted tnum">
-                    {r.date} · {r.time}
-                  </td>
-                  <td className="py-2.5 pr-3">
-                    <span
-                      className={cn(
-                        'rounded-full px-2.5 py-1 text-[11px] font-medium',
-                        PAYMENT_PILL[r.status] ?? 'bg-canvas text-muted',
-                      )}
-                    >
-                      {r.status}
-                    </span>
-                  </td>
+      {firstRun ? (
+        <EmptyState
+          icon="hgi-ticket-01"
+          actions={
+            draft
+              ? [
+                  {
+                    label: 'Finish setup and publish',
+                    to: `/admin/event-form?id=${encodeURIComponent(event.id)}`,
+                    icon: 'hgi-rocket-01',
+                  },
+                  { label: 'Set up ticket types', onClick: () => onTab('tickets') },
+                ]
+              : [
+                  {
+                    label: 'Check your ticket types',
+                    onClick: () => onTab('tickets'),
+                    icon: 'hgi-ticket-01',
+                  },
+                  { label: 'See all registrations', to: '/admin/registrations' },
+                ]
+          }
+        >
+          {draft
+            ? `A registration is created the moment someone claims a ticket. This event is still a
+               draft, so nobody can register yet — publish it with a ticket type on sale.`
+            : `Nobody has claimed a ticket for this event yet. Each registration lands here as it
+               happens, with the tickets it covers and what was paid.`}
+        </EmptyState>
+      ) : (
+        <>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left">
+              <thead>
+                <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  <th className="pb-3 pr-3 font-semibold">Attendee</th>
+                  <th className="pb-3 pr-3 font-semibold">Tickets</th>
+                  <th className="pb-3 pr-3 font-semibold">Amount</th>
+                  <th className="pb-3 pr-3 font-semibold">Registered</th>
+                  <th className="pb-3 pr-3 font-semibold">Status</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody className="text-[13px]">
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>
+                      {/* Registrations exist for the event, so either a filter is
+                          hiding them or the page number ran off the end — and only
+                          one of those has "Clear filters" as its way out.
+                          `range.total` is the count for *these* filters, so it is
+                          what proves there are rows further back to go to; without
+                          it a filtered-to-nothing page 2 would be told to start
+                          from the beginning of a list that has no rows at all. */}
+                      {emptyReason === 'past-end' && range.total > 0 ? (
+                        <PastEnd noun="registrations" onFirstPage={() => onPage(1)} />
+                      ) : (
+                        <NoResults noun="registrations" onClear={onClear} />
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((r) => (
+                    <tr key={r.reference} className="border-t border-line transition hover:bg-line/50">
+                      <td className="py-2.5 pr-3">
+                        <div className="flex items-center gap-2.5">
+                          <ToneAvatar initials={r.initials} tone={r.tone} />
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-semibold text-ink">{r.name}</p>
+                            {/* The reference, not an email — this endpoint sends none. */}
+                            <p className="truncate text-[11px] text-muted tnum">{r.reference}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-3 text-[13px] text-muted tnum">{r.tickets}</td>
+                      <td className="py-2.5 pr-3 text-[13px] font-semibold text-ink tnum">{r.amount}</td>
+                      <td className="py-2.5 pr-3 text-[13px] text-muted tnum">
+                        {r.date} · {r.time}
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        <span
+                          className={cn(
+                            'rounded-full px-2.5 py-1 text-[11px] font-medium',
+                            PAYMENT_PILL[r.status] ?? 'bg-canvas text-muted',
+                          )}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-      <TabPager range={range} noun="registrations" onPage={onPage} onSize={onSize} />
+          <TabPager range={range} noun="registrations" onPage={onPage} onSize={onSize} />
+        </>
+      )}
     </section>
   )
 }
@@ -700,81 +802,133 @@ function TabPager({
 function AttendeesPanel({
   rows,
   range,
+  onTab,
   onPage,
 }: {
   rows: AttendeeRow[]
   range: PageWindow
+  onTab: (tab: EventTab) => void
   onPage: (page: number) => void
 }) {
+  /* The window's total is the whole tab, not the page: zero means nobody has
+     completed a registration for this event yet. Nothing in the URL narrows this
+     list — the loader sends only `page` and `limit` — so the total alone decides,
+     and a stale `?status=` left over from the registrations tab cannot turn a
+     genuine first run into a filtered one. */
+  const firstRun = range.total === 0
+
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h2 className="text-[16px] font-bold tracking-tight">Attendees</h2>
-          <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
-            {num(range.total)} confirmed
-          </span>
+          {!firstRun && (
+            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand">
+              {num(range.total)} confirmed
+            </span>
+          )}
         </div>
       </div>
-      <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[680px] text-left">
-          <thead>
-            <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted">
-              <th className="pb-3 pr-3 font-semibold">Attendee</th>
-              <th className="pb-3 pr-3 font-semibold">Registrations</th>
-              <th className="pb-3 pr-3 font-semibold">Seats</th>
-            </tr>
-          </thead>
-          <tbody className="text-[13px]">
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="py-8 text-center text-[12px] text-muted">
-                  No confirmed attendees yet
-                </td>
-              </tr>
-            ) : (
-              rows.map((a) => (
-                <tr key={a.email} className="border-t border-line transition hover:bg-line/50">
-                  <td className="py-2.5 pr-3">
-                    <div className="flex items-center gap-2.5">
-                      <ToneAvatar initials={a.initials} tone={a.tone} />
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-semibold text-ink">{a.name}</p>
-                        <p className="truncate text-[11px] text-muted">{a.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-2.5 pr-3 text-[13px] text-muted tnum">{a.registrations}</td>
-                  <td className="py-2.5 pr-3 text-[13px] font-medium text-ink tnum">{a.seats}</td>
+      {firstRun ? (
+        <EmptyState
+          icon="hgi-user-multiple"
+          actions={[
+            { label: 'Set up ticket types', onClick: () => onTab('tickets'), icon: 'hgi-add-01' },
+            { label: 'Open the attendee directory', to: '/admin/attendees' },
+          ]}
+        >
+          Everyone who completes a registration for this event appears here, with the tickets they
+          hold. Nobody has completed one yet.
+        </EmptyState>
+      ) : (
+        <>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[680px] text-left">
+              <thead>
+                <tr className="text-[10px] font-semibold uppercase tracking-wider text-muted">
+                  <th className="pb-3 pr-3 font-semibold">Attendee</th>
+                  <th className="pb-3 pr-3 font-semibold">Registrations</th>
+                  <th className="pb-3 pr-3 font-semibold">Seats</th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      <TabPager range={range} noun="attendees" onPage={onPage} />
+              </thead>
+              <tbody className="text-[13px]">
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={3}>
+                      {/* `firstRun` already covers a total of zero, so reaching this
+                          means attendees exist and the page number ran past them.
+                          This tab has no filters to clear, only a page to go back to. */}
+                      <PastEnd noun="attendees" onFirstPage={() => onPage(1)} />
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((a) => (
+                    <tr key={a.email} className="border-t border-line transition hover:bg-line/50">
+                      <td className="py-2.5 pr-3">
+                        <div className="flex items-center gap-2.5">
+                          <ToneAvatar initials={a.initials} tone={a.tone} />
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-semibold text-ink">{a.name}</p>
+                            <p className="truncate text-[11px] text-muted">{a.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 pr-3 text-[13px] text-muted tnum">{a.registrations}</td>
+                      <td className="py-2.5 pr-3 text-[13px] font-medium text-ink tnum">{a.seats}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <TabPager range={range} noun="attendees" onPage={onPage} />
+        </>
+      )}
     </section>
   )
 }
 
 /* ---------- Speakers ---------- */
-function SpeakersPanel({ speakers }: { speakers: SpeakerCard[] }) {
+function SpeakersPanel({
+  speakers,
+  eventId,
+  onTab,
+}: {
+  speakers: SpeakerCard[]
+  eventId: string
+  onTab: (tab: EventTab) => void
+}) {
+  /* The directory is event-scoped and falls back to the MOST RECENT event when
+     the URL names none, so every link out of this panel has to carry the event
+     it came from — otherwise a speaker added from an older event's workspace
+     silently attaches to a different one. */
+  const directory = `/admin/speakers?eventId=${encodeURIComponent(eventId)}`
+
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex items-center justify-between">
         <h2 className="text-[16px] font-bold tracking-tight">Speakers</h2>
         <Link
-          to="/admin/speakers"
+          to={directory}
           className="inline-flex items-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-brand-dark"
         >
           <i className="hgi-stroke hgi-add-01 text-[15px]" />
           <span className="hidden sm:inline">Manage speakers</span>
         </Link>
       </div>
+      {/* This tab has no filters, so an empty list can only mean a first run. */}
       {speakers.length === 0 ? (
-        <p className="mt-4 rounded-2xl bg-canvas px-4 py-10 text-center text-[13px] text-muted">
-          No speakers on this event yet.
-        </p>
+        <EmptyState
+          icon="hgi-mic-01"
+          actions={[
+            { label: 'Add your first speaker', to: directory, icon: 'hgi-user-add-01' },
+            { label: 'Build the agenda', onClick: () => onTab('agenda') },
+          ]}
+        >
+          Speakers are part of this event's programme, so you can line them up well before the
+          first ticket sells. Add a name, bio and session and they appear on the event page and in
+          the agenda.
+        </EmptyState>
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {speakers.map((s) => (
@@ -806,20 +960,26 @@ function SpeakersPanel({ speakers }: { speakers: SpeakerCard[] }) {
 /* ---------- Agenda ---------- */
 function AgendaPanel({
   days,
+  eventId,
   onAdd,
   onRemove,
 }: {
   days: AgendaDay[]
+  eventId: string
   onAdd: () => void
   onRemove: (sessionId: string) => void
 }) {
+  /* Both programme screens default to the most recent event, so the id travels
+     with the link — see SpeakersPanel. */
+  const scoped = (path: string) => `${path}?eventId=${encodeURIComponent(eventId)}`
+
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-[16px] font-bold tracking-tight">Agenda</h2>
         <div className="flex items-center gap-3">
           <Link
-            to="/admin/agenda"
+            to={scoped('/admin/agenda')}
             className="hidden text-[12px] font-semibold text-brand hover:underline sm:inline"
           >
             Manage agenda
@@ -836,10 +996,19 @@ function AgendaPanel({
         </div>
       </div>
       <div className="mt-4 space-y-5">
+        {/* No filters on this tab either — nothing has been scheduled yet. */}
         {days.length === 0 ? (
-          <p className="rounded-xl bg-canvas px-3 py-8 text-center text-[12px] text-muted">
-            No sessions yet — add the first one.
-          </p>
+          <EmptyState
+            icon="hgi-time-schedule"
+            actions={[
+              { label: 'Add the first session', onClick: onAdd, icon: 'hgi-add-01' },
+              { label: 'Add speakers', to: scoped('/admin/speakers') },
+            ]}
+          >
+            The agenda is this event's programme — talks, workshops and breaks laid out by time
+            slot. Build it whenever you like; it does not wait on registrations, and attendees see
+            it on the event page.
+          </EmptyState>
         ) : (
           days.map((d) => (
             <div key={d.day}>
@@ -916,13 +1085,21 @@ function TicketsPanel({ tickets, onAdd }: { tickets: TicketRow[]; onAdd: () => v
           </button>
         </div>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {tickets.length === 0 ? (
-          <div className="col-span-full rounded-2xl bg-canvas px-4 py-10 text-center text-[13px] text-muted">
-            No ticket types yet — click “Add ticket” to create one.
-          </div>
-        ) : (
-          tickets.map((t) => (
+      {/* Nothing to filter here — an empty grid means none have been created. */}
+      {tickets.length === 0 ? (
+        <EmptyState
+          icon="hgi-ticket-01"
+          actions={[
+            { label: 'Add ticket', onClick: onAdd, icon: 'hgi-add-01' },
+            { label: 'Manage tickets', to: '/admin/tickets' },
+          ]}
+        >
+          Every ticket type carries a price in ฿, how many are available and when they go on sale.
+          Add the first one and this event can start selling.
+        </EmptyState>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {tickets.map((t) => (
             <div key={t.id} className="rounded-2xl bg-canvas p-4">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[13px] font-bold text-ink">{t.name}</p>
@@ -946,9 +1123,9 @@ function TicketsPanel({ tickets, onAdd }: { tickets: TicketRow[]; onAdd: () => v
                 </div>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

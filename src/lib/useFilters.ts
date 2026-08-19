@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { nextParams, type FilterPatch } from './urlFilters'
+import {
+  clearedParams,
+  emptyListReason,
+  hasActiveFilters,
+  nextParams,
+  type FilterPatch,
+} from './urlFilters'
 
 /** How long typing pauses before the URL — and therefore the API — is asked. */
 export const SEARCH_DEBOUNCE_MS = 300
@@ -12,8 +18,9 @@ export const SEARCH_DEBOUNCE_MS = 300
  * organizer made; pass `replace` for changes they did not deliberately make
  * one at a time, such as each keystroke in a search box.
  */
-export function useFilters() {
+export function useFilters(options: FilterMeta = {}) {
   const [params, setParams] = useSearchParams()
+  const { defaults, ignore, total } = options
 
   const set = useCallback(
     (patch: FilterPatch, options: { replace?: boolean } = {}) => {
@@ -22,7 +29,40 @@ export function useFilters() {
     [setParams],
   )
 
-  return { params, set }
+  // `clear` is handed to an empty state as a callback, so it needs a stable
+  // identity. `ignore` is a fresh array literal on every render, which would
+  // defeat that — depend on its contents instead of its reference.
+  const ignoreKey = ignore?.join(',') ?? ''
+  const clear = useCallback(() => {
+    const keep = ignoreKey ? ignoreKey.split(',') : undefined
+    setParams((current) => clearedParams(current, { ignore: keep }))
+  }, [setParams, ignoreKey])
+
+  return {
+    params,
+    set,
+    clear,
+    /** Whether anything is currently narrowing the list. */
+    filtered: hasActiveFilters(params, { defaults, ignore }),
+    /**
+     * Which empty state to show if the list came back with no rows. Branch on
+     * this rather than on `filtered`, so a page past the end gets its own
+     * answer instead of being blamed on filters nobody set.
+     */
+    emptyReason: emptyListReason(params, { defaults, ignore, total }),
+  }
+}
+
+/** What this page's query string means, so a default is not read as a filter. */
+export interface FilterMeta {
+  defaults?: Record<string, string>
+  ignore?: string[]
+  /**
+   * The matching total the API reported (`window.total`), when the page has
+   * one. Pass it so an empty page can only be called "past the end" while rows
+   * genuinely exist further back.
+   */
+  total?: number
 }
 
 /**

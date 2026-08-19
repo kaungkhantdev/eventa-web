@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useFetcher, useLoaderData } from 'react-router'
-import { PageHeader, PageFooter, HeaderUser, ButtonLink, Icon } from '@/components/ui'
+import { PageHeader, PageFooter, HeaderUser, ButtonLink, EmptyState, Icon } from '@/components/ui'
 import type { ActionResult } from '@/app/loaders'
 import { cn } from '@/lib/cn'
 import type { LandingPagesData } from '../events.routes'
@@ -158,6 +158,33 @@ export default function LandingPagesPage() {
         }
       />
 
+      {/* First run: the four designs exist before any event does, so they stay
+          on screen — what is missing is an event to build a page from, and that
+          is all this block says. Nothing real is hidden behind it.
+
+          Looking is all the copy offers, because looking is all there is to do:
+          with no event to attach a design to, Preview is disabled and every
+          "Use template" is a link to the event form. There is nowhere to keep a
+          choice made now, so the copy does not pretend one can be made. */}
+      {events.length === 0 && (
+        <EmptyState
+          className="card mb-4"
+          icon="hgi-browser"
+          title="No event pages yet"
+          actions={[
+            {
+              label: 'Create your first event',
+              to: '/admin/event-form',
+              icon: 'hgi-calendar-add-01',
+            },
+          ]}
+        >
+          Every event you create gets its own page, built from one of the four templates below —
+          title, date, venue, agenda and tickets all fill in from the event itself. Browse the
+          designs, then create an event to preview one with real details.
+        </EmptyState>
+      )}
+
       {/* how it works + sample switcher */}
       <div className="rounded-2xl bg-surface p-4 lg:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -173,11 +200,13 @@ export default function LandingPagesPage() {
               </p>
             </div>
           </div>
-          <div className="shrink-0">
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Preview with
-            </p>
-            {events.length ? (
+          {/* Nothing to preview against until an event exists; the block above
+              already says so, so the switcher goes rather than repeating it. */}
+          {events.length > 0 && (
+            <div className="shrink-0">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                Preview with
+              </p>
               <div className="inline-flex max-w-full flex-wrap rounded-lg bg-canvas p-0.5 text-[12px] font-semibold">
                 {events.map((event) => (
                   <button
@@ -194,12 +223,8 @@ export default function LandingPagesPage() {
                   </button>
                 ))}
               </div>
-            ) : (
-              <p className="text-[12px] text-muted">
-                Create an event to preview a template against it.
-              </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   ButtonLink,
+  EmptyState,
   HeaderUser,
   Icon,
+  NoResults,
   PageFooter,
   PageHeader,
+  PastEnd,
   PillTabs,
 } from '@/components/ui'
 import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
@@ -14,6 +17,7 @@ import type { Me } from '@/features/auth/types'
 import { cn } from '@/lib/cn'
 import { num } from '@/lib/format'
 import { PAGE_SIZES, type PageWindow } from '@/lib/paging'
+import type { ListEmptyReason } from '@/lib/urlFilters'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
 import { EventCalendar } from '../components/EventCalendar'
@@ -41,12 +45,32 @@ const MAX_SEARCH_LENGTH = 120
 
 export default function EventsPage() {
   const data = useLoaderData() as EventsData
-  const { params, set } = useFilters()
+  // `view` picks which screen this is and `month` walks the calendar — neither
+  // narrows the list, so neither counts as a filter. (`sort` and `limit` are
+  // already non-narrowing everywhere.) The total is what lets an empty page 2
+  // be called "past the end" only while rows really do exist further back.
+  const { params, set, clear, filtered, emptyReason } = useFilters({
+    ignore: ['view', 'month'],
+    // The calendar has no pager, so it has no total and cannot run off an end.
+    total: data.view === 'overview' ? data.window.total : undefined,
+  })
   const filtering = useIsFiltering()
   const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
 
   const view = data.view
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+
+  /* An empty table means several different things and only one of them is a
+     first run. The Active/Completed badges are live counts for the *whole*
+     workspace — not this page — so they are what says there is genuinely
+     nothing yet, rather than a status tab or a search hiding it; `EmptyEvents`
+     below sorts out the rest. The calendar answers with one month, which can be
+     empty in a busy workspace, so it never claims a first run. */
+  const firstRun =
+    data.view === 'overview' &&
+    !filtered &&
+    data.summary.active === 0 &&
+    data.summary.completed === 0
 
   return (
     <>
@@ -67,93 +91,135 @@ export default function EventsPage() {
         }
       />
 
-      {/* view tabs + status filter */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-1 rounded-xl bg-surface p-1">
-          <ViewTab label="Overview" active={view === 'overview'} onClick={() => set({ view: null })} />
-          <ViewTab
-            label="Calendar"
-            active={view === 'calendar'}
-            onClick={() => set({ view: 'calendar' })}
-          />
-        </div>
-        {data.view === 'overview' && (
-          <PillTabs<EventBucket>
-            items={[
-              { value: 'active', label: 'Active', count: data.summary.active },
-              { value: 'completed', label: 'Completed', count: data.summary.completed },
-            ]}
-            value={(params.get('bucket') as EventBucket) ?? 'active'}
-            onChange={(bucket) => set({ bucket: bucket === 'active' ? null : bucket })}
-          />
-        )}
-      </div>
-
-      {data.view === 'calendar' ? (
-        <div className={cn(filtering && 'opacity-60 transition-opacity')}>
-          <EventCalendar
-            month={data.month}
-            events={data.events}
-            count={data.count}
-            onMonth={(month) => set({ month })}
-          />
-        </div>
+      {firstRun ? (
+        /* Nothing to filter, so the tabs, search and table go too — what is
+           left is the one step that fills this page. */
+        <EmptyState
+          className="card"
+          icon="hgi-calendar-03"
+          title="No events yet"
+          actions={[
+            ...(can(me, 'evCreate')
+              ? [
+                  {
+                    label: 'Create your first event',
+                    to: '/admin/event-form',
+                    icon: 'hgi-calendar-add-01',
+                  },
+                ]
+              : []),
+            { label: 'Browse page designs', to: '/admin/landing-pages' },
+          ]}
+        >
+          Create your first event to start selling tickets. You can save it as a draft, add tickets
+          and a programme, then publish when it&apos;s ready.
+        </EmptyState>
       ) : (
-        <div className={cn(filtering && 'opacity-60 transition-opacity')}>
-          {/* search + filters (out of table) */}
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative w-full flex-1">
-              <Icon
-                name="hgi-search-01"
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+        <>
+          {/* view tabs + status filter */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-1 rounded-xl bg-surface p-1">
+              <ViewTab
+                label="Overview"
+                active={view === 'overview'}
+                onClick={() => set({ view: null })}
               />
-              <input
-                type="text"
-                value={term}
-                onChange={(e) => setTerm(e.target.value)}
-                className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-                placeholder="Search events…"
-                maxLength={MAX_SEARCH_LENGTH}
-                aria-label="Search events"
+              <ViewTab
+                label="Calendar"
+                active={view === 'calendar'}
+                onClick={() => set({ view: 'calendar' })}
               />
             </div>
-            <select
-              value={params.get('sort') ?? 'registrations'}
-              onChange={(e) => set({ sort: e.target.value })}
-              className="select h-10 w-full border-0 bg-surface font-medium sm:w-52"
-              aria-label="Sort by"
-            >
-              {EVENT_SORTS.map((sort) => (
-                <option key={sort} value={sort}>
-                  {SORT_LABEL[sort]}
-                </option>
-              ))}
-            </select>
-            <select
-              value={params.get('type') ?? ALL_TYPES}
-              onChange={(e) => set({ type: e.target.value === ALL_TYPES ? null : e.target.value })}
-              className="select h-10 w-full border-0 bg-surface font-medium sm:w-44"
-              aria-label="Event type"
-            >
-              <option value={ALL_TYPES}>{ALL_TYPES}</option>
-              {EVENT_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+            {data.view === 'overview' && (
+              <PillTabs<EventBucket>
+                items={[
+                  { value: 'active', label: 'Active', count: data.summary.active },
+                  { value: 'completed', label: 'Completed', count: data.summary.completed },
+                ]}
+                value={(params.get('bucket') as EventBucket) ?? 'active'}
+                onChange={(bucket) => set({ bucket: bucket === 'active' ? null : bucket })}
+              />
+            )}
           </div>
 
-          <EventsTable
-            rows={data.rows}
-            range={data.window}
-            canDuplicate={can(me, 'evCreate')}
-            canDelete={can(me, 'evPublish')}
-            onPage={(page) => set({ page })}
-            onSize={(limit) => set({ limit })}
-          />
-        </div>
+          {data.view === 'calendar' ? (
+            <div className={cn(filtering && 'opacity-60 transition-opacity')}>
+              <EventCalendar
+                month={data.month}
+                events={data.events}
+                count={data.count}
+                onMonth={(month) => set({ month })}
+              />
+            </div>
+          ) : (
+            <div className={cn(filtering && 'opacity-60 transition-opacity')}>
+              {/* search + filters (out of table) */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="relative w-full flex-1">
+                  <Icon
+                    name="hgi-search-01"
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                  />
+                  <input
+                    type="text"
+                    value={term}
+                    onChange={(e) => setTerm(e.target.value)}
+                    className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+                    placeholder="Search events…"
+                    maxLength={MAX_SEARCH_LENGTH}
+                    aria-label="Search events"
+                  />
+                </div>
+                <select
+                  value={params.get('sort') ?? 'registrations'}
+                  onChange={(e) => set({ sort: e.target.value })}
+                  className="select h-10 w-full border-0 bg-surface font-medium sm:w-52"
+                  aria-label="Sort by"
+                >
+                  {EVENT_SORTS.map((sort) => (
+                    <option key={sort} value={sort}>
+                      {SORT_LABEL[sort]}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={params.get('type') ?? ALL_TYPES}
+                  onChange={(e) =>
+                    set({ type: e.target.value === ALL_TYPES ? null : e.target.value })
+                  }
+                  className="select h-10 w-full border-0 bg-surface font-medium sm:w-44"
+                  aria-label="Event type"
+                >
+                  <option value={ALL_TYPES}>{ALL_TYPES}</option>
+                  {EVENT_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <EventsTable
+                rows={data.rows}
+                range={data.window}
+                canDuplicate={can(me, 'evCreate')}
+                canDelete={can(me, 'evPublish')}
+                onPage={(page) => set({ page })}
+                onSize={(limit) => set({ limit })}
+                empty={
+                  <EmptyEvents
+                    reason={emptyReason}
+                    completed={data.summary.completed}
+                    canCreate={can(me, 'evCreate')}
+                    onClear={clear}
+                    onCompleted={() => set({ bucket: 'completed' })}
+                  />
+                }
+              />
+            </div>
+          )}
+        </>
       )}
 
       <PageFooter />
@@ -185,6 +251,64 @@ function ViewTab({
   )
 }
 
+/**
+ * The three ways this table comes back empty, which need three different
+ * answers — see `emptyListReason`.
+ *
+ * The last one is the one worth spelling out. The Active pill writes no
+ * `bucket` parameter, so a workspace whose events have all finished or been
+ * cancelled arrives here with nothing narrowing the list at all: "Clear
+ * filters" would navigate to the URL already on screen and change nothing. The
+ * Completed badge counts the whole workspace, so it is the proof that those
+ * events are still there, one tab away. (Both badges reading zero never gets
+ * this far — the page-level first-run block takes the whole screen instead.)
+ */
+function EmptyEvents({
+  reason,
+  completed,
+  canCreate,
+  onClear,
+  onCompleted,
+}: {
+  reason: ListEmptyReason
+  completed: number
+  canCreate: boolean
+  onClear: () => void
+  onCompleted: () => void
+}) {
+  if (reason === 'past-end') return <PastEnd noun="events" onFirstPage={onClear} />
+
+  if (reason === 'no-results') {
+    return (
+      <NoResults noun="events" onClear={onClear}>
+        Nothing matches the current search, status tab and event type. Try a shorter search term, or
+        widen the filters.
+      </NoResults>
+    )
+  }
+
+  return (
+    <EmptyState
+      compact
+      icon="hgi-calendar-check-out-01"
+      title="No active events"
+      actions={[
+        {
+          label: `View completed (${num(completed)})`,
+          onClick: onCompleted,
+          icon: 'hgi-arrow-right-01',
+        },
+        ...(canCreate
+          ? [{ label: 'Create an event', to: '/admin/event-form', icon: 'hgi-calendar-add-01' }]
+          : []),
+      ]}
+    >
+      Nothing is on sale or coming up — every event in this workspace has already finished or been
+      cancelled. They are on the Completed tab.
+    </EmptyState>
+  )
+}
+
 function EventsTable({
   rows,
   range,
@@ -192,6 +316,7 @@ function EventsTable({
   canDelete,
   onPage,
   onSize,
+  empty,
 }: {
   rows: EventRow[]
   range: PageWindow
@@ -199,6 +324,8 @@ function EventsTable({
   canDelete: boolean
   onPage: (page: number) => void
   onSize: (size: number) => void
+  /** What stands in for the rows — the page decides which of the three it is. */
+  empty: ReactNode
 }) {
   const menu = useRowMenu()
 
@@ -219,10 +346,10 @@ function EventsTable({
             {rows.length ? (
               rows.map((row) => <EventTableRow key={row.id} r={row} onKebab={menu.open} />)
             ) : (
+              /* The tabs and filters stay on screen — whichever of them is
+                 responsible is what has to change. */
               <tr>
-                <td colSpan={5}>
-                  <div className="py-10 text-center text-[13px] text-muted">No events match.</div>
-                </td>
+                <td colSpan={5}>{empty}</td>
               </tr>
             )}
           </tbody>

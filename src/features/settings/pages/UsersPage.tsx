@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   DataTable,
+  EmptyState,
   HeaderUser,
   Icon,
   Input,
@@ -13,6 +14,7 @@ import {
   PageHeader,
   Paginator,
   Panel,
+  PastEnd,
   Select,
 } from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
@@ -29,8 +31,14 @@ import type { MemberRow } from '../settings.types'
  */
 export default function UsersPage() {
   const data = useLoaderData() as UsersData
-  const { set } = useFilters()
+  const { set, clear, emptyReason } = useFilters({ total: data.window.total })
   const invite = useDisclosure()
+  // The list has no search, role filter or status tabs — the API pages it and
+  // nothing else — so the only way it comes back empty other than on a first
+  // run is a page number past the end. That still has to be told apart:
+  // emptying the last page by removing somebody must not tell an organizer with
+  // twenty colleagues to invite their first.
+  const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
 
   return (
     <>
@@ -49,41 +57,62 @@ export default function UsersPage() {
         }
       />
 
-      <Card className="p-4">
-        <div className="overflow-x-auto">
-          <DataTable className="min-w-[720px]">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-[13px]">
-              {data.rows.map((row) => (
-                <MemberTableRow key={row.id} row={row} roles={data.roles} />
-              ))}
-              {data.rows.length === 0 && (
+      {firstRun ? (
+        <EmptyState
+          className="card"
+          icon="hgi-user-multiple"
+          title="No teammates yet"
+          actions={[
+            { label: 'Invite a teammate', onClick: invite.onOpen, icon: 'hgi-user-add-01' },
+            { label: 'See what each role can do', to: '/admin/roles' },
+          ]}
+        >
+          The workspace has one member so far — you, as its owner. Invite people once you need the
+          help: organizers to build and publish events, staff to check attendees in on the day.
+        </EmptyState>
+      ) : (
+        <Card className="p-4">
+          <div className="overflow-x-auto">
+            <DataTable className="min-w-[720px]">
+              <thead>
                 <tr>
-                  <td colSpan={4}>
-                    <div className="py-10 text-center text-[13px] text-muted">
-                      Nobody has been invited yet.
-                    </div>
-                  </td>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th className="text-right">Actions</th>
                 </tr>
-              )}
-            </tbody>
-          </DataTable>
-        </div>
+              </thead>
+              <tbody className="text-[13px]">
+                {data.rows.map((row) => (
+                  <MemberTableRow key={row.id} row={row} roles={data.roles} />
+                ))}
+                {/* There is nothing on this page to blame on a filter: the page
+                    offers none, so an empty body past the first run means the
+                    page number ran off the end of the list. `clear` rather than
+                    `set({ page: null })` so a stale link carrying anything else
+                    is dropped too, and the button always lands somewhere. */}
+                {data.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={4}>
+                      <PastEnd noun="users" onFirstPage={clear}>
+                        Nothing is on this page of the list — it may have got shorter since it was
+                        opened. The workspace&apos;s members are still there, back at the start.
+                      </PastEnd>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </DataTable>
+          </div>
 
-        <Paginator
-          {...data.window}
-          noun="users"
-          onPage={(page) => set({ page })}
-          onSize={(size) => set({ limit: size, page: null })}
-        />
-      </Card>
+          <Paginator
+            {...data.window}
+            noun="users"
+            onPage={(page) => set({ page })}
+            onSize={(size) => set({ limit: size, page: null })}
+          />
+        </Card>
+      )}
 
       <PageFooter />
 

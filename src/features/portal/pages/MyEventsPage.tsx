@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { Link, useLoaderData, useNavigate } from 'react-router'
-import { Badge, Icon, PillTabs, Paginator, type PillTabItem } from '@/components/ui'
+import {
+  Badge,
+  EmptyState,
+  Icon,
+  PillTabs,
+  Paginator,
+  type PillTabItem,
+} from '@/components/ui'
 import { authApi } from '@/features/auth/api'
 import { useTheme } from '@/lib/useTheme'
 import { useDisclosure } from '@/lib/useDisclosure'
@@ -27,6 +34,13 @@ const SWITCH_CSS = `
 `
 
 type Tab = 'events' | 'payments' | 'profile' | 'settings'
+
+/* Nothing on this page is filtered — the tabs are component state and the only
+   query parameters are the payment history's page and page size — so an empty
+   list here always means "you have not done this yet", never "a filter hid it".
+   That makes the way forward the same in every case: go and find an event.
+   Attendee pages never answer emptiness with "create one". */
+const DISCOVER_ACTION = { label: 'Discover events', to: '/portal/discover', icon: 'hgi-search-01' }
 
 function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   e.currentTarget.style.display = 'none'
@@ -292,167 +306,232 @@ export default function MyEventsPage() {
 
         <div className="mt-5">
           {/* ======================= My Events ======================= */}
-          {tab === 'events' && (
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-[15px] font-bold tracking-tight">
-                  Upcoming <span className="text-muted">· {upcoming.length}</span>
-                </h2>
-                <Link
-                  to="/portal/discover"
-                  className="text-[12px] font-semibold text-brand hover:underline"
-                >
-                  Discover more →
-                </Link>
-              </div>
-
-              {upcoming.length ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {upcoming.map((ev) => (
-                    <UpcomingCard
-                      key={ev.orderId}
-                      ev={ev}
-                      holder={me.name}
-                      onTicket={openTicket}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-2xl bg-surface px-4 py-8 text-center text-[13px] text-muted">
-                  Nothing booked yet.{' '}
-                  <Link to="/portal/discover" className="font-semibold text-brand hover:underline">
-                    Find an event
-                  </Link>
-                </p>
-              )}
-
-              {past.length > 0 && (
-                <>
-                  <h2 className="mb-3 mt-7 text-[15px] font-bold tracking-tight">
-                    Past <span className="text-muted">· {past.length}</span>
+          {tab === 'events' &&
+            (upcoming.length + past.length === 0 ? (
+              /* Never registered for anything. The "Upcoming · 0" heading and
+                 its "Discover more" link go too: with no list to head, they are
+                 a label over nothing and a second copy of the one real step. */
+              <EmptyState
+                className="card"
+                icon="hgi-ticket-02"
+                title="No tickets yet"
+                actions={[DISCOVER_ACTION]}
+              >
+                Events you register for show up here with your ticket and its QR code, ready to
+                scan at the door. Nothing is booked yet.
+              </EmptyState>
+            ) : (
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-[15px] font-bold tracking-tight">
+                    Upcoming <span className="text-muted">· {upcoming.length}</span>
                   </h2>
+                  <Link
+                    to="/portal/discover"
+                    className="text-[12px] font-semibold text-brand hover:underline"
+                  >
+                    Discover more →
+                  </Link>
+                </div>
 
+                {upcoming.length ? (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {past.map((ev) => (
-                      <PastCard key={ev.orderId} ev={ev} />
+                    {upcoming.map((ev) => (
+                      <UpcomingCard
+                        key={ev.orderId}
+                        ev={ev}
+                        holder={me.name}
+                        onTicket={openTicket}
+                      />
                     ))}
                   </div>
-                </>
-              )}
-            </div>
-          )}
+                ) : (
+                  /* Past events below, so the heading stays and only the
+                     Upcoming grid is replaced. No title — the heading above it
+                     already says which half of the tab is empty. */
+                  <EmptyState
+                    compact
+                    className="card"
+                    icon="hgi-calendar-03"
+                    actions={[DISCOVER_ACTION]}
+                  >
+                    Nothing coming up. Your next booking appears here with its ticket and QR code.
+                  </EmptyState>
+                )}
+
+                {past.length > 0 && (
+                  <>
+                    <h2 className="mb-3 mt-7 text-[15px] font-bold tracking-tight">
+                      Past <span className="text-muted">· {past.length}</span>
+                    </h2>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {past.map((ev) => (
+                        <PastCard key={ev.orderId} ev={ev} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
 
           {/* ======================= Payment history ======================= */}
-          {tab === 'payments' && (
-            <div>
-              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="card p-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-                    <Icon name="hgi-wallet-01" size={13} className="text-brand" />
-                    Total spent
-                  </p>
-                  <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
-                    {totals.spent}
-                  </p>
+          {tab === 'payments' &&
+            (range.total === 0 ? (
+              /* The API's own count of the whole history, not of the rows on
+                 this page: there has never been a payment, so the three totals
+                 would read zero three times above a table with no rows. */
+              <EmptyState
+                className="card"
+                icon="hgi-credit-card"
+                title="No payments yet"
+                actions={[DISCOVER_ACTION]}
+              >
+                Tickets you pay for are listed here with their receipts, so you can look up what
+                you paid, when, and for which event.
+              </EmptyState>
+            ) : (
+              <div>
+                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="card p-4">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                      <Icon name="hgi-wallet-01" size={13} className="text-brand" />
+                      Total spent
+                    </p>
+                    <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
+                      {totals.spent}
+                    </p>
+                  </div>
+                  <div className="card p-4">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                      <Icon name="hgi-credit-card" size={13} className="text-brand" />
+                      Transactions
+                    </p>
+                    <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
+                      {num(totals.count)}
+                    </p>
+                  </div>
+                  <div className="card p-4">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                      <Icon name="hgi-delivery-return-01" size={13} className="text-brand" />
+                      Refunded
+                    </p>
+                    <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
+                      {totals.refunded}
+                    </p>
+                  </div>
                 </div>
-                <div className="card p-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-                    <Icon name="hgi-credit-card" size={13} className="text-brand" />
-                    Transactions
-                  </p>
-                  <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
-                    {num(totals.count)}
-                  </p>
-                </div>
-                <div className="card p-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-                    <Icon name="hgi-delivery-return-01" size={13} className="text-brand" />
-                    Refunded
-                  </p>
-                  <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
-                    {totals.refunded}
-                  </p>
-                </div>
-              </div>
 
-              <div className="card overflow-hidden">
-                <div className="flex items-center justify-between border-b border-hair px-4 py-3">
-                  <h2 className="text-[14px] font-bold tracking-tight">Transactions</h2>
-                  <button type="button" className="btn btn-soft btn-sm">
-                    <Icon name="hgi-download-01" size={14} />
-                    Export
-                  </button>
-                </div>
-                <div className="overflow-x-auto px-4 py-3">
-                  <table className="data-table w-full [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
-                    <thead>
-                      <tr>
-                        <th className="text-left">Event</th>
-                        <th className="text-left">Date</th>
-                        <th className="text-left">Method</th>
-                        <th className="text-right">Amount</th>
-                        <th className="text-left">Status</th>
-                        <th className="text-right">Receipt</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {transactions.map((t) => (
-                        <tr key={t.id}>
-                          <td>
-                            <p className="text-[13px] font-semibold text-ink">{t.event}</p>
-                            <p className="font-mono text-[11px] text-muted">{t.reference}</p>
-                          </td>
-                          <td className="whitespace-nowrap text-[12px] text-muted">{t.date}</td>
-                          <td className="whitespace-nowrap text-[12px] text-muted">{t.method}</td>
-                          <td
-                            className={cn(
-                              'text-right text-[13px] font-semibold tabular-nums',
-                              t.refunded && 'text-muted line-through',
-                            )}
-                          >
-                            {t.amount}
-                          </td>
-                          <td>
-                            {t.refunded ? (
-                              <Badge tone="red">
-                                <i className="hgi-stroke hgi-delivery-return-01 text-[11px]" />
-                                Refunded
-                              </Badge>
-                            ) : (
-                              <Badge tone="green">
-                                <i className="hgi-stroke hgi-tick-02 text-[11px]" />
-                                Paid
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="text-right">
-                            <button type="button" className="btn-icon bg-line" title="Download receipt">
-                              <Icon name="hgi-download-01" size={15} />
-                            </button>
-                          </td>
+                <div className="card overflow-hidden">
+                  <div className="flex items-center justify-between border-b border-hair px-4 py-3">
+                    <h2 className="text-[14px] font-bold tracking-tight">Transactions</h2>
+                    <button type="button" className="btn btn-soft btn-sm">
+                      <Icon name="hgi-download-01" size={14} />
+                      Export
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto px-4 py-3">
+                    <table className="data-table w-full [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
+                      <thead>
+                        <tr>
+                          <th className="text-left">Event</th>
+                          <th className="text-left">Date</th>
+                          <th className="text-left">Method</th>
+                          <th className="text-right">Amount</th>
+                          <th className="text-left">Status</th>
+                          <th className="text-right">Receipt</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {transactions.length === 0 ? (
+                          /* History exists but this page holds none of it — a
+                             hand-typed `?page=`, or the last row of the page
+                             refunded away. Not a filtered view and not a first
+                             run, so the way back is the first page, and the
+                             paginator below stays put. */
+                          <tr>
+                            <td colSpan={6}>
+                              <EmptyState
+                                compact
+                                icon="hgi-search-01"
+                                title="Nothing on this page"
+                                actions={[
+                                  {
+                                    label: 'Back to the first page',
+                                    onClick: () => set({ page: 1 }),
+                                    icon: 'hgi-refresh',
+                                  },
+                                ]}
+                              >
+                                This page is past the end of your payment history.
+                              </EmptyState>
+                            </td>
+                          </tr>
+                        ) : (
+                          transactions.map((t) => (
+                            <tr key={t.id}>
+                              <td>
+                                <p className="text-[13px] font-semibold text-ink">{t.event}</p>
+                                <p className="font-mono text-[11px] text-muted">{t.reference}</p>
+                              </td>
+                              <td className="whitespace-nowrap text-[12px] text-muted">{t.date}</td>
+                              <td className="whitespace-nowrap text-[12px] text-muted">
+                                {t.method}
+                              </td>
+                              <td
+                                className={cn(
+                                  'text-right text-[13px] font-semibold tabular-nums',
+                                  t.refunded && 'text-muted line-through',
+                                )}
+                              >
+                                {t.amount}
+                              </td>
+                              <td>
+                                {t.refunded ? (
+                                  <Badge tone="red">
+                                    <i className="hgi-stroke hgi-delivery-return-01 text-[11px]" />
+                                    Refunded
+                                  </Badge>
+                                ) : (
+                                  <Badge tone="green">
+                                    <i className="hgi-stroke hgi-tick-02 text-[11px]" />
+                                    Paid
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="text-right">
+                                <button
+                                  type="button"
+                                  className="btn-icon bg-line"
+                                  title="Download receipt"
+                                >
+                                  <Icon name="hgi-download-01" size={15} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
 
-                  {/* The API pages this, so the numbers come from its `meta`
-                      and the page lives in the URL — the back button works and
-                      the count can never disagree with the rows. */}
-                  <Paginator
-                    from={range.from}
-                    to={range.to}
-                    total={range.total}
-                    page={range.page}
-                    pageCount={range.pageCount}
-                    size={range.size}
-                    onPage={(page) => set({ page })}
-                    onSize={(limit) => set({ limit })}
-                    noun="transactions"
-                  />
+                    {/* The API pages this, so the numbers come from its `meta`
+                        and the page lives in the URL — the back button works and
+                        the count can never disagree with the rows. */}
+                    <Paginator
+                      from={range.from}
+                      to={range.to}
+                      total={range.total}
+                      page={range.page}
+                      pageCount={range.pageCount}
+                      size={range.size}
+                      onPage={(page) => set({ page })}
+                      onSize={(limit) => set({ limit })}
+                      noun="transactions"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            ))}
 
           {/* ======================= Profile ======================= */}
           {tab === 'profile' && (

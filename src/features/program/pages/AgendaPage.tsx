@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
-import { Button, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
+import { Button, EmptyState, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters } from '@/lib/useFilters'
@@ -34,10 +34,42 @@ export default function AgendaPage() {
   const hours = calendarHours()
   const [editing, setEditing] = useState<SessionDraft | null>(null)
   const remove = useFetcher<ActionResult>()
+  const event = data.event
 
   const open = (session: SessionDraft | null) => {
     setEditing(session)
     panel.onOpen()
+  }
+
+  /* A session belongs to a day of a particular event, so with no events at all
+     there is nothing to plan against and the picker has nothing to offer. The
+     one real next step is on another page. */
+  if (!event) {
+    return (
+      <>
+        <PageHeader
+          title="Agenda"
+          subtitle="Plan sessions across the days your event runs."
+          actions={<HeaderUser />}
+        />
+        <EmptyState
+          className="card"
+          icon="hgi-calendar-03"
+          title="No events yet"
+          actions={[
+            {
+              label: 'Create your first event',
+              to: '/admin/event-form',
+              icon: 'hgi-calendar-add-01',
+            },
+          ]}
+        >
+          A session sits on a day of an event, so the programme starts with the event itself. Create
+          one and you can lay out its talks, workshops and breaks straight away.
+        </EmptyState>
+        <PageFooter />
+      </>
+    )
   }
 
   return (
@@ -47,12 +79,7 @@ export default function AgendaPage() {
         subtitle="Plan sessions across the days your event runs."
         actions={
           <>
-            <Button
-              variant="primary"
-              className="shrink-0"
-              onClick={() => open(null)}
-              disabled={!data.event}
-            >
+            <Button variant="primary" className="shrink-0" onClick={() => open(null)}>
               <Icon name="hgi-add-01" size={16} />
               <span className="hidden sm:inline">New session</span>
               <span className="sm:hidden">New</span>
@@ -62,16 +89,18 @@ export default function AgendaPage() {
         }
       />
 
+      {/* The picker stays whatever the agenda holds: it chooses which event is
+          being planned, so it is the way out of an empty one, not a filter. */}
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
         <EventChooser
           events={data.events}
-          value={data.event?.id ?? ''}
+          value={event.id}
           onChange={(eventId) => set({ eventId })}
         />
       </div>
 
       <div className="card overflow-hidden p-0">
-        {data.event && data.days.length > 0 ? (
+        {data.blocks.length > 0 ? (
           <div className="overflow-x-auto">
             <div style={{ minWidth: `${56 + data.days.length * 140}px` }}>
               <DayHeader days={data.days} />
@@ -100,7 +129,24 @@ export default function AgendaPage() {
             </div>
           </div>
         ) : (
-          <EmptyAgenda hasEvent={Boolean(data.event)} name={data.event?.name ?? ''} />
+          /* Nothing is filtered here — the whole event is read in one go — so an
+             empty agenda is always a first run, never a search that missed. */
+          <EmptyState
+            icon="hgi-time-schedule"
+            title="No sessions scheduled yet"
+            actions={[
+              { label: 'Add the first session', onClick: () => open(null), icon: 'hgi-add-01' },
+              {
+                label: 'Add speakers',
+                // Stay on the same event's programme rather than the default one.
+                to: `/admin/speakers?eventId=${encodeURIComponent(event.id)}`,
+              },
+            ]}
+          >
+            The agenda is your event&apos;s programme — talks, workshops and breaks laid out by time
+            slot. Build it whenever you like; it does not wait on registrations, and attendees see
+            it on the event page.
+          </EmptyState>
         )}
       </div>
 
@@ -109,14 +155,14 @@ export default function AgendaPage() {
       <SessionPanel
         open={panel.open}
         onClose={panel.onClose}
-        eventId={data.event?.id ?? ''}
+        eventId={event.id}
         days={data.days}
         speakers={data.speakers}
         editing={editing}
         onDelete={() => {
           if (!editing) return
           remove.submit(
-            { intent: 'delete', eventId: data.event?.id ?? '', sessionId: editing.id },
+            { intent: 'delete', eventId: event.id, sessionId: editing.id },
             { method: 'post' },
           )
           panel.onClose()
@@ -189,24 +235,6 @@ function DayColumn({
           </button>
         )
       })}
-    </div>
-  )
-}
-
-function EmptyAgenda({ hasEvent, name }: { hasEvent: boolean; name: string }) {
-  return (
-    <div className="grid place-items-center px-4 py-16 text-center">
-      <div className="max-w-sm">
-        <Icon name="hgi-calendar-03" size={30} className="text-muted/40" />
-        <p className="mt-2 text-[14px] font-semibold text-ink">
-          {hasEvent ? `No agenda for ${name} yet` : 'No events yet'}
-        </p>
-        <p className="mt-1 text-[13px] text-muted">
-          {hasEvent
-            ? 'Add a session to start building this event’s schedule.'
-            : 'Create an event before planning its programme.'}
-        </p>
-      </div>
     </div>
   )
 }

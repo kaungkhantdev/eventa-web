@@ -1,5 +1,5 @@
 import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
-import { HeaderUser, Icon, PageFooter } from '@/components/ui'
+import { EmptyState, HeaderUser, Icon, PageFooter } from '@/components/ui'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import { CameraStage, CameraStatus } from '../components/CameraStage'
 import { EventChooser } from '../components/EventChooser'
@@ -101,38 +101,62 @@ export default function CheckInToolPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
-        <section className="card overflow-hidden p-0 xl:col-span-3">
-          <div className="flex items-center justify-between px-5 pb-2 pt-4">
-            <div>
-              <h2 className="text-[15px] font-bold tracking-tight">Scan tickets</h2>
-              <p className="mt-0.5 text-[12px] text-muted">
-                Every valid scan checks the attendee in instantly.
-              </p>
+      {/* With no event there is no id to scan against — the camera's decode
+          returns early and every submit would be addressed to nobody — so the
+          station explains the chain instead of offering an inert scanner.
+
+          It does NOT claim the narrower "this event has nobody registered": the
+          only signal for that is `counts.total`, which also reads 0 when the
+          API omits the counts block, and hiding a working scanner at a live
+          door on a missing field is a worse failure than an idle one. */}
+      {!data.event ? (
+        <EmptyState
+          className="card"
+          icon="hgi-qr-code-01"
+          title="No tickets to scan yet"
+          actions={[
+            { label: 'Create an event', to: '/admin/event-form', icon: 'hgi-calendar-add-01' },
+            { label: 'Open the check-in list', to: '/admin/check-in' },
+          ]}
+        >
+          The scanner checks each QR code against this event’s registrations, and a ticket only
+          gets a QR code once it is sold. Publish an event with tickets on sale, then bring this
+          station to the door.
+        </EmptyState>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
+          <section className="card overflow-hidden p-0 xl:col-span-3">
+            <div className="flex items-center justify-between px-5 pb-2 pt-4">
+              <div>
+                <h2 className="text-[15px] font-bold tracking-tight">Scan tickets</h2>
+                <p className="mt-0.5 text-[12px] text-muted">
+                  Every valid scan checks the attendee in instantly.
+                </p>
+              </div>
+              <CameraStatus camera={camera} />
             </div>
-            <CameraStatus camera={camera} />
+
+            <CameraStage camera={camera} busy={busy} />
+
+            {feedback && <ScanResult feedback={feedback} />}
+            {error && (
+              <p
+                role="alert"
+                className="mx-5 mb-4 rounded-xl bg-red-50 p-3 text-[13px] text-red-600 dark:bg-red-500/15 dark:text-red-300"
+              >
+                {error}
+              </p>
+            )}
+
+            <ManualSearch eventId={eventId} />
+          </section>
+
+          <div className="flex flex-col gap-3 xl:col-span-2">
+            <Stats counts={data.counts} />
+            <Feed feed={data.feed} />
           </div>
-
-          <CameraStage camera={camera} busy={busy} />
-
-          {feedback && <ScanResult feedback={feedback} />}
-          {error && (
-            <p
-              role="alert"
-              className="mx-5 mb-4 rounded-xl bg-red-50 p-3 text-[13px] text-red-600 dark:bg-red-500/15 dark:text-red-300"
-            >
-              {error}
-            </p>
-          )}
-
-          <ManualSearch eventId={eventId} />
-        </section>
-
-        <div className="flex flex-col gap-3 xl:col-span-2">
-          <Stats counts={data.counts} />
-          <Feed feed={data.feed} />
         </div>
-      </div>
+      )}
 
       <PageFooter />
     </>

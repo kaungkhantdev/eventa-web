@@ -3,14 +3,17 @@ import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Button,
   Card,
+  EmptyState,
   HeaderUser,
   Hint,
   Icon,
   Input,
   Label,
+  NoResults,
   PageFooter,
   PageHeader,
   Panel,
+  PastEnd,
   PillTabs,
   Select,
   type PillTabItem,
@@ -21,6 +24,7 @@ import type { Me } from '@/features/auth/types'
 import { cn } from '@/lib/cn'
 import { num } from '@/lib/format'
 import { PAGE_SIZES, type PageWindow } from '@/lib/paging'
+import type { ListEmptyReason } from '@/lib/urlFilters'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -60,7 +64,10 @@ const TAB_LABEL: Record<RegTab, string> = {
 
 export default function RegistrationsPage() {
   const data = useLoaderData() as RegistrationsData
-  const { params, set } = useFilters()
+  // Every control on this page writes only what the organizer chose — the tab
+  // is dropped for All and the search for an empty box — so no default has to
+  // be declared for an empty queue to be read correctly.
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
   const filtering = useIsFiltering()
   const panel = useDisclosure()
   const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
@@ -68,24 +75,67 @@ export default function RegistrationsPage() {
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
   const canManage = can(me, 'regManage')
 
+  // The loader lists events through `withoutForbidden`, so an empty list is
+  // either a workspace with no events or Staff who may not see them. Only the
+  // non-empty case proves anything, and it is read in one direction: to
+  // withdraw an offer that would be dead, never to assert there are none.
+  const hasEvents = data.events.length > 0
+
+  // No registration has ever been taken: the tabs count nothing, the event
+  // filter narrows nothing, so both go and the page says what fills it instead.
+  const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
+
+  if (firstRun) {
+    return (
+      <>
+        <QueueHeader canManage={canManage} canAdd={hasEvents} onAdd={panel.onOpen} />
+
+        <Card>
+          {/* The kit's copy ("the moment someone buys a ticket") is not true of
+              this page: free tiers register without a payment, and the header's
+              own "Add registration" enters a booking taken at the door. What is
+              true either way is that a ticket type has to exist to book.
+
+              Sending someone with events to /admin/tickets rather than to the
+              event form; sending someone without them to the form, because
+              Tickets answers a first run with "Create an event first" and would
+              bounce them straight back. */}
+          <EmptyState
+            icon="hgi-ticket-01"
+            title="No registrations yet"
+            actions={
+              hasEvents
+                ? [
+                    { label: 'Set up ticket types', to: '/admin/tickets' },
+                    { label: 'See all events', to: '/admin/events' },
+                  ]
+                : [
+                    {
+                      label: 'Create an event',
+                      to: '/admin/event-form',
+                      icon: 'hgi-calendar-add-01',
+                    },
+                  ]
+            }
+          >
+            {hasEvents
+              ? 'Every ticket someone takes lands in this queue — bought online, claimed for free, or entered here by hand. Put a ticket type on sale and the first ones will arrive.'
+              : 'Every ticket someone takes lands in this queue — bought online, claimed for free, or entered here by hand. It stays empty until an event has a ticket type on sale.'}
+          </EmptyState>
+        </Card>
+
+        <PageFooter />
+
+        {panel.open && (
+          <AddRegistrationPanel events={data.events} tiers={data.tiers} onClose={panel.onClose} />
+        )}
+      </>
+    )
+  }
+
   return (
     <>
-      <PageHeader
-        title="Registrations"
-        subtitle="Manage attendee registrations & approvals."
-        actions={
-          <>
-            {canManage && (
-              <Button variant="primary" onClick={panel.onOpen}>
-                <Icon name="hgi-user-add-01" />
-                <span className="hidden sm:inline">Add registration</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-            )}
-            <HeaderUser />
-          </>
-        }
-      />
+      <QueueHeader canManage={canManage} canAdd={hasEvents} onAdd={panel.onOpen} />
 
       <PillTabs<RegTab>
         items={tabItems(data.tabs)}
@@ -137,6 +187,9 @@ export default function RegistrationsPage() {
           rows={data.rows}
           range={data.window}
           canManage={canManage}
+          emptyReason={emptyReason}
+          onClear={clear}
+          onFirstPage={() => set({ page: null })}
           onPage={(page) => set({ page })}
           onSize={(limit) => set({ limit })}
         />
@@ -155,6 +208,44 @@ export default function RegistrationsPage() {
   )
 }
 
+/**
+ * The header both states share — a booking can still be entered by hand on a
+ * first run, which is one of the ways the queue gets its first row.
+ *
+ * But only once there is an event to book against: with none, the panel's event
+ * select has no options, no tier can be chosen and Save can never enable. So the
+ * button is disabled rather than left as the way out of an empty page that it
+ * cannot be — the same gate Attendees puts on Invite.
+ */
+function QueueHeader({
+  canManage,
+  canAdd,
+  onAdd,
+}: {
+  canManage: boolean
+  canAdd: boolean
+  onAdd: () => void
+}) {
+  return (
+    <PageHeader
+      title="Registrations"
+      subtitle="Manage attendee registrations & approvals."
+      actions={
+        <>
+          {canManage && (
+            <Button variant="primary" onClick={onAdd} disabled={!canAdd}>
+              <Icon name="hgi-user-add-01" />
+              <span className="hidden sm:inline">Add registration</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          )}
+          <HeaderUser />
+        </>
+      }
+    />
+  )
+}
+
 function tabItems(counts: TabCounts): PillTabItem<RegTab>[] {
   return REG_TABS.map((value) => ({ value, label: TAB_LABEL[value], count: counts[value] }))
 }
@@ -163,12 +254,18 @@ function QueueTable({
   rows,
   range,
   canManage,
+  emptyReason,
+  onClear,
+  onFirstPage,
   onPage,
   onSize,
 }: {
   rows: Registration[]
   range: PageWindow
   canManage: boolean
+  emptyReason: ListEmptyReason
+  onClear: () => void
+  onFirstPage: () => void
   onPage: (page: number) => void
   onSize: (size: number) => void
 }) {
@@ -193,7 +290,18 @@ function QueueTable({
             ) : (
               <tr>
                 <td colSpan={7}>
-                  <div className="py-10 text-center text-[13px] text-muted">No matches.</div>
+                  {emptyReason === 'past-end' ? (
+                    /* A page number that outlived its rows. Back to the first
+                       page keeping whatever was searched — that is what the
+                       button says, and clearing the filters too would throw
+                       away a search that probably has matches on page one. */
+                    <PastEnd noun="registrations" onFirstPage={onFirstPage} />
+                  ) : (
+                    <NoResults noun="registrations" onClear={onClear}>
+                      Nothing matches the current search, status tab and event. Try a shorter search
+                      term, or widen the filters.
+                    </NoResults>
+                  )}
                 </td>
               </tr>
             )}

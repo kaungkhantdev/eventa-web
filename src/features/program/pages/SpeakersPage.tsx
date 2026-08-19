@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
+  EmptyState,
   HeaderUser,
   Icon,
+  NoResults,
   PageFooter,
   PageHeader,
   Paginator,
+  PastEnd,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useDisclosure } from '@/lib/useDisclosure'
@@ -32,7 +35,11 @@ const MAX_SEARCH_LENGTH = 120
 
 export default function SpeakersPage() {
   const data = useLoaderData() as SpeakersData
-  const { params, set } = useFilters()
+  // `eventId` chooses whose programme is on screen, not which of its speakers
+  // to show — so it is page state. Counting it as a filter would read an event
+  // with no speakers as a search that missed, and "clear filters" would then
+  // silently move the organizer to a different event.
+  const { params, set, clear, emptyReason } = useFilters({ ignore: ['eventId'], total: data.window.total })
   const filtering = useIsFiltering()
   const panel = useDisclosure()
   const del = useDisclosure()
@@ -40,11 +47,48 @@ export default function SpeakersPage() {
   const [editing, setEditing] = useState<SpeakerCard | null>(null)
   const [deleting, setDeleting] = useState<SpeakerCard | null>(null)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+  const event = data.event
 
   const add = () => {
     setEditing(null)
     panel.onOpen()
   }
+
+  /* A speaker hangs off an event on the API, so a workspace with no events has
+     nowhere to put one — the Add button would open a form that cannot save. */
+  if (!event) {
+    return (
+      <>
+        <PageHeader
+          title="Speakers"
+          subtitle="Manage speakers and their sessions."
+          actions={<HeaderUser />}
+        />
+        <EmptyState
+          className="card"
+          icon="hgi-mic-01"
+          title="No events yet"
+          actions={[
+            {
+              label: 'Create your first event',
+              to: '/admin/event-form',
+              icon: 'hgi-calendar-add-01',
+            },
+          ]}
+        >
+          Speakers belong to an event&apos;s programme, so the event comes first. Create one and you
+          can line up its speakers straight away — well before the first ticket sells.
+        </EmptyState>
+        <PageFooter />
+      </>
+    )
+  }
+
+  /* Nothing on this event yet. The search box, the view toggles and the pager
+     have nothing to act on, so they go with the list — but only when the empty
+     list really is a first run, not a search that missed or a page past the
+     end, where taking the controls away would remove the way back. */
+  const firstRun = data.cards.length === 0 && emptyReason === 'first-run'
 
   return (
     <>
@@ -53,7 +97,7 @@ export default function SpeakersPage() {
         subtitle="Manage speakers and their sessions."
         actions={
           <>
-            <Button variant="primary" className="shrink-0" onClick={add} disabled={!data.event}>
+            <Button variant="primary" className="shrink-0" onClick={add}>
               <Icon name="hgi-user-add-01" size={16} />
               <span className="hidden sm:inline">Add speaker</span>
               <span className="sm:hidden">Add</span>
@@ -63,74 +107,114 @@ export default function SpeakersPage() {
         }
       />
 
+      {/* The event picker survives the empty states: it is how the organizer
+          moves to another event's speakers, not something narrowing this one. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full flex-1">
-          <Icon
-            name="hgi-search-01"
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-          />
-          <input
-            type="text"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search speakers by name, company or topic…"
-            maxLength={MAX_SEARCH_LENGTH}
-            aria-label="Search speakers"
-          />
-        </div>
-        <EventChooser
-          events={data.events}
-          value={data.event?.id ?? ''}
-          onChange={(eventId) => set({ eventId })}
-        />
-        <div className="flex shrink-0 items-center gap-1 self-start rounded-lg bg-surface p-1 sm:self-auto">
-          <ViewButton icon="hgi-grid-view" label="Grid view" on={view === 'grid'} onClick={() => setView('grid')} />
-          <ViewButton icon="hgi-list-view" label="List view" on={view === 'list'} onClick={() => setView('list')} />
-        </div>
-      </div>
-
-      <div className={cn(filtering && 'opacity-60 transition-opacity')}>
-        <p className="mb-2 mt-3 text-[12px] text-muted">
-          {data.window.total} {data.window.total === 1 ? 'speaker' : 'speakers'}
-        </p>
-
-        {data.cards.length === 0 ? (
-          <EmptyState hasEvent={Boolean(data.event)} />
-        ) : (
-          <div
-            className={cn(
-              view === 'grid'
-                ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4'
-                : 'flex flex-col gap-2',
-            )}
-          >
-            {data.cards.map((card) => (
-              <SpeakerTile
-                key={card.id}
-                card={card}
-                list={view === 'list'}
-                onEdit={() => {
-                  setEditing(card)
-                  panel.onOpen()
-                }}
-                onDelete={() => {
-                  setDeleting(card)
-                  del.onOpen()
-                }}
-              />
-            ))}
+        {!firstRun && (
+          <div className="relative w-full flex-1">
+            <Icon
+              name="hgi-search-01"
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+            />
+            <input
+              type="text"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+              placeholder="Search speakers by name, company or topic…"
+              maxLength={MAX_SEARCH_LENGTH}
+              aria-label="Search speakers"
+            />
           </div>
         )}
-
-        <Paginator
-          {...data.window}
-          noun="speakers"
-          onPage={(page) => set({ page })}
-          onSize={(size) => set({ limit: size, page: null })}
+        <EventChooser
+          events={data.events}
+          value={event.id}
+          onChange={(eventId) => set({ eventId })}
         />
+        {!firstRun && (
+          <div className="flex shrink-0 items-center gap-1 self-start rounded-lg bg-surface p-1 sm:self-auto">
+            <ViewButton icon="hgi-grid-view" label="Grid view" on={view === 'grid'} onClick={() => setView('grid')} />
+            <ViewButton icon="hgi-list-view" label="List view" on={view === 'list'} onClick={() => setView('list')} />
+          </div>
+        )}
       </div>
+
+      {firstRun ? (
+        <EmptyState
+          className="card mt-3"
+          icon="hgi-mic-01"
+          title="No speakers yet"
+          actions={[
+            { label: 'Add your first speaker', onClick: add, icon: 'hgi-user-add-01' },
+            {
+              label: 'Build the agenda',
+              // Keep the same event's programme, not whichever one is default.
+              to: `/admin/agenda?eventId=${encodeURIComponent(event.id)}`,
+            },
+          ]}
+        >
+          Speakers are part of an event&apos;s programme, so you can line them up well before the
+          first ticket sells. Add a name, bio and session and they appear on the event page and in
+          the agenda.
+        </EmptyState>
+      ) : (
+        <div className={cn(filtering && 'opacity-60 transition-opacity')}>
+          <p className="mb-2 mt-3 text-[12px] text-muted">
+            {data.window.total} {data.window.total === 1 ? 'speaker' : 'speakers'}
+          </p>
+
+          {data.cards.length === 0 ? (
+            <div className="card mt-2">
+              {emptyReason === 'past-end' ? (
+                /* Deleting the last speaker on page 2 leaves the organizer
+                   standing on it with no search set — so the count above reads
+                   "10 speakers" and blaming a filter would be nonsense. Back to
+                   the first page rather than `clear`, which would also throw
+                   away a search that still has matches earlier in the list. */
+                <PastEnd noun="speakers" onFirstPage={() => set({ page: null })} />
+              ) : (
+                <NoResults noun="speakers" onClear={clear}>
+                  None of this event&apos;s speakers match the current search. Try a different
+                  spelling, or clear it.
+                </NoResults>
+              )}
+            </div>
+          ) : (
+            <div
+              className={cn(
+                view === 'grid'
+                  ? 'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4'
+                  : 'flex flex-col gap-2',
+              )}
+            >
+              {data.cards.map((card) => (
+                <SpeakerTile
+                  key={card.id}
+                  card={card}
+                  list={view === 'list'}
+                  onEdit={() => {
+                    setEditing(card)
+                    panel.onOpen()
+                  }}
+                  onDelete={() => {
+                    setDeleting(card)
+                    del.onOpen()
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          <Paginator
+            {...data.window}
+            noun="speakers"
+            onPage={(page) => set({ page })}
+            onSize={(size) => set({ limit: size, page: null })}
+          />
+        </div>
+      )}
 
       <PageFooter />
 
@@ -138,15 +222,15 @@ export default function SpeakersPage() {
         open={panel.open}
         onClose={panel.onClose}
         editing={editing}
-        eventId={data.event?.id ?? ''}
-        eventName={data.event?.name ?? ''}
+        eventId={event.id}
+        eventName={event.name}
       />
 
       <DeleteSpeakerModal
         open={del.open}
         onClose={del.onClose}
         target={deleting}
-        eventId={data.event?.id ?? ''}
+        eventId={event.id}
       />
     </>
   )
@@ -176,24 +260,6 @@ function ViewButton({
     >
       <Icon name={icon} size={16} />
     </button>
-  )
-}
-
-function EmptyState({ hasEvent }: { hasEvent: boolean }) {
-  return (
-    <div className="card mt-2 flex flex-col items-center justify-center p-12 text-center">
-      <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-line text-muted">
-        <Icon name="hgi-mic-01" size={22} />
-      </span>
-      <p className="mt-3 text-[14px] font-semibold text-ink">
-        {hasEvent ? 'No speakers found' : 'No events yet'}
-      </p>
-      <p className="mt-1 text-[12px] text-muted">
-        {hasEvent
-          ? 'Try a different search, or add the first speaker.'
-          : 'Create an event before booking speakers for it.'}
-      </p>
-    </div>
   )
 }
 

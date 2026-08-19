@@ -1,5 +1,5 @@
 import { Link, useLoaderData } from 'react-router'
-import { Icon } from '@/components/ui'
+import { EmptyState, Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useTheme } from '@/lib/useTheme'
 import { ExpiredNotice, PayNowPanel } from '../components/PayNowPanel'
@@ -145,14 +145,20 @@ function TicketCard({ ticket }: { ticket: GuestTicket }) {
   )
 }
 
+/**
+ * The shared empty block, not a hand-rolled copy of it.
+ *
+ * No action: the state banner at the top of the page has already said why an
+ * order has no tickets — cancelled, refunded — and the account offer below is
+ * the page's own way forward. Repeating one here would be a third answer to a
+ * question already answered twice.
+ */
 function NothingToShow() {
   return (
-    <section className="card mt-4 p-6 text-center">
-      <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-line text-muted">
-        <Icon name="hgi-ticket-02" size={24} />
-      </span>
-      <p className="mt-3 text-[14px] font-semibold">Nothing to show</p>
-      <p className="mt-1 text-[13px] text-muted">This order has no tickets attached to it.</p>
+    <section className="card mt-4">
+      <EmptyState compact icon="hgi-ticket-02" title="Nothing to show">
+        This order has no tickets attached to it.
+      </EmptyState>
     </section>
   )
 }

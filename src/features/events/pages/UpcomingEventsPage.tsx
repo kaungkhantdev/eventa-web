@@ -1,5 +1,5 @@
 import { Link, useLoaderData } from 'react-router'
-import { ButtonLink, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
+import { ButtonLink, EmptyState, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { UP_TONE } from '../events.presentation'
 import type { UpcomingData } from '../events.routes'
@@ -31,32 +31,54 @@ export default function UpcomingEventsPage() {
         }
       />
 
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-[13px] text-muted">
-          Next <span className="font-semibold text-ink tnum">{cards.length}</span> events, soonest
-          first.
-        </p>
-        <Link to="/admin/events" className="text-[12px] font-semibold text-brand hover:underline">
-          Manage all events →
-        </Link>
-      </div>
+      {/* Nothing to filter here — the API answers with the next few events and
+          that is the whole page, so an empty answer only ever means there is
+          nothing ahead of today. The count strip goes with the grid rather than
+          reading "Next 0 events".
 
+          It says "Create an event", never "your first": this loader asks for
+          events starting from now that are not cancelled, so an organizer with
+          years of past events behind them sees exactly this screen. Only the
+          title and the sentence — both about what is *ahead* — can be said with
+          any confidence here. */}
       {cards.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center p-12 text-center">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-line text-muted">
-            <Icon name="hgi-calendar-03" size={22} />
-          </span>
-          <p className="mt-3 text-[14px] font-semibold text-ink">Nothing coming up</p>
-          <p className="mt-1 text-[12px] text-muted">
-            Events scheduled for the future will appear here.
-          </p>
-        </div>
+        <EmptyState
+          className="card"
+          icon="hgi-calendar-03"
+          title="Nothing coming up"
+          actions={[
+            {
+              label: 'Create an event',
+              to: '/admin/event-form',
+              icon: 'hgi-calendar-add-01',
+            },
+            { label: 'Manage all events', to: '/admin/events' },
+          ]}
+        >
+          This is a countdown of the events still ahead of today, soonest first. Create an event and
+          give it a date and it will appear here until the day it runs.
+        </EmptyState>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {cards.map((card) => (
-            <UpcomingEventCard key={card.id} e={card} />
-          ))}
-        </div>
+        <>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-[13px] text-muted">
+              Next <span className="font-semibold text-ink tnum">{cards.length}</span> events,
+              soonest first.
+            </p>
+            <Link
+              to="/admin/events"
+              className="text-[12px] font-semibold text-brand hover:underline"
+            >
+              Manage all events →
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {cards.map((card) => (
+              <UpcomingEventCard key={card.id} e={card} />
+            ))}
+          </div>
+        </>
       )}
 
       <PageFooter />

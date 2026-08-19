@@ -6,13 +6,16 @@ import {
   Card,
   DataTable,
   DownloadButton,
+  EmptyState,
   HeaderUser,
   Icon,
   Input,
   Label,
+  NoResults,
   PageFooter,
   PageHeader,
   Paginator,
+  PastEnd,
   PillTabs,
   type PillTabItem,
 } from '@/components/ui'
@@ -37,28 +40,78 @@ const MAX_SEARCH_LENGTH = 120
 
 export default function InvoicesPage() {
   const data = useLoaderData() as InvoicesData
-  const { params, set } = useFilters()
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
   const filtering = useIsFiltering()
   const voiding = useDisclosure()
   const [target, setTarget] = useState<InvoiceRow | null>(null)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
-  return (
-    <>
-      <PageHeader
-        title="Invoices"
-        subtitle="Tax invoices issued for your events."
-        actions={
-          <>
+  const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
+
+  const header = (
+    <PageHeader
+      title="Invoices"
+      subtitle="Tax invoices issued for your events."
+      actions={
+        <>
+          {/* `/invoices/export.csv` answers 409 "nothing to export" on an empty
+              set, so on a first run the only thing this button can do is
+              contradict the sentence beside it. */}
+          {!firstRun && (
             <DownloadButton
               path="/invoices/export.csv"
               query={data.exportQuery}
               filename="eventa-invoices.csv"
             />
-            <HeaderUser />
-          </>
-        }
-      />
+          )}
+          <HeaderUser />
+        </>
+      }
+    />
+  )
+
+  // Nothing has been invoiced yet, so the status tabs are all zero and there is
+  // nothing to search or page through: the controls go with the table, and the
+  // page says what will fill it instead.
+  //
+  // The kit's copy here ("Eventa raises an invoice for every order a buyer
+  // places") describes a product this one is not. `POST /invoices` takes one
+  // `orderId` and nothing in the API, worker or relay calls it on settlement —
+  // an invoice is raised deliberately, against a chosen order. Promising it
+  // arrives by itself would send an organizer away to sell tickets and back to
+  // the same empty page, so the copy departs from the source deliberately.
+  if (firstRun) {
+    return (
+      <>
+        {header}
+
+        <Card>
+          <EmptyState
+            icon="hgi-invoice-01"
+            title="No invoices yet"
+            actions={[
+              {
+                label: 'Add your billing details',
+                to: '/admin/settings-organization',
+                icon: 'hgi-building-03',
+              },
+              { label: 'Create your first event', to: '/admin/event-form' },
+            ]}
+          >
+            A tax invoice is raised against one order at a time, and keeps its number for good —
+            selling a ticket does not issue one by itself. Set up the tax details that go on them,
+            then start taking orders; the invoices you raise are listed here.
+          </EmptyState>
+        </Card>
+
+        <PageFooter />
+      </>
+    )
+  }
+
+  return (
+    <>
+      {header}
 
       <PillTabs<InvoiceTab>
         items={tabItems(data.tabs)}
@@ -128,9 +181,14 @@ export default function InvoicesPage() {
                 {data.rows.length === 0 && (
                   <tr>
                     <td colSpan={8}>
-                      <div className="py-10 text-center text-[13px] text-muted">
-                        No invoices match these filters.
-                      </div>
+                      {emptyReason === 'past-end' ? (
+                        <PastEnd noun="invoices" onFirstPage={clear} />
+                      ) : (
+                        <NoResults noun="invoices" onClear={clear}>
+                          No invoice matches the current search, event and status filters. Try a
+                          different invoice number or buyer, or widen the filters.
+                        </NoResults>
+                      )}
                     </td>
                   </tr>
                 )}

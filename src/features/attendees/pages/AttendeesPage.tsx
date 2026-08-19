@@ -3,15 +3,18 @@ import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
   Card,
+  EmptyState,
   HeaderUser,
   Hint,
   Icon,
   Input,
   Label,
+  NoResults,
   PageFooter,
   PageHeader,
   Paginator,
   Panel,
+  PastEnd,
   PillTabs,
   Select,
   Textarea,
@@ -36,6 +39,9 @@ import type { AttendeeRow, AttendeeSegment, AttendeeSort } from '../directory.ty
 const ALL_TAGS = 'All tags'
 const MAX_SEARCH_LENGTH = 120
 
+/** What the loader sorts by when the URL says nothing — see `SORTS`. */
+const DEFAULT_SORT: AttendeeSort = 'recent'
+
 const SORT_LABEL: Record<AttendeeSort, string> = {
   recent: 'Sort: Last activity',
   name: 'Sort: Name (A–Z)',
@@ -45,26 +51,75 @@ const SORT_LABEL: Record<AttendeeSort, string> = {
 
 export default function AttendeesPage() {
   const data = useLoaderData() as DirectoryData
-  const { params, set } = useFilters()
+  // No defaults are declared: the sort select writes its value even when it is
+  // the default one, but sorting reorders rather than hides, so `useFilters`
+  // does not count it as narrowing in the first place.
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
   const filtering = useIsFiltering()
   const invite = useDisclosure()
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
+  // Nothing has been registered yet: there is nothing to search, tab through or
+  // page, so the controls go with the table and the page explains itself.
+  const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
+
+  // The loader fetches these for the invite panel, so the page already knows
+  // whether anything has been published — and an organizer who is simply
+  // waiting for the first signup must not be told to create their first event.
+  //
+  // Read in one direction only: a non-empty list proves events exist, so it can
+  // withdraw an offer, but an empty one is not proof of the opposite anywhere it
+  // could have been masked (Registrations loads the same list through
+  // `withoutForbidden`, and gets `[]` for Staff who may not list events).
+  const hasEvents = data.events.length > 0
+
+  if (firstRun) {
+    return (
+      <>
+        <DirectoryHeader onInvite={invite.onOpen} canInvite={hasEvents} />
+
+        <Card>
+          {/* Two different organizers land here, and the next step is not the
+              same one: nothing published yet, or a live event nobody has
+              registered for. With events on the calendar the remaining links
+              in the chain are a ticket type on sale and the invitations this
+              page can send itself — "Create an event" would be a step they
+              have already taken, and "See registrations" would be this same
+              empty card one page over. */}
+          <EmptyState
+            icon="hgi-user-multiple"
+            title="No attendees yet"
+            actions={
+              hasEvents
+                ? [
+                    { label: 'Set up ticket types', to: '/admin/tickets', icon: 'hgi-ticket-01' },
+                    { label: 'Invite attendees', onClick: invite.onOpen },
+                  ]
+                : [
+                    {
+                      label: 'Create an event',
+                      to: '/admin/event-form',
+                      icon: 'hgi-calendar-add-01',
+                    },
+                  ]
+            }
+          >
+            {hasEvents
+              ? 'Everyone who completes a registration gets a profile here, with their tickets, tags and history. Put a ticket type on sale, or invite people to one of your events, and the first profiles will follow.'
+              : 'Everyone who completes a registration gets a profile here, with their tickets, tags and history. Publish an event with tickets on sale and the first attendees will follow.'}
+          </EmptyState>
+        </Card>
+
+        <PageFooter />
+
+        <InvitePanel open={invite.open} onClose={invite.onClose} events={data.events} />
+      </>
+    )
+  }
+
   return (
     <>
-      <PageHeader
-        title="Attendees"
-        subtitle="Everyone who has registered for your events."
-        actions={
-          <>
-            <Button variant="primary" onClick={invite.onOpen} disabled={data.events.length === 0}>
-              <Icon name="hgi-mail-send-01" />
-              <span>Invite</span>
-            </Button>
-            <HeaderUser />
-          </>
-        }
-      />
+      <DirectoryHeader onInvite={invite.onOpen} canInvite={hasEvents} />
 
       <PillTabs<AttendeeSegment>
         items={pills(data)}
@@ -118,7 +173,7 @@ export default function AttendeesPage() {
                 className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
               />
               <select
-                value={params.get('sort') ?? 'recent'}
+                value={params.get('sort') ?? DEFAULT_SORT}
                 onChange={(e) => set({ sort: e.target.value })}
                 className="select h-10 w-full border-0 bg-surface pl-9 font-medium sm:w-52"
                 aria-label="Sort attendees"
@@ -153,9 +208,18 @@ export default function AttendeesPage() {
                 {data.rows.length === 0 && (
                   <tr>
                     <td colSpan={6}>
-                      <div className="py-10 text-center text-[13px] text-muted">
-                        Nobody matches these filters.
-                      </div>
+                      {emptyReason === 'past-end' ? (
+                        /* A bookmarked `?page=4` that no longer has anybody on
+                           it. Back to the first page keeping the search: it is
+                           what the button says, and "Clear filters" would
+                           throw away a search that may well have matches. */
+                        <PastEnd noun="attendees" onFirstPage={() => set({ page: null })} />
+                      ) : (
+                        <NoResults noun="attendees" onClear={clear}>
+                          Nothing matches the current search, tab and tag filter. Try a shorter
+                          search term, or widen the filters.
+                        </NoResults>
+                      )}
                     </td>
                   </tr>
                 )}
@@ -176,6 +240,26 @@ export default function AttendeesPage() {
 
       <InvitePanel open={invite.open} onClose={invite.onClose} events={data.events} />
     </>
+  )
+}
+
+/** The same header above both states — an invitation is still possible on a
+ *  first run, as long as there is an event to invite people to. */
+function DirectoryHeader({ onInvite, canInvite }: { onInvite: () => void; canInvite: boolean }) {
+  return (
+    <PageHeader
+      title="Attendees"
+      subtitle="Everyone who has registered for your events."
+      actions={
+        <>
+          <Button variant="primary" onClick={onInvite} disabled={!canInvite}>
+            <Icon name="hgi-mail-send-01" />
+            <span>Invite</span>
+          </Button>
+          <HeaderUser />
+        </>
+      }
+    />
   )
 }
 

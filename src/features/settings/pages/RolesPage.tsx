@@ -3,6 +3,7 @@ import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
   Card,
+  EmptyState,
   HeaderUser,
   Hint,
   Icon,
@@ -30,6 +31,11 @@ export default function RolesPage() {
   const panel = useDisclosure()
   const [editing, setEditing] = useState<RoleCard | null>(null)
 
+  const newRole = () => {
+    setEditing(null)
+    panel.onOpen()
+  }
+
   return (
     <>
       <PageHeader
@@ -37,13 +43,7 @@ export default function RolesPage() {
         subtitle="Define what each role can access in your workspace."
         actions={
           <>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setEditing(null)
-                panel.onOpen()
-              }}
-            >
+            <Button variant="primary" onClick={newRole}>
               <Icon name="hgi-add-01" size={16} />
               <span className="hidden sm:inline">New role</span>
               <span className="sm:hidden">New</span>
@@ -53,38 +53,57 @@ export default function RolesPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {data.roles.map((role) => (
-          <Card key={role.id} className="flex flex-col gap-3 p-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="truncate text-[15px] font-bold text-ink">{role.name}</p>
-                <p className="mt-0.5 text-[12px] text-muted">{role.members}</p>
+      {/* Nothing on this page filters the list, so an empty one can only be a
+          first run — there is no "hidden by a filter" case to tell apart. In
+          practice a workspace arrives with its built-in roles, and this is what
+          shows if one ever does not. */}
+      {data.roles.length === 0 ? (
+        <EmptyState
+          className="card"
+          icon="hgi-shield-user"
+          title="No roles yet"
+          actions={[
+            { label: 'New role', onClick: newRole, icon: 'hgi-add-01' },
+            { label: 'See who is in the workspace', to: '/admin/users' },
+          ]}
+        >
+          A role is what a teammate is allowed to reach — building events, taking payments,
+          checking people in at the door. Create one, then hand it out from the Users page.
+        </EmptyState>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {data.roles.map((role) => (
+            <Card key={role.id} className="flex flex-col gap-3 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-bold text-ink">{role.name}</p>
+                  <p className="mt-0.5 text-[12px] text-muted">{role.members}</p>
+                </div>
+                {role.isSystem && <span className="badge badge-gray">Built-in</span>}
               </div>
-              {role.isSystem && <span className="badge badge-gray">Built-in</span>}
-            </div>
-            <p className="text-[12.5px] text-muted">{role.description}</p>
-            <p className="text-[12px] text-muted">
-              <span className="tnum font-semibold text-ink">{role.permissions.length}</span>{' '}
-              permissions
-            </p>
-            <div className="mt-auto border-t border-hair pt-3">
-              <Button
-                variant="soft"
-                size="sm"
-                className="w-full"
-                onClick={() => {
-                  setEditing(role)
-                  panel.onOpen()
-                }}
-              >
-                <Icon name="hgi-edit-02" size={14} />
-                Edit permissions
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+              <p className="text-[12.5px] text-muted">{role.description}</p>
+              <p className="text-[12px] text-muted">
+                <span className="tnum font-semibold text-ink">{role.permissions.length}</span>{' '}
+                permissions
+              </p>
+              <div className="mt-auto border-t border-hair pt-3">
+                <Button
+                  variant="soft"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => {
+                    setEditing(role)
+                    panel.onOpen()
+                  }}
+                >
+                  <Icon name="hgi-edit-02" size={14} />
+                  Edit permissions
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <PageFooter />
 

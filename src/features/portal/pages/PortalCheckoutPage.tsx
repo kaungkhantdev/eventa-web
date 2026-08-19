@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useFetcher, useLoaderData } from 'react-router'
-import { Icon, Input, Label } from '@/components/ui'
+import { EmptyState, Icon, Input, Label } from '@/components/ui'
 import { useTheme } from '@/lib/useTheme'
 import { cn } from '@/lib/cn'
 import { PaymentHandoff } from '../components/PaymentHandoff'
@@ -109,6 +109,7 @@ export default function PortalCheckoutPage() {
           {checkout.mode === 'reserved' ? (
             <SeatPicker
               rows={checkout.rows}
+              backTo={checkout.header.backTo}
               selected={seatIds}
               max={tier?.maxPerOrder ?? checkout.maxPerBooking}
               onToggle={(id) => setSeatIds(toggleSeat(seatIds, id, tier?.maxPerOrder ?? 0))}
@@ -375,19 +376,31 @@ function QuantityPicker({
 
 function SeatPicker({
   rows,
+  backTo,
   selected,
   max,
   onToggle,
 }: {
   rows: SeatRow[]
+  /** The event's own page — the only thing left to do when there is no map. */
+  backTo: string
   selected: number[]
   max: number
   onToggle: (id: number) => void
 }) {
+  // A reserved event whose seat map has not been published yet. Nothing on this
+  // page can be completed, and the top bar's way back is hidden on a phone —
+  // so the block that replaces the map carries one.
   if (rows.length === 0) {
     return (
-      <div className="rounded-2xl border border-hair bg-surface p-6 text-center text-[13px] text-muted">
-        Seats for this event are not on sale yet.
+      <div className="rounded-2xl border border-hair bg-surface">
+        <EmptyState
+          compact
+          icon="hgi-seat-selector"
+          actions={[{ label: 'Back to event', to: backTo, icon: 'hgi-arrow-left-01' }]}
+        >
+          Seats for this event are not on sale yet.
+        </EmptyState>
       </div>
     )
   }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link, useRevalidator } from 'react-router'
+import { EmptyState, type EmptyAction } from '@/components/ui'
 import { cn } from '@/lib/cn'
 
 /**
@@ -48,11 +49,23 @@ export function CountBadge({ value, tone }: { value: number; tone: 'brand' | 'pl
   )
 }
 
-export function PanelEmpty({ children }: { children: ReactNode }) {
+export function PanelEmpty({
+  children,
+  icon = 'hgi-inbox',
+  action,
+}: {
+  children: ReactNode
+  /** Hugeicons slug for the panel's own subject. */
+  icon?: string
+  /** The one real next step. A panel with nothing to say and nowhere to go is a dead card. */
+  action?: EmptyAction
+}) {
   return (
-    <p className="mt-3.5 rounded-xl bg-canvas px-4 py-6 text-center text-[13px] text-muted">
-      {children}
-    </p>
+    <div className="mt-3.5 rounded-xl bg-canvas">
+      <EmptyState compact icon={icon} actions={action ? [action] : []}>
+        {children}
+      </EmptyState>
+    </div>
   )
 }
 

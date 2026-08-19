@@ -1,15 +1,17 @@
-import { useEffect } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Badge,
-  Button,
+  ButtonLink,
   Card,
   DataTable,
+  EmptyState,
   HeaderUser,
   Icon,
+  NoResults,
   PageFooter,
   PageHeader,
   Paginator,
+  PastEnd,
   PillTabs,
   type PillTabItem,
 } from '@/components/ui'
@@ -36,25 +38,68 @@ const TABS: PillTabItem<PayoutTab>[] = [
   { value: 'failed', label: 'Failed' },
 ]
 
+/**
+ * Where connecting a payout account actually happens.
+ *
+ * Not a `POST /payouts/settings-link` from here, which is what this page used
+ * to offer: for an unconnected workspace that endpoint answers
+ * `{connected:false, url:null}` — there is no provider URL to follow in exactly
+ * the case the button is shown — and `pageAction` returns `{ok:true}` for
+ * anything that is not a `Response`, so the link would never reach the page
+ * even when the provider had one. A plain link, as in the kit (payouts.html).
+ */
+const PAYOUT_SETTINGS = '/admin/settings-payments'
+
 export default function PayoutsPage() {
   const data = useLoaderData() as PayoutsData
-  const { params, set } = useFilters()
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
   const filtering = useIsFiltering()
-  const connect = useFetcher<ActionResult & { url?: string | null }>()
 
-  // The provider's settings URL is one-time; follow it as soon as it arrives.
-  useEffect(() => {
-    const url = connect.data && 'url' in connect.data ? connect.data.url : null
-    if (url) window.location.assign(url)
-  }, [connect.data])
+  const header = (
+    <PageHeader
+      title="Payouts"
+      subtitle="Money on its way to your bank account."
+      actions={<HeaderUser />}
+    />
+  )
+
+  /* Nothing has been paid out *and* no account is connected, so every balance
+     above is masked: three dashes over an empty table is a page with nothing on
+     it. Once an account exists the balances are real figures worth showing, even
+     before the first transfer — so that case keeps the tiles and answers inside
+     the table instead. */
+  if (data.rows.length === 0 && emptyReason === 'first-run' && !data.balances.connected) {
+    return (
+      <>
+        {header}
+
+        <Card>
+          <EmptyState
+            icon="hgi-bank"
+            title="No payouts yet"
+            actions={[
+              {
+                label: 'Connect a payout account',
+                to: PAYOUT_SETTINGS,
+                icon: 'hgi-link-square-02',
+              },
+              { label: 'Create your first event', to: '/admin/event-form' },
+            ]}
+          >
+            A payout moves your ticket sales from Eventa to your bank. Connect a payout account
+            first — after that your balance builds up as tickets sell, and every transfer is listed
+            here.
+          </EmptyState>
+        </Card>
+
+        <PageFooter />
+      </>
+    )
+  }
 
   return (
     <>
-      <PageHeader
-        title="Payouts"
-        subtitle="Money on its way to your bank account."
-        actions={<HeaderUser />}
-      />
+      {header}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <BalanceTile label="Available" value={data.balances.available} icon="hgi-wallet-01" />
@@ -68,12 +113,9 @@ export default function PayoutsPage() {
           <p className="flex-1 text-[13px] text-ink">
             Connect a payout account to receive the money from your ticket sales.
           </p>
-          <connect.Form method="post">
-            <input type="hidden" name="intent" value="connect" />
-            <Button variant="primary" type="submit" disabled={connect.state !== 'idle'}>
-              {connect.state === 'idle' ? 'Connect account' : 'Opening…'}
-            </Button>
-          </connect.Form>
+          <ButtonLink variant="primary" to={PAYOUT_SETTINGS}>
+            Connect account
+          </ButtonLink>
         </div>
       )}
 
@@ -108,9 +150,21 @@ export default function PayoutsPage() {
                 {data.rows.length === 0 && (
                   <tr>
                     <td colSpan={8}>
-                      <div className="py-10 text-center text-[13px] text-muted">
-                        No payouts yet.
-                      </div>
+                      {emptyReason === 'past-end' ? (
+                        <PastEnd noun="payouts" onFirstPage={clear} />
+                      ) : emptyReason === 'no-results' ? (
+                        <NoResults noun="payouts" onClear={clear}>
+                          Nothing matches the current status tab. Try widening it to see more
+                          payouts.
+                        </NoResults>
+                      ) : (
+                        // The account is connected — the balances above are real
+                        // figures — but no transfer has been made yet.
+                        <EmptyState compact icon="hgi-bank" title="No payouts yet">
+                          Your available balance is transferred to your bank on a schedule. The
+                          first payout will be listed here once it is on its way.
+                        </EmptyState>
+                      )}
                     </td>
                   </tr>
                 )}

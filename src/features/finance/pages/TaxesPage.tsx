@@ -28,6 +28,17 @@ import type { TaxRow } from '../finance.types'
  * Thailand files VAT monthly, due on the 15th of the following month. Filing
  * late is recorded rather than hidden — the surcharge depends on it, and the
  * organizer is the one who will be asked about it.
+ *
+ * Alone among the finance pages this one has no empty state, because it cannot
+ * be empty: `/tax-periods` builds a row for every month of the requested year
+ * whether or not anything was sold ("the ledger is always twelve rows, so it is
+ * a fixed list rather than a page" — tax-periods.controller.ts), and the loader
+ * always states a year inside the accepted range. A first-run workspace does
+ * see twelve ฿0 rows under four ฿0 headlines, which is not much of a welcome —
+ * but nothing in this loader's data distinguishes "never sold anything" from
+ * "sold nothing in the year you are looking at", and the ledger is year-scoped,
+ * so inferring a first run from the zeros would greet an organizer with real
+ * VAT history who happened to page back a year.
  */
 export default function TaxesPage() {
   const data = useLoaderData() as TaxesData

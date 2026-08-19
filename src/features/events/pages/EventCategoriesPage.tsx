@@ -11,6 +11,8 @@ import {
   Input,
   Textarea,
   Icon,
+  EmptyState,
+  NoResults,
 } from '@/components/ui'
 import type { ActionResult } from '@/app/loaders'
 import { useDisclosure } from '@/lib/useDisclosure'
@@ -92,7 +94,9 @@ function RowActions({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => 
 
 export default function EventCategoriesPage() {
   const { cards, total } = useLoaderData() as CategoriesData
-  const { params, set } = useFilters()
+  // Grid or list is how the cards are drawn, not which ones — it narrows
+  // nothing, so it must not make an empty page read as a filtered one.
+  const { params, set, clear, filtered } = useFilters({ ignore: ['view'] })
   const filtering = useIsFiltering()
   // Deleting and saving get their own fetchers. A shared one would still be
   // holding the previous success when the panel is opened again, and the panel
@@ -124,6 +128,11 @@ export default function EventCategoriesPage() {
       active ? 'bg-brand-soft text-brand' : 'text-muted',
     )
 
+  /* `total` is the count of *this* query — the search is sent to the API — so
+     it cannot tell an empty workspace from a search that matched nothing. The
+     URL can, and does. */
+  const firstRun = cards.length === 0 && !filtered
+
   return (
     <>
       <PageHeader
@@ -141,59 +150,6 @@ export default function EventCategoriesPage() {
         }
       />
 
-      {/* toolbar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full flex-1">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search categories…"
-            maxLength={MAX_SEARCH_LENGTH}
-            aria-label="Search categories"
-          />
-        </div>
-        <div className="relative w-full sm:w-52">
-          <i className="hgi-stroke hgi-arrow-up-down text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <select
-            value={params.get('sort') ?? 'name'}
-            onChange={(e) => set({ sort: e.target.value === 'name' ? null : e.target.value })}
-            className="select h-10 w-full border-0 bg-surface pl-9 font-medium"
-            aria-label="Sort categories"
-          >
-            {CATEGORY_SORTS.map((sort) => (
-              <option key={sort} value={sort}>
-                {SORT_LABEL[sort]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex shrink-0 items-center gap-1 self-start rounded-lg bg-surface p-1 sm:self-auto">
-          <button
-            type="button"
-            onClick={() => set({ view: null })}
-            className={viewBtn(view === 'grid')}
-            title="Grid view"
-          >
-            <Icon name="hgi-grid-view" size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => set({ view: 'list' })}
-            className={viewBtn(view === 'list')}
-            title="List view"
-          >
-            <Icon name="hgi-list-view" size={16} />
-          </button>
-        </div>
-      </div>
-
-      <p className="mb-2 mt-3 text-[12px] text-muted">
-        {total} {total === 1 ? 'category' : 'categories'}
-      </p>
-
       {deleter.data?.error && (
         <p
           role="alert"
@@ -203,53 +159,129 @@ export default function EventCategoriesPage() {
         </p>
       )}
 
-      <div className={cn(filtering && 'opacity-60 transition-opacity')}>
-        {cards.length === 0 ? (
-          <div className="mt-2 card flex flex-col items-center justify-center p-12 text-center">
-            <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-line text-muted">
-              <Icon name="hgi-folder-01" size={22} />
-            </span>
-            <p className="mt-3 text-[14px] font-semibold text-ink">No categories found</p>
-            <p className="mt-1 text-[12px] text-muted">
-              Try a different search, or create a new category.
-            </p>
+      {firstRun ? (
+        /* Nothing to search or sort yet, so the toolbar and the count go with
+           the cards; what is left is the button that makes the first one. */
+        <EmptyState
+          className="card"
+          icon="hgi-folder-01"
+          title="No categories yet"
+          actions={[
+            { label: 'Create your first category', onClick: openNew, icon: 'hgi-add-01' },
+            { label: 'Create an event', to: '/admin/event-form' },
+          ]}
+        >
+          Categories sort your events into groups — conferences, workshops, weddings — each with its
+          own icon and colour. Add a few now and you can pick one on every event you create.
+        </EmptyState>
+      ) : (
+        <>
+          {/* toolbar */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative w-full flex-1">
+              <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                type="text"
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+                placeholder="Search categories…"
+                maxLength={MAX_SEARCH_LENGTH}
+                aria-label="Search categories"
+              />
+            </div>
+            <div className="relative w-full sm:w-52">
+              <i className="hgi-stroke hgi-arrow-up-down text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <select
+                value={params.get('sort') ?? 'name'}
+                onChange={(e) => set({ sort: e.target.value === 'name' ? null : e.target.value })}
+                className="select h-10 w-full border-0 bg-surface pl-9 font-medium"
+                aria-label="Sort categories"
+              >
+                {CATEGORY_SORTS.map((sort) => (
+                  <option key={sort} value={sort}>
+                    {SORT_LABEL[sort]}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex shrink-0 items-center gap-1 self-start rounded-lg bg-surface p-1 sm:self-auto">
+              <button
+                type="button"
+                onClick={() => set({ view: null })}
+                className={viewBtn(view === 'grid')}
+                title="Grid view"
+              >
+                <Icon name="hgi-grid-view" size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => set({ view: 'list' })}
+                className={viewBtn(view === 'list')}
+                title="List view"
+              >
+                <Icon name="hgi-list-view" size={16} />
+              </button>
+            </div>
           </div>
-        ) : view === 'grid' ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {cards.map((c) => (
-              <Card key={c.id} className="p-4">
-                <div className="flex items-start justify-between">
-                  <CategoryTile color={c.color} icon={c.icon} sizeClass="h-12 w-12" iconPx={24} />
-                  <RowActions onEdit={() => openEdit(c)} onDelete={() => remove(c)} />
-                </div>
-                <p className="mt-3 text-[15px] font-bold text-ink">{c.name}</p>
-                <p className="mt-0.5 line-clamp-2 text-[12px] text-muted">{c.description}</p>
-                <div className="mt-3 flex items-center gap-1.5 border-t border-line pt-3 text-[12px] text-muted">
-                  <Icon name="hgi-calendar-03" size={14} />
-                  <span className="font-semibold text-ink tnum">{c.eventCount}</span> events
-                </div>
-              </Card>
-            ))}
+
+          <p className="mb-2 mt-3 text-[12px] text-muted">
+            {total} {total === 1 ? 'category' : 'categories'}
+          </p>
+
+          <div className={cn(filtering && 'opacity-60 transition-opacity')}>
+            {cards.length === 0 ? (
+              /* The categories exist — the search just matched none of them, so
+                 the toolbar stays put and the only offer is to widen it. */
+              <div className="mt-2 card">
+                <NoResults noun="categories" onClear={clear}>
+                  None of your categories match the current search. Try a different spelling, or
+                  clear it to see them all.
+                </NoResults>
+              </div>
+            ) : view === 'grid' ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {cards.map((c) => (
+                  <Card key={c.id} className="p-4">
+                    <div className="flex items-start justify-between">
+                      <CategoryTile
+                        color={c.color}
+                        icon={c.icon}
+                        sizeClass="h-12 w-12"
+                        iconPx={24}
+                      />
+                      <RowActions onEdit={() => openEdit(c)} onDelete={() => remove(c)} />
+                    </div>
+                    <p className="mt-3 text-[15px] font-bold text-ink">{c.name}</p>
+                    <p className="mt-0.5 line-clamp-2 text-[12px] text-muted">{c.description}</p>
+                    <div className="mt-3 flex items-center gap-1.5 border-t border-line pt-3 text-[12px] text-muted">
+                      <Icon name="hgi-calendar-03" size={14} />
+                      <span className="font-semibold text-ink tnum">{c.eventCount}</span> events
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {cards.map((c) => (
+                  <Card key={c.id} className="flex items-center gap-3 p-3">
+                    <CategoryTile color={c.color} icon={c.icon} sizeClass="h-11 w-11" iconPx={21} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-bold text-ink">{c.name}</p>
+                      <p className="truncate text-[12px] text-muted">{c.description}</p>
+                    </div>
+                    <div className="hidden shrink-0 items-center gap-1.5 text-[12px] text-muted sm:flex">
+                      <Icon name="hgi-calendar-03" size={14} />
+                      <span className="font-semibold text-ink tnum">{c.eventCount}</span> events
+                    </div>
+                    <RowActions onEdit={() => openEdit(c)} onDelete={() => remove(c)} />
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {cards.map((c) => (
-              <Card key={c.id} className="flex items-center gap-3 p-3">
-                <CategoryTile color={c.color} icon={c.icon} sizeClass="h-11 w-11" iconPx={21} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-bold text-ink">{c.name}</p>
-                  <p className="truncate text-[12px] text-muted">{c.description}</p>
-                </div>
-                <div className="hidden shrink-0 items-center gap-1.5 text-[12px] text-muted sm:flex">
-                  <Icon name="hgi-calendar-03" size={14} />
-                  <span className="font-semibold text-ink tnum">{c.eventCount}</span> events
-                </div>
-                <RowActions onEdit={() => openEdit(c)} onDelete={() => remove(c)} />
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+        </>
+      )}
 
       <PageFooter />
 

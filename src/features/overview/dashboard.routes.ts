@@ -27,6 +27,11 @@ export interface DashboardData {
   tiers: TierRow[]
   /** The donut's centre — the same figure as the registrations card. */
   totalRegistrations: string
+  /**
+   * The events card's figure before formatting, kept so the first-run rule can
+   * read it as a count. Null when the KPI is withheld — unknown, not zero.
+   */
+  upcomingEvents: number | null
   sellingFast: SellingFastRow[]
   recent: RecentRow[]
 }
@@ -57,6 +62,7 @@ export const dashboardRoute = {
       range,
       tiers: toTierRows(view.tierMix),
       totalRegistrations: countLabel(view.kpis.registrations.value),
+      upcomingEvents: view.kpis.upcomingEvents.value,
       sellingFast: view.sellingFast.map(toSellingFastRow),
       recent: view.recent.map(toRecentRow),
     }

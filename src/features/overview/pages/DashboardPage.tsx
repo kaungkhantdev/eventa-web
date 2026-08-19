@@ -1,12 +1,14 @@
 import { useLoaderData, useRouteLoaderData } from 'react-router'
-import { ButtonLink, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
+import { ButtonLink, EmptyState, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
 import { ADMIN_ROUTE_ID } from '@/app/loaders'
+import { can } from '@/features/auth/permissions'
 import type { Me } from '@/features/auth/types'
 import { cn } from '@/lib/cn'
 import { RecentRegistrationsPanel } from '../components/RecentRegistrationsPanel'
 import { RevenuePanel } from '../components/RevenuePanel'
 import { SellingFastPanel } from '../components/SellingFastPanel'
 import { TierMixPanel } from '../components/TierMixPanel'
+import { isDashboardFirstRun } from '../dashboard.firstRun'
 import type { DashboardData } from '../dashboard.routes'
 import type { StatCard } from '../overview.types'
 
@@ -20,9 +22,14 @@ import type { StatCard } from '../overview.types'
  * finance access.
  */
 export default function DashboardPage() {
-  const { cards, revenue, range, tiers, totalRegistrations, sellingFast, recent } =
-    useLoaderData() as DashboardData
+  const data = useLoaderData() as DashboardData
+  const { cards, revenue, range, tiers, totalRegistrations, sellingFast, recent } = data
   const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
+
+  // Zeroed cards over a flat line and an empty donut read as a broken page, so
+  // a workspace with nothing in it gets the one card that says what will fill
+  // it instead. There is nothing to filter here, so the range toggle goes too.
+  const firstRun = isDashboardFirstRun(data, can(me, 'regView'))
 
   return (
     <>
@@ -41,25 +48,50 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {cards.map((c, i) => (
-          <StatTile key={c.id} card={c} last={i === cards.length - 1} />
-        ))}
-      </div>
+      {firstRun ? (
+        <EmptyState
+          className="card"
+          // The same icon the sidebar uses for this page (navigation.ts). The
+          // kit's dashboard.html reaches for `hgi-dashboard-square-01` here
+          // while its own rail tile is the gauge — two icons for one page, with
+          // nothing gained, and they sit side by side on screen.
+          icon="hgi-dashboard-speed-02"
+          title="No activity yet"
+          actions={[
+            {
+              label: 'Create your first event',
+              to: '/admin/event-form',
+              icon: 'hgi-calendar-add-01',
+            },
+            { label: 'Manage events', to: '/admin/events' },
+          ]}
+        >
+          This dashboard summarises registrations, ticket revenue and check-ins across your events.
+          Create your first event and publish it — the figures start moving as soon as tickets sell.
+        </EmptyState>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            {cards.map((c, i) => (
+              <StatTile key={c.id} card={c} last={i === cards.length - 1} />
+            ))}
+          </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-5">
-        {revenue && <RevenuePanel revenue={revenue} range={range} />}
-        <TierMixPanel
-          tiers={tiers}
-          total={totalRegistrations}
-          className={revenue ? 'xl:col-span-2' : 'xl:col-span-5'}
-        />
-      </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-5">
+            {revenue && <RevenuePanel revenue={revenue} range={range} />}
+            <TierMixPanel
+              tiers={tiers}
+              total={totalRegistrations}
+              className={revenue ? 'xl:col-span-2' : 'xl:col-span-5'}
+            />
+          </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-5">
-        <SellingFastPanel rows={sellingFast} />
-        <RecentRegistrationsPanel rows={recent} />
-      </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-5">
+            <SellingFastPanel rows={sellingFast} />
+            <RecentRegistrationsPanel rows={recent} />
+          </div>
+        </>
+      )}
 
       <PageFooter />
     </>

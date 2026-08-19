@@ -3,10 +3,12 @@ import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
   Card,
+  EmptyState,
   HeaderUser,
   Icon,
   Input,
   Label,
+  NoResults,
   PageFooter,
   PageHeader,
   Paginator,
@@ -36,12 +38,24 @@ const MAX_SEARCH_LENGTH = 120
 
 export default function MeetingsPage() {
   const data = useLoaderData() as MeetingsData
-  const { params, set } = useFilters()
+  // Nothing here is written as a default — an absent `tab` is "all" — so every
+  // parameter in the URL is a choice the organizer made, the bucket included.
+  const { params, set, clear, filtered } = useFilters()
   const filtering = useIsFiltering()
   const panel = useDisclosure()
   const cancelling = useDisclosure()
   const [editing, setEditing] = useState<MeetingDraft | null>(null)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+
+  const schedule = () => {
+    setEditing(null)
+    panel.onOpen()
+  }
+
+  // With nothing narrowing the list, an empty first page is the whole diary:
+  // there are no meetings at all, so the tabs, filters and rows have nothing
+  // to describe and the panel is the only thing worth offering.
+  const firstRun = data.cards.length === 0 && !filtered
 
   return (
     <>
@@ -50,13 +64,7 @@ export default function MeetingsPage() {
         subtitle="Venue, sponsor, vendor and speaker meetings."
         actions={
           <>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setEditing(null)
-                panel.onOpen()
-              }}
-            >
+            <Button variant="primary" onClick={schedule}>
               <Icon name="hgi-add-01" size={16} />
               <span className="hidden sm:inline">Schedule meeting</span>
               <span className="sm:hidden">New</span>
@@ -66,86 +74,107 @@ export default function MeetingsPage() {
         }
       />
 
-      <PillTabs<MeetingTab>
-        items={tabItems(data.counts)}
-        value={(params.get('tab') as MeetingTab) ?? 'all'}
-        onChange={(tab) => set({ tab: tab === 'all' ? null : tab })}
-      />
-
-      <div className={cn('mt-3', filtering && 'opacity-60 transition-opacity')}>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative w-full flex-1">
-            <Icon
-              name="hgi-search-01"
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
-            />
-            <input
-              type="text"
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-              placeholder="Search meetings or people…"
-              maxLength={MAX_SEARCH_LENGTH}
-              aria-label="Search meetings"
-            />
-          </div>
-          <select
-            value={params.get('type') ?? ''}
-            onChange={(e) => set({ type: e.target.value || null })}
-            className="select h-10 border-0 bg-surface font-medium sm:w-44"
-            aria-label="Meeting type"
-          >
-            <option value="">{ALL_TYPES}</option>
-            {MEETING_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-          <select
-            value={params.get('eventId') ?? ''}
-            onChange={(e) => set({ eventId: e.target.value || null })}
-            className="select h-10 border-0 bg-surface font-medium sm:w-52"
-            aria-label="Filter by event"
-          >
-            <option value="">{ALL_EVENTS}</option>
-            {data.events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <Card className="mt-3 p-2 sm:p-3">
-          <div className="divide-y divide-line">
-            {data.cards.map((card) => (
-              <MeetingRow
-                key={card.id}
-                card={card}
-                onEdit={() => {
-                  setEditing(card.edit)
-                  panel.onOpen()
-                }}
-              />
-            ))}
-          </div>
-
-          {data.cards.length === 0 && (
-            <p className="py-12 text-center text-[13px] text-muted">
-              No meetings match these filters.
-            </p>
-          )}
-
-          <Paginator
-            {...data.window}
-            noun="meetings"
-            onPage={(page) => set({ page })}
-            onSize={(size) => set({ limit: size, page: null })}
+      {firstRun ? (
+        /* Nothing to filter, so the tabs, search and list go with it — what is
+           left is the one step that fills the page. */
+        <EmptyState
+          className="card"
+          icon="hgi-meeting-room"
+          title="No meetings scheduled"
+          actions={[
+            { label: 'Schedule a meeting', onClick: schedule, icon: 'hgi-calendar-add-01' },
+            { label: 'See your speakers', to: '/admin/speakers' },
+          ]}
+        >
+          Keep your calls and site walkthroughs with speakers, sponsors, venues and vendors in one
+          place. Schedule one and every guest gets a Google Calendar invite with a Meet link.
+        </EmptyState>
+      ) : (
+        <>
+          <PillTabs<MeetingTab>
+            items={tabItems(data.counts)}
+            value={(params.get('tab') as MeetingTab) ?? 'all'}
+            onChange={(tab) => set({ tab: tab === 'all' ? null : tab })}
           />
-        </Card>
-      </div>
+
+          <div className={cn('mt-3', filtering && 'opacity-60 transition-opacity')}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full flex-1">
+                <Icon
+                  name="hgi-search-01"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                />
+                <input
+                  type="text"
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+                  placeholder="Search meetings or people…"
+                  maxLength={MAX_SEARCH_LENGTH}
+                  aria-label="Search meetings"
+                />
+              </div>
+              <select
+                value={params.get('type') ?? ''}
+                onChange={(e) => set({ type: e.target.value || null })}
+                className="select h-10 border-0 bg-surface font-medium sm:w-44"
+                aria-label="Meeting type"
+              >
+                <option value="">{ALL_TYPES}</option>
+                {MEETING_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={params.get('eventId') ?? ''}
+                onChange={(e) => set({ eventId: e.target.value || null })}
+                className="select h-10 border-0 bg-surface font-medium sm:w-52"
+                aria-label="Filter by event"
+              >
+                <option value="">{ALL_EVENTS}</option>
+                {data.events.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Card className="mt-3 p-2 sm:p-3">
+              <div className="divide-y divide-line">
+                {data.cards.map((card) => (
+                  <MeetingRow
+                    key={card.id}
+                    card={card}
+                    onEdit={() => {
+                      setEditing(card.edit)
+                      panel.onOpen()
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* The tabs and filters stay above — changing them is the way out. */}
+              {data.cards.length === 0 && (
+                <NoResults noun="meetings" onClear={clear}>
+                  No meeting matches the current tab, type, event and search. Try a different name,
+                  or widen the filters.
+                </NoResults>
+              )}
+
+              <Paginator
+                {...data.window}
+                noun="meetings"
+                onPage={(page) => set({ page })}
+                onSize={(size) => set({ limit: size, page: null })}
+              />
+            </Card>
+          </div>
+        </>
+      )}
 
       <PageFooter />
 

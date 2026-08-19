@@ -21,6 +21,7 @@ export {
 } from './PageHeader'
 export { TableWrap, DataTable, EmptyRow } from './DataTable'
 export { Skeleton, SkeletonText, SkeletonCircle, SkeletonScreen } from './Skeleton'
+export { EmptyState, NoResults, PastEnd, type EmptyAction } from './EmptyState'
 export {
   AreaChart,
   DonutChart,

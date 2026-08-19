@@ -6,14 +6,17 @@ import {
   Card,
   DataTable,
   DownloadButton,
+  EmptyState,
   HeaderUser,
   Hint,
   Icon,
   Input,
   Label,
+  NoResults,
   PageFooter,
   PageHeader,
   Paginator,
+  PastEnd,
   PillTabs,
   type PillTabItem,
 } from '@/components/ui'
@@ -39,28 +42,69 @@ const MAX_SEARCH_LENGTH = 120
 
 export default function PaymentsPage() {
   const data = useLoaderData() as PaymentsData
-  const { params, set } = useFilters()
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
   const filtering = useIsFiltering()
   const refund = useDisclosure()
   const [refunding, setRefunding] = useState<PaymentRow | null>(null)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
-  return (
-    <>
-      <PageHeader
-        title="Payments"
-        subtitle="Every charge, refund and failed attempt."
-        actions={
-          <>
+  const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
+
+  const header = (
+    <PageHeader
+      title="Payments"
+      subtitle="Every charge, refund and failed attempt."
+      actions={
+        <>
+          {/* `/payments/export.csv` answers 409 "nothing to export" on an empty
+              set, so on a first run the only thing this button can do is
+              contradict the sentence beside it. */}
+          {!firstRun && (
             <DownloadButton
               path="/payments/export.csv"
               query={data.exportQuery}
               filename="eventa-payments.csv"
             />
-            <HeaderUser />
-          </>
-        }
-      />
+          )}
+          <HeaderUser />
+        </>
+      }
+    />
+  )
+
+  // No money has moved yet: the status tabs are all zero and there is nothing to
+  // search, so the controls go with the table rather than sitting above nothing.
+  if (firstRun) {
+    return (
+      <>
+        {header}
+
+        <Card>
+          <EmptyState
+            icon="hgi-credit-card"
+            title="No payments yet"
+            actions={[
+              {
+                label: 'Create your first event',
+                to: '/admin/event-form',
+                icon: 'hgi-calendar-add-01',
+              },
+              { label: 'Set up payments', to: '/admin/settings-payments' },
+            ]}
+          >
+            Every charge, refund and failed attempt lands here the moment a buyer pays. Publish an
+            event with a paid ticket and your first transaction will appear.
+          </EmptyState>
+        </Card>
+
+        <PageFooter />
+      </>
+    )
+  }
+
+  return (
+    <>
+      {header}
 
       <PillTabs<LedgerTab>
         items={tabItems(data.tabs)}
@@ -145,9 +189,14 @@ export default function PaymentsPage() {
                 {data.rows.length === 0 && (
                   <tr>
                     <td colSpan={8}>
-                      <div className="py-10 text-center text-[13px] text-muted">
-                        No payments match these filters.
-                      </div>
+                      {emptyReason === 'past-end' ? (
+                        <PastEnd noun="transactions" onFirstPage={clear} />
+                      ) : (
+                        <NoResults noun="transactions" onClear={clear}>
+                          No transaction matches the current search and filters. Try a different
+                          name or reference, or widen the filters.
+                        </NoResults>
+                      )}
                     </td>
                   </tr>
                 )}
