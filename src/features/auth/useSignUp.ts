@@ -4,6 +4,7 @@ import { messageOf } from '@/lib/api'
 import type { Persona } from '@/lib/persona'
 import { authApi } from './api'
 import { checkEmailPathFor } from './personas'
+import { signUpInputOf } from './signUpInput'
 
 /**
  * Signing up, for either audience.
@@ -37,23 +38,17 @@ export function useSignUp(persona: Persona) {
       return
     }
     const form = new FormData(e.currentTarget)
-    const email = String(form.get('email') ?? '')
+    const input = signUpInputOf(form, persona, password)
     setPending(true)
     setError(null)
     try {
-      await authApi.register({
-        name: String(form.get('name') ?? ''),
-        email,
-        password,
-        // Passed through rather than hard-coded: asserting somebody's consent
-        // on their behalf is not this app's to make, and the API is what
-        // refuses when it is missing.
-        acceptTerms: form.get('acceptTerms') === 'on',
-        persona,
-      })
+      await authApi.register(input)
       // `replace`, so Back returns to wherever they came from rather than to a
       // sign-up form for an account that now exists.
-      navigate(checkEmailPathFor(persona), { replace: true, state: { email } })
+      navigate(checkEmailPathFor(persona), {
+        replace: true,
+        state: { email: input.email },
+      })
     } catch (cause) {
       // The API writes these for the person reading them — shown verbatim
       // rather than replaced with a generic "sign-up failed".

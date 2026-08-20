@@ -52,6 +52,27 @@ export default function RegisterPage() {
           </p>
         )}
 
+        {/* Named here, or the API falls back to "<your name>'s Workspace" and
+            slugifies that — a slug nobody chose, nobody was told, and which
+            sign-in then asks for by heart. */}
+        <div>
+          <label htmlFor="organization-name" className="label">
+            Workspace name
+          </label>
+          <input
+            id="organization-name"
+            name="organizationName"
+            type="text"
+            autoComplete="organization"
+            placeholder="Acme Events"
+            className="input"
+            required
+          />
+          <p className="mt-1.5 text-[12px] text-muted">
+            Your company or team — attendees see this on tickets and receipts.
+          </p>
+        </div>
+
         <div>
           <label htmlFor="full-name" className="label">
             Full name
