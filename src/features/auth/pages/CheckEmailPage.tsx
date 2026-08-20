@@ -8,6 +8,7 @@ export default function CheckEmailPage() {
 
   return (
     <CheckEmailNotice
+      persona="admin"
       email={email}
       subtitle="One more step before your workspace is ready."
       signInPath="/auth/login"

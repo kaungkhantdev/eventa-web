@@ -15,6 +15,7 @@ export default function PortalCheckEmailPage() {
 
   return (
     <CheckEmailNotice
+      persona="attendee"
       email={email}
       subtitle="One more step before your tickets are in one place."
       signInPath="/portal/login"

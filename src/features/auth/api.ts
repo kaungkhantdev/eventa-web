@@ -83,6 +83,22 @@ export const authApi = {
    * account in the platform organization and no workspace at all (US-DISC-08).
    * Which one is stated, never inferred — the same rule as sign-in.
    */
+  /**
+   * Ask for the confirmation link again.
+   *
+   * Rate-limited server-side; a 429 arrives as an ApiError with the API's own
+   * wording, which is written for the person reading it.
+   */
+  async resendVerification(input: {
+    email: string
+    /** Omitted means organizer, matching the API's own default. */
+    persona?: Persona
+  }): Promise<{ message: string }> {
+    return api.post<{ message: string }>('/auth/verify-email/resend', input, {
+      anonymous: true,
+    })
+  },
+
   async register(input: {
     name: string
     email: string
