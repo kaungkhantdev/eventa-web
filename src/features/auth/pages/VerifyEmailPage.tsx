@@ -37,17 +37,14 @@ function Confirmed({ verified }: { verified: VerifiedEmail }) {
           <Icon name="hgi-checkmark-circle-02" size={30} />
         </span>
 
-        {/* The slug an organizer never chose and has never seen. Shown because
-            it is what the sign-in form asks for, and the link below fills it
-            in. An attendee has none to show — theirs is the platform
-            organization, which is storage, not something they sign in to. */}
-        {!attendee && (
-          <p className="mt-4 text-[13px] text-muted">
-            Your workspace is{' '}
-            <span className="font-semibold text-ink">{verified.orgSlug}</span>.
-          </p>
-        )}
+        {/* The slug used to be printed here, because the sign-in form asked
+            for it and this was the only place anyone was ever told. Sign-in
+            takes an email and a password now, so showing somebody a generated
+            string they never chose and no longer need is just noise.
 
+            The link still carries it — see signInLinkFor — which costs nothing
+            and skips the workspace picker for the rare account that would
+            otherwise see one. */}
         <Link to={signInLinkFor(verified)} className="btn btn-primary mt-5 w-full">
           Sign in
         </Link>

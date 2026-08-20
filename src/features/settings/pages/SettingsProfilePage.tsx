@@ -111,10 +111,10 @@ function PhotoCard({ profile }: { profile: ProfileCard }) {
           <img
             src={profile.avatarUrl}
             alt=""
-            className="h-20 w-20 shrink-0 rounded-2xl object-cover"
+            className="h-20 w-20 shrink-0 rounded-full object-cover"
           />
         ) : (
-          <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand to-emerald-400 text-[26px] font-bold text-white">
+          <span className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-emerald-400 text-[26px] font-bold text-white">
             {profile.initials}
           </span>
         )}
