@@ -166,6 +166,16 @@ export interface ProfileCard {
 }
 
 /** `GET /organization` — the workspace itself. */
+/** The capability the API hands the browser to PUT one file, once. */
+export interface LogoUploadWire {
+  key: string
+  uploadUrl: string
+  /** Sent verbatim — they are covered by the signature. */
+  headers: Record<string, string>
+  expiresInSeconds: number
+  maxBytes: number
+}
+
 export interface OrganizationWire {
   id: number
   name: string

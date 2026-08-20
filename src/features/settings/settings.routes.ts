@@ -26,6 +26,7 @@ import type {
   RoleCard,
   RoleWire,
   OrganizationForm,
+  LogoUploadWire,
   OrganizationWire,
   PaymentSettingsCard,
   PaymentSettingsWire,
@@ -361,7 +362,7 @@ function nullable(form: FormData, name: string): string | null {
  * PCI SAQ-A: none of these carries a card. Connecting a provider hands over an
  * account reference the provider issued; the card details never reach this app.
  */
-const accountApi = {
+export const accountApi = {
   profile: () => api.get<ProfileWire>('/me/profile'),
   saveProfile: (body: Record<string, unknown>) => api.patch<ProfileWire>('/me/profile', body),
   /** Confirms at the new address before it replaces the old one. */
@@ -370,6 +371,20 @@ const accountApi = {
   organization: () => api.get<OrganizationWire>('/organization'),
   saveOrganization: (body: Record<string, unknown>) =>
     api.patch<OrganizationWire>('/organization', body),
+
+  /**
+   * The logo, in the API's two steps: ask where to PUT, send the bytes
+   * straight to storage, then confirm. The file never passes through this app
+   * or the API — only the browser and the bucket ever hold it.
+   */
+  logoUploadUrl: (contentType: string, byteSize: number) =>
+    api.post<LogoUploadWire>('/organization/logo/upload-url', {
+      contentType,
+      byteSize,
+    }),
+  confirmLogo: (key: string) =>
+    api.post<{ logoUrl: string }>('/organization/logo', { key }),
+  removeLogo: () => api.delete<unknown>('/organization/logo'),
 
   paymentSettings: () => api.get<PaymentSettingsWire>('/payment-settings'),
   savePaymentPreferences: (body: Record<string, unknown>) =>

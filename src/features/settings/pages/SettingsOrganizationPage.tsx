@@ -1,6 +1,7 @@
 import { useFetcher, useLoaderData } from 'react-router'
 import { Button, Card, Hint, Icon, Input, Label, Select } from '@/components/ui'
 import type { ActionResult } from '@/app/loaders'
+import { LogoCard } from '../components/LogoCard'
 import { SettingsHeader } from '../components/SettingsHeader'
 import type { OrganizationData } from '../settings.routes'
 import type { OrganizationForm } from '../settings.types'
@@ -98,7 +99,13 @@ export default function SettingsOrganizationPage() {
           </save.Form>
         </Card>
 
-        <FixedFacts organization={organization} />
+        <div>
+          <FixedFacts organization={organization} />
+          {/* Branding sits beside the billing facts rather than inside the
+              company form: it is uploaded the moment a file is chosen, not on
+              Save, and putting it in the form would imply otherwise. */}
+          <LogoCard logoUrl={organization.logoUrl} name={organization.name} />
+        </div>
       </div>
     </>
   )
