@@ -98,8 +98,6 @@ export default function SettingsProfilePage() {
           </save.Form>
         </Card>
       </div>
-
-      <EmailCard profile={profile} />
     </>
   )
 }
@@ -133,6 +131,10 @@ function PhotoCard({ profile }: { profile: ProfileCard }) {
           </Badge>
         </p>
       </div>
+
+      {/* Directly under the badge that reports on it: the address, whether it
+          is confirmed, and how to move it are one subject. */}
+      <EmailForm profile={profile} />
     </Card>
   )
 }
@@ -140,17 +142,20 @@ function PhotoCard({ profile }: { profile: ProfileCard }) {
 /**
  * Changing the address you sign in with.
  *
- * A separate form because it is a separate act: the API sends a confirmation
- * to the new address and the old one keeps working until that link is used.
+ * Its own form, and its own fetcher, because it is a separate act from saving a
+ * profile: the API sends a confirmation to the NEW address and the old one goes
+ * on working until that link is opened. Stacked rather than laid out in a row —
+ * it lives in the 280px column, where a side-by-side field and button would
+ * wrap anyway.
  */
-function EmailCard({ profile }: { profile: ProfileCard }) {
+function EmailForm({ profile }: { profile: ProfileCard }) {
   const change = useFetcher<ActionResult>()
   const error = change.data?.ok === false ? change.data.error : null
   const sent = change.state === 'idle' && change.data?.ok === true
 
   return (
-    <Card className="mt-4 p-5">
-      <h3 className="text-[14px] font-bold tracking-tight">Email address</h3>
+    <div className="mt-4 border-t border-hair pt-4">
+      <p className="text-[13px] font-bold tracking-tight">Change email</p>
       <p className="mt-0.5 text-[12px] text-muted">
         You sign in with this. A new address has to be confirmed before it takes over.
       </p>
@@ -163,20 +168,26 @@ function EmailCard({ profile }: { profile: ProfileCard }) {
         </Hint>
       )}
 
-      <change.Form method="post" className="mt-4 flex flex-wrap items-end gap-3">
+      <change.Form method="post" className="mt-3">
         <input type="hidden" name="intent" value="email" />
-        <div className="min-w-[240px] flex-1">
-          <Label htmlFor="profile-email">New email</Label>
-          <Input
-            id="profile-email"
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            placeholder={profile.email}
-          />
-        </div>
-        <Button variant="soft" size="sm" type="submit" disabled={change.state !== 'idle'}>
+        <Label htmlFor="profile-email">New email</Label>
+        <Input
+          id="profile-email"
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          // Not the current address: on a field asking for a new one that reads
+          // as already filled in, and it is the one value the API refuses.
+          placeholder="you@example.com"
+        />
+        <Button
+          variant="soft"
+          size="sm"
+          type="submit"
+          className="mt-2 w-full"
+          disabled={change.state !== 'idle'}
+        >
           Send confirmation
         </Button>
       </change.Form>
@@ -187,6 +198,6 @@ function EmailCard({ profile }: { profile: ProfileCard }) {
         </p>
       )}
       {sent && <p className="mt-2 text-[13px] text-brand">Check the new address for a link.</p>}
-    </Card>
+    </div>
   )
 }
