@@ -24,8 +24,15 @@ const SIGN_UP_PATH: Record<Persona, string> = {
   attendee: '/portal/register',
 }
 
+/**
+ * Where a fresh sign-in lands, when the guard has no `?from=` to honour.
+ *
+ * The organizer's is Home, not Dashboard — the same place `/admin` itself
+ * redirects to and the first stop on the rail. Signing in is arriving at work,
+ * not asking for the metrics screen.
+ */
 const HOME_PATH: Record<Persona, string> = {
-  admin: '/admin/dashboard',
+  admin: '/admin/home',
   attendee: '/portal/my-events',
 }
 

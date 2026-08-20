@@ -22,8 +22,10 @@ describe('two personas, never one login', () => {
     expect(signUpPathFor('attendee')).toBe('/portal/register')
   })
 
+  // The same place `/admin` itself redirects to, and the first stop on the
+  // rail. Signing in is not a request for the metrics screen.
   it('lands each persona on its own home', () => {
-    expect(homeFor('admin')).toBe('/admin/dashboard')
+    expect(homeFor('admin')).toBe('/admin/home')
     expect(homeFor('attendee')).toBe('/portal/my-events')
   })
 
