@@ -25,9 +25,21 @@ export interface Me {
  * code. Modelled as a discriminated union so a caller cannot read
  * `accessToken` off a response that never had one.
  */
+/** One of the workspaces a verified password opens. */
+export interface WorkspaceOption {
+  slug: string
+  name: string
+}
+
 export type LoginResult =
   | { twoFactorRequired: false; accessToken: string; refreshToken: string; user: Me }
   | { twoFactorRequired: true; challengeToken: string; expiresIn: number }
+  /**
+   * The address and password open several workspaces, so one must be named.
+   * No session exists yet — the caller shows these and signs in again with the
+   * chosen slug.
+   */
+  | { twoFactorRequired: false; chooseWorkspace: true; workspaces: WorkspaceOption[] }
 
 export interface Credentials {
   email: string

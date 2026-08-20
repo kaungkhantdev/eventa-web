@@ -1,7 +1,7 @@
 import { api, session } from '@/lib/api'
 import type { Persona } from '@/lib/persona'
 import { personaOfSession } from './personas'
-import type { Credentials, LoginResult, Me } from './types'
+import type { Credentials, LoginResult, Me, WorkspaceOption } from './types'
 
 /**
  * A confirmed account, and where it signs in.
@@ -22,8 +22,10 @@ interface RawLogin {
   challengeToken?: string
   accessToken?: string
   refreshToken?: string
-  expiresIn: number
+  expiresIn?: number
   user?: Me
+  chooseWorkspace?: boolean
+  workspaces?: WorkspaceOption[]
 }
 
 /**
@@ -143,11 +145,21 @@ export const authApi = {
 }
 
 function establish(raw: RawLogin): LoginResult {
+  // Nothing was issued: the password fits more than one workspace and the
+  // caller has to say which. Deliberately checked before the token branch,
+  // which would otherwise start a session on empty strings.
+  if (raw.chooseWorkspace) {
+    return {
+      twoFactorRequired: false,
+      chooseWorkspace: true,
+      workspaces: raw.workspaces ?? [],
+    }
+  }
   if (raw.twoFactorRequired) {
     return {
       twoFactorRequired: true,
       challengeToken: raw.challengeToken ?? '',
-      expiresIn: raw.expiresIn,
+      expiresIn: raw.expiresIn ?? 0,
     }
   }
   // The API always sends all three together on a completed sign-in; the DTO

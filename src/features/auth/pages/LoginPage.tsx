@@ -8,10 +8,13 @@ import { ORG_PARAM } from '@/features/auth/verifiedSignIn'
 
 export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)
-  const { pending, error, challenge, submit: onSubmit } = useSignIn('admin')
-  // Filled in for someone arriving from their confirmation email: the slug was
-  // generated at sign-up, so they have never seen it and cannot be expected to
-  // remember it. Still editable — it is a default, not a lock.
+  const { pending, error, challenge, workspaces, submit: onSubmit } = useSignIn('admin')
+  /**
+   * Sign-in no longer asks which workspace: the slug is generated at sign-up
+   * and shown nowhere, so it was the one thing nobody could answer. The
+   * password resolves it instead, and this is sent only when somebody arrives
+   * from their confirmation email — which already knows the answer.
+   */
   const [params] = useSearchParams()
   const workspace = params.get(ORG_PARAM) ?? ''
 
@@ -60,20 +63,28 @@ export default function LoginPage() {
           </div>
         ) : (
           <>
-            <div>
-              <label htmlFor="orgSlug" className="label">
-                Workspace
-              </label>
-              <input
-                id="orgSlug"
-                name="orgSlug"
-                autoComplete="organization"
-                placeholder="acme"
-                className="input"
-                required
-                defaultValue={workspace}
-              />
-            </div>
+            {/* Only when the API asked. The password fits several workspaces
+                — the same address invited into two, with the same password in
+                both — so it is the one case anybody has to answer, and by then
+                they have already proved the credentials are theirs. */}
+            {workspaces.length > 0 ? (
+              <div>
+                <label htmlFor="orgSlug" className="label">
+                  Which workspace?
+                </label>
+                <select id="orgSlug" name="orgSlug" className="select" required>
+                  {workspaces.map((w) => (
+                    <option key={w.slug} value={w.slug}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              // Known only when they came from their confirmation email; that
+              // link carries the slug so they never see a picker at all.
+              workspace && <input type="hidden" name="orgSlug" value={workspace} />
+            )}
 
             <div>
               <label htmlFor="email" className="label">
