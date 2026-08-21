@@ -4,6 +4,7 @@ import {
   toNotificationRow,
   toPermissionOption,
   toRoleCard,
+  describeDevice,
   toAuditRow,
   toSessionRow,
 } from './settings.mapper'
@@ -187,5 +188,77 @@ describe('toAuditRow', () => {
   it('keeps the title and type through unchanged', () => {
     const row = toAuditRow(entry({ type: 'pwd', title: 'Password changed' }))
     expect(row).toMatchObject({ type: 'pwd', title: 'Password changed' })
+  })
+})
+
+/**
+ * A device somebody can recognise (US-ACC-06).
+ *
+ * The card exists so an organizer can spot a sign-in that was not theirs, and
+ * the API sends a raw user-agent. Two rows reading "Mozilla/5.0 (Macintosh;
+ * Intel Mac OS X 10_15_7) AppleW…" defeat the entire purpose — they are
+ * identical, truncated, and say nothing about which is which.
+ */
+describe('describeDevice', () => {
+  it.each([
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+      'Chrome on macOS',
+    ],
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+      'Safari on macOS',
+    ],
+    [
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      'Safari on iPhone',
+    ],
+    [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+      'Edge on Windows',
+    ],
+    [
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Chrome on Linux',
+    ],
+    [
+      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      'Chrome on Android',
+    ],
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0',
+      'Firefox on macOS',
+    ],
+  ])('reads %s as %s', (agent, expected) => {
+    expect(describeDevice(agent)).toBe(expected)
+  })
+
+  /**
+   * Edge and Chrome both claim to be Chrome, and Chrome claims to be Safari.
+   * The order the checks run in is the whole rule, so it is pinned: the most
+   * specific claim wins.
+   */
+  it('does not call Edge "Chrome", though Edge says it is', () => {
+    expect(
+      describeDevice('Mozilla/5.0 (Windows NT 10.0) Chrome/120.0.0.0 Safari/537.36 Edg/120.0'),
+    ).toBe('Edge on Windows')
+  })
+
+  it('does not call Chrome "Safari", though Chrome says it is', () => {
+    expect(
+      describeDevice('Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/151.0 Safari/537.36'),
+    ).toBe('Chrome on macOS')
+  })
+
+  /**
+   * A UA nobody anticipated must still produce something, and must never be the
+   * raw string — an unreadable row is what this replaced.
+   */
+  it('falls back to something readable for an unknown agent', () => {
+    expect(describeDevice('SomeBot/1.0')).toBe('Unknown device')
+  })
+
+  it('handles a missing user-agent', () => {
+    expect(describeDevice('')).toBe('Unknown device')
   })
 })

@@ -500,9 +500,12 @@ function SessionsCard({ sessions }: { sessions: SessionRow[] }) {
         )}
       </div>
 
-      <div className="mt-1 divide-y divide-line">
+      {/* The kit's list sits under a heading alone; here the heading shares its
+          row with a button, so the list needs its own gap rather than the kit's
+          `first:pt-0`, which would leave the first device touching the title. */}
+      <div className="mt-3 divide-y divide-line border-t border-hair pt-1">
         {sessions.map((session) => (
-          <div key={session.id} className="flex flex-wrap items-center gap-3 py-3 first:pt-0">
+          <div key={session.id} className="flex flex-wrap items-center gap-3 py-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-line text-muted">
               <Icon name="hgi-smart-phone-01" size={16} />
             </span>

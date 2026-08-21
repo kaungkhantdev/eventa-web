@@ -85,10 +85,54 @@ function humanise(key: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
 }
 
+/**
+ * Browsers lie about each other, so the order here IS the rule: Edge claims to
+ * be Chrome, Chrome claims to be Safari, and every one of them opens with
+ * "Mozilla/5.0". The most specific claim has to be tested first.
+ */
+const BROWSERS: readonly (readonly [RegExp, string])[] = [
+  [/\bEdg[e/]/, 'Edge'],
+  [/\bOPR\/|\bOpera\b/, 'Opera'],
+  [/\bFirefox\//, 'Firefox'],
+  [/\bChrome\//, 'Chrome'],
+  [/\bSafari\//, 'Safari'],
+]
+
+/** Same rule: iPhone and iPad are Mac-like, so they are checked before macOS. */
+const PLATFORMS: readonly (readonly [RegExp, string])[] = [
+  [/\biPhone\b/, 'iPhone'],
+  [/\biPad\b/, 'iPad'],
+  [/\bAndroid\b/, 'Android'],
+  [/\bWindows\b/, 'Windows'],
+  [/\bMac OS X\b|\bMacintosh\b/, 'macOS'],
+  [/\bLinux\b|\bX11\b/, 'Linux'],
+]
+
+const UNKNOWN_DEVICE = 'Unknown device'
+
+/**
+ * A device an organizer can recognise (US-ACC-06).
+ *
+ * The sessions card exists so somebody can spot a sign-in that was not theirs.
+ * The API sends a raw user-agent, and two rows of truncated
+ * "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleW…" are identical on
+ * screen — which makes the one question the card asks impossible to answer.
+ *
+ * Deliberately coarse. A version number would age the row without helping
+ * anybody recognise it, and a UA nobody anticipated returns a plain label
+ * rather than falling back to the raw string this replaced.
+ */
+export function describeDevice(userAgent: string): string {
+  const browser = BROWSERS.find(([pattern]) => pattern.test(userAgent))?.[1]
+  const platform = PLATFORMS.find(([pattern]) => pattern.test(userAgent))?.[1]
+  if (!browser || !platform) return UNKNOWN_DEVICE
+  return `${browser} on ${platform}`
+}
+
 export function toSessionRow(wire: LoginSessionWire): SessionRow {
   return {
     id: wire.id,
-    device: wire.device,
+    device: describeDevice(wire.device),
     ipAddress: wire.ipAddress,
     // Somebody checking whether a sign-in was theirs is reading their own
     // clock, which in this product is Bangkok's.
