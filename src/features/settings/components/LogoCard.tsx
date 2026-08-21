@@ -83,43 +83,51 @@ export function LogoCard({
         Shown on your public pages, invoices and receipts.
       </p>
 
-      <div className="mt-4 flex items-center gap-4">
+      <div className="mt-3 flex items-center gap-4">
         {logoUrl ? (
           <img
             src={logoUrl}
             alt={`${name} logo`}
-            className="h-16 w-16 shrink-0 rounded-full border border-hair object-contain"
+            className="h-20 w-20 shrink-0 rounded-2xl border border-hair object-contain"
           />
         ) : (
           // Not an empty box: the initial is what a workspace without a logo
-          // already shows everywhere else.
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-brand-soft text-[22px] font-bold text-brand">
+          // already shows everywhere else. The kit's square gradient tile.
+          <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand to-emerald-400 text-[28px] font-bold text-white">
             {name.trim().charAt(0).toUpperCase() || '?'}
           </span>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="soft"
-            size="sm"
-            type="button"
-            disabled={busy}
-            onClick={() => file.current?.click()}
-          >
-            <Icon name="hgi-image-upload" size={15} />
-            {logoUrl ? 'Replace' : 'Upload'}
-          </Button>
-          {logoUrl && (
-            <Button variant="ghost" size="sm" type="button" disabled={busy} onClick={() => void remove()}>
-              Remove
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="soft"
+              size="sm"
+              type="button"
+              disabled={busy}
+              onClick={() => file.current?.click()}
+            >
+              <Icon name="hgi-image-upload" size={15} />
+              {logoUrl ? 'Replace' : 'Upload'}
             </Button>
-          )}
+            {/* A text link, as the kit draws it — removing a logo should not
+                look as reachable as choosing one. */}
+            {logoUrl && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void remove()}
+                className="text-[12px] font-medium text-muted transition hover:text-red-500 disabled:opacity-50"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] leading-snug text-muted">
+            JPEG, PNG or WebP · square looks best
+          </p>
         </div>
       </div>
-
-      <p className="mt-3 text-[11.5px] text-muted">
-        JPEG, PNG or WebP. A square image looks best.
-      </p>
 
       {/* The kit's identity block: who this workspace is, then the two figures
           worth knowing about it. There is no plan or tier — this product has no
