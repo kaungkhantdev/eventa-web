@@ -148,7 +148,6 @@ function Fact({ label, value, mono }: { label: string; value: string; mono?: boo
 function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
   const save = useFetcher<ActionResult>()
   const [mode, setMode] = useState<'test' | 'live'>(payments.testMode ? 'test' : 'live')
-  const [revealed, setRevealed] = useState(false)
   const failed = save.data?.ok === false ? save.data : null
   const fields = failed?.fieldErrors ?? {}
   const unattached = Object.keys(fields).length === 0 ? (failed?.error ?? null) : null
@@ -230,31 +229,14 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
           </div>
 
           <div>
-            <Label htmlFor="keys-sk">Secret key</Label>
-            <div className="relative">
-              <Input
-                id="keys-sk"
-                name="secretKey"
-                // Reveal is for checking a paste, so it flips the input type
-                // rather than fetching anything: the stored key is not here to
-                // reveal, and never will be.
-                type={revealed ? 'text' : 'password'}
-                required
-                autoComplete="off"
-                className="pr-10 font-mono text-[12px]"
-                placeholder={payments.secretKeyMasked || `sk_${mode}_...`}
-                aria-describedby={fields.secretKey ? 'keys-sk-error' : undefined}
-              />
-              <button
-                type="button"
-                onClick={() => setRevealed((was) => !was)}
-                aria-label={revealed ? 'Hide secret key' : 'Reveal secret key'}
-                className="btn-icon absolute right-1 top-1/2 -translate-y-1/2"
-              >
-                <Icon name={revealed ? 'hgi-view-off' : 'hgi-view'} size={16} />
-              </button>
-            </div>
-            <FieldError id="keys-sk-error" message={fields.secretKey} />
+            <SecretField
+              id="keys-sk"
+              name="secretKey"
+              label="Secret key"
+              required
+              placeholder={payments.secretKeyMasked || `sk_${mode}_...`}
+              error={fields.secretKey}
+            />
             <Hint>
               Starts with <span className="font-mono">sk_</span>. Stored encrypted — never shown
               again, and never sent to a browser.
@@ -262,14 +244,14 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
           </div>
 
           <div className="sm:col-span-2">
-            <Label htmlFor="keys-whsec">Webhook signing secret</Label>
-            <Input
+            <SecretField
               id="keys-whsec"
               name="webhookSecret"
-              type="password"
-              autoComplete="off"
-              className="font-mono text-[12px]"
-              placeholder={payments.webhookSecretSet ? 'Saved — leave blank to keep' : 'whsec_...'}
+              label="Webhook signing secret"
+              placeholder={
+                payments.webhookSecretSet ? 'Saved — leave blank to keep' : 'whsec_...'
+              }
+              error={fields.webhookSecret}
             />
             <Hint>
               From the endpoint you register in Stripe for this workspace. Without it, payments are
@@ -292,6 +274,70 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
         </div>
       </save.Form>
     </Card>
+  )
+}
+
+/**
+ * A secret this page accepts but must never show back.
+ *
+ * Every one of these is write-only: the API stores it encrypted and answers with
+ * a masked tail, so the box is empty on load and the reveal flips the input type
+ * rather than fetching anything. There is nothing stored to un-hide — reveal
+ * exists to check a paste before saving, which is the moment a wrong character
+ * is cheap to catch and the only moment the value is in the browser at all.
+ *
+ * Shared by the secret key and the webhook signing secret because they are the
+ * same kind of field with the same rules; one of them having a reveal and the
+ * other not was an accident of the order they were written in.
+ */
+function SecretField({
+  id,
+  name,
+  label,
+  placeholder,
+  error,
+  required = false,
+}: {
+  id: string
+  name: string
+  label: string
+  placeholder: string
+  error?: string
+  required?: boolean
+}) {
+  const [revealed, setRevealed] = useState(false)
+
+  return (
+    <>
+      <Label htmlFor={id}>{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          name={name}
+          type={revealed ? 'text' : 'password'}
+          required={required}
+          // Never offer to remember it: a password manager storing an API key
+          // puts it somewhere this app cannot protect and did not choose.
+          autoComplete="off"
+          className="pr-10 font-mono text-[12px]"
+          placeholder={placeholder}
+          aria-describedby={error ? `${id}-error` : undefined}
+        />
+        <button
+          type="button"
+          onClick={() => setRevealed((was) => !was)}
+          // The label says what pressing it DOES, not what the state is — a
+          // screen reader announces the action, and `hidden`/`shown` alone
+          // leaves which one ambiguous.
+          aria-label={revealed ? `Hide ${label}` : `Reveal ${label}`}
+          aria-pressed={revealed}
+          className="btn-icon absolute right-1 top-1/2 -translate-y-1/2"
+        >
+          <Icon name={revealed ? 'hgi-view-off' : 'hgi-view'} size={16} />
+        </button>
+      </div>
+      <FieldError id={`${id}-error`} message={error} />
+    </>
   )
 }
 
