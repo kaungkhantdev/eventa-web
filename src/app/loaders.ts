@@ -130,7 +130,15 @@ export function pageAction(run: (args: LoaderArgs) => Promise<unknown>) {
     } catch (cause) {
       if (cause instanceof ApiError && cause.isUnauthorized) throw signIn('admin')
       if (cause instanceof ApiError || cause instanceof NetworkError) {
-        return { ok: false, error: messageOf(cause) }
+        return {
+          ok: false,
+          error: messageOf(cause),
+          // Which input each refusal is about, when the API said. Pages put
+          // these under the field rather than at the foot of the form.
+          ...(cause instanceof ApiError && cause.fieldErrors.length > 0
+            ? { fieldErrors: cause.byField() }
+            : {}),
+        }
       }
       throw cause
     }
@@ -142,6 +150,12 @@ export interface ActionResult {
   ok: boolean
   /** The API's own sentence, shown verbatim — it was written for the reader. */
   error?: string
+  /**
+   * Field name → the refusal about it, when the API named one. Absent when
+   * nothing is to blame in particular: a network failure and a stale version
+   * belong at the foot of the form, not under an input.
+   */
+  fieldErrors?: Record<string, string>
 }
 
 export interface LoaderArgs {

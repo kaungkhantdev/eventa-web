@@ -178,7 +178,6 @@ function PreferencesCard({ payments }: { payments: PaymentSettingsCard }) {
           {error}
         </p>
       )}
-      {saved && <p className="mt-3 text-[13px] text-brand">Saved.</p>}
     </Card>
   )
 }

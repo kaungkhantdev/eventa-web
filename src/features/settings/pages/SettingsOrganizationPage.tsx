@@ -1,5 +1,5 @@
 import { useFetcher, useLoaderData } from 'react-router'
-import { Button, Card, Hint, Icon, Input, Label, Select } from '@/components/ui'
+import { Button, Card, FieldError, Hint, Icon, Input, Label, Select } from '@/components/ui'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import { LogoCard } from '../components/LogoCard'
@@ -21,6 +21,13 @@ export default function SettingsOrganizationPage() {
   const { organization } = useLoaderData() as OrganizationData
   const save = useFetcher<ActionResult>()
   const error = save.data?.ok === false ? save.data.error : null
+  /**
+   * Refusals the API pinned to a field. Those render under their input; the
+   * banner below keeps only what belongs to no field in particular — a stale
+   * version, a dropped connection.
+   */
+  const fields = (save.data?.ok === false ? save.data.fieldErrors : undefined) ?? {}
+  const unattached = Object.keys(fields).length === 0 ? error : null
   const saved = save.state === 'idle' && save.data?.ok === true
   useSavedToast(saved, 'Organization saved.')
   useFailureToast(save.state === 'idle' ? error : null)
@@ -44,11 +51,13 @@ export default function SettingsOrganizationPage() {
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <Label htmlFor="org-name">Organization name</Label>
-                <Input id="org-name" name="name" required defaultValue={organization.name} />
+                <Input id="org-name" name="name" required defaultValue={organization.name} aria-describedby={fields.name ? 'org-name-error' : undefined} />
+                <FieldError id="org-name-error" message={fields.name} />
               </div>
               <div className="sm:col-span-2">
                 <Label htmlFor="org-address">Address</Label>
-                <Input id="org-address" name="address" defaultValue={organization.address} />
+                <Input id="org-address" name="address" defaultValue={organization.address} aria-describedby={fields.address ? 'org-address-error' : undefined} />
+                <FieldError id="org-address-error" message={fields.address} />
               </div>
               <div>
                 <Label htmlFor="org-website">Website</Label>
@@ -58,11 +67,14 @@ export default function SettingsOrganizationPage() {
                   type="url"
                   placeholder="https://"
                   defaultValue={organization.website}
+                  aria-describedby={fields.website ? 'org-website-error' : undefined}
                 />
+                <FieldError id="org-website-error" message={fields.website} />
               </div>
               <div>
                 <Label htmlFor="org-tax-id">Tax ID</Label>
-                <Input id="org-tax-id" name="taxId" defaultValue={organization.taxId} />
+                <Input id="org-tax-id" name="taxId" defaultValue={organization.taxId} aria-describedby={fields.taxId ? 'org-tax-id-error' : undefined} />
+                <FieldError id="org-tax-id-error" message={fields.taxId} />
               </div>
               <div>
                 <Label htmlFor="org-timezone">Timezone</Label>
@@ -86,12 +98,11 @@ export default function SettingsOrganizationPage() {
               </div>
             </div>
 
-            {error && (
+            {unattached && (
               <p role="alert" className="mt-3 text-[13px] text-red-500">
-                {error}
+                {unattached}
               </p>
             )}
-            {saved && <p className="mt-3 text-[13px] text-brand">Organization saved.</p>}
 
             <div className="mt-5 flex justify-end border-t border-hair pt-4">
               <Button variant="primary" size="sm" type="submit" disabled={save.state !== 'idle'}>

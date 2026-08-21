@@ -88,7 +88,6 @@ function PasswordCard() {
             {error}
           </p>
         )}
-        {changed && <p className="text-[13px] text-brand">Password changed.</p>}
 
         <Button variant="primary" type="submit" disabled={fetcher.state !== 'idle'}>
           {fetcher.state === 'idle' ? 'Change password' : 'Changing…'}
