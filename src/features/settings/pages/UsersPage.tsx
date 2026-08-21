@@ -15,9 +15,9 @@ import {
   Paginator,
   Panel,
   PastEnd,
+  PillTabs,
   Select,
 } from '@/components/ui'
-import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters } from '@/lib/useFilters'
@@ -284,19 +284,17 @@ function UserFilters({
 
   return (
     <div className="mb-3 space-y-3">
-      <div className="flex flex-wrap gap-1.5">
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.label}
-            type="button"
-            onClick={() => onChange({ status: tab.value || null, page: 1 })}
-            className={cn('pilltab', filters.status === tab.value && 'tab-active')}
-          >
-            {tab.label}
-            <span className="pilltab-count tnum">{counts[tab.count]}</span>
-          </button>
-        ))}
-      </div>
+      {/* `PillTabs` already carries the kit's own container — the rounded
+          surface the pills sit in. Hand-rolling the buttons lost it. */}
+      <PillTabs
+        value={filters.status}
+        onChange={(status) => onChange({ status: status || null, page: 1 })}
+        items={STATUS_TABS.map((tab) => ({
+          value: tab.value,
+          label: tab.label,
+          count: counts[tab.count],
+        }))}
+      />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative w-full sm:flex-1">
