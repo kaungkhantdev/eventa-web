@@ -112,7 +112,11 @@ function ConnectionCard({ payments }: { payments: PaymentSettingsCard }) {
         </p>
       ))}
 
-      <div className="mt-3 grid grid-cols-1 gap-2 border-t border-hair pt-3 text-[12px] sm:grid-cols-3">
+      {/* Three short facts, sat together on one line rather than spread across
+          thirds of the card. Two of them are "—" until a key is saved, and a
+          row of dashes stretched over the full width reads as a broken table
+          rather than as a status the page is still waiting to fill in. */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-hair pt-3 text-[12px]">
         <Fact label="Account" value={payments.accountRef} mono />
         <Fact label="Connected" value={payments.connectedOn} />
         <Fact label="Settles in" value={payments.defaultCurrency} />
@@ -123,11 +127,9 @@ function ConnectionCard({ payments }: { payments: PaymentSettingsCard }) {
 
 function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <p className="flex items-center justify-between gap-2 sm:block">
+    <p className="flex items-center gap-2">
       <span className="text-muted">{label}</span>
-      <span className={cn('font-semibold text-ink sm:mt-0.5 sm:block', mono && 'tnum')}>
-        {value}
-      </span>
+      <span className={cn('font-semibold text-ink', mono && 'tnum')}>{value}</span>
     </p>
   )
 }
@@ -230,7 +232,11 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
         <input type="hidden" name="intent" value="keys" />
         <input type="hidden" name="mode" value={mode} />
 
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* The kit's two-up grid, with a third column once there is room for
+            one. This card carries a field the kit never had — the signing
+            secret — and stretching it across the full 1600px made a `whsec_`
+            string sit in a box wide enough for a paragraph. */}
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <Label htmlFor="keys-pk">Publishable key</Label>
             <Input
@@ -264,7 +270,7 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
             </Hint>
           </div>
 
-          <div className="sm:col-span-2">
+          <div>
             <SecretField
               id="keys-whsec"
               name="webhookSecret"
@@ -278,9 +284,13 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
               From the endpoint you register in Stripe for this workspace. Without it, payments are
               taken but no ticket is issued.
             </Hint>
-            <WebhookUrl url={payments.webhookUrl} />
           </div>
         </div>
+
+        {/* Below the grid, not inside the field's cell: this is the address to
+            paste into Stripe, not part of filling the box in, and a URL that
+            has to wrap three times inside a column is one nobody reads. */}
+        <WebhookUrl url={payments.webhookUrl} />
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-hair pt-3">
           <p className="text-[11px] text-muted">
@@ -385,7 +395,7 @@ function WebhookUrl({ url }: { url: string }) {
   }
 
   return (
-    <div className="mt-2 rounded-lg border border-hair bg-canvas px-3 py-2.5">
+    <div className="mt-3 rounded-lg border border-hair bg-canvas px-3 py-2.5">
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
           Your webhook URL
