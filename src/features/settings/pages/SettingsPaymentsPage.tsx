@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
-import { Badge, Button, Card, Hint, Icon, Input, Label } from '@/components/ui'
+import { Badge, Button, Card, FieldError, Hint, Icon, Input, Label, Select } from '@/components/ui'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
@@ -15,9 +16,10 @@ import type { PaymentSettingsCard } from '../settings.types'
  * account, which mode, what appears on a statement. Card numbers are entered
  * on the provider's own hosted fields and never enter this app.
  *
- * Connecting an account is deliberately not a form here either: it is an
- * OAuth hand-off the provider owns, and pasting an account id into this page
- * would be a worse version of it.
+ * Connecting asks for one thing: the workspace's own Stripe account reference.
+ * No secret key, and none is wanted — Eventa charges *on behalf of* that
+ * account using the platform's key, so a tenant secret would be a liability
+ * with nothing to spend it on.
  */
 export default function SettingsPaymentsPage() {
   const { payments } = useLoaderData() as PaymentsData
@@ -38,9 +40,6 @@ export default function SettingsPaymentsPage() {
 }
 
 function ProviderCard({ payments }: { payments: PaymentSettingsCard }) {
-  const act = useFetcher<ActionResult>()
-  const error = act.data?.ok === false ? act.data.error : null
-
   return (
     <Card className="h-fit p-5">
       <div className="flex items-start justify-between gap-2">
@@ -78,35 +77,124 @@ function ProviderCard({ payments }: { payments: PaymentSettingsCard }) {
         </p>
       </div>
 
-      {error && (
-        <p role="alert" className="mt-3 text-[13px] text-red-500">
-          {error}
-        </p>
-      )}
-
       {payments.connected ? (
         <div className="mt-4 flex flex-wrap gap-2 border-t border-hair pt-4">
-          <act.Form method="post">
-            <input type="hidden" name="intent" value="test" />
-            <Button variant="soft" size="sm" type="submit" disabled={act.state !== 'idle'}>
-              <Icon name="hgi-connect" size={15} />
-              Test connection
-            </Button>
-          </act.Form>
-          <act.Form method="post">
-            <input type="hidden" name="intent" value="disconnect" />
-            <Button variant="danger" size="sm" type="submit" disabled={act.state !== 'idle'}>
-              Disconnect
-            </Button>
-          </act.Form>
+          <IntentForm intent="test" done="Connection is working.">
+            {(busy) => (
+              <Button variant="soft" size="sm" type="submit" disabled={busy}>
+                <Icon name="hgi-connect" size={15} />
+                {busy ? 'Testing…' : 'Test connection'}
+              </Button>
+            )}
+          </IntentForm>
+          <IntentForm intent="disconnect" done="Payment account disconnected.">
+            {(busy) => (
+              <Button variant="danger" size="sm" type="submit" disabled={busy}>
+                Disconnect
+              </Button>
+            )}
+          </IntentForm>
         </div>
       ) : (
-        <Hint className="mt-4 border-t border-hair pt-4">
-          Connecting an account happens on {payments.provider}, not here. Contact support to start
-          the hand-off.
-        </Hint>
+        <ConnectForm provider={payments.provider} />
       )}
     </Card>
+  )
+}
+
+/**
+ * One posted intent, with its own fetcher so its own outcome is what gets
+ * reported. Sharing a fetcher across Test and Disconnect would mean one toast
+ * wording for two different things, and a failure from either appearing under
+ * both.
+ */
+function IntentForm({
+  intent,
+  done,
+  children,
+}: {
+  intent: string
+  /** What the toast says when it worked — written for this action alone. */
+  done: string
+  children: (busy: boolean) => ReactNode
+}) {
+  const act = useFetcher<ActionResult>()
+  const error = act.data?.ok === false ? act.data.error : null
+  useSavedToast(act.state === 'idle' && act.data?.ok === true, done)
+  useFailureToast(act.state === 'idle' ? error : null)
+
+  return (
+    <act.Form method="post">
+      <input type="hidden" name="intent" value={intent} />
+      {children(act.state !== 'idle')}
+    </act.Form>
+  )
+}
+
+/**
+ * Connecting the workspace's own account (US-SET-08).
+ *
+ * The account REFERENCE and nothing else. Eventa holds one platform key and
+ * charges on behalf of this account, so there is no tenant secret to collect —
+ * and collecting one would mean holding every organizer's Stripe credentials in
+ * a single database, which is a far larger thing to protect than it is to
+ * avoid. The reference is not a credential: on its own it authorises nothing.
+ *
+ * The API verifies it with Stripe before saving, so a typo is refused here
+ * rather than at a buyer's checkout.
+ */
+function ConnectForm({ provider }: { provider: string }) {
+  const connect = useFetcher<ActionResult>()
+  const failed = connect.data?.ok === false ? connect.data : null
+  const fieldError = failed?.fieldErrors?.accountId
+  useSavedToast(
+    connect.state === 'idle' && connect.data?.ok === true,
+    'Payment account connected.',
+  )
+  // Only what has no field of its own to sit under — otherwise the same
+  // sentence would be shown twice.
+  useFailureToast(connect.state === 'idle' && !fieldError ? (failed?.error ?? null) : null)
+
+  return (
+    <div className="mt-4 border-t border-hair pt-4">
+      <connect.Form method="post">
+        <input type="hidden" name="intent" value="connect" />
+
+        <Label htmlFor="payments-account">{provider} account ID</Label>
+        <Input
+          id="payments-account"
+          name="accountId"
+          required
+          placeholder="acct_1A2b3C"
+          aria-describedby={fieldError ? 'payments-account-error' : undefined}
+        />
+        <FieldError id="payments-account-error" message={fieldError} />
+
+        <Label htmlFor="payments-mode" className="mt-3">
+          Mode
+        </Label>
+        <Select id="payments-mode" name="mode" defaultValue="test">
+          <option value="test">Test — nothing is really charged</option>
+          <option value="live">Live — real money</option>
+        </Select>
+
+        <Button
+          variant="primary"
+          size="sm"
+          type="submit"
+          className="mt-3 w-full"
+          disabled={connect.state !== 'idle'}
+        >
+          {connect.state === 'idle' ? 'Connect' : 'Checking…'}
+        </Button>
+      </connect.Form>
+
+      <Hint className="mt-3">
+        Find this in your {provider} dashboard under Settings → Account details. Eventa never asks
+        for a secret key — payments are taken on your account using ours, and your card details stay
+        with {provider}.
+      </Hint>
+    </div>
   )
 }
 

@@ -336,6 +336,12 @@ export const paymentsRoute = {
     const intent = form.get('intent')
     if (intent === 'disconnect') return accountApi.disconnectPayments()
     if (intent === 'test') return accountApi.testPayments()
+    if (intent === 'connect') {
+      return accountApi.connectPayments({
+        accountId: field(form, 'accountId'),
+        mode: field(form, 'mode') === 'live' ? 'live' : 'test',
+      })
+    }
     if (intent === 'method') {
       return accountApi.setPaymentMethod(field(form, 'method'), form.get('enabled') === 'true')
     }
@@ -391,6 +397,13 @@ export const accountApi = {
     api.patch<PaymentSettingsWire>('/payment-settings', body),
   setPaymentMethod: (method: string, enabled: boolean) =>
     api.patch<unknown>(`/payment-settings/methods/${method}`, { enabled }),
+  /**
+   * The account reference the workspace's own Stripe account is known by, and
+   * nothing else. No secret key: Eventa charges on behalf of this account with
+   * the platform's key, so a tenant secret would be a liability with no use.
+   */
+  connectPayments: (body: { accountId: string; mode: 'test' | 'live' }) =>
+    api.post<PaymentSettingsWire>('/payment-settings/connect', body),
   testPayments: () => api.post<unknown>('/payment-settings/test'),
   disconnectPayments: () => api.post<unknown>('/payment-settings/disconnect'),
 }
