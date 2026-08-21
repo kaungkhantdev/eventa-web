@@ -46,6 +46,8 @@ import type {
 
 const settingsApi = {
   members: (query: Query) => api.list<MemberWire>('/members', { query }),
+  /** The tab counts. Its own call: the list is one page, these describe all. */
+  memberCounts: (query: Query) => api.get<MemberCounts>('/members/counts', { query }),
   invite: (body: { name: string; email: string; roleId: number }) =>
     api.post<unknown>('/members', body),
   setRole: (id: number, roleId: number) => api.patch<unknown>(`/members/${id}`, { roleId }),
@@ -88,21 +90,51 @@ const settingsApi = {
 
 /* ── users ────────────────────────────────────────────────────────────── */
 
+export interface MemberCounts {
+  all: number
+  active: number
+  invited: number
+  suspended: number
+}
+
 export interface UsersData {
   rows: MemberRow[]
   window: PageWindow
   roles: { id: number; name: string }[]
+  counts: MemberCounts
+  /** Echoed back so the controls show what the URL actually asked for. */
+  filters: { search: string; status: string; roleId: string }
 }
 
 async function loadUsers({ request }: LoaderArgs): Promise<UsersData> {
   const params = queryOf(request)
   const limit = intParam(params, 'limit', DEFAULT_PAGE_SIZE)
-  const [page, roles] = await Promise.all([
+  // Filters live in the URL, not component state: the API pages server-side, so
+  // the URL is the single source of truth and the back button works.
+  const filters = {
+    search: params.get('q') ?? '',
+    status: params.get('status') ?? '',
+    roleId: params.get('roleId') ?? '',
+  }
+  const narrowing = {
+    ...(filters.search ? { search: filters.search } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.roleId ? { roleId: Number(filters.roleId) } : {}),
+  }
+
+  const [page, roles, counts] = await Promise.all([
     settingsApi.members({
       page: intParam(params, 'page', 1),
       limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
+      ...narrowing,
     }),
     settingsApi.roles(),
+    // Status is left off deliberately — a tab shows its own total even while a
+    // different one is selected. Search and role narrow them.
+    settingsApi.memberCounts({
+      ...(filters.search ? { search: filters.search } : {}),
+      ...(filters.roleId ? { roleId: Number(filters.roleId) } : {}),
+    }),
   ])
 
   return {
@@ -111,6 +143,8 @@ async function loadUsers({ request }: LoaderArgs): Promise<UsersData> {
     // The invite form and the role switcher both need every role, not the ones
     // that happen to be held by somebody on this page.
     roles: roles.map((role) => ({ id: role.id, name: role.name })),
+    counts,
+    filters,
   }
 }
 

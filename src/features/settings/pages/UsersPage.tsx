@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Badge,
@@ -17,11 +17,12 @@ import {
   PastEnd,
   Select,
 } from '@/components/ui'
+import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters } from '@/lib/useFilters'
 import type { ActionResult } from '@/app/loaders'
-import type { UsersData } from '../settings.routes'
+import type { MemberCounts, UsersData } from '../settings.routes'
 import type { MemberRow } from '../settings.types'
 
 /**
@@ -34,12 +35,14 @@ export default function UsersPage() {
   const data = useLoaderData() as UsersData
   const { set, clear, emptyReason } = useFilters({ total: data.window.total })
   const invite = useDisclosure()
-  // The list has no search, role filter or status tabs — the API pages it and
-  // nothing else — so the only way it comes back empty other than on a first
-  // run is a page number past the end. That still has to be told apart:
-  // emptying the last page by removing somebody must not tell an organizer with
-  // twenty colleagues to invite their first.
-  const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
+  // A first run has to be told apart from a search that found nobody, and from
+  // a page number past the end: emptying the last page by removing somebody
+  // must not tell an organizer with twenty colleagues to invite their first.
+  const filtered = Boolean(
+    data.filters.search || data.filters.status || data.filters.roleId,
+  )
+  const firstRun =
+    data.rows.length === 0 && emptyReason === 'first-run' && !filtered
 
   return (
     <>
@@ -57,6 +60,15 @@ export default function UsersPage() {
           </>
         }
       />
+
+      {!firstRun && (
+        <UserFilters
+          filters={data.filters}
+          counts={data.counts}
+          roles={data.roles}
+          onChange={set}
+        />
+      )}
 
       {firstRun ? (
         <EmptyState
@@ -87,18 +99,31 @@ export default function UsersPage() {
                 {data.rows.map((row) => (
                   <MemberTableRow key={row.id} row={row} roles={data.roles} />
                 ))}
-                {/* There is nothing on this page to blame on a filter: the page
-                    offers none, so an empty body past the first run means the
-                    page number ran off the end of the list. `clear` rather than
-                    `set({ page: null })` so a stale link carrying anything else
-                    is dropped too, and the button always lands somewhere. */}
+                {/* Two different empties, and telling somebody the wrong one
+                    sends them looking in the wrong place. A filter that matched
+                    nobody is their search; an empty page past the first is the
+                    page number running off the end. `clear` in both cases so a
+                    stale link carrying anything else is dropped too, and the
+                    button always lands somewhere. */}
                 {data.rows.length === 0 && (
                   <tr>
                     <td colSpan={4}>
-                      <PastEnd noun="users" onFirstPage={clear}>
-                        Nothing is on this page of the list — it may have got shorter since it was
-                        opened. The workspace&apos;s members are still there, back at the start.
-                      </PastEnd>
+                      {filtered ? (
+                        <EmptyState
+                          compact
+                          icon="hgi-search-01"
+                          title="Nobody matches that"
+                          actions={[{ label: 'Clear filters', onClick: clear }]}
+                        >
+                          No member of this workspace matches the filters above. Widen them, or
+                          check the spelling of the name or address.
+                        </EmptyState>
+                      ) : (
+                        <PastEnd noun="users" onFirstPage={clear}>
+                          Nothing is on this page of the list — it may have got shorter since it was
+                          opened. The workspace&apos;s members are still there, back at the start.
+                        </PastEnd>
+                      )}
                     </td>
                   </tr>
                 )}
@@ -202,6 +227,110 @@ function MemberTableRow({ row, roles }: { row: MemberRow; roles: RoleOption[] })
         </div>
       </td>
     </tr>
+  )
+}
+
+/** The tabs the kit draws, and what each one asks the API for. */
+const STATUS_TABS = [
+  { value: '', label: 'All', count: 'all' },
+  { value: 'Active', label: 'Active', count: 'active' },
+  { value: 'Invited', label: 'Invited', count: 'invited' },
+  { value: 'Suspended', label: 'Suspended', count: 'suspended' },
+] as const satisfies readonly {
+  value: string
+  label: string
+  count: keyof MemberCounts
+}[]
+
+/** Long enough that a fast typist gets one request, short enough to feel live. */
+const SEARCH_SETTLE_MS = 300
+
+/**
+ * Status tabs, search and a role filter (US-ACC-02), as the kit draws them.
+ *
+ * Every one of them goes into the URL rather than component state, because the
+ * API pages and counts server-side: the URL is what the loader reads, so it is
+ * the only place they can live without the rows, the counts and the paginator
+ * drifting apart. It also means the back button works and a filtered view can
+ * be linked to.
+ *
+ * Changing any filter resets to page 1. Staying on page 4 of a list that now
+ * has one page is how somebody lands on "no results" for a search that matched.
+ */
+function UserFilters({
+  filters,
+  counts,
+  roles,
+  onChange,
+}: {
+  filters: UsersData['filters']
+  counts: MemberCounts
+  roles: { id: number; name: string }[]
+  onChange: (patch: Record<string, string | number | null>) => void
+}) {
+  // Mirrors the URL so typing feels immediate, while the request waits for a
+  // pause. Seeded from the URL so a shared link shows its own term.
+  const [term, setTerm] = useState(filters.search)
+  const settle = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  const search = (next: string) => {
+    setTerm(next)
+    clearTimeout(settle.current)
+    settle.current = setTimeout(
+      () => onChange({ q: next || null, page: 1 }),
+      SEARCH_SETTLE_MS,
+    )
+  }
+
+  return (
+    <div className="mb-3 space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {STATUS_TABS.map((tab) => (
+          <button
+            key={tab.label}
+            type="button"
+            onClick={() => onChange({ status: tab.value || null, page: 1 })}
+            className={cn('pilltab', filters.status === tab.value && 'tab-active')}
+          >
+            {tab.label}
+            <span className="pilltab-count tnum">{counts[tab.count]}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:flex-1">
+          <Icon
+            name="hgi-search-01"
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+          />
+          <input
+            type="search"
+            value={term}
+            onChange={(event) => search(event.target.value)}
+            aria-label="Search users by name or email"
+            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+            placeholder="Search by name or email…"
+          />
+        </div>
+        <div className="w-full sm:w-52">
+          <Select
+            value={filters.roleId}
+            onChange={(event) => onChange({ roleId: event.target.value || null, page: 1 })}
+            aria-label="Filter by role"
+            className="h-10 w-full border-0 bg-surface font-medium"
+          >
+            <option value="">All roles</option>
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+    </div>
   )
 }
 
