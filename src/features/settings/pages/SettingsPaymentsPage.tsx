@@ -145,14 +145,35 @@ function Fact({ label, value, mono }: { label: string; value: string; mono?: boo
  * pre-fill it with — the API answers with a masked tail — and a box that looked
  * populated would invite an organizer to "save" a value the browser never held.
  */
+/**
+ * What the toast says when the keys are refused.
+ *
+ * A refusal must never be quieter than a success — the Save button sits at the
+ * foot of a tall card and the field it is complaining about can be off-screen,
+ * so "nothing happened" is the only reading available without one.
+ *
+ * When the API named the fields, the toast points at them instead of repeating
+ * their sentences: those are already under the boxes, verbatim, which is where
+ * they are worth reading. When it named none, the API's own message IS the
+ * whole explanation, so it is what gets announced.
+ */
+const FIELDS_REFUSED = 'Those keys were not saved — check the fields marked below.'
+
+function refusalNote(
+  failed: ActionResult | null,
+  fields: Record<string, string>,
+): string | null {
+  if (!failed) return null
+  return Object.keys(fields).length > 0 ? FIELDS_REFUSED : (failed.error ?? null)
+}
+
 function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
   const save = useFetcher<ActionResult>()
   const [mode, setMode] = useState<'test' | 'live'>(payments.testMode ? 'test' : 'live')
   const failed = save.data?.ok === false ? save.data : null
   const fields = failed?.fieldErrors ?? {}
-  const unattached = Object.keys(fields).length === 0 ? (failed?.error ?? null) : null
   useSavedToast(save.state === 'idle' && save.data?.ok === true, 'Payment keys saved.')
-  useFailureToast(save.state === 'idle' ? unattached : null)
+  useFailureToast(save.state === 'idle' ? refusalNote(failed, fields) : null)
 
   const busy = save.state !== 'idle'
 
