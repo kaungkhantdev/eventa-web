@@ -1,59 +1,110 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import { Badge, Button, Card, FieldError, Hint, Icon, Input, Label, Select } from '@/components/ui'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
+import { cn } from '@/lib/cn'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
 import { Toggle } from '../components/Toggle'
 import type { PaymentsData } from '../settings.routes'
-import type { PaymentSettingsCard } from '../settings.types'
+import type { PaymentMethodRow, PaymentSettingsCard } from '../settings.types'
 
 /**
- * How money reaches this workspace (US-FIN-01, US-DISC-05).
+ * Payment provider, API keys and checkout preferences (US-SET-08/09/10),
+ * ported from `eventa-ui-kit/admin/settings-payments.html`.
  *
- * PCI SAQ-A: there is no card field on this screen, and there never will be.
- * What is configured here is the *connection* to the payment provider — which
- * account, which mode, what appears on a statement. Card numbers are entered
- * on the provider's own hosted fields and never enter this app.
+ * PCI SAQ-A: there is no card field on this screen and there never will be.
+ * What is configured here is the *connection* — which keys, which mode, what
+ * appears on a statement. Card numbers are entered on Stripe's own hosted page.
  *
  * The workspace pastes its OWN Stripe keys. The secret is sent once, stored
  * encrypted by the API, and never comes back — this page only ever sees a
- * masked tail, enough to say which key is saved and useless for anything else.
+ * four-character tail, enough to say which key is saved and useless otherwise.
  */
 export default function SettingsPaymentsPage() {
-  const { payments } = useLoaderData() as PaymentsData
+  const { payments, methods } = useLoaderData() as PaymentsData
 
   return (
     <>
       <SettingsHeader
         title="Payments"
-        subtitle="How you take money, and what buyers see on their statement."
+        subtitle="Payment provider, API keys and checkout preferences."
       />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <PreferencesCard payments={payments} />
-        <ProviderCard payments={payments} />
+      <div className="space-y-3">
+        {payments.testMode && <TestModeBanner />}
+
+        <ConnectionCard payments={payments} />
+        <KeysCard payments={payments} />
+
+        {/* Similar-sized cards, so the kit balances them side by side. */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+          <MethodsCard methods={methods} />
+          <PreferencesCard payments={payments} />
+        </div>
       </div>
     </>
   )
 }
 
-function ProviderCard({ payments }: { payments: PaymentSettingsCard }) {
+/**
+ * Amber, and above everything else on the page.
+ *
+ * A workspace taking play money while it believes it is trading is the one
+ * state here that costs real revenue, and it looks identical to working. The
+ * kit puts this first for that reason.
+ */
+function TestModeBanner() {
   return (
-    <Card className="h-fit p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="text-[13px] font-bold tracking-tight">{payments.provider}</p>
-          <p className="mt-0.5 text-[12px] text-muted">Your payment provider.</p>
-        </div>
-        <Badge tone={payments.statusTone}>{payments.statusLabel}</Badge>
-      </div>
+    <div className="flex items-center gap-2.5 rounded-xl border border-amber-300/60 bg-amber-50 px-3.5 py-2.5 text-[12px] font-medium text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-300">
+      <Icon name="hgi-alert-circle" size={16} />
+      <span>
+        You&rsquo;re using <b>Test keys</b> — no real charges are processed. Add your Live keys to
+        accept payments.
+      </span>
+    </div>
+  )
+}
 
-      {payments.testMode && (
-        <Hint className="mt-3">
-          Test mode — no real money moves, and these payments are not settled.
-        </Hint>
-      )}
+/** Stripe's own brand purple, as the kit hard-codes it. */
+const STRIPE_PURPLE = 'bg-[#635BFF]'
+
+function ConnectionCard({ payments }: { payments: PaymentSettingsCard }) {
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              'grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-sm',
+              STRIPE_PURPLE,
+            )}
+          >
+            <Icon name="hgi-credit-card" size={20} />
+          </span>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-[15px] font-bold tracking-tight">{payments.provider}</h2>
+              <Badge tone={payments.statusTone}>{payments.statusLabel}</Badge>
+            </div>
+            <p className="mt-0.5 text-[12px] text-muted">
+              Your payment gateway for cards, PromptPay and wallets.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {payments.connected && (
+            <IntentForm intent="disconnect" done="Payment account disconnected.">
+              {(busy) => (
+                <Button variant="danger" size="sm" type="submit" disabled={busy}>
+                  Disconnect
+                </Button>
+              )}
+            </IntentForm>
+          )}
+        </div>
+      </div>
 
       {payments.warnings.map((warning) => (
         <p key={warning} role="alert" className="mt-2 text-[12px] text-amber-600">
@@ -61,43 +112,415 @@ function ProviderCard({ payments }: { payments: PaymentSettingsCard }) {
         </p>
       ))}
 
-      <div className="mt-4 space-y-2 border-t border-hair pt-4 text-[12px]">
-        <p className="flex items-center justify-between gap-2">
-          <span className="text-muted">Account</span>
-          <span className="tnum font-semibold text-ink">{payments.accountRef}</span>
-        </p>
-        <p className="flex items-center justify-between gap-2">
-          <span className="text-muted">Connected</span>
-          <span className="font-semibold text-ink">{payments.connectedOn}</span>
-        </p>
-        <p className="flex items-center justify-between gap-2">
-          <span className="text-muted">Settles in</span>
-          <span className="font-semibold text-ink">{payments.defaultCurrency}</span>
-        </p>
+      <div className="mt-3 grid grid-cols-1 gap-2 border-t border-hair pt-3 text-[12px] sm:grid-cols-3">
+        <Fact label="Account" value={payments.accountRef} mono />
+        <Fact label="Connected" value={payments.connectedOn} />
+        <Fact label="Settles in" value={payments.defaultCurrency} />
+      </div>
+    </Card>
+  )
+}
+
+function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <p className="flex items-center justify-between gap-2 sm:block">
+      <span className="text-muted">{label}</span>
+      <span className={cn('font-semibold text-ink sm:mt-0.5 sm:block', mono && 'tnum')}>
+        {value}
+      </span>
+    </p>
+  )
+}
+
+/**
+ * The API keys card (US-SET-08).
+ *
+ * The mode segmented control is part of this card's own form rather than page
+ * chrome, because mode and keys are submitted together: they have to agree, and
+ * the API refuses a pair that disagrees with the toggle above it. A live pair
+ * saved under Test takes real money from real people while the banner says
+ * nothing is charged.
+ *
+ * The secret field is empty on load rather than pre-filled. There is nothing to
+ * pre-fill it with — the API answers with a masked tail — and a box that looked
+ * populated would invite an organizer to "save" a value the browser never held.
+ */
+function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
+  const save = useFetcher<ActionResult>()
+  const [mode, setMode] = useState<'test' | 'live'>(payments.testMode ? 'test' : 'live')
+  const [revealed, setRevealed] = useState(false)
+  const failed = save.data?.ok === false ? save.data : null
+  const fields = failed?.fieldErrors ?? {}
+  const unattached = Object.keys(fields).length === 0 ? (failed?.error ?? null) : null
+  useSavedToast(save.state === 'idle' && save.data?.ok === true, 'Payment keys saved.')
+  useFailureToast(save.state === 'idle' ? unattached : null)
+
+  const busy = save.state !== 'idle'
+
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[15px] font-bold tracking-tight">
+          API keys
+          <span className="ml-1 align-middle text-[11px] font-medium text-muted">
+            {mode === 'test' ? 'Test mode' : 'Live mode'}
+          </span>
+        </h2>
+        <div className="flex items-center gap-2">
+          {/* Switching mode swaps which stored pair is being edited, so it also
+              swaps what "Save keys" writes — the two travel together. */}
+          <div className="segmented">
+            <button
+              type="button"
+              onClick={() => setMode('test')}
+              className={cn(mode === 'test' && 'active')}
+            >
+              Test
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('live')}
+              className={cn(mode === 'live' && 'active')}
+            >
+              Live
+            </button>
+          </div>
+          <a
+            href="https://dashboard.stripe.com/apikeys"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
+          >
+            Where do I find these?
+            <Icon name="hgi-arrow-up-right-01" size={13} />
+          </a>
+        </div>
       </div>
 
-      {payments.connected && (
-        <div className="mt-4 flex flex-wrap gap-2 border-t border-hair pt-4">
-          <IntentForm intent="test" done="Connection is working.">
-            {(busy) => (
-              <Button variant="soft" size="sm" type="submit" disabled={busy}>
-                <Icon name="hgi-connect" size={15} />
-                {busy ? 'Testing…' : 'Test connection'}
-              </Button>
-            )}
-          </IntentForm>
-          <IntentForm intent="disconnect" done="Payment account disconnected.">
-            {(busy) => (
-              <Button variant="danger" size="sm" type="submit" disabled={busy}>
-                Disconnect
-              </Button>
-            )}
-          </IntentForm>
-        </div>
-      )}
+      <div className="mt-2 flex items-start gap-2.5 rounded-lg border border-hair bg-canvas px-3 py-2.5 text-[12px] text-muted">
+        <Icon name="hgi-idea-01" size={15} className="mt-px shrink-0 text-brand" />
+        <span>
+          In your <b className="text-ink">Stripe Dashboard</b> go to{' '}
+          <b className="text-ink">Developers → API keys</b>, copy the two keys, and paste them
+          below.
+        </span>
+      </div>
 
-      <KeysCard payments={payments} />
+      <save.Form method="post">
+        <input type="hidden" name="intent" value="keys" />
+        <input type="hidden" name="mode" value={mode} />
+
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="keys-pk">Publishable key</Label>
+            <Input
+              id="keys-pk"
+              name="publishableKey"
+              required
+              className="font-mono text-[12px]"
+              placeholder={`pk_${mode}_...`}
+              defaultValue={mode === 'test' ? payments.publishableKey : ''}
+              aria-describedby={fields.publishableKey ? 'keys-pk-error' : undefined}
+            />
+            <FieldError id="keys-pk-error" message={fields.publishableKey} />
+            <Hint>
+              Starts with <span className="font-mono">pk_test_</span> (test) or{' '}
+              <span className="font-mono">pk_live_</span> (live).
+            </Hint>
+          </div>
+
+          <div>
+            <Label htmlFor="keys-sk">Secret key</Label>
+            <div className="relative">
+              <Input
+                id="keys-sk"
+                name="secretKey"
+                // Reveal is for checking a paste, so it flips the input type
+                // rather than fetching anything: the stored key is not here to
+                // reveal, and never will be.
+                type={revealed ? 'text' : 'password'}
+                required
+                autoComplete="off"
+                className="pr-10 font-mono text-[12px]"
+                placeholder={payments.secretKeyMasked || `sk_${mode}_...`}
+                aria-describedby={fields.secretKey ? 'keys-sk-error' : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setRevealed((was) => !was)}
+                aria-label={revealed ? 'Hide secret key' : 'Reveal secret key'}
+                className="btn-icon absolute right-1 top-1/2 -translate-y-1/2"
+              >
+                <Icon name={revealed ? 'hgi-view-off' : 'hgi-view'} size={16} />
+              </button>
+            </div>
+            <FieldError id="keys-sk-error" message={fields.secretKey} />
+            <Hint>
+              Starts with <span className="font-mono">sk_</span>. Stored encrypted — never shown
+              again, and never sent to a browser.
+            </Hint>
+          </div>
+
+          <div className="sm:col-span-2">
+            <Label htmlFor="keys-whsec">Webhook signing secret</Label>
+            <Input
+              id="keys-whsec"
+              name="webhookSecret"
+              type="password"
+              autoComplete="off"
+              className="font-mono text-[12px]"
+              placeholder={payments.webhookSecretSet ? 'Saved — leave blank to keep' : 'whsec_...'}
+            />
+            <Hint>
+              From the endpoint you register in Stripe for this workspace. Without it, payments are
+              taken but no ticket is issued.
+            </Hint>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-hair pt-3">
+          <p className="text-[11px] text-muted">
+            {payments.keysSavedOn ? `Last saved ${payments.keysSavedOn}` : 'Not saved yet'}
+          </p>
+          <div className="flex gap-2">
+            <TestConnectionButton />
+            <Button variant="primary" size="sm" type="submit" disabled={busy}>
+              {busy ? 'Checking…' : 'Save keys'}
+            </Button>
+          </div>
+        </div>
+      </save.Form>
     </Card>
+  )
+}
+
+/**
+ * Its own form, not a second submit button inside the keys form — it proves the
+ * SAVED key still works, which is a different question from "are these two
+ * boxes valid", and submitting the unsaved boxes would answer neither.
+ */
+function TestConnectionButton() {
+  return (
+    <IntentForm intent="test" done="Connection is working.">
+      {(busy) => (
+        <Button variant="soft" size="sm" type="submit" disabled={busy}>
+          <Icon name="hgi-plug-socket" size={14} />
+          {busy ? 'Testing…' : 'Test connection'}
+        </Button>
+      )}
+    </IntentForm>
+  )
+}
+
+/**
+ * How each method looks. The API says which methods exist and whether each is
+ * on; everything here is presentation, so it stays a lookup table rather than a
+ * branch — a new method Stripe adds needs a row here, not an `if`.
+ */
+const METHOD_LOOKS: Record<
+  string,
+  { icon: string; tint: string; blurb?: string; schemes?: string[] }
+> = {
+  Card: {
+    icon: 'hgi-credit-card',
+    tint: 'bg-brand-soft text-brand',
+    schemes: ['VISA', 'MC', 'AMEX', 'JCB'],
+  },
+  PromptPay: {
+    icon: 'hgi-qr-code-01',
+    tint: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
+    blurb: 'Thailand QR bank transfer',
+  },
+  'Apple Pay': {
+    icon: 'hgi-apple',
+    tint: 'bg-line text-ink',
+    blurb: 'One-tap checkout on Apple devices',
+  },
+  'Google Pay': {
+    icon: 'hgi-wallet-01',
+    tint: 'bg-line text-muted',
+    blurb: 'One-tap checkout on Android & Chrome',
+  },
+  'Bank transfer': {
+    icon: 'hgi-bank',
+    tint: 'bg-line text-muted',
+    blurb: 'Pay by direct bank transfer',
+  },
+}
+
+const FALLBACK_LOOK = { icon: 'hgi-wallet-01', tint: 'bg-line text-muted' }
+
+function MethodsCard({ methods }: { methods: PaymentMethodRow[] }) {
+  const save = useFetcher<ActionResult>()
+  const error = save.data?.ok === false ? save.data.error : null
+  useSavedToast(save.state === 'idle' && save.data?.ok === true, 'Payment methods updated.')
+  useFailureToast(save.state === 'idle' ? error : null)
+
+  return (
+    <Card className="p-4">
+      <h2 className="text-[15px] font-bold tracking-tight">Payment methods</h2>
+      <p className="mt-0.5 text-[12px] text-muted">
+        Choose which methods to offer your attendees at checkout.
+      </p>
+
+      <div className="mt-2 divide-y divide-line">
+        {methods.map((row) => (
+          <MethodRow
+            key={row.method}
+            row={row}
+            busy={save.state !== 'idle'}
+            onChange={(enabled) =>
+              save.submit(
+                { intent: 'method', method: row.method, enabled: String(enabled) },
+                { method: 'post' },
+              )
+            }
+          />
+        ))}
+      </div>
+    </Card>
+  )
+}
+
+function MethodRow({
+  row,
+  busy,
+  onChange,
+}: {
+  row: PaymentMethodRow
+  busy: boolean
+  onChange: (enabled: boolean) => void
+}) {
+  const look = METHOD_LOOKS[row.method] ?? FALLBACK_LOOK
+  const schemes = 'schemes' in look ? look.schemes : undefined
+  const blurb = 'blurb' in look ? look.blurb : undefined
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-1 last:pb-1">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-lg', look.tint)}>
+          <Icon name={look.icon} size={16} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-ink">{row.method}</p>
+          {schemes && (
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              {schemes.map((scheme) => (
+                <span
+                  key={scheme}
+                  className="rounded bg-line px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink"
+                >
+                  {scheme}
+                </span>
+              ))}
+            </div>
+          )}
+          {blurb && <p className="text-[11px] text-muted">{blurb}</p>}
+        </div>
+      </div>
+      <Toggle on={row.enabled} disabled={busy} onChange={onChange} label={row.method} />
+    </div>
+  )
+}
+
+function PreferencesCard({ payments }: { payments: PaymentSettingsCard }) {
+  const save = useFetcher<ActionResult>()
+  const error = save.data?.ok === false ? save.data.error : null
+  useSavedToast(save.state === 'idle' && save.data?.ok === true, 'Payment preferences saved.')
+  useFailureToast(save.state === 'idle' ? error : null)
+
+  const setFlag = (field: 'saveCards' | 'emailReceipts', value: boolean) =>
+    save.submit(
+      {
+        statementDescriptor: payments.statementDescriptor,
+        saveCards: String(field === 'saveCards' ? value : payments.saveCards),
+        emailReceipts: String(field === 'emailReceipts' ? value : payments.emailReceipts),
+      },
+      { method: 'post' },
+    )
+
+  const busy = save.state !== 'idle'
+
+  return (
+    <Card className="p-4">
+      <h2 className="text-[15px] font-bold tracking-tight">Checkout preferences</h2>
+
+      <save.Form method="post" key={payments.statementDescriptor}>
+        <input type="hidden" name="saveCards" value={String(payments.saveCards)} />
+        <input type="hidden" name="emailReceipts" value={String(payments.emailReceipts)} />
+
+        <div className="mt-3 grid grid-cols-1 gap-4">
+          <div>
+            <Label htmlFor="pay-currency">Default currency</Label>
+            {/* Read-only for now: the API warns on a mismatch with the workspace
+                currency rather than blocking, and changing it mid-sales would
+                re-price live tickets. */}
+            <Select id="pay-currency" name="defaultCurrency" defaultValue={payments.defaultCurrency}>
+              <option value={payments.defaultCurrency}>{payments.defaultCurrency}</option>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="pay-descriptor">Statement descriptor</Label>
+            <Input
+              id="pay-descriptor"
+              name="statementDescriptor"
+              maxLength={22}
+              defaultValue={payments.statementDescriptor}
+              placeholder="EVENTA TICKETS"
+            />
+            <Hint>Appears on your attendee&rsquo;s card statement.</Hint>
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-1 border-t border-hair pt-2">
+          <PreferenceRow
+            title="Save cards for faster checkout"
+            description="Let returning attendees reuse a saved card"
+            on={payments.saveCards}
+            busy={busy}
+            onChange={(next) => setFlag('saveCards', next)}
+          />
+          <PreferenceRow
+            title="Email receipts"
+            description="Send a receipt after each successful payment"
+            on={payments.emailReceipts}
+            busy={busy}
+            onChange={(next) => setFlag('emailReceipts', next)}
+          />
+        </div>
+
+        <div className="mt-3 flex justify-end border-t border-hair pt-3">
+          <Button variant="primary" size="sm" type="submit" disabled={busy}>
+            <Icon name="hgi-tick-02" size={15} />
+            {busy ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </save.Form>
+    </Card>
+  )
+}
+
+function PreferenceRow({
+  title,
+  description,
+  on,
+  busy,
+  onChange,
+}: {
+  title: string
+  description: string
+  on: boolean
+  busy: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2">
+      <span>
+        <span className="block text-[13px] font-medium text-ink">{title}</span>
+        <span className="block text-[11px] text-muted">{description}</span>
+      </span>
+      <Toggle on={on} disabled={busy} onChange={onChange} label={title} />
+    </div>
   )
 }
 
@@ -127,206 +550,5 @@ function IntentForm({
       <input type="hidden" name="intent" value={intent} />
       {children(act.state !== 'idle')}
     </act.Form>
-  )
-}
-
-/**
- * The workspace's own Stripe keys (US-SET-08), as the UI kit draws this card.
- *
- * The secret goes up once and never comes back: the API stores it encrypted and
- * answers with a masked tail, which is all this screen needs to say WHICH key is
- * saved. So the field is empty on load rather than pre-filled — there is nothing
- * to pre-fill it with, and a box that looks populated would invite an organizer
- * to "save" a value the browser does not actually hold.
- *
- * Mode is submitted with the keys because the two have to agree. The API refuses
- * a live pair saved under Test: that combination takes real money from real
- * people while the banner above says nothing is charged.
- */
-function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
-  const save = useFetcher<ActionResult>()
-  const failed = save.data?.ok === false ? save.data : null
-  const fields = failed?.fieldErrors ?? {}
-  const unattached = Object.keys(fields).length === 0 ? (failed?.error ?? null) : null
-  useSavedToast(save.state === 'idle' && save.data?.ok === true, 'Payment keys saved.')
-  useFailureToast(save.state === 'idle' ? unattached : null)
-
-  return (
-    <div className="mt-4 border-t border-hair pt-4">
-      <p className="text-[13px] font-bold tracking-tight">API keys</p>
-      <p className="mt-0.5 text-[12px] text-muted">
-        In your Stripe Dashboard go to Developers → API keys, copy the two keys, and paste them
-        below.
-      </p>
-
-      <save.Form method="post" className="mt-3">
-        <input type="hidden" name="intent" value="keys" />
-
-        <Label htmlFor="keys-mode">Mode</Label>
-        <Select id="keys-mode" name="mode" defaultValue={payments.testMode ? 'test' : 'live'}>
-          <option value="test">Test — nothing is really charged</option>
-          <option value="live">Live — real money</option>
-        </Select>
-
-        <Label htmlFor="keys-pk" className="mt-3">
-          Publishable key
-        </Label>
-        <Input
-          id="keys-pk"
-          name="publishableKey"
-          required
-          className="font-mono text-[12px]"
-          placeholder="pk_test_..."
-          aria-describedby={fields.publishableKey ? 'keys-pk-error' : undefined}
-        />
-        <FieldError id="keys-pk-error" message={fields.publishableKey} />
-
-        <Label htmlFor="keys-sk" className="mt-3">
-          Secret key
-        </Label>
-        <Input
-          id="keys-sk"
-          name="secretKey"
-          type="password"
-          required
-          autoComplete="off"
-          className="font-mono text-[12px]"
-          placeholder={payments.secretKeyMasked || 'sk_test_...'}
-          aria-describedby={fields.secretKey ? 'keys-sk-error' : undefined}
-        />
-        <FieldError id="keys-sk-error" message={fields.secretKey} />
-        <Hint className="mt-1">
-          Starts with sk_. Stored encrypted — never shown again, and never sent to a browser.
-        </Hint>
-
-        <Label htmlFor="keys-whsec" className="mt-3">
-          Webhook signing secret
-        </Label>
-        <Input
-          id="keys-whsec"
-          name="webhookSecret"
-          type="password"
-          autoComplete="off"
-          className="font-mono text-[12px]"
-          placeholder={payments.webhookSecretSet ? 'Saved — leave blank to keep' : 'whsec_...'}
-        />
-        <Hint className="mt-1">
-          From the endpoint you register in Stripe for this workspace. Without it, payments are
-          taken but no ticket is issued.
-        </Hint>
-
-
-        <Button
-          variant="primary"
-          size="sm"
-          type="submit"
-          className="mt-3 w-full"
-          disabled={save.state !== 'idle'}
-        >
-          <Icon name="hgi-tick-02" size={15} />
-          {save.state === 'idle' ? 'Save keys' : 'Checking…'}
-        </Button>
-      </save.Form>
-
-      {payments.keysSavedOn && (
-        <p className="mt-2 text-[11px] text-muted">Last saved {payments.keysSavedOn}</p>
-      )}
-    </div>
-  )
-}
-
-function PreferencesCard({ payments }: { payments: PaymentSettingsCard }) {
-  const save = useFetcher<ActionResult>()
-  const error = save.data?.ok === false ? save.data.error : null
-  const saved = save.state === 'idle' && save.data?.ok === true
-  useSavedToast(saved, 'Payment preferences saved.')
-  useFailureToast(save.state === 'idle' ? error : null)
-
-  const setFlag = (field: 'saveCards' | 'emailReceipts', value: boolean) =>
-    save.submit(
-      {
-        statementDescriptor: payments.statementDescriptor,
-        saveCards: String(field === 'saveCards' ? value : payments.saveCards),
-        emailReceipts: String(field === 'emailReceipts' ? value : payments.emailReceipts),
-      },
-      { method: 'post' },
-    )
-
-  return (
-    <Card className="p-5">
-      <h3 className="text-[14px] font-bold tracking-tight">Checkout preferences</h3>
-      <p className="mt-0.5 text-[12px] text-muted">
-        What buyers see, and what happens after they pay.
-      </p>
-
-      <save.Form method="post" key={payments.statementDescriptor}>
-        <input type="hidden" name="saveCards" value={String(payments.saveCards)} />
-        <input type="hidden" name="emailReceipts" value={String(payments.emailReceipts)} />
-        <div className="mt-4">
-          <Label htmlFor="pay-descriptor">Statement descriptor</Label>
-          <Input
-            id="pay-descriptor"
-            name="statementDescriptor"
-            maxLength={22}
-            defaultValue={payments.statementDescriptor}
-            placeholder="ACME EVENTS"
-          />
-          <Hint>Up to 22 characters — what appears on a buyer's bank statement.</Hint>
-        </div>
-        <div className="mt-4 flex justify-end border-t border-hair pt-4">
-          <Button variant="primary" size="sm" type="submit" disabled={save.state !== 'idle'}>
-            <Icon name="hgi-tick-02" size={15} />
-            {save.state === 'idle' ? 'Save' : 'Saving…'}
-          </Button>
-        </div>
-      </save.Form>
-
-      <div className="mt-2 divide-y divide-line border-t border-hair">
-        <PreferenceRow
-          title="Let buyers save a card"
-          description="Their card is stored by the provider, never by Eventa."
-          on={payments.saveCards}
-          busy={save.state !== 'idle'}
-          onChange={(next) => setFlag('saveCards', next)}
-        />
-        <PreferenceRow
-          title="Email a receipt"
-          description="Sent automatically once a payment clears."
-          on={payments.emailReceipts}
-          busy={save.state !== 'idle'}
-          onChange={(next) => setFlag('emailReceipts', next)}
-        />
-      </div>
-
-      {error && (
-        <p role="alert" className="mt-3 text-[13px] text-red-500">
-          {error}
-        </p>
-      )}
-    </Card>
-  )
-}
-
-function PreferenceRow({
-  title,
-  description,
-  on,
-  busy,
-  onChange,
-}: {
-  title: string
-  description: string
-  on: boolean
-  busy: boolean
-  onChange: (next: boolean) => void
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-3.5">
-      <div className="min-w-0">
-        <p className="text-[13.5px] font-semibold text-ink">{title}</p>
-        <p className="mt-0.5 text-[12px] text-muted">{description}</p>
-      </div>
-      <Toggle on={on} disabled={busy} onChange={onChange} label={title} />
-    </div>
   )
 }

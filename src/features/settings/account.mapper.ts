@@ -85,6 +85,7 @@ export function toPaymentSettingsCard(
     emailReceipts: settings.emailReceipts,
     testMode: settings.testMode,
     warnings: settings.warnings ?? [],
+    publishableKey: keys?.publishableKey ?? '',
     // Never the key. The API only ever sends a tail, and this only passes it on.
     secretKeyMasked: keys?.secretKeyMasked ?? '',
     webhookSecretSet: keys?.webhookSecretSet ?? false,

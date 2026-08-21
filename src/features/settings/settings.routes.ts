@@ -29,6 +29,8 @@ import type {
   LogoUploadWire,
   OrganizationWire,
   PaymentSettingsCard,
+  PaymentMethodRow,
+  PaymentMethodWire,
   PaymentSettingsWire,
   StoredKeysWire,
   ProfileCard,
@@ -325,6 +327,7 @@ export const organizationRoute = {
 
 export interface PaymentsData {
   payments: PaymentSettingsCard
+  methods: PaymentMethodRow[]
 }
 
 export const paymentsRoute = {
@@ -332,8 +335,14 @@ export const paymentsRoute = {
     const settings = await accountApi.paymentSettings()
     // The stored-key summary is for the active mode only — the other mode's
     // pair is untouched by this screen until the organizer switches to it.
-    const keys = await accountApi.storedPaymentKeys(settings.mode)
-    return { payments: toPaymentSettingsCard(settings, keys) }
+    const [keys, methods] = await Promise.all([
+      accountApi.storedPaymentKeys(settings.mode),
+      accountApi.paymentMethods(),
+    ])
+    return {
+      payments: toPaymentSettingsCard(settings, keys),
+      methods: methods.map((m) => ({ method: m.method, enabled: m.enabled })),
+    }
   }),
 
   action: pageAction(async ({ request }: LoaderArgs) => {
@@ -405,6 +414,7 @@ export const accountApi = {
   paymentSettings: () => api.get<PaymentSettingsWire>('/payment-settings'),
   savePaymentPreferences: (body: Record<string, unknown>) =>
     api.patch<PaymentSettingsWire>('/payment-settings', body),
+  paymentMethods: () => api.get<PaymentMethodWire[]>('/payment-settings/methods'),
   setPaymentMethod: (method: string, enabled: boolean) =>
     api.patch<unknown>(`/payment-settings/methods/${method}`, { enabled }),
   /**

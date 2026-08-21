@@ -216,6 +216,22 @@ export interface OrganizationForm {
  * secret key and the webhook signing secret. `secretKeyMasked` answers the only
  * question the screen has — WHICH key is saved — and is useless for anything else.
  */
+/** One payment method as the API reports it (US-SET-09). */
+export interface PaymentMethodWire {
+  method: string
+  enabled: boolean
+}
+
+/**
+ * A method row as the kit draws it: the API says which methods exist and
+ * whether each is on; the icon, blurb and card-scheme badges are presentation
+ * and live in the page's own lookup table.
+ */
+export interface PaymentMethodRow {
+  method: string
+  enabled: boolean
+}
+
 export interface StoredKeysWire {
   mode: 'test' | 'live'
   publishableKey: string
@@ -254,6 +270,8 @@ export interface PaymentSettingsCard {
   emailReceipts: boolean
   testMode: boolean
   warnings: string[]
+  /** The stored publishable key — public by design, so shown in full. */
+  publishableKey: string
   /** Last four of the stored secret — never the key. Empty when none is saved. */
   secretKeyMasked: string
   /** Whether a webhook signing secret is stored. Never the secret itself. */
