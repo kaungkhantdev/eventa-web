@@ -241,6 +241,7 @@ export interface StoredKeysWire {
 }
 
 export interface PaymentSettingsWire {
+  webhookUrl: string | null
   provider: 'stripe'
   mode: 'test' | 'live'
   status: 'disconnected' | 'connected'
@@ -278,4 +279,6 @@ export interface PaymentSettingsCard {
   webhookSecretSet: boolean
   /** When the keys were last saved, already formatted. Empty when never. */
   keysSavedOn: string
+  /** This workspace's own webhook endpoint. Empty until keys are first saved. */
+  webhookUrl: string
 }

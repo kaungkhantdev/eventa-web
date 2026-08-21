@@ -90,6 +90,7 @@ export function toPaymentSettingsCard(
     secretKeyMasked: keys?.secretKeyMasked ?? '',
     webhookSecretSet: keys?.webhookSecretSet ?? false,
     keysSavedOn: keys?.savedAt ? bangkokDate(keys.savedAt) : '',
+    webhookUrl: settings.webhookUrl ?? '',
   }
 }
 

@@ -115,12 +115,28 @@ const PAYMENTS: PaymentSettingsWire = {
   saveCards: true,
   emailReceipts: true,
   testMode: false,
+  webhookUrl: 'https://api.eventa.test/api/v1/public/payments/webhook/tok_abc',
 }
 
 const payments = (patch: Partial<PaymentSettingsWire> = {}) =>
   toPaymentSettingsCard({ ...PAYMENTS, ...patch })
 
 describe('toPaymentSettingsCard', () => {
+  /**
+   * The organizer registers this in Stripe by hand, so it is passed through
+   * exactly as the API built it — and rendered empty, not as a broken URL,
+   * before the first key save mints a token.
+   */
+  it('carries the workspace’s own webhook endpoint', () => {
+    expect(payments().webhookUrl).toBe(
+      'https://api.eventa.test/api/v1/public/payments/webhook/tok_abc',
+    )
+  })
+
+  it('shows no webhook URL before one exists', () => {
+    expect(payments({ webhookUrl: null }).webhookUrl).toBe('')
+  })
+
   it('says which provider is connected, and in which mode', () => {
     expect(payments()).toMatchObject({
       provider: 'Stripe',

@@ -275,6 +275,7 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
               From the endpoint you register in Stripe for this workspace. Without it, payments are
               taken but no ticket is issued.
             </Hint>
+            <WebhookUrl url={payments.webhookUrl} />
           </div>
         </div>
 
@@ -291,6 +292,54 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
         </div>
       </save.Form>
     </Card>
+  )
+}
+
+/**
+ * The endpoint an organizer registers in Stripe, with a one-click copy.
+ *
+ * It appears only once a token exists — which is after the first key save.
+ * Showing a half-formed URL beforehand would invite somebody to register an
+ * address that can never resolve, and they would find out when a real buyer
+ * paid and no ticket arrived.
+ *
+ * Copy falls back to selecting the text: `navigator.clipboard` needs a secure
+ * context, and a URL nobody can copy is worse than one they select by hand.
+ */
+function WebhookUrl({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  if (!url) return null
+
+  const copy = () => {
+    void navigator.clipboard?.writeText(url).then(
+      () => setCopied(true),
+      () => setCopied(false),
+    )
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-hair bg-canvas px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+          Your webhook URL
+        </p>
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
+        >
+          <Icon name={copied ? 'hgi-tick-02' : 'hgi-copy-01'} size={13} />
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <p className="mt-1 break-all font-mono text-[11px] text-ink">
+        {url}
+      </p>
+      <p className="mt-1.5 text-[11px] text-muted">
+        In Stripe: Developers → Webhooks → Add endpoint. Paste this, then copy the signing secret
+        it gives you into the box above.
+      </p>
+    </div>
   )
 }
 
