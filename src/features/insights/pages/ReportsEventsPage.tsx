@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useOutletContext } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
-import { PageFooter, NotificationBell, UserChip, Paginator, usePagination } from '@/components/ui'
+import { PageFooter, NotificationBell, SignedInChip, Paginator, usePagination } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { baht, num } from '@/lib/format'
 import { REPORTS_EVENTS, type ReportEventStatus } from '../data/reportsEvents'
@@ -67,7 +67,7 @@ export default function ReportsEventsPage() {
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
           <NotificationBell />
-          <UserChip />
+          <SignedInChip />
         </div>
       </div>
 

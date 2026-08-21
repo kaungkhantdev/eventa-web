@@ -1,107 +1,114 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { Button, ButtonLink, Icon, IconButton } from '@/components/ui'
+import { bangkokDayKey } from '@/lib/format'
 import { cn } from '@/lib/cn'
-import type { Tone } from '../types'
-import { COVER } from '../data/events'
-import { CAL_EVENT_SEEDS, CAL_PILL, MONTHS, WEEK } from '../data/calendar'
+import {
+  dayHeading,
+  eventsOnDay,
+  longTime,
+  monthGrid,
+  monthOfDay,
+  parseMonth,
+  shiftMonth,
+  shortTime,
+} from '../calendar'
+import { CAL_PILL, COVER, MONTHS, WEEK } from '../events.presentation'
+import type { CalendarEvent } from '../types'
 
-/* Calendar view of admin/events.html — month grid + day agenda. Ported from the
-   inline <script>: same 14 demo events (offset from today), same +N more roll-up
-   at 3 pills per cell, same selected-day ring and today highlight. */
+/** The 1st, as the day a freshly-opened month selects. */
+const firstDayOf = (month: string): string => `${month}-01`
 
-type CalEvent = { d: Date; t: string; name: string; tone: Tone }
+/* Calendar view of admin/events.html — month grid + day agenda. Same three
+   pills per square with a "+N more" roll-up, same selected-day ring and today
+   highlight as the source kit.
 
-const addDays = (base: Date, n: number): Date => {
-  const d = new Date(base)
-  d.setDate(d.getDate() + n)
-  return d
+   The month is the page's — it comes from the URL and is fetched by the loader —
+   so this component only asks for a different one. Which day is selected is
+   local: nothing is loaded for it, and it should not survive a reload. */
+
+export interface EventCalendarProps {
+  /** `YYYY-MM`, the month being shown. */
+  month: string
+  events: CalendarEvent[]
+  /** How many events the month holds, as the API counted them. */
+  count: number
+  onMonth: (month: string) => void
 }
-const sameDay = (a: Date, b: Date): boolean =>
-  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
-const fmtTime = (t: string): string => {
-  const [h, m] = t.split(':').map(Number)
-  const ap = h < 12 ? 'am' : 'pm'
-  const h12 = h % 12 || 12
-  return m === 0 ? h12 + ap : h12 + ':' + String(m).padStart(2, '0') + ap
-}
-const fmtTimeLong = (t: string): string => {
-  const [h, m] = t.split(':').map(Number)
-  const ap = h < 12 ? 'AM' : 'PM'
-  const h12 = h % 12 || 12
-  return h12 + ':' + String(m).padStart(2, '0') + ' ' + ap
-}
+export function EventCalendar({ month, events, count, onMonth }: EventCalendarProps) {
+  // Today in Bangkok, not in the browser's timezone: this is the same "today"
+  // the rest of the product means, and it is only recomputed on mount.
+  const [today] = useState(() => bangkokDayKey(new Date()))
+  const [selected, setSelected] = useState(today)
+  // The month the arrows are stepping from. `month` is loader data, and the
+  // router does not advance it until the fetch lands — so two quick clicks
+  // would both step off August and the second would be thrown away.
+  const [asked, setAsked] = useState(month)
+  const [landed, setLanded] = useState(month)
 
-export function EventCalendar() {
-  const [today] = useState(() => new Date())
-  const [calState, setCalState] = useState({ y: today.getFullYear(), m: today.getMonth() })
-  const [selectedDay, setSelectedDay] = useState(() => new Date(today))
+  // Whenever a month actually lands — including one arrived at by the back
+  // button — that becomes the month the arrows step from again. While a fetch
+  // is still in flight the prop has not moved, so further clicks keep counting
+  // from where the last one left off.
+  if (month !== landed) {
+    setLanded(month)
+    setAsked(month)
+  }
 
-  const calEvents = useMemo<CalEvent[]>(
-    () => CAL_EVENT_SEEDS.map((e) => ({ d: addDays(today, e.offset), t: e.t, name: e.name, tone: e.tone })),
-    [today],
+  // Only one month is loaded at a time, so a day outside it has no events to
+  // show — and reporting "0 events scheduled" for a day whose events simply
+  // were not fetched would be a lie. The agenda follows the month across.
+  const shown = monthOfDay(selected) === month ? selected : firstDayOf(month)
+  const cells = useMemo(
+    () => monthGrid(month, events, { today, selected: shown }),
+    [month, events, today, shown],
   )
+  const agenda = useMemo(() => eventsOnDay(events, shown), [events, shown])
+  const { year, month: index } = parseMonth(month)
 
-  const monthCount = calEvents.filter(
-    (e) => e.d.getFullYear() === calState.y && e.d.getMonth() === calState.m,
-  ).length
+  const goToMonth = (next: string) => {
+    setAsked(next)
+    onMonth(next)
+  }
 
-  const cells = useMemo(() => {
-    const first = new Date(calState.y, calState.m, 1)
-    const gridStart = new Date(calState.y, calState.m, 1 - first.getDay())
-    return Array.from({ length: 42 }, (_, i) => {
-      const d = addDays(gridStart, i)
-      const other = d.getMonth() !== calState.m
-      const isToday = sameDay(d, today)
-      const isSel = sameDay(d, selectedDay)
-      const evs = calEvents.filter((e) => sameDay(e.d, d)).sort((a, b) => a.t.localeCompare(b.t))
-      const shown = evs.slice(0, 3)
-      const more = evs.length - shown.length
-      return { d, other, isToday, isSel, shown, more }
-    })
-  }, [calState, selectedDay, today, calEvents])
+  const step = (by: number) => goToMonth(shiftMonth(asked, by))
 
-  const agenda = useMemo(
-    () => calEvents.filter((e) => sameDay(e.d, selectedDay)).sort((a, b) => a.t.localeCompare(b.t)),
-    [calEvents, selectedDay],
-  )
-  const agendaIsToday = sameDay(selectedDay, today)
-
-  const prevMonth = () =>
-    setCalState((s) => (s.m === 0 ? { y: s.y - 1, m: 11 } : { y: s.y, m: s.m - 1 }))
-  const nextMonth = () =>
-    setCalState((s) => (s.m === 11 ? { y: s.y + 1, m: 0 } : { y: s.y, m: s.m + 1 }))
-  const goToday = () => setCalState({ y: today.getFullYear(), m: today.getMonth() })
-
-  const selectDay = (d: Date) => {
-    setSelectedDay(d)
-    if (d.getMonth() !== calState.m || d.getFullYear() !== calState.y) {
-      setCalState({ y: d.getFullYear(), m: d.getMonth() })
-    }
+  const selectDay = (day: string) => {
+    setSelected(day)
+    // Following a leading or trailing square into its own month is what the
+    // kit did; here it also asks the loader for that month's events.
+    if (monthOfDay(day) !== month) goToMonth(monthOfDay(day))
   }
 
   return (
     <section className="rounded-2xl bg-surface p-4 lg:p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <IconButton title="Previous month" onClick={prevMonth}>
+          <IconButton title="Previous month" onClick={() => step(-1)}>
             <Icon name="hgi-arrow-left-01" size={18} />
           </IconButton>
           <div className="min-w-[150px] text-center">
             <h2 className="text-[16px] font-bold tracking-tight">
-              {MONTHS[calState.m]} {calState.y}
+              {MONTHS[index]} {year}
             </h2>
             <p className="text-[11px] text-muted">
-              {monthCount} {monthCount === 1 ? 'event' : 'events'} this month
+              {count} {count === 1 ? 'event' : 'events'} this month
             </p>
           </div>
-          <IconButton title="Next month" onClick={nextMonth}>
+          <IconButton title="Next month" onClick={() => step(1)}>
             <Icon name="hgi-arrow-right-01" size={18} />
           </IconButton>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="soft" size="sm" onClick={goToday}>
+          <Button
+            variant="soft"
+            size="sm"
+            onClick={() => {
+              setSelected(today)
+              goToMonth(monthOfDay(today))
+            }}
+          >
             Today
           </Button>
           <ButtonLink to="/admin/event-form" variant="primary" size="sm">
@@ -125,49 +132,54 @@ export function EventCalendar() {
               ))}
             </div>
             <div className="grid grid-cols-7">
-              {cells.map(({ d, other, isToday, isSel, shown, more }) => (
+              {cells.map((cell) => (
                 <div
-                  key={`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`}
-                  onClick={() => selectDay(d)}
+                  key={cell.key}
+                  onClick={() => selectDay(cell.key)}
                   className={cn(
                     'min-h-[118px] cursor-pointer border-b border-r border-line p-1.5 transition',
-                    other && 'bg-canvas/40',
-                    isSel ? 'ring-2 ring-inset ring-brand/60' : 'hover:bg-line/30',
+                    cell.otherMonth && 'bg-canvas/40',
+                    cell.isSelected ? 'ring-2 ring-inset ring-brand/60' : 'hover:bg-line/30',
                   )}
                 >
                   <div className="mb-1">
                     <span
                       className={
-                        isToday
+                        cell.isToday
                           ? 'grid h-6 w-6 place-items-center rounded-full bg-brand text-[12px] font-bold text-white'
-                          : cn('text-[12px] font-semibold', other ? 'text-muted/40' : 'text-ink')
+                          : cn(
+                              'text-[12px] font-semibold',
+                              cell.otherMonth ? 'text-muted/40' : 'text-ink',
+                            )
                       }
                     >
-                      {d.getDate()}
+                      {cell.day}
                     </span>
                   </div>
                   <div className="space-y-1">
-                    {shown.map((e, idx) => (
+                    {cell.events.map((event) => (
                       <Link
-                        key={idx}
-                        to="/admin/event-detail"
+                        key={event.id}
+                        to={`/admin/event-detail?id=${event.id}`}
                         onClick={(ev) => ev.stopPropagation()}
-                        title={`${e.name} · ${fmtTime(e.t)}`}
+                        title={`${event.name} · ${shortTime(event.time)}`}
                         className={cn(
                           'block rounded-md px-1.5 py-1 transition hover:brightness-95',
-                          CAL_PILL[e.tone],
+                          CAL_PILL[event.tone],
                         )}
                       >
                         <span className="block truncate text-[11px] font-semibold leading-tight">
-                          {e.name}
+                          {event.name}
                         </span>
                         <span className="mt-0.5 block text-[10px] font-medium leading-tight opacity-75 tnum">
-                          {fmtTime(e.t)}
+                          {shortTime(event.time)}
                         </span>
                       </Link>
                     ))}
-                    {more > 0 && (
-                      <div className="px-1.5 text-[10px] font-semibold text-muted">+{more} more</div>
+                    {cell.more > 0 && (
+                      <div className="px-1.5 text-[10px] font-semibold text-muted">
+                        +{cell.more} more
+                      </div>
                     )}
                   </div>
                 </div>
@@ -178,30 +190,27 @@ export function EventCalendar() {
 
         <aside className="rounded-xl border border-hair p-4">
           <p className="text-[14px] font-bold tracking-tight text-ink">
-            {(agendaIsToday ? 'Today · ' : '') +
-              selectedDay.toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'short',
-                day: 'numeric',
-              })}
+            {(shown === today ? 'Today · ' : '') + dayHeading(shown)}
           </p>
           <p className="text-[11px] text-muted">
             {agenda.length} {agenda.length === 1 ? 'event scheduled' : 'events scheduled'}
           </p>
           <div className="mt-3 space-y-2">
             {agenda.length ? (
-              agenda.map((e, idx) => (
+              agenda.map((event) => (
                 <Link
-                  key={idx}
-                  to="/admin/event-detail"
+                  key={event.id}
+                  to={`/admin/event-detail?id=${event.id}`}
                   className="flex items-center gap-3 rounded-lg bg-canvas p-2.5 transition hover:bg-line"
                 >
-                  <span className={cn('h-9 w-1 shrink-0 rounded-full', COVER[e.tone])} />
+                  <span className={cn('h-9 w-1 shrink-0 rounded-full', COVER[event.tone])} />
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-bold text-ink tnum leading-tight">
-                      {fmtTimeLong(e.t)}
+                      {longTime(event.time)}
                     </p>
-                    <p className="mt-0.5 truncate text-[12.5px] font-medium text-ink">{e.name}</p>
+                    <p className="mt-0.5 truncate text-[12.5px] font-medium text-ink">
+                      {event.name}
+                    </p>
                   </div>
                   <Icon name="hgi-arrow-right-01" size={15} className="shrink-0 text-muted" />
                 </Link>

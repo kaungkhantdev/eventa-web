@@ -49,11 +49,17 @@ export function DonutChart({
 }: DonutChartProps) {
   const total = data.reduce((sum, d) => sum + d.value, 0) || 1
 
-  let start = 0
+  // Each arc starts where the ones before it ended. Worked out up front rather
+  // than by mutating a counter inside the map: reassigning a variable while
+  // rendering is exactly what breaks when React re-runs a render.
+  const offsets = data.reduce<number[]>(
+    (running, d) => [...running, running[running.length - 1]! + (d.value / total) * 100],
+    [0],
+  )
+
   const arcs = data.map((d, i) => {
-    const pct = (d.value / total) * 100
-    const len = Math.max(pct - gap, 0.4)
-    const arc = (
+    const len = Math.max((d.value / total) * 100 - gap, 0.4)
+    return (
       <circle
         key={i}
         cx={21}
@@ -64,11 +70,9 @@ export function DonutChart({
         strokeWidth={thickness}
         strokeLinecap="round"
         strokeDasharray={`${len} ${100 - len}`}
-        strokeDashoffset={25 - start}
+        strokeDashoffset={25 - offsets[i]!}
       />
     )
-    start += pct
-    return arc
   })
 
   return (

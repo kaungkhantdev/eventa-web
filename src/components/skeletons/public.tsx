@@ -190,7 +190,7 @@ function PortalEventCards() {
 }
 
 /** Registration: ticket tiers, the seat map, payment, and the fixed footer bar. */
-export function PortalRegisterSkeleton() {
+export function PortalCheckoutSkeleton() {
   return (
     <div className="h-full bg-canvas">
       <PortalNav width="max-w-4xl" items={2} />

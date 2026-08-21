@@ -1,0 +1,124 @@
+import type { BadgeTone } from '@/components/ui'
+import { bangkokDate, bangkokTime, initials } from '@/lib/format'
+import type {
+  LoginSessionWire,
+  MemberRow,
+  MemberStatus,
+  MemberWire,
+  NotificationCategory,
+  NotificationPrefWire,
+  NotificationRow,
+  PermissionOption,
+  PermissionWire,
+  RoleCard,
+  RoleWire,
+  SessionRow,
+} from './settings.types'
+
+/** The rules behind the settings screens (US-ACC-*, US-SET-*). */
+
+const STATUS_TONE: Record<MemberStatus, BadgeTone> = {
+  Active: 'green',
+  Invited: 'amber',
+  Unconfirmed: 'amber',
+  Suspended: 'red',
+}
+
+export function toMemberRow(wire: MemberWire): MemberRow {
+  return {
+    id: wire.id,
+    name: wire.name,
+    email: wire.email,
+    initials: initials(wire.name),
+    role: wire.role,
+    roleId: wire.roleId,
+    status: wire.status,
+    statusTone: STATUS_TONE[wire.status],
+    // The two states an admin acts on differently: an invitation can be sent
+    // again, and a suspended member is reactivated rather than suspended.
+    //
+    // `Invited` only — NOT `Unconfirmed`. Someone who signed themselves up has
+    // no invitation to resend; offering the button would send them a token for
+    // a workspace invite that never existed. Their own confirmation link is
+    // re-sent by trying to sign in.
+    invited: wire.status === 'Invited',
+    suspended: wire.status === 'Suspended',
+  }
+}
+
+export function toRoleCard(wire: RoleWire): RoleCard {
+  return {
+    id: wire.id,
+    name: wire.name,
+    description: wire.description,
+    permissions: wire.permissions,
+    members: memberCount(wire.memberCount),
+    isSystem: wire.isSystem,
+  }
+}
+
+/** "0 members" reads as a defect; a role nobody holds yet is a normal state. */
+function memberCount(count: number): string {
+  if (count === 0) return 'No members yet'
+  return `${count} ${count === 1 ? 'member' : 'members'}`
+}
+
+/**
+ * A permission, ready to be offered as a checkbox.
+ *
+ * Some come back with the key as their own label. "evCreate" is not a sentence
+ * to put in front of somebody deciding what a role may do, so a key is spaced
+ * out into something readable rather than shown raw.
+ */
+export function toPermissionOption(wire: PermissionWire): PermissionOption {
+  return {
+    key: wire.key,
+    label: wire.label === wire.key ? humanise(wire.key) : wire.label,
+    group: wire.group,
+  }
+}
+
+function humanise(key: string): string {
+  const spaced = key.replace(/([A-Z])/g, ' $1').toLowerCase().trim()
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+export function toSessionRow(wire: LoginSessionWire): SessionRow {
+  return {
+    id: wire.id,
+    device: wire.device,
+    ipAddress: wire.ipAddress,
+    // Somebody checking whether a sign-in was theirs is reading their own
+    // clock, which in this product is Bangkok's.
+    signedIn: `${bangkokDate(wire.signedInAt)} · ${bangkokTime(wire.signedInAt)}`,
+    isCurrent: wire.isCurrent,
+  }
+}
+
+/** What each notification category is, in the organizer's terms. */
+const CATEGORY: Record<NotificationCategory, { title: string; description: string }> = {
+  registration: {
+    title: 'Registrations',
+    description: 'Someone registers for one of your events.',
+  },
+  payment: { title: 'Payments', description: 'A charge succeeds, fails or is refunded.' },
+  sales: { title: 'Sales milestones', description: 'A ticket type sells out or is running low.' },
+  feedback: { title: 'Feedback', description: 'An attendee leaves a rating or a comment.' },
+  payout: { title: 'Payouts', description: 'Money is on its way to your bank account.' },
+  alert: { title: 'Operational alerts', description: 'Something needs your attention today.' },
+  task: { title: 'Tasks', description: 'A reminder about work assigned to you.' },
+}
+
+export function toNotificationRow(wire: NotificationPrefWire): NotificationRow {
+  const meta = CATEGORY[wire.category]
+  return {
+    category: wire.category,
+    title: meta.title,
+    description: meta.description,
+    emailEnabled: wire.emailEnabled,
+    // Unavailable and off are different facts: one is the product not offering
+    // it, the other is a choice this person made.
+    smsEnabled: wire.smsEnabled,
+    smsAvailable: wire.smsAvailable,
+  }
+}

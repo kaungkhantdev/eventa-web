@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { Icon } from '@/components/ui'
-import { getLandingEvent, getLandingHighlights } from '@/features/landing/data/events'
+import type { LandingEvent } from '@/features/landing/types'
 
 /* Port of landing/minimal.html — a centered, editorial single-column event page.
-   Renders the shared landing event (picked by ?event=<slug>) with the same
-   sections, copy and Tailwind class strings as the static template. */
+   Renders the event it is given, already mapped from the API, with the same
+   copy and Tailwind class strings as the static template. Sections it has no
+   content for are left out rather than headed. */
 
 const PAGE_STYLE = `
   html { scroll-behavior: smooth; }
@@ -33,21 +34,21 @@ const PAGE_STYLE = `
   }
 `
 
-export default function MinimalPage() {
+export default function MinimalPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()
   const [coverError, setCoverError] = useState(false)
 
-  const ev = useMemo(() => getLandingEvent(params), [params])
-  const highlights = useMemo(
-    () => getLandingHighlights(params, ev.highlights),
-    [params, ev.highlights],
-  )
+  const ev = event
+  const highlights = ev.highlights
 
   const reg = ev.registerUrl || '#'
   const title = ev.title || 'Event'
   const isOnline = ev.online === true || params.get('online') === '1'
   const venueCity = isOnline ? 'Online event' : [ev.venue, ev.city].filter(Boolean).join(', ')
-  const heroCover = ev.image || `https://picsum.photos/seed/${ev.slug}/1600/800`
+  // No cover, no photograph. The kit filled the hero from picsum; a stock
+  // image of somebody else's crowd on a real organizer's page is a claim
+  // about their event. The gradient beneath shows through instead.
+  const heroCover = ev.image
 
   useEffect(() => {
     document.title = `${title} — Register`
@@ -150,7 +151,7 @@ export default function MinimalPage() {
           </div>
 
           <div className="reveal d4 relative mt-12 aspect-[16/8] overflow-hidden rounded-2xl bg-gradient-to-br from-brand to-emerald-500">
-            {!coverError && (
+            {heroCover && !coverError && (
               <img
                 alt=""
                 className="absolute inset-0 h-full w-full object-cover"
@@ -162,150 +163,162 @@ export default function MinimalPage() {
         </section>
 
         {/* ============ 3 · HIGHLIGHTS ============ */}
-        <section className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
-            {highlights.map((h, i) => (
-              <div key={i} className="flex flex-col items-center gap-3 text-center">
-                <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand">
-                  <Icon name={h.icon || 'hgi-star'} size={21} />
-                </span>
-                <span className="text-[13px] font-semibold leading-snug text-ink">{h.label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+        {highlights.length > 0 && (
+          <section className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
+              {highlights.map((h, i) => (
+                <div key={i} className="flex flex-col items-center gap-3 text-center">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand">
+                    <Icon name={h.icon || 'hgi-star'} size={21} />
+                  </span>
+                  <span className="text-[13px] font-semibold leading-snug text-ink">{h.label}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ============ 4 · ABOUT ============ */}
-        <section id="about" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
-          <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brand">About</h2>
-          <p className="mt-4 text-[15px] leading-[1.75] text-muted">{ev.about}</p>
-          <dl className="mt-8 divide-y divide-line rounded-2xl bg-surface px-5">
-            {aboutRows.map((r) => (
-              <div key={r.k} className="flex items-center justify-between gap-4 py-3.5">
-                <dt className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-muted">
-                  <span className="text-brand">
-                    <Icon name={r.icon} size={15} />
-                  </span>
-                  {r.k}
-                </dt>
-                <dd className="text-right text-[13.5px] font-medium text-ink">{r.v}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
+        {ev.about && (
+          <section id="about" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brand">About</h2>
+            <p className="mt-4 text-[15px] leading-[1.75] text-muted">{ev.about}</p>
+            <dl className="mt-8 divide-y divide-line rounded-2xl bg-surface px-5">
+              {aboutRows.map((r) => (
+                <div key={r.k} className="flex items-center justify-between gap-4 py-3.5">
+                  <dt className="flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-muted">
+                    <span className="text-brand">
+                      <Icon name={r.icon} size={15} />
+                    </span>
+                    {r.k}
+                  </dt>
+                  <dd className="text-right text-[13.5px] font-medium text-ink">{r.v}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
 
         {/* ============ 5 · AGENDA ============ */}
-        <section id="agenda" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
-          <h2 className="text-[18px] font-bold tracking-tight text-ink">{ev.agendaTitle}</h2>
-          <ol className="mt-7">
-            {ev.agenda.map((a, i) => {
-              const last = i === ev.agenda.length - 1
-              return (
-                <li key={i} className="grid grid-cols-[62px_1fr] gap-4">
-                  <div className="pt-0.5 text-right text-[13px] font-semibold tnum text-brand">
-                    {a.time}
-                  </div>
-                  <div className={`relative border-l border-line pl-5 ${last ? 'pb-1' : 'pb-7'}`}>
-                    <span className="absolute -left-[4px] top-1.5 h-2 w-2 rounded-full bg-brand ring-4 ring-canvas" />
-                    <h3 className="text-[14.5px] font-semibold leading-snug text-ink">{a.title}</h3>
-                    <p className="mt-1 text-[13.5px] leading-relaxed text-muted">{a.desc}</p>
-                  </div>
-                </li>
-              )
-            })}
-          </ol>
-        </section>
+        {ev.agenda.length > 0 && (
+          <section id="agenda" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
+            <h2 className="text-[18px] font-bold tracking-tight text-ink">{ev.agendaTitle}</h2>
+            <ol className="mt-7">
+              {ev.agenda.map((a, i) => {
+                const last = i === ev.agenda.length - 1
+                return (
+                  <li key={i} className="grid grid-cols-[62px_1fr] gap-4">
+                    <div className="pt-0.5 text-right text-[13px] font-semibold tnum text-brand">
+                      {a.time}
+                    </div>
+                    <div className={`relative border-l border-line pl-5 ${last ? 'pb-1' : 'pb-7'}`}>
+                      <span className="absolute -left-[4px] top-1.5 h-2 w-2 rounded-full bg-brand ring-4 ring-canvas" />
+                      <h3 className="text-[14.5px] font-semibold leading-snug text-ink">{a.title}</h3>
+                      <p className="mt-1 text-[13.5px] leading-relaxed text-muted">{a.desc}</p>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          </section>
+        )}
 
         {/* ============ 6 · SPEAKERS ============ */}
-        <section id="speakers" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
-          <h2 className="text-[18px] font-bold tracking-tight text-ink">{ev.speakersTitle}</h2>
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {ev.speakers.map((s, i) => (
-              <div key={i} className="rounded-2xl bg-surface p-4 text-center">
-                <span
-                  className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand-soft text-[15px] font-bold text-brand"
-                  aria-hidden="true"
-                >
-                  {s.initials}
-                </span>
-                <div className="mt-3 text-[13.5px] font-semibold leading-snug text-ink">{s.name}</div>
-                <div className="mt-0.5 text-[12px] text-muted">{s.role}</div>
-              </div>
-            ))}
-          </div>
-        </section>
+        {ev.speakers.length > 0 && (
+          <section id="speakers" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
+            <h2 className="text-[18px] font-bold tracking-tight text-ink">{ev.speakersTitle}</h2>
+            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {ev.speakers.map((s, i) => (
+                <div key={i} className="rounded-2xl bg-surface p-4 text-center">
+                  <span
+                    className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand-soft text-[15px] font-bold text-brand"
+                    aria-hidden="true"
+                  >
+                    {s.initials}
+                  </span>
+                  <div className="mt-3 text-[13.5px] font-semibold leading-snug text-ink">{s.name}</div>
+                  <div className="mt-0.5 text-[12px] text-muted">{s.role}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ============ 7 · TICKETS ============ */}
-        <section id="tickets" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
-          <h2 className="text-[18px] font-bold tracking-tight text-ink">{ev.ticketsTitle}</h2>
-          <div className="mt-6 grid items-start gap-3 sm:grid-cols-3">
-            {ev.tickets.map((t, i) => {
-              const feat = !!t.featured
-              return (
-                <div
-                  key={i}
-                  className={`flex h-full flex-col rounded-2xl p-5 ${feat ? 'bg-brand-soft' : 'bg-surface'}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-[12.5px] font-bold uppercase tracking-wide text-ink">
-                      {t.name}
-                    </h3>
-                    {t.note && (
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide ${
-                          feat ? 'bg-brand text-white' : 'bg-brand-soft text-brand'
-                        }`}
-                      >
-                        {t.note}
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-3 text-[24px] font-extrabold tracking-tight tnum text-ink">
-                    {t.price}
-                  </div>
-                  <ul className="mt-4 flex-1 space-y-2.5">
-                    {t.features.map((f, j) => (
-                      <li key={j} className="flex items-start gap-2 text-[13px] text-muted">
-                        <span className="mt-0.5 text-brand">
-                          <Icon name="check" size={15} />
-                        </span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a
-                    href={reg}
-                    className={
-                      feat
-                        ? 'mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-brand-dark'
-                        : 'mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:brightness-95'
-                    }
+        {ev.tickets.length > 0 && (
+          <section id="tickets" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
+            <h2 className="text-[18px] font-bold tracking-tight text-ink">{ev.ticketsTitle}</h2>
+            <div className="mt-6 grid items-start gap-3 sm:grid-cols-3">
+              {ev.tickets.map((t, i) => {
+                const feat = !!t.featured
+                return (
+                  <div
+                    key={i}
+                    className={`flex h-full flex-col rounded-2xl p-5 ${feat ? 'bg-brand-soft' : 'bg-surface'}`}
                   >
-                    Register <Icon name="arrow-right" size={15} />
-                  </a>
-                </div>
-              )
-            })}
-          </div>
-        </section>
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-[12.5px] font-bold uppercase tracking-wide text-ink">
+                        {t.name}
+                      </h3>
+                      {t.note && (
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide ${
+                            feat ? 'bg-brand text-white' : 'bg-brand-soft text-brand'
+                          }`}
+                        >
+                          {t.note}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-3 text-[24px] font-extrabold tracking-tight tnum text-ink">
+                      {t.price}
+                    </div>
+                    <ul className="mt-4 flex-1 space-y-2.5">
+                      {t.features.map((f, j) => (
+                        <li key={j} className="flex items-start gap-2 text-[13px] text-muted">
+                          <span className="mt-0.5 text-brand">
+                            <Icon name="check" size={15} />
+                          </span>
+                          <span>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <a
+                      href={reg}
+                      className={
+                        feat
+                          ? 'mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-brand-dark'
+                          : 'mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-4 py-2.5 text-[13px] font-semibold text-brand transition hover:brightness-95'
+                      }
+                    >
+                      Register <Icon name="arrow-right" size={15} />
+                    </a>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {/* ============ 8 · FAQ ============ */}
-        <section id="faq" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
-          <h2 className="text-[18px] font-bold tracking-tight text-ink">Frequently asked</h2>
-          <div className="mt-5 border-t border-line">
-            {ev.faqs.map((f, i) => (
-              <details key={i} className="faq border-b border-line" open={i === 0}>
-                <summary className="flex items-center justify-between gap-4 py-4 text-[14.5px] font-semibold text-ink">
-                  <span>{f.q}</span>
-                  <span className="faq-chev shrink-0 text-brand">
-                    <Icon name="chevron-down" size={18} />
-                  </span>
-                </summary>
-                <p className="pb-4 pr-8 text-[14px] leading-relaxed text-muted">{f.a}</p>
-              </details>
-            ))}
-          </div>
-        </section>
+        {ev.faqs.length > 0 && (
+          <section id="faq" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
+            <h2 className="text-[18px] font-bold tracking-tight text-ink">Frequently asked</h2>
+            <div className="mt-5 border-t border-line">
+              {ev.faqs.map((f, i) => (
+                <details key={i} className="faq border-b border-line" open={i === 0}>
+                  <summary className="flex items-center justify-between gap-4 py-4 text-[14.5px] font-semibold text-ink">
+                    <span>{f.q}</span>
+                    <span className="faq-chev shrink-0 text-brand">
+                      <Icon name="chevron-down" size={18} />
+                    </span>
+                  </summary>
+                  <p className="pb-4 pr-8 text-[14px] leading-relaxed text-muted">{f.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       {/* ============ 9 · FOOTER ============ */}

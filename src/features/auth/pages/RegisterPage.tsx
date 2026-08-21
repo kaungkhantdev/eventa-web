@@ -1,15 +1,30 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
-import { STRENGTH_COLORS, STRENGTH_TEXTS, scorePassword } from '@/features/auth/data/passwordStrength'
+import { SocialAuth } from '@/features/auth/components/SocialAuth'
+import {
+  MIN_PASSWORD_LENGTH,
+  STRENGTH_COLORS,
+  STRENGTH_TEXTS,
+  scorePassword,
+} from '@/features/auth/passwordStrength'
+import { useSignUp } from '@/features/auth/useSignUp'
 
+/**
+ * Organizer sign-up — a workspace and its first owner (US-ACC-01).
+ *
+ * The attendee's own sign-up is a separate page at `/portal/register`, the same
+ * arrangement as the two logins: different audience, different promise, and a
+ * different realm on the API. The flow they share lives in `useSignUp`.
+ */
 export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false)
   const [showCpw, setShowCpw] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const { pending, error, submit } = useSignUp('admin')
 
   const score = scorePassword(password)
   const cpwMatch = confirm === password
@@ -27,13 +42,44 @@ export default function RegisterPage() {
         </p>
       }
     >
-      <form className="space-y-4" onSubmit={(e: FormEvent<HTMLFormElement>) => e.preventDefault()}>
+      <form className="space-y-4" onSubmit={(e) => submit(e, password, confirm)}>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg bg-rose-500/10 px-3 py-2.5 text-[13px] text-rose-600 dark:text-rose-400"
+          >
+            {error}
+          </p>
+        )}
+
+        {/* Named here, or the API falls back to "<your name>'s Workspace" and
+            slugifies that — a slug nobody chose, nobody was told, and which
+            sign-in then asks for by heart. */}
+        <div>
+          <label htmlFor="organization-name" className="label">
+            Workspace name
+          </label>
+          <input
+            id="organization-name"
+            name="organizationName"
+            type="text"
+            autoComplete="organization"
+            placeholder="Acme Events"
+            className="input"
+            required
+          />
+          <p className="mt-1.5 text-[12px] text-muted">
+            Your company or team — attendees see this on tickets and receipts.
+          </p>
+        </div>
+
         <div>
           <label htmlFor="full-name" className="label">
             Full name
           </label>
           <input
             id="full-name"
+            name="name"
             type="text"
             autoComplete="name"
             placeholder="Jordan Lee"
@@ -48,6 +94,7 @@ export default function RegisterPage() {
           </label>
           <input
             id="email"
+            name="email"
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
@@ -68,6 +115,7 @@ export default function RegisterPage() {
               placeholder="••••••••"
               className="input pr-10"
               required
+              minLength={MIN_PASSWORD_LENGTH}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -134,6 +182,7 @@ export default function RegisterPage() {
         <label className="flex cursor-pointer items-start gap-2 text-[13px] text-muted">
           <input
             id="terms"
+            name="acceptTerms"
             type="checkbox"
             className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-hair accent-brand"
             required
@@ -148,21 +197,14 @@ export default function RegisterPage() {
           </a>
         </label>
 
-        <button type="submit" className="btn btn-primary w-full">
-          Create account
+        <button type="submit" className="btn btn-primary w-full" disabled={pending}>
+          {pending ? 'Creating…' : 'Create account'}
         </button>
       </form>
 
-      <div className="my-5 flex items-center gap-3">
-        <div className="h-px flex-1 bg-hair" />
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted">or</span>
-        <div className="h-px flex-1 bg-hair" />
-      </div>
-
-      <button type="button" className="btn btn-soft w-full">
-        <Icon name="hgi-global" size={16} />
-        Sign up with Google
-      </button>
+      {/* The kit offered only Google here and both providers on sign-in. Whichever
+          way someone arrives, the same accounts should be on offer. */}
+      <SocialAuth mode="sign-up" />
     </AuthLayout>
   )
 }

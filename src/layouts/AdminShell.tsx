@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, Outlet, useLocation, useMatches } from 'react-router'
 import {
   MODULES,
@@ -107,8 +107,14 @@ export default function AdminShell() {
   const mod = useMemo(() => MODULES.find((m) => m.id === selected), [selected])
   const hasPanel = Boolean(mod?.groups?.length) && !focused
 
-  // Close the mobile drawer whenever the route changes.
-  useEffect(() => setDrawerOpen(false), [location.pathname])
+  // Close the mobile drawer whenever the route changes. Adjusted during render
+  // rather than in an effect, so the drawer is already gone on the paint that
+  // shows the new page instead of flashing over it for one frame.
+  const [drawerPath, setDrawerPath] = useState(location.pathname)
+  if (location.pathname !== drawerPath) {
+    setDrawerPath(location.pathname)
+    setDrawerOpen(false)
+  }
 
   return (
     <div className="flex h-full min-h-screen">
@@ -124,7 +130,7 @@ export default function AdminShell() {
         )}
       >
         {/* icon rail — modules */}
-        <aside className="relative z-30 flex w-16 shrink-0 flex-col items-center bg-[#0e0f12] py-4 dark:bg-[#101613]">
+        <aside className="relative z-30 flex w-16 shrink-0 flex-col items-center bg-[#0e0f12] py-4 dark:bg-[#101613]"> 
           <div className="group relative flex justify-center">
             <Link
               to="/admin/dashboard"

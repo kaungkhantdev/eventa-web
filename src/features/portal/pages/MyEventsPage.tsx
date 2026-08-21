@@ -1,14 +1,24 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
-import { Badge, Icon, PillTabs, Paginator, usePagination, type PillTabItem } from '@/components/ui'
+import { useState } from 'react'
+import { Link, useLoaderData, useNavigate } from 'react-router'
+import {
+  Badge,
+  EmptyState,
+  Icon,
+  PillTabs,
+  Paginator,
+  type PillTabItem,
+} from '@/components/ui'
+import { authApi } from '@/features/auth/api'
 import { useTheme } from '@/lib/useTheme'
 import { useDisclosure } from '@/lib/useDisclosure'
-import { baht, num } from '@/lib/format'
+import { useFilters } from '@/lib/useFilters'
+import { initials, num } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { TicketModal } from '../components/TicketModal'
 import type { FlyerTicket } from '../lib/ticketFlyer'
-import { UPCOMING_EVENTS, PAST_EVENTS, type UpcomingEvent, type PastEvent } from '../data/myEvents'
-import { TRANSACTIONS } from '../data/transactions'
+import type { MyEventsData } from '../myEvents.routes'
+import type { MyEventRow } from '../myEvents.types'
+import { EVENT_ICON, lookOf } from '../portal.presentation'
 
 /* Attendee "My Account" (portal/my-events.html). Standalone page with four
    tabs (My Events, Payment history, Profile, Settings), a paginated
@@ -24,6 +34,13 @@ const SWITCH_CSS = `
 `
 
 type Tab = 'events' | 'payments' | 'profile' | 'settings'
+
+/* Nothing on this page is filtered — the tabs are component state and the only
+   query parameters are the payment history's page and page size — so an empty
+   list here always means "you have not done this yet", never "a filter hid it".
+   That makes the way forward the same in every case: go and find an event.
+   Attendee pages never answer emptiness with "create one". */
+const DISCOVER_ACTION = { label: 'Discover events', to: '/portal/discover', icon: 'hgi-search-01' }
 
 function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   e.currentTarget.style.display = 'none'
@@ -52,56 +69,66 @@ function Switch({
   )
 }
 
-function UpcomingCard({ ev, onTicket }: { ev: UpcomingEvent; onTicket: (t: FlyerTicket) => void }) {
+function UpcomingCard({
+  ev,
+  holder,
+  onTicket,
+}: {
+  ev: MyEventRow
+  holder: string
+  onTicket: (t: FlyerTicket) => void
+}) {
+  // Stable per event, so the same booking is the same colour on every visit.
+  const look = lookOf(ev.slug)
+
   return (
     <article className="group overflow-hidden rounded-2xl bg-surface ring-2 ring-transparent transition hover:ring-brand">
-      <div className={cn('relative h-24', ev.headerClass)}>
+      <div className={cn('relative h-24', look.header)}>
         <img
-          src={`https://picsum.photos/seed/${ev.imgSeed}/540/240`}
+          src={ev.image ?? `https://picsum.photos/seed/${ev.slug}/540/240`}
           alt=""
           loading="lazy"
           className="absolute inset-0 h-full w-full object-cover"
           onError={hideOnError}
         />
-        <span
-          className={cn(
-            'absolute right-2.5 top-2.5 rounded-full px-2.5 py-1 text-[11px] font-semibold',
-            ev.tag.variant === 'brand'
-              ? 'bg-brand text-white'
-              : 'bg-white/85 text-ink backdrop-blur-sm',
-          )}
-        >
-          {ev.tag.text}
-        </span>
+        {/* The API writes the phrase — "in 3 days" — and stops once it passes. */}
+        {ev.countdown && (
+          <span className="absolute right-2.5 top-2.5 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-sm">
+            {ev.countdown}
+          </span>
+        )}
         <span
           className={cn(
             'absolute -bottom-5 left-4 grid h-11 w-11 place-items-center rounded-xl text-white shadow-md ring-4 ring-surface',
-            ev.badgeClass,
+            look.badge,
           )}
         >
-          <i className={cn('hgi-stroke text-[20px]', ev.icon)} />
+          <i className={cn('hgi-stroke text-[20px]', EVENT_ICON)} />
         </span>
       </div>
       <div className="px-4 pb-4 pt-7">
         <div className="flex items-start justify-between gap-2">
           <p className="truncate text-[15px] font-bold tracking-tight text-ink">{ev.title}</p>
-          <Badge tone={ev.chip.tone} className="shrink-0">
-            <i className={cn('hgi-stroke text-[11px]', ev.chip.icon)} />
-            {ev.chip.label}
+          <Badge tone={look.tone} className="shrink-0">
+            <i className="hgi-stroke hgi-ticket-01 text-[11px]" />
+            {ev.ticket}
           </Badge>
         </div>
         <div className="mt-2 space-y-1.5">
           <p className="flex items-center gap-1.5 text-[12px] text-muted">
             <Icon name="hgi-calendar-03" size={14} />
-            {ev.date}
+            {ev.when}
           </p>
           <p className="flex items-center gap-1.5 text-[12px] text-muted">
             <Icon name="hgi-location-01" size={14} />
-            {ev.venue}
+            {ev.where}
           </p>
         </div>
         <div className="mt-3.5 flex items-center gap-2 border-t border-hair pt-3.5">
-          <Link to="/admin/event-detail" className="btn btn-soft btn-sm flex-1">
+          {/* An attendee's "Details" pointed into the organizer console, which
+              they may not open — the API answers 403. Their own event page is
+              the public one. */}
+          <Link to={`/e/${ev.slug}`} className="btn btn-soft btn-sm flex-1">
             <Icon name="hgi-eye" size={14} />
             Details
           </Link>
@@ -110,13 +137,13 @@ function UpcomingCard({ ev, onTicket }: { ev: UpcomingEvent; onTicket: (t: Flyer
             className="btn btn-primary btn-sm flex-1"
             onClick={() =>
               onTicket({
-                id: ev.ticket.id,
-                event: ev.ticket.event,
-                date: ev.ticket.date,
-                venue: ev.ticket.venue,
-                type: ev.ticket.type,
-                attendee: 'Anong Pattana',
-                payload: 'https://eventa.app/t/' + ev.ticket.id,
+                id: ev.reference,
+                event: ev.title,
+                date: ev.when,
+                venue: ev.where,
+                type: ev.ticket,
+                attendee: holder,
+                payload: `${window.location.origin}/e/${ev.slug}`,
               })
             }
           >
@@ -129,28 +156,34 @@ function UpcomingCard({ ev, onTicket }: { ev: UpcomingEvent; onTicket: (t: Flyer
   )
 }
 
-function PastCard({ ev }: { ev: PastEvent }) {
+function PastCard({ ev }: { ev: MyEventRow }) {
+  const look = lookOf(ev.slug)
+
   return (
     <article className="group overflow-hidden rounded-2xl bg-surface ring-2 ring-transparent transition hover:ring-hair">
       <div className="relative h-24 bg-line">
         <img
-          src={`https://picsum.photos/seed/${ev.imgSeed}/540/240`}
+          src={ev.image ?? `https://picsum.photos/seed/${ev.slug}/540/240`}
           alt=""
           loading="lazy"
           className="absolute inset-0 h-full w-full object-cover opacity-70 grayscale"
           onError={hideOnError}
         />
-        <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-sm">
-          <i className="hgi-stroke hgi-checkmark-badge-01 text-[11px]" />
-          Attended
-        </span>
+        {/* Only claimed when they were actually scanned in — a past event they
+            missed is still theirs, and saying "Attended" would be wrong. */}
+        {ev.attended && (
+          <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-sm">
+            <i className="hgi-stroke hgi-checkmark-badge-01 text-[11px]" />
+            Attended
+          </span>
+        )}
         <span
           className={cn(
             'absolute -bottom-5 left-4 grid h-11 w-11 place-items-center rounded-xl text-white shadow-md ring-4 ring-surface',
-            ev.badgeClass,
+            look.badge,
           )}
         >
-          <i className={cn('hgi-stroke text-[20px]', ev.icon)} />
+          <i className={cn('hgi-stroke text-[20px]', EVENT_ICON)} />
         </span>
       </div>
       <div className="px-4 pb-4 pt-7">
@@ -158,15 +191,15 @@ function PastCard({ ev }: { ev: PastEvent }) {
         <div className="mt-2 space-y-1.5">
           <p className="flex items-center gap-1.5 text-[12px] text-muted">
             <Icon name="hgi-calendar-03" size={14} />
-            {ev.date}
+            {ev.when}
           </p>
           <p className="flex items-center gap-1.5 text-[12px] text-muted">
             <Icon name="hgi-location-01" size={14} />
-            {ev.venue}
+            {ev.where}
           </p>
         </div>
         <div className="mt-3.5 border-t border-hair pt-3.5">
-          <Link to={`/portal/survey?event=${ev.surveySlug}`} className="btn btn-soft btn-sm w-full">
+          <Link to={`/portal/survey?event=${ev.slug}`} className="btn btn-soft btn-sm w-full">
             <Icon name="hgi-comment-01" size={14} />
             Leave feedback
           </Link>
@@ -177,27 +210,24 @@ function PastCard({ ev }: { ev: PastEvent }) {
 }
 
 export default function MyEventsPage() {
+  const { me, upcoming, past, transactions, window: range, totals } =
+    useLoaderData() as MyEventsData
+  const navigate = useNavigate()
+  const { set } = useFilters()
   const { dark, toggle } = useTheme()
   const [tab, setTabState] = useState<Tab>('events')
+
+  async function signOut() {
+    await authApi.logout()
+    navigate('/portal/login', { replace: true })
+  }
 
   const modal = useDisclosure()
   const [ticket, setTicket] = useState<FlyerTicket | null>(null)
 
-  const pager = usePagination(TRANSACTIONS, 10)
-
-  const stats = useMemo(() => {
-    let spent = 0
-    let refunded = 0
-    for (const t of TRANSACTIONS) {
-      if (t.refunded) refunded += t.amount
-      else spent += t.amount
-    }
-    return { spent, refunded, count: TRANSACTIONS.length }
-  }, [])
-
   function setTab(next: Tab) {
     setTabState(next)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    globalThis.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   function openTicket(t: FlyerTicket) {
@@ -206,14 +236,15 @@ export default function MyEventsPage() {
   }
 
   const tabItems: PillTabItem<Tab>[] = [
-    { value: 'events', label: 'My Events', count: UPCOMING_EVENTS.length + PAST_EVENTS.length },
-    { value: 'payments', label: 'Payment history', count: TRANSACTIONS.length },
+    { value: 'events', label: 'My Events', count: upcoming.length + past.length },
+    // The whole history, not the page on screen — the API counted it.
+    { value: 'payments', label: 'Payment history', count: range.total },
     { value: 'profile', label: 'Profile' },
     { value: 'settings', label: 'Settings' },
   ]
 
   return (
-    <div className="h-full bg-canvas font-sans text-ink antialiased">
+    <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
       <style>{SWITCH_CSS}</style>
 
       {/* ============ Top bar ============ */}
@@ -241,13 +272,21 @@ export default function MyEventsPage() {
               title="Account"
             >
               <span className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-brand to-emerald-400 text-[11px] font-semibold text-white">
-                AP
+                {initials(me.name)}
               </span>
-              <span className="hidden text-[13px] font-semibold sm:inline">Anong</span>
+              <span className="hidden text-[13px] font-semibold sm:inline">{me.name}</span>
             </button>
-            <Link to="/portal/login" className="btn-icon bg-surface" title="Sign out">
+            {/* A real sign-out. This used to be a Link, which navigated away and
+                left the tokens in localStorage — so "signed out" was a change of
+                page rather than of session. */}
+            <button
+              type="button"
+              onClick={signOut}
+              className="btn-icon bg-surface"
+              title="Sign out"
+            >
               <Icon name="hgi-logout-03" size={18} />
-            </Link>
+            </button>
           </div>
         </div>
       </header>
@@ -267,149 +306,232 @@ export default function MyEventsPage() {
 
         <div className="mt-5">
           {/* ======================= My Events ======================= */}
-          {tab === 'events' && (
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-[15px] font-bold tracking-tight">
-                  Upcoming <span className="text-muted">· {UPCOMING_EVENTS.length}</span>
-                </h2>
-                <Link
-                  to="/portal/discover"
-                  className="text-[12px] font-semibold text-brand hover:underline"
-                >
-                  Discover more →
-                </Link>
-              </div>
+          {tab === 'events' &&
+            (upcoming.length + past.length === 0 ? (
+              /* Never registered for anything. The "Upcoming · 0" heading and
+                 its "Discover more" link go too: with no list to head, they are
+                 a label over nothing and a second copy of the one real step. */
+              <EmptyState
+                className="card"
+                icon="hgi-ticket-02"
+                title="No tickets yet"
+                actions={[DISCOVER_ACTION]}
+              >
+                Events you register for show up here with your ticket and its QR code, ready to
+                scan at the door. Nothing is booked yet.
+              </EmptyState>
+            ) : (
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-[15px] font-bold tracking-tight">
+                    Upcoming <span className="text-muted">· {upcoming.length}</span>
+                  </h2>
+                  <Link
+                    to="/portal/discover"
+                    className="text-[12px] font-semibold text-brand hover:underline"
+                  >
+                    Discover more →
+                  </Link>
+                </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {UPCOMING_EVENTS.map((ev) => (
-                  <UpcomingCard key={ev.ticket.id} ev={ev} onTicket={openTicket} />
-                ))}
-              </div>
+                {upcoming.length ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {upcoming.map((ev) => (
+                      <UpcomingCard
+                        key={ev.orderId}
+                        ev={ev}
+                        holder={me.name}
+                        onTicket={openTicket}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  /* Past events below, so the heading stays and only the
+                     Upcoming grid is replaced. No title — the heading above it
+                     already says which half of the tab is empty. */
+                  <EmptyState
+                    compact
+                    className="card"
+                    icon="hgi-calendar-03"
+                    actions={[DISCOVER_ACTION]}
+                  >
+                    Nothing coming up. Your next booking appears here with its ticket and QR code.
+                  </EmptyState>
+                )}
 
-              <h2 className="mb-3 mt-7 text-[15px] font-bold tracking-tight">
-                Past <span className="text-muted">· {PAST_EVENTS.length}</span>
-              </h2>
+                {past.length > 0 && (
+                  <>
+                    <h2 className="mb-3 mt-7 text-[15px] font-bold tracking-tight">
+                      Past <span className="text-muted">· {past.length}</span>
+                    </h2>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {PAST_EVENTS.map((ev) => (
-                  <PastCard key={ev.surveySlug} ev={ev} />
-                ))}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {past.map((ev) => (
+                        <PastCard key={ev.orderId} ev={ev} />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-          )}
+            ))}
 
           {/* ======================= Payment history ======================= */}
-          {tab === 'payments' && (
-            <div>
-              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="card p-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-                    <Icon name="hgi-wallet-01" size={13} className="text-brand" />
-                    Total spent
-                  </p>
-                  <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
-                    {baht(stats.spent)}
-                  </p>
+          {tab === 'payments' &&
+            (range.total === 0 ? (
+              /* The API's own count of the whole history, not of the rows on
+                 this page: there has never been a payment, so the three totals
+                 would read zero three times above a table with no rows. */
+              <EmptyState
+                className="card"
+                icon="hgi-credit-card"
+                title="No payments yet"
+                actions={[DISCOVER_ACTION]}
+              >
+                Tickets you pay for are listed here with their receipts, so you can look up what
+                you paid, when, and for which event.
+              </EmptyState>
+            ) : (
+              <div>
+                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="card p-4">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                      <Icon name="hgi-wallet-01" size={13} className="text-brand" />
+                      Total spent
+                    </p>
+                    <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
+                      {totals.spent}
+                    </p>
+                  </div>
+                  <div className="card p-4">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                      <Icon name="hgi-credit-card" size={13} className="text-brand" />
+                      Transactions
+                    </p>
+                    <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
+                      {num(totals.count)}
+                    </p>
+                  </div>
+                  <div className="card p-4">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
+                      <Icon name="hgi-delivery-return-01" size={13} className="text-brand" />
+                      Refunded
+                    </p>
+                    <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
+                      {totals.refunded}
+                    </p>
+                  </div>
                 </div>
-                <div className="card p-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-                    <Icon name="hgi-credit-card" size={13} className="text-brand" />
-                    Transactions
-                  </p>
-                  <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
-                    {num(stats.count)}
-                  </p>
-                </div>
-                <div className="card p-4">
-                  <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-                    <Icon name="hgi-delivery-return-01" size={13} className="text-brand" />
-                    Refunded
-                  </p>
-                  <p className="mt-1 text-[22px] font-bold tabular-nums tracking-tight">
-                    {baht(stats.refunded)}
-                  </p>
-                </div>
-              </div>
 
-              <div className="card overflow-hidden">
-                <div className="flex items-center justify-between border-b border-hair px-4 py-3">
-                  <h2 className="text-[14px] font-bold tracking-tight">Transactions</h2>
-                  <button type="button" className="btn btn-soft btn-sm">
-                    <Icon name="hgi-download-01" size={14} />
-                    Export
-                  </button>
-                </div>
-                <div className="overflow-x-auto px-4 py-3">
-                  <table className="data-table w-full [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
-                    <thead>
-                      <tr>
-                        <th className="text-left">Event</th>
-                        <th className="text-left">Date</th>
-                        <th className="text-left">Method</th>
-                        <th className="text-right">Amount</th>
-                        <th className="text-left">Status</th>
-                        <th className="text-right">Receipt</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pager.slice.map((t) => (
-                        <tr key={t.inv}>
-                          <td>
-                            <p className="text-[13px] font-semibold text-ink">{t.event}</p>
-                            <p className="font-mono text-[11px] text-muted">{t.inv}</p>
-                          </td>
-                          <td className="whitespace-nowrap text-[12px] text-muted">{t.date}</td>
-                          <td className="whitespace-nowrap text-[12px] text-muted">
-                            <i className={cn('hgi-stroke mr-1 text-[13px]', t.icon)} />
-                            {t.method}
-                          </td>
-                          <td
-                            className={cn(
-                              'text-right text-[13px] font-semibold tabular-nums',
-                              t.refunded && 'text-muted line-through',
-                            )}
-                          >
-                            {baht(t.amount)}
-                          </td>
-                          <td>
-                            {t.refunded ? (
-                              <Badge tone="red">
-                                <i className="hgi-stroke hgi-delivery-return-01 text-[11px]" />
-                                Refunded
-                              </Badge>
-                            ) : (
-                              <Badge tone="green">
-                                <i className="hgi-stroke hgi-tick-02 text-[11px]" />
-                                Paid
-                              </Badge>
-                            )}
-                          </td>
-                          <td className="text-right">
-                            <button type="button" className="btn-icon bg-line" title="Download receipt">
-                              <Icon name="hgi-download-01" size={15} />
-                            </button>
-                          </td>
+                <div className="card overflow-hidden">
+                  <div className="flex items-center justify-between border-b border-hair px-4 py-3">
+                    <h2 className="text-[14px] font-bold tracking-tight">Transactions</h2>
+                    <button type="button" className="btn btn-soft btn-sm">
+                      <Icon name="hgi-download-01" size={14} />
+                      Export
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto px-4 py-3">
+                    <table className="data-table w-full [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
+                      <thead>
+                        <tr>
+                          <th className="text-left">Event</th>
+                          <th className="text-left">Date</th>
+                          <th className="text-left">Method</th>
+                          <th className="text-right">Amount</th>
+                          <th className="text-left">Status</th>
+                          <th className="text-right">Receipt</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {transactions.length === 0 ? (
+                          /* History exists but this page holds none of it — a
+                             hand-typed `?page=`, or the last row of the page
+                             refunded away. Not a filtered view and not a first
+                             run, so the way back is the first page, and the
+                             paginator below stays put. */
+                          <tr>
+                            <td colSpan={6}>
+                              <EmptyState
+                                compact
+                                icon="hgi-search-01"
+                                title="Nothing on this page"
+                                actions={[
+                                  {
+                                    label: 'Back to the first page',
+                                    onClick: () => set({ page: 1 }),
+                                    icon: 'hgi-refresh',
+                                  },
+                                ]}
+                              >
+                                This page is past the end of your payment history.
+                              </EmptyState>
+                            </td>
+                          </tr>
+                        ) : (
+                          transactions.map((t) => (
+                            <tr key={t.id}>
+                              <td>
+                                <p className="text-[13px] font-semibold text-ink">{t.event}</p>
+                                <p className="font-mono text-[11px] text-muted">{t.reference}</p>
+                              </td>
+                              <td className="whitespace-nowrap text-[12px] text-muted">{t.date}</td>
+                              <td className="whitespace-nowrap text-[12px] text-muted">
+                                {t.method}
+                              </td>
+                              <td
+                                className={cn(
+                                  'text-right text-[13px] font-semibold tabular-nums',
+                                  t.refunded && 'text-muted line-through',
+                                )}
+                              >
+                                {t.amount}
+                              </td>
+                              <td>
+                                {t.refunded ? (
+                                  <Badge tone="red">
+                                    <i className="hgi-stroke hgi-delivery-return-01 text-[11px]" />
+                                    Refunded
+                                  </Badge>
+                                ) : (
+                                  <Badge tone="green">
+                                    <i className="hgi-stroke hgi-tick-02 text-[11px]" />
+                                    Paid
+                                  </Badge>
+                                )}
+                              </td>
+                              <td className="text-right">
+                                <button
+                                  type="button"
+                                  className="btn-icon bg-line"
+                                  title="Download receipt"
+                                >
+                                  <Icon name="hgi-download-01" size={15} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
 
-                  <Paginator
-                    from={pager.from}
-                    to={pager.to}
-                    total={pager.total}
-                    page={pager.page}
-                    pageCount={pager.pageCount}
-                    size={pager.size}
-                    onPage={pager.setPage}
-                    onSize={pager.setSize}
-                    noun="transactions"
-                  />
+                    {/* The API pages this, so the numbers come from its `meta`
+                        and the page lives in the URL — the back button works and
+                        the count can never disagree with the rows. */}
+                    <Paginator
+                      from={range.from}
+                      to={range.to}
+                      total={range.total}
+                      page={range.page}
+                      pageCount={range.pageCount}
+                      size={range.size}
+                      onPage={(page) => set({ page })}
+                      onSize={(limit) => set({ limit })}
+                      noun="transactions"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            ))}
 
           {/* ======================= Profile ======================= */}
           {tab === 'profile' && (
@@ -438,8 +560,8 @@ export default function MyEventsPage() {
                   </div>
                 </div>
                 <div className="mt-4 border-t border-hair pt-4">
-                  <h3 className="text-[15px] font-bold tracking-tight">Anong Phanit</h3>
-                  <p className="text-[12px] text-muted">Attendee · Bangkok</p>
+                  <h3 className="text-[15px] font-bold tracking-tight">{me.name}</h3>
+                  <p className="text-[12px] text-muted">{me.email}</p>
                 </div>
                 <div className="mt-4 border-t border-hair pt-4">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
@@ -484,8 +606,8 @@ export default function MyEventsPage() {
 
                 <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="label">First name</label>
-                    <input className="input" defaultValue="Anong" />
+                    <label className="label">Name</label>
+                    <input className="input" name="name" defaultValue={me.name} />
                   </div>
                   <div>
                     <label className="label">Last name</label>
@@ -493,7 +615,7 @@ export default function MyEventsPage() {
                   </div>
                   <div>
                     <label className="label">Email</label>
-                    <input className="input" type="email" defaultValue="anong.p@gmail.com" />
+                    <input className="input" type="email" defaultValue={me.email} readOnly />
                   </div>
                   <div>
                     <label className="label">Phone</label>

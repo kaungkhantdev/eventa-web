@@ -112,14 +112,20 @@ function EventPickerPopup({
   }, [rows, q])
 
   const selectedLabel = value || (rows.find((r) => r.isAll)?.label ?? '')
-  const [active, setActive] = useState(0)
 
-  // Reset the active row to the current selection (or first) whenever the
-  // filtered view changes — mirrors the static kit's paint().
-  useEffect(() => {
+  // Where the keyboard is, once the list is filtered — the current selection,
+  // or the first row. Adjusted during render rather than in an effect, which
+  // would paint the old highlight for a frame after every keystroke.
+  const defaultActive = () => {
     const i = view.findIndex((r) => r.label === selectedLabel)
-    setActive(i >= 0 ? i : view.length ? 0 : -1)
-  }, [view, selectedLabel])
+    return i >= 0 ? i : view.length ? 0 : -1
+  }
+  const [active, setActive] = useState(defaultActive)
+  const [seen, setSeen] = useState(view)
+  if (view !== seen) {
+    setSeen(view)
+    setActive(defaultActive())
+  }
 
   // Position the popup under the trigger, flipping up if it would overflow.
   useLayoutEffect(() => {

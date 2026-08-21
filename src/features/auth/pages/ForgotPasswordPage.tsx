@@ -1,17 +1,43 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
+import { authApi } from '@/features/auth/api'
+import { personaOfSearch, signInPathFor } from '@/features/auth/personas'
+import { messageOf } from '@/lib/api'
 
 export default function ForgotPasswordPage() {
+  const [params] = useSearchParams()
+  // One page serves both audiences, and the API looks the address up in that
+  // persona's realm — so an attendee arriving here without the flag would be
+  // searched for among organizers and never found.
+  const persona = personaOfSearch(params)
   const [email, setEmail] = useState('')
   const [sentEmail, setSentEmail] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const sent = sentEmail !== null
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  /**
+   * The confirmation is shown for ANY address the API accepted — it answers
+   * uniformly whether or not an account exists, so that this page cannot be
+   * used to discover who is registered. Only a genuine failure (a malformed
+   * address, an unreachable server) is surfaced.
+   */
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setSentEmail(email || 'that email')
+    if (pending || sent) return
+    setPending(true)
+    setError(null)
+    try {
+      await authApi.forgotPassword(email, persona)
+      setSentEmail(email || 'that email')
+    } catch (cause) {
+      setError(messageOf(cause))
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -21,7 +47,7 @@ export default function ForgotPasswordPage() {
       footer={
         <p className="mt-6 text-center text-[13px]">
           <Link
-            to="/auth/login"
+            to={signInPathFor(persona)}
             className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"
           >
             <Icon name="hgi-arrow-left-01" size={14} />
@@ -31,6 +57,15 @@ export default function ForgotPasswordPage() {
       }
     >
       <form className="space-y-4" onSubmit={onSubmit}>
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg bg-rose-500/10 px-3 py-2.5 text-[13px] text-rose-600 dark:text-rose-400"
+          >
+            {error}
+          </p>
+        )}
+
         <div>
           <label htmlFor="email" className="label">
             Email
@@ -49,11 +84,14 @@ export default function ForgotPasswordPage() {
 
         <button
           type="submit"
-          disabled={sent}
-          className={cn('btn btn-primary w-full', sent && 'opacity-60 cursor-not-allowed')}
+          disabled={sent || pending}
+          className={cn(
+            'btn btn-primary w-full',
+            (sent || pending) && 'opacity-60 cursor-not-allowed',
+          )}
         >
           <Icon name={sent ? 'hgi-checkmark-circle-02' : 'hgi-mail-send-01'} size={16} />
-          <span>{sent ? 'Link sent' : 'Send reset link'}</span>
+          <span>{sent ? 'Link sent' : pending ? 'Sending…' : 'Send reset link'}</span>
         </button>
 
         <div

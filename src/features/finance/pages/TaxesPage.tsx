@@ -1,234 +1,227 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useFetcher, useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
-  HeaderUser,
+  Badge,
   Button,
   Card,
+  DataTable,
+  DownloadButton,
+  HeaderUser,
+  Hint,
   Icon,
-  PillTabs,
-  Paginator,
-  usePagination,
-  type PillTabItem,
+  Input,
+  Label,
+  PageFooter,
+  PageHeader,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import {
-  TAX_ROWS,
-  TAX_STATUS_BADGE,
-  TAX_YEARS,
-  baht,
-  bahtShort,
-  type TaxStatus,
-} from '../data/taxes'
+import { toast } from '@/lib/toast'
+import { useDisclosure } from '@/lib/useDisclosure'
+import { useFilters } from '@/lib/useFilters'
+import { useIsFiltering } from '@/lib/usePendingPath'
+import type { ActionResult } from '@/app/loaders'
+import type { TaxesData } from '../finance.routes'
+import type { TaxRow } from '../finance.types'
 
-type TaxTab = 'all' | TaxStatus
-
+/**
+ * The VAT ledger (US-FIN-11/12). Layout ported from taxes.html.
+ *
+ * Thailand files VAT monthly, due on the 15th of the following month. Filing
+ * late is recorded rather than hidden — the surcharge depends on it, and the
+ * organizer is the one who will be asked about it.
+ *
+ * Alone among the finance pages this one has no empty state, because it cannot
+ * be empty: `/tax-periods` builds a row for every month of the requested year
+ * whether or not anything was sold ("the ledger is always twelve rows, so it is
+ * a fixed list rather than a page" — tax-periods.controller.ts), and the loader
+ * always states a year inside the accepted range. A first-run workspace does
+ * see twelve ฿0 rows under four ฿0 headlines, which is not much of a welcome —
+ * but nothing in this loader's data distinguishes "never sold anything" from
+ * "sold nothing in the year you are looking at", and the ledger is year-scoped,
+ * so inferring a first run from the zeros would greet an organizer with real
+ * VAT history who happened to page back a year.
+ */
 export default function TaxesPage() {
-  const [tab, setTab] = useState<TaxTab>('all')
-  const [year, setYear] = useState('')
-
-  // pill-tab counts computed from the data
-  const counts = useMemo(
-    () => ({
-      all: TAX_ROWS.length,
-      Filed: TAX_ROWS.filter((r) => r.st === 'Filed').length,
-      Due: TAX_ROWS.filter((r) => r.st === 'Due').length,
-      Upcoming: TAX_ROWS.filter((r) => r.st === 'Upcoming').length,
-    }),
-    [],
-  )
-
-  const tabs: PillTabItem<TaxTab>[] = [
-    { value: 'all', label: 'All', count: counts.all },
-    { value: 'Filed', label: 'Filed', count: counts.Filed },
-    { value: 'Due', label: 'Due', count: counts.Due },
-    { value: 'Upcoming', label: 'Upcoming', count: counts.Upcoming },
-  ]
-
-  /* KPI headlines are DERIVED from the same rows the table renders, scoped to the
-     year filter (not the status tab). payable = collected - remitted is an identity
-     here, so the headline figures can never drift from the column beneath them. */
-  const kpis = useMemo(() => {
-    const scope = TAX_ROWS.filter((r) => !year || String(r.year) === year)
-    const collected = scope.reduce((s, r) => s + r.vat, 0)
-    const remitted = scope.reduce((s, r) => s + (r.st === 'Filed' ? r.vat : 0), 0)
-    const wht = scope.reduce((s, r) => s + r.wht, 0)
-    return { collected, remitted, payable: collected - remitted, wht }
-  }, [year])
-
-  const filtered = useMemo(
-    () =>
-      TAX_ROWS.filter(
-        (r) => (tab === 'all' || r.st === tab) && (!year || String(r.year) === year),
-      ),
-    [tab, year],
-  )
-
-  const pager = usePagination(filtered)
-  const { setPage } = pager
-  useEffect(() => setPage(1), [tab, year, setPage])
+  const data = useLoaderData() as TaxesData
+  const { set } = useFilters()
+  const filtering = useIsFiltering()
+  const filing = useDisclosure()
+  const [target, setTarget] = useState<TaxRow | null>(null)
 
   return (
     <>
       <PageHeader
         title="Taxes"
-        subtitle="VAT collected and remitted."
+        subtitle="VAT collected, remitted and still payable."
         actions={
           <>
-            <Button variant="ghost">
-              <Icon name="hgi-download-01" size={16} />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
+            <DownloadButton
+              path="/tax-periods/export.csv"
+              query={{ year: data.year }}
+              filename={`eventa-vat-${data.year}.csv`}
+            />
             <HeaderUser />
           </>
         }
       />
 
-      {/* KPI row */}
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-percent-circle text-[16px]" />
-            VAT collected
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">{bahtShort(kpis.collected)}</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              11.4%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-checkmark-badge-01 text-[16px]" />
-            VAT remitted
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">{bahtShort(kpis.remitted)}</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              9.8%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-clock-01 text-[16px]" />
-            VAT payable
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">{bahtShort(kpis.payable)}</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              2.6%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-taxes text-[16px]" />
-            Withholding tax
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">{bahtShort(kpis.wht)}</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              3.1%
-            </span>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Headline label="VAT collected" value={data.headlines.collected} icon="hgi-invoice-01" />
+        <Headline label="VAT remitted" value={data.headlines.remitted} icon="hgi-checkmark-badge-01" />
+        <Headline label="VAT payable" value={data.headlines.payable} icon="hgi-alert-circle" />
+        <Headline label="Withholding" value={data.headlines.withholding} icon="hgi-percent" />
       </div>
 
-      {/* filter row: filing status tabs + year */}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <PillTabs items={tabs} value={tab} onChange={setTab} />
-        <div className="relative w-full sm:w-40">
-          <i className="hgi-stroke hgi-calendar-03 text-[15px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <select
-            value={year}
-            onChange={(e) => setYear(e.target.value)}
-            className="select h-10 w-full border-0 bg-surface pl-9 font-medium sm:w-40"
-          >
-            <option value="">All years</option>
-            {TAX_YEARS.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="mt-3 flex items-center gap-2">
+        <label htmlFor="tax-year" className="text-[12px] text-muted">
+          Tax year
+        </label>
+        <select
+          id="tax-year"
+          value={data.year}
+          onChange={(e) => set({ year: e.target.value })}
+          className="select h-10 border-0 bg-surface font-medium sm:w-32"
+        >
+          {data.years.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* table */}
-      <Card className="mt-3 p-4">
+      <Card className={cn('mt-3 p-4', filtering && 'opacity-60 transition-opacity')}>
         <div className="overflow-x-auto">
-          <table className="data-table min-w-[820px]">
+          <DataTable className="min-w-[880px]">
             <thead>
               <tr>
                 <th>Period</th>
-                <th className="text-right">Taxable sales ฿</th>
-                <th className="text-right">VAT collected ฿</th>
-                <th className="text-right">Withholding ฿</th>
-                <th className="text-right">Remitted ฿</th>
+                <th>Due</th>
+                <th>Sales (ex-VAT)</th>
+                <th>VAT</th>
+                <th>Withholding</th>
+                <th>Remitted</th>
                 <th>Status</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="text-[13px]">
-              {pager.slice.length ? (
-                pager.slice.map((r) => {
-                  const s = TAX_STATUS_BADGE[r.st]
-                  const filing = (r.st === 'Filed' ? 'Filed ' : 'Due ') + r.due
-                  return (
-                    <tr key={r.period}>
-                      <td>
-                        <p className="font-semibold text-ink">{r.period}</p>
-                        <p className="mt-0.5 text-[11px] text-muted">{filing}</p>
-                      </td>
-                      <td className="text-right text-ink tnum">{baht(r.sales)}</td>
-                      <td className="text-right font-semibold text-ink tnum">{baht(r.vat)}</td>
-                      <td className="text-right text-muted tnum">{baht(r.wht)}</td>
-                      {r.remitted ? (
-                        <td className="text-right font-semibold text-ink tnum">
-                          {baht(r.remitted)}
-                        </td>
-                      ) : (
-                        <td className="text-right text-muted tnum">—</td>
-                      )}
-                      <td>
-                        <span className={s.cls}>
-                          <i className={cn('hgi-stroke', s.icon, 'text-[12px]')} />
-                          {r.st}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-[13px] text-muted">
-                    No periods match your filters.
+              {data.rows.map((row) => (
+                <tr key={row.key}>
+                  <td className="font-medium text-ink">{row.period}</td>
+                  <td className="tnum text-muted">{row.due}</td>
+                  <td className="tnum text-muted">{row.sales}</td>
+                  <td className="tnum font-semibold text-ink">{row.vat}</td>
+                  <td className="tnum text-muted">{row.withholding}</td>
+                  <td className="tnum text-muted">{row.remitted}</td>
+                  <td>
+                    <Badge tone={row.statusTone}>{row.statusLabel}</Badge>
+                    {row.lateNote && (
+                      <span className="ml-1.5 text-[11px] text-amber-500">{row.lateNote}</span>
+                    )}
+                  </td>
+                  <td className="text-right">
+                    {row.canFile && (
+                      <Button
+                        variant="soft"
+                        size="sm"
+                        onClick={() => {
+                          setTarget(row)
+                          filing.onOpen()
+                        }}
+                      >
+                        Record filing
+                      </Button>
+                    )}
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
-          </table>
+          </DataTable>
         </div>
-
-        <Paginator
-          from={pager.from}
-          to={pager.to}
-          total={pager.total}
-          page={pager.page}
-          pageCount={pager.pageCount}
-          size={pager.size}
-          onPage={pager.setPage}
-          onSize={pager.setSize}
-          noun="periods"
-        />
       </Card>
 
       <PageFooter />
+
+      <FileModal open={filing.open} onClose={filing.onClose} target={target} />
+    </>
+  )
+}
+
+function Headline({ label, value, icon }: { label: string; value: string; icon: string }) {
+  return (
+    <div className="rounded-2xl bg-surface p-4">
+      <div className="flex items-center gap-1.5 text-[12px] text-muted">
+        <Icon name={icon} size={16} />
+        {label}
+      </div>
+      <p className="tnum mt-2 text-[22px] font-bold tracking-tight">{value}</p>
+    </div>
+  )
+}
+
+/** Recording a filing with the Revenue Department (US-FIN-12). */
+function FileModal({
+  open,
+  onClose,
+  target,
+}: {
+  open: boolean
+  onClose: () => void
+  target: TaxRow | null
+}) {
+  const fetcher = useFetcher<ActionResult>()
+  const error = fetcher.data?.ok === false ? fetcher.data.error : null
+  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
+
+  useEffect(() => {
+    if (!done || !open) return
+    toast.success('VAT period filed.')
+    onClose()
+  }, [done, open, onClose])
+
+  return (
+    <>
+      <div className={cn('panel-overlay', open && 'open')} onClick={onClose} />
+      <div className={cn('modal', open && 'open')} role="dialog" aria-modal="true">
+        <fetcher.Form method="post" className="p-5">
+          <input type="hidden" name="year" value={target?.year ?? ''} />
+          <input type="hidden" name="month" value={target?.month ?? ''} />
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-brand-soft text-brand">
+            <Icon name="hgi-checkmark-badge-01" size={18} />
+          </div>
+          <h3 className="mt-3 text-[15px] font-bold tracking-tight">Record this filing?</h3>
+          <p className="mt-1 text-[13px] text-muted">
+            {target ? `${target.period} · VAT ${target.vat} · due ${target.due}` : ''}
+          </p>
+
+          {error && (
+            <p role="alert" className="mt-3 text-[13px] text-red-500">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-4">
+            <Label htmlFor="remitted">Amount remitted (฿)</Label>
+            <Input id="remitted" name="remitted" type="number" min={0} step={1} />
+            <Hint>Leave blank to record the VAT figure above.</Hint>
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <Button variant="soft" className="flex-1" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1"
+              type="submit"
+              disabled={fetcher.state !== 'idle'}
+            >
+              {fetcher.state === 'idle' ? 'Record filing' : 'Recording…'}
+            </Button>
+          </div>
+        </fetcher.Form>
+      </div>
     </>
   )
 }

@@ -1,317 +1,57 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
-import { Icon } from '@/components/ui'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useFetcher, useLoaderData } from 'react-router'
+import { EmptyState, Icon, NoResults, PastEnd } from '@/components/ui'
+import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useTheme } from '@/lib/useTheme'
 import { cn } from '@/lib/cn'
-import { num } from '@/lib/format'
-import { PORTAL_EVENTS, type PortalEvent } from '../data/events'
+import { MASKED } from '@/lib/format'
+import type { PageWindow } from '@/lib/paging'
+import type { ActionResult } from '@/app/loaders'
+import { signUpPathFor } from '@/features/auth/personas'
+import { ALL_CATEGORIES, lookOfCategory } from '../discover.presentation'
+import type { DiscoverData } from '../discover.routes'
+import type { DiscoverCard } from '../discover.types'
 
-/* Attendee "What's on" browser (portal/discover.html). Standalone page with a
-   Meetup-style category strip (icon over label, active = underline), search,
-   and a responsive event-card grid derived from the shared event catalogue. */
-
-const ALL = 'All events'
-
-const GRAD: [string, string][] = [
-  ['#1ba770', '#059669'],
-  ['#7c3aed', '#c026d3'],
-  ['#f59e0b', '#f97316'],
-  ['#0ea5e9', '#6366f1'],
-  ['#f43f5e', '#ec4899'],
-  ['#14b8a6', '#06b6d4'],
-  ['#8b5cf6', '#6d28d9'],
-  ['#10b981', '#0d9488'],
-  ['#eab308', '#f59e0b'],
-]
-
-const CAT_ICON: Record<string, string> = {
-  'All events': 'hgi-sparkles',
-  Concert: 'hgi-music-note-01',
-  Conference: 'hgi-presentation-01',
-  Exhibition: 'hgi-image-01',
-  'Food & Drink': 'hgi-restaurant-02',
-  Meetup: 'hgi-user-group',
-  Networking: 'hgi-connect',
-  'Sports & Wellness': 'hgi-workout-run',
-  Wedding: 'hgi-favourite',
-}
-
-const CAT_COLOR: Record<string, string> = {
-  'All events': '#1ba770',
-  Concert: '#7c3aed',
-  Conference: '#0ea5e9',
-  Exhibition: '#ec4899',
-  'Food & Drink': '#f97316',
-  Meetup: '#6366f1',
-  Networking: '#14b8a6',
-  'Sports & Wellness': '#f59e0b',
-  Wedding: '#f43f5e',
-}
+/**
+ * Attendee "What's on" browser (portal/discover.html), on the public feed.
+ *
+ * The search box and the category strip write to the URL, not to component
+ * state: the API pages server-side, so a filtered result is a request rather
+ * than a slice of what happened to be loaded, and the address bar is what makes
+ * a search shareable and the back button honest.
+ *
+ * The kit invented a rating, a cover photo and three attendee faces from each
+ * slug. All three now come from the API or not at all.
+ */
 
 const SAVE_OFF =
   'absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60'
 const SAVE_ON =
   'absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white text-red-500 shadow-sm transition'
 
-function hash(s: string): number {
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h + s.charCodeAt(i)) | 0
-  return Math.abs(h)
-}
-function catIcon(c: string) {
-  return CAT_ICON[c] || 'hgi-ticket-star'
-}
-function rating(slug: string) {
-  return (4.3 + (hash(slug) % 7) / 10).toFixed(1)
-}
-function going(ev: PortalEvent) {
-  return Math.max(0, ev.capacity - ev.seatsLeft)
-}
-function tpl(cat: string) {
-  const c = (cat || '').toLowerCase()
-  if (/festival|food|music|concert/.test(c)) return 'atlas'
-  if (/wedding/.test(c)) return 'minimal'
-  if (/exhibition|art/.test(c)) return 'noir'
-  return 'aurora'
-}
-function isFree(ev: PortalEvent) {
-  return /free/i.test(ev.priceFrom || '') || /^฿?0$/.test((ev.priceFrom || '').replace(/[, ]/g, ''))
-}
-
-function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
-  e.currentTarget.style.display = 'none'
-}
-
-function Avatars({ slug }: { slug: string }) {
-  return (
-    <span className="flex -space-x-2">
-      {[0, 1, 2].map((i) => {
-        const gg = GRAD[(hash(slug) + i * 3) % GRAD.length]!
-        return (
-          <span
-            key={i}
-            className="relative inline-block h-6 w-6 overflow-hidden rounded-full ring-2 ring-canvas"
-            style={{ backgroundImage: `linear-gradient(135deg,${gg[0]},${gg[1]})` }}
-          >
-            <img
-              src={`https://picsum.photos/seed/${encodeURIComponent(slug)}-a${i}/48/48`}
-              alt=""
-              loading="lazy"
-              className="h-full w-full object-cover"
-              onError={hideOnError}
-            />
-          </span>
-        )
-      })}
-    </span>
-  )
-}
-
-function EventCard({
-  ev,
-  saved,
-  onToggleSave,
-}: {
-  ev: PortalEvent
-  saved: boolean
-  onToggleSave: () => void
-}) {
-  const g = GRAD[hash(ev.slug) % GRAD.length]!
-  const free = isFree(ev)
-  const left = ev.seatsLeft
-  const cap = ev.capacity
-  const pct = left != null && cap ? left / cap : 1
-  const loc = [ev.venue, ev.city].filter(Boolean).join(', ')
-
-  return (
-    <Link to={`/landing/${tpl(ev.category)}?event=${encodeURIComponent(ev.slug)}`} className="group block">
-      <div
-        className="relative aspect-[3/2] overflow-hidden rounded-2xl"
-        style={{ backgroundImage: `linear-gradient(135deg,${g[0]},${g[1]})` }}
-      >
-        <img
-          src={`https://picsum.photos/seed/${encodeURIComponent(ev.slug)}/560/374`}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          onError={hideOnError}
-        />
-        {left === 0 ? (
-          <span className="absolute left-3 top-3 rounded-full bg-amber-500 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
-            Waitlist
-          </span>
-        ) : pct <= 0.15 ? (
-          <span className="absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
-            Selling fast
-          </span>
-        ) : null}
-        <button
-          type="button"
-          aria-label="Save event"
-          className={saved ? SAVE_ON : SAVE_OFF}
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            onToggleSave()
-          }}
-        >
-          <Icon name="hgi-favourite" size={16} />
-        </button>
-      </div>
-      <div className="pt-3">
-        <p
-          className="text-[11px] font-semibold uppercase tracking-wide"
-          style={{ color: ev.accent || '#1ba770' }}
-        >
-          {ev.category || 'Event'}
-        </p>
-        <h3 className="mt-1 line-clamp-2 text-[15.5px] font-bold leading-snug tracking-tight text-ink transition group-hover:text-brand">
-          {ev.title}
-        </h3>
-        <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-muted">
-          <Icon name="hgi-calendar-03" size={14} />
-          <span className="truncate">{ev.dateText || ''}</span>
-        </p>
-        <p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-muted">
-          <Icon name="hgi-location-01" size={14} />
-          <span className="truncate">{loc}</span>
-        </p>
-        <p className="mt-1 flex items-center gap-1 text-[12.5px] text-muted">
-          <span className="truncate">by {ev.organizer || 'Eventa'}</span>
-          <span>·</span>
-          <i className="hgi-stroke hgi-star text-[13px] text-amber-400" />
-          <span className="font-semibold text-ink">{rating(ev.slug)}</span>
-        </p>
-        <div className="mt-2.5 flex items-center justify-between">
-          <span className="flex items-center gap-2 text-[12px] text-muted">
-            <Avatars slug={ev.slug} />
-            <span>{num(going(ev))} going</span>
-          </span>
-          <span className="text-[13px] text-muted">
-            {free ? (
-              <span className="font-semibold text-brand">Free</span>
-            ) : (
-              <>
-                From <span className="font-bold text-ink">{ev.priceFrom}</span>
-              </>
-            )}
-          </span>
-        </div>
-      </div>
-    </Link>
-  )
-}
-
 export default function DiscoverPage() {
-  const { dark, toggle } = useTheme()
-  const [q, setQ] = useState('')
-  const [cat, setCat] = useState(ALL)
-  const [saved, setSaved] = useState<Set<string>>(new Set())
-
-  const catsRef = useRef<HTMLDivElement>(null)
-  const [canLeft, setCanLeft] = useState(false)
-  const [canRight, setCanRight] = useState(false)
-
-  const cats = useMemo(
-    () => [ALL, ...Array.from(new Set(PORTAL_EVENTS.map((e) => e.category))).sort()],
-    [],
+  const data = useLoaderData() as DiscoverData
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
+  const [term, setTerm] = useSearchBox(params.get('q') ?? '', (next) =>
+    // Replace, not push: a search is typed, and every keystroke does not
+    // deserve its own entry in the back button's history.
+    set({ q: next || null, page: null }, { replace: true }),
   )
+  const category = params.get('category') ?? ALL_CATEGORIES
+  const saved = new Set(data.saved)
 
-  const list = useMemo(() => {
-    const query = q.trim().toLowerCase()
-    return PORTAL_EVENTS.filter((ev) => {
-      if (cat !== ALL && ev.category !== cat) return false
-      if (!query) return true
-      return [ev.title, ev.category, ev.city, ev.venue].join(' ').toLowerCase().indexOf(query) !== -1
-    })
-  }, [q, cat])
-
-  function updateArrows() {
-    const el = catsRef.current
-    if (!el) return
-    const max = el.scrollWidth - el.clientWidth
-    setCanLeft(el.scrollLeft > 2)
-    setCanRight(el.scrollLeft < max - 2)
-  }
-
-  useEffect(() => {
-    updateArrows()
-    const el = catsRef.current
-    const onScroll = () => updateArrows()
-    el?.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
-    // re-measure after the icon font loads (glyph widths shift layout)
-    const t = window.setTimeout(updateArrows, 350)
-    return () => {
-      el?.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
-      window.clearTimeout(t)
-    }
-  }, [])
-
-  function scrollCats(dir: number) {
-    const el = catsRef.current
-    if (!el) return
-    el.scrollBy({ left: dir * Math.max(200, el.clientWidth * 0.7), behavior: 'smooth' })
-  }
-
-  function toggleSave(slug: string) {
-    setSaved((prev) => {
-      const next = new Set(prev)
-      if (next.has(slug)) next.delete(slug)
-      else next.add(slug)
-      return next
-    })
-  }
+  // An empty feed is three different things, and the visitor is owed the right
+  // one: a search that matched nothing is theirs to undo, a page past the end
+  // is a link that went stale, and a diary with nothing coming up is neither of
+  // those and no move of theirs will fix it. The URL tells them apart — `q`,
+  // `category` and the page number are all that can narrow this feed.
+  const nothingUpcoming = data.cards.length === 0 && emptyReason === 'first-run'
 
   return (
-    <div className="h-full bg-surface font-sans text-ink antialiased">
-      {/* ============ Top bar ============ */}
-      <header className="sticky top-0 z-30 border-b border-hair bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 lg:px-6">
-          <Link to="/portal/discover" className="flex shrink-0 items-center gap-2.5">
-            <span className="brand-logo text-brand h-[17px] w-[31px]" />
-            <span className="hidden text-[15px] font-extrabold tracking-tight sm:inline">Eventa</span>
-          </Link>
-          {/* search (in top nav) */}
-          <div className="relative min-w-0 flex-1">
-            <i className="hgi-stroke hgi-search-01 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[16px] text-muted" />
-            <input
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="h-9 w-full rounded-full border border-transparent bg-canvas pl-10 pr-4 text-[13px] text-ink transition placeholder:text-muted hover:bg-line focus:border-brand/40 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand/20"
-              placeholder="Search events, cities, categories…"
-              autoComplete="off"
-            />
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
-            <Link
-              to="/portal/discover"
-              className="hidden rounded-lg px-3 py-1.5 text-[13px] font-semibold text-brand md:inline-flex md:items-center md:gap-1.5"
-            >
-              <i className="hgi-stroke hgi-compass-01 text-[15px]" />
-              Explore
-            </Link>
-            <Link
-              to="/portal/my-events"
-              className="hidden rounded-lg px-3 py-1.5 text-[13px] font-medium text-muted transition hover:bg-line hover:text-ink md:inline-flex md:items-center md:gap-1.5"
-            >
-              <i className="hgi-stroke hgi-ticket-02 text-[15px]" />
-              My tickets
-            </Link>
-            <button type="button" onClick={toggle} className="btn-icon bg-surface" title="Toggle theme">
-              <Icon name={dark ? 'hgi-sun-03' : 'hgi-moon-02'} size={18} />
-            </button>
-            <Link to="/portal/login" className="btn btn-primary btn-sm">
-              Sign in
-            </Link>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-surface font-sans text-ink antialiased">
+      <TopBar value={term} onSearch={setTerm} />
 
       <main className="mx-auto max-w-5xl px-4 pb-16 pt-7 lg:px-6">
-        {/* hero */}
         <div className="mb-6">
           <h1 className="text-[26px] font-extrabold tracking-tight sm:text-[34px]">
             What's on in <span className="text-brand">Bangkok</span>
@@ -321,100 +61,68 @@ export default function DiscoverPage() {
           </p>
         </div>
 
-        {/* category filter (Meetup-style: icon over label, active = underline) */}
-        <div className="relative mb-6">
-          <div ref={catsRef} className="no-scrollbar flex gap-7 overflow-x-auto scroll-smooth px-0.5 sm:gap-9">
-            {cats.map((c) => {
-              const on = c === cat
-              const col = CAT_COLOR[c] || '#1ba770'
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setCat(c)}
-                  className="group flex shrink-0 flex-col items-center gap-1.5 pt-0.5 outline-none"
-                >
-                  <i
-                    className={cn('hgi-stroke text-[27px] leading-none transition group-hover:scale-110', catIcon(c))}
-                    style={{ color: col }}
-                  />
-                  <span
-                    className={cn(
-                      'whitespace-nowrap border-b-2 pb-2.5 text-[12.5px] transition',
-                      on
-                        ? 'border-ink font-semibold text-ink'
-                        : 'border-transparent text-muted group-hover:text-ink',
-                    )}
-                  >
-                    {c}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-          {/* left control */}
-          <div
-            className={cn(
-              'pointer-events-none absolute inset-y-0 left-0 items-center pr-8',
-              canLeft ? 'flex' : 'hidden',
-            )}
-            style={{ background: 'linear-gradient(90deg, rgb(var(--surface)) 55%, transparent)' }}
+        {nothingUpcoming ? (
+          /* The category strip, the count and the pager go with the grid:
+             there is nothing to narrow, nothing to count and nowhere to page
+             to, so offering all three would be three dead controls. The one
+             thing that can fill this page is somebody scheduling an event.
+
+             The copy says "coming up", not "published": the feed is public,
+             published *and* still ahead of now (the API's `browsable`), so a
+             platform with a full back catalogue and nothing on the calendar
+             lands here too — and telling it that it has never published
+             anything would simply be untrue. */
+          <EmptyState
+            icon="hgi-calendar-03"
+            title="Nothing on just yet"
+            actions={[
+              { label: 'Create an event', to: ORGANIZER_SIGN_UP, icon: 'hgi-calendar-add-01' },
+            ]}
           >
-            <button
-              type="button"
-              aria-label="Scroll categories left"
-              onClick={() => scrollCats(-1)}
-              className="pointer-events-auto grid h-9 w-9 place-items-center rounded-full bg-ink text-canvas shadow-md transition hover:opacity-90"
-            >
-              <Icon name="hgi-arrow-left-01" size={18} />
-            </button>
-          </div>
-          {/* right control */}
-          <div
-            className={cn(
-              'pointer-events-none absolute inset-y-0 right-0 items-center justify-end pl-8',
-              canRight ? 'flex' : 'hidden',
+            Nothing is coming up right now. Conferences, concerts, workshops and festivals appear
+            here as organizers schedule them — check back soon.
+          </EmptyState>
+        ) : (
+          <>
+            <CategoryStrip
+              categories={data.categories}
+              active={category}
+              onPick={(next) =>
+                set({ category: next === ALL_CATEGORIES ? null : next, page: null })
+              }
+            />
+
+            <p className="mb-3 text-[12px] font-medium text-muted">
+              {data.window.total} {data.window.total === 1 ? 'event' : 'events'}
+            </p>
+
+            {data.cards.length > 0 ? (
+              <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+                {data.cards.map((card) => (
+                  <EventCard key={card.id} card={card} saved={saved.has(card.id)} />
+                ))}
+              </div>
+            ) : emptyReason === 'past-end' ? (
+              /* A bookmarked `?page=9` outlives the ninth page — an organizer
+                 unpublishes a few events and the feed is eight pages long.
+                 Often no filter is set at all, so "No events match / Clear
+                 filters" would name choices the visitor never made and offer a
+                 button that clears nothing. Page one, keeping whatever search
+                 they *did* make: dropping it as well is not what "Back to the
+                 first page" says it does. */
+              <PastEnd noun="events" onFirstPage={() => set({ page: null })}>
+                That page is past the end of what's on — start again from the first page.
+              </PastEnd>
+            ) : (
+              /* The search box and the strip stay on screen — they are what
+                 has to change, and "Clear filters" puts both back. */
+              <NoResults noun="events" onClear={clear}>
+                Try a different search or category.
+              </NoResults>
             )}
-            style={{ background: 'linear-gradient(270deg, rgb(var(--surface)) 55%, transparent)' }}
-          >
-            <button
-              type="button"
-              aria-label="Scroll categories right"
-              onClick={() => scrollCats(1)}
-              className="pointer-events-auto grid h-9 w-9 place-items-center rounded-full bg-ink text-canvas shadow-md transition hover:opacity-90"
-            >
-              <Icon name="hgi-arrow-right-01" size={18} />
-            </button>
-          </div>
-        </div>
 
-        {/* results */}
-        <p className="mb-3 text-[12px] font-medium text-muted">
-          {list.length} {list.length === 1 ? 'event' : 'events'}
-        </p>
-
-        {list.length > 0 && (
-          <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
-            {list.map((ev) => (
-              <EventCard
-                key={ev.slug}
-                ev={ev}
-                saved={saved.has(ev.slug)}
-                onToggleSave={() => toggleSave(ev.slug)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* empty state */}
-        {list.length === 0 && (
-          <div className="py-16 text-center">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-line text-muted">
-              <Icon name="hgi-search-remove" size={26} />
-            </span>
-            <p className="mt-3 text-[15px] font-semibold">No events found</p>
-            <p className="mt-1 text-[13px] text-muted">Try a different search or category.</p>
-          </div>
+            <Pager window={data.window} onPage={(page) => set({ page })} />
+          </>
         )}
 
         <p className="mt-10 text-center text-[11px] text-muted/70">
@@ -422,5 +130,375 @@ export default function DiscoverPage() {
         </p>
       </main>
     </div>
+  )
+}
+
+/** Where "Create an event" leads — the organizer's sign-up, not the attendee's. */
+const ORGANIZER_SIGN_UP = signUpPathFor('admin')
+
+function TopBar({ value, onSearch }: { value: string; onSearch: (next: string) => void }) {
+  const { dark, toggle } = useTheme()
+
+  return (
+    <header className="sticky top-0 z-30 border-b border-hair bg-surface/90 backdrop-blur">
+      <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 lg:px-6">
+        <Link to="/portal/discover" className="flex shrink-0 items-center gap-2.5">
+          <span className="brand-logo text-brand h-[17px] w-[31px]" />
+          <span className="hidden text-[15px] font-extrabold tracking-tight sm:inline">Eventa</span>
+        </Link>
+        <div className="relative min-w-0 flex-1">
+          <i className="hgi-stroke hgi-search-01 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[16px] text-muted" />
+          <input
+            type="search"
+            value={value}
+            onChange={(e) => onSearch(e.target.value)}
+            aria-label="Search events"
+            className="h-9 w-full rounded-full border border-transparent bg-canvas pl-10 pr-4 text-[13px] text-ink transition placeholder:text-muted hover:bg-line focus:border-brand/40 focus:bg-surface focus:outline-none focus:ring-2 focus:ring-brand/20"
+            placeholder="Search events, cities, categories…"
+            autoComplete="off"
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Link
+            to="/portal/discover"
+            className="hidden rounded-lg px-3 py-1.5 text-[13px] font-semibold text-brand md:inline-flex md:items-center md:gap-1.5"
+          >
+            <i className="hgi-stroke hgi-compass-01 text-[15px]" />
+            Explore
+          </Link>
+          <Link
+            to="/portal/my-events"
+            className="hidden rounded-lg px-3 py-1.5 text-[13px] font-medium text-muted transition hover:bg-line hover:text-ink md:inline-flex md:items-center md:gap-1.5"
+          >
+            <i className="hgi-stroke hgi-ticket-02 text-[15px]" />
+            My tickets
+          </Link>
+          {/* The console's only door from the public side. An organizer
+              arriving here would otherwise find just the attendee sign-in and
+              no way through — the two personas never share a login. */}
+          <Link
+            to={ORGANIZER_SIGN_UP}
+            className="hidden rounded-lg px-3 py-1.5 text-[13px] font-medium text-muted transition hover:bg-line hover:text-ink md:inline-flex md:items-center md:gap-1.5"
+          >
+            <i className="hgi-stroke hgi-calendar-add-01 text-[15px]" />
+            Create an event
+          </Link>
+          <button
+            type="button"
+            onClick={toggle}
+            className="btn-icon bg-surface"
+            title="Toggle theme"
+          >
+            <Icon name={dark ? 'hgi-sun-03' : 'hgi-moon-02'} size={18} />
+          </button>
+          <Link to="/portal/login" className="btn btn-primary btn-sm">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+/**
+ * The Meetup-style strip: icon over label, active = underline.
+ *
+ * Its own panel, so a categories request that fails costs the visitor the
+ * shortcut and nothing else — the grid beneath it is a separate request and
+ * still works.
+ */
+function CategoryStrip({
+  categories,
+  active,
+  onPick,
+}: {
+  categories: DiscoverData['categories']
+  active: string
+  onPick: (category: string) => void
+}) {
+  const strip = useRef<HTMLDivElement>(null)
+  const [canLeft, setCanLeft] = useState(false)
+  const [canRight, setCanRight] = useState(false)
+
+  useEffect(() => {
+    const el = strip.current
+    const measure = () => {
+      if (!el) return
+      setCanLeft(el.scrollLeft > 2)
+      setCanRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 2)
+    }
+    measure()
+    el?.addEventListener('scroll', measure, { passive: true })
+    window.addEventListener('resize', measure)
+    // Re-measure once the icon font lands — glyph widths shift the layout.
+    const settle = window.setTimeout(measure, 350)
+    return () => {
+      el?.removeEventListener('scroll', measure)
+      window.removeEventListener('resize', measure)
+      window.clearTimeout(settle)
+    }
+  }, [categories])
+
+  if (!categories.ok) return null
+
+  const chips = [ALL_CATEGORIES, ...categories.data]
+  const scrollBy = (direction: number) =>
+    strip.current?.scrollBy({
+      left: direction * Math.max(200, strip.current.clientWidth * 0.7),
+      behavior: 'smooth',
+    })
+
+  return (
+    <div className="relative mb-6">
+      <div
+        ref={strip}
+        className="no-scrollbar flex gap-7 overflow-x-auto scroll-smooth px-0.5 sm:gap-9"
+      >
+        {chips.map((chip) => {
+          const on = chip === active
+          const look = lookOfCategory(chip)
+          return (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => onPick(chip)}
+              aria-pressed={on}
+              className="group flex shrink-0 flex-col items-center gap-1.5 pt-0.5 outline-none"
+            >
+              <i
+                className={cn(
+                  'hgi-stroke text-[27px] leading-none transition group-hover:scale-110',
+                  look.icon,
+                )}
+                style={{ color: look.colour }}
+              />
+              <span
+                className={cn(
+                  'whitespace-nowrap border-b-2 pb-2.5 text-[12.5px] transition',
+                  on
+                    ? 'border-ink font-semibold text-ink'
+                    : 'border-transparent text-muted group-hover:text-ink',
+                )}
+              >
+                {chip}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <StripArrow side="left" shown={canLeft} onClick={() => scrollBy(-1)} />
+      <StripArrow side="right" shown={canRight} onClick={() => scrollBy(1)} />
+    </div>
+  )
+}
+
+function StripArrow({
+  side,
+  shown,
+  onClick,
+}: {
+  side: 'left' | 'right'
+  shown: boolean
+  onClick: () => void
+}) {
+  const left = side === 'left'
+  return (
+    <div
+      className={cn(
+        'pointer-events-none absolute inset-y-0 items-center',
+        left ? 'left-0 pr-8' : 'right-0 justify-end pl-8',
+        shown ? 'flex' : 'hidden',
+      )}
+      style={{
+        background: `linear-gradient(${left ? '90deg' : '270deg'}, rgb(var(--surface)) 55%, transparent)`,
+      }}
+    >
+      <button
+        type="button"
+        aria-label={`Scroll categories ${side}`}
+        onClick={onClick}
+        className="pointer-events-auto grid h-9 w-9 place-items-center rounded-full bg-ink text-canvas shadow-md transition hover:opacity-90"
+      >
+        <Icon name={left ? 'hgi-arrow-left-01' : 'hgi-arrow-right-01'} size={18} />
+      </button>
+    </div>
+  )
+}
+
+function EventCard({ card, saved }: { card: DiscoverCard; saved: boolean }) {
+  const look = lookOfCategory(card.category)
+  const save = useFetcher<ActionResult>()
+  // The heart answers the press, not the round trip.
+  const on = save.formData ? save.formData.get('save') === 'true' : saved
+
+  return (
+    // The heart is a sibling of the link, not a child of it: a form inside an
+    // anchor is invalid markup, and suppressing the anchor to let the button
+    // through would suppress the submit with it.
+    <div className="group relative">
+      <Link to={card.href} className="block">
+        <div
+          className="relative aspect-[3/2] overflow-hidden rounded-2xl"
+          style={{
+            backgroundImage: `linear-gradient(135deg, ${card.accent}, ${look.colour}cc)`,
+          }}
+        >
+          {card.cover && (
+            <img
+              src={card.cover}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            />
+          )}
+          {card.badge && (
+            <span
+              className={cn(
+                'absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm',
+                card.badge.kind === 'waitlist' ? 'bg-amber-500' : 'bg-black/60 backdrop-blur-sm',
+              )}
+            >
+              {card.badge.label}
+            </span>
+          )}
+        </div>
+
+        <div className="pt-3">
+          <p
+            className="text-[11px] font-semibold uppercase tracking-wide"
+            style={{ color: card.accent }}
+          >
+            {card.category}
+          </p>
+          <h3 className="mt-1 line-clamp-2 text-[15.5px] font-bold leading-snug tracking-tight text-ink transition group-hover:text-brand">
+            {card.name}
+          </h3>
+          <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-muted">
+            <Icon name="hgi-calendar-03" size={14} />
+            <span className="truncate">{card.when}</span>
+          </p>
+          <p className="mt-1 flex items-center gap-1.5 text-[12.5px] text-muted">
+            <Icon name="hgi-location-01" size={14} />
+            <span className="truncate">{card.where}</span>
+          </p>
+          <p className="mt-1 flex items-center gap-1 text-[12.5px] text-muted">
+            <span className="truncate">by {card.organizer}</span>
+            {card.rating && (
+              <>
+                <span>·</span>
+                <i className="hgi-stroke hgi-star text-[13px] text-amber-400" />
+                <span className="font-semibold text-ink">{card.rating}</span>
+              </>
+            )}
+          </p>
+          <div className="mt-2.5 flex items-center justify-between">
+            <span className="flex items-center gap-2 text-[12px] text-muted">
+              <GoingCluster faces={card.faces} accent={card.accent} />
+              {card.going} going
+            </span>
+            <Price price={card.price} />
+          </div>
+        </div>
+      </Link>
+
+      <save.Form method="post" action="/portal/discover">
+        <input type="hidden" name="eventId" value={card.id} />
+        <input type="hidden" name="save" value={String(!on)} />
+        <button
+          type="submit"
+          aria-label={on ? `Remove ${card.name} from saved` : `Save ${card.name}`}
+          aria-pressed={on}
+          className={on ? SAVE_ON : SAVE_OFF}
+        >
+          <Icon name="hgi-favourite" size={16} />
+        </button>
+      </save.Form>
+
+      {save.data?.ok === false && (
+        <p role="alert" className="mt-1 text-[11px] text-red-500">
+          {save.data.error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The kit's overlapping circles beside the going count (discover.html:124-133).
+ *
+ * Its three were photographs picsum invented from the slug. These carry no
+ * faces: the feed is public and the attendance port returns a count and nothing
+ * else, so a face here would be a real person's likeness published without their
+ * say-so. The cluster is drawn from the count itself — the crowd is real even
+ * though no one in it is named.
+ *
+ * `aria-hidden`, because the sentence beside it already says how many are going.
+ */
+function GoingCluster({ faces, accent }: { faces: number; accent: string }) {
+  if (faces === 0) return null
+
+  return (
+    <span className="flex -space-x-2" aria-hidden="true">
+      {Array.from({ length: faces }, (_, i) => (
+        <span
+          key={i}
+          className="relative inline-block h-6 w-6 shrink-0 overflow-hidden rounded-full ring-2 ring-canvas"
+          // Each circle a shade further from the type's colour, so the stack
+          // reads as several people rather than one shape repeated.
+          style={{ backgroundImage: `linear-gradient(135deg, ${accent}, ${accent}${TINTS[i]})` }}
+        />
+      ))}
+    </span>
+  )
+}
+
+/** Alpha suffixes, lightening each circle in the stack. */
+const TINTS = ['dd', '99', '55'] as const
+
+/** No price is not a free price — nothing is left to buy. */
+function Price({ price }: { price: DiscoverCard['price'] }) {
+  if (price === null) return <span className="text-[13px] text-muted">{MASKED}</span>
+  if (price.isFree) return <span className="text-[13px] font-semibold text-brand">Free</span>
+  return (
+    <span className="text-[13px] text-muted">
+      From <span className="font-bold text-ink">{price.label}</span>
+    </span>
+  )
+}
+
+/**
+ * Prev/next through the feed.
+ *
+ * Deliberately not the admin `Paginator`: that one offers a page-size dropdown,
+ * which is a tool for working through a table, not for browsing what's on. The
+ * grid is a fixed twelve so that every page is whole rows.
+ */
+function Pager({ window: page, onPage }: { window: PageWindow; onPage: (page: number) => void }) {
+  if (page.pageCount <= 1) return null
+
+  return (
+    <nav className="mt-10 flex items-center justify-center gap-3" aria-label="Pagination">
+      <button
+        type="button"
+        className="btn btn-soft btn-sm"
+        disabled={page.page <= 1}
+        onClick={() => onPage(page.page - 1)}
+      >
+        <Icon name="hgi-arrow-left-01" size={16} />
+        Previous
+      </button>
+      <span className="tnum text-[12.5px] text-muted">
+        Page {page.page} of {page.pageCount}
+      </span>
+      <button
+        type="button"
+        className="btn btn-soft btn-sm"
+        disabled={page.page >= page.pageCount}
+        onClick={() => onPage(page.page + 1)}
+      >
+        Next
+        <Icon name="hgi-arrow-right-01" size={16} />
+      </button>
+    </nav>
   )
 }

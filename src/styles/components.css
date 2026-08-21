@@ -482,3 +482,155 @@ html.dark .segmented {
 html.dark .segmented button.active {
   background: rgba(255, 255, 255, 0.1);
 }
+
+/* ── door station scanner ─────────────────────────────────────────────────
+   Copied from eventa-ui-kit/admin/check-in-tool.html's <style> block. The kit
+   drove these off `#cam-stage` and an `is-live` class; here the ids become
+   `.cam-stage` / `.cam-live` so the same rules survive being a component.
+
+   The viewport is a light, on-brand placeholder while idle and goes dark only
+   once a real camera feed is behind it — so an off camera never looks like a
+   broken one. */
+.cam-stage {
+  background: linear-gradient(180deg, rgb(var(--canvas)), rgb(var(--line)));
+}
+.cam-stage .cam-glow {
+  background: radial-gradient(ellipse at center, rgb(var(--brand-soft) / 0.6), transparent 60%);
+}
+.cam-stage .frame-corner {
+  border-color: rgb(var(--muted) / 0.4);
+}
+.cam-stage .qr-ghost {
+  color: rgb(var(--muted) / 0.22);
+}
+.cam-stage .cam-hint {
+  color: rgb(var(--muted));
+}
+.cam-stage .cam-hint b {
+  color: rgb(var(--ink));
+}
+.cam-stage .scan-line {
+  opacity: 0;
+}
+.cam-stage.cam-live {
+  background: #0b0b0c;
+}
+.cam-stage.cam-live .cam-glow {
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.06), transparent 70%);
+}
+.cam-stage.cam-live .frame-corner {
+  border-color: rgba(255, 255, 255, 0.85);
+}
+.cam-stage.cam-live .qr-ghost {
+  color: rgba(255, 255, 255, 0.1);
+}
+.cam-stage.cam-live .cam-hint {
+  color: rgba(255, 255, 255, 0.72);
+}
+.cam-stage.cam-live .cam-hint b {
+  color: #fff;
+}
+.cam-stage.cam-live .scan-line {
+  opacity: 1;
+}
+
+@keyframes scanmove {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(220px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.scan-line {
+  animation: scanmove 2.6s ease-in-out infinite;
+}
+@keyframes resultpop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.result-pop {
+  animation: resultpop 0.22s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .scan-line,
+  .result-pop {
+    animation: none;
+  }
+}
+
+/* ---------- Empty states ----------
+   Ported from the kit's app.css. Two flavours, same block:
+   · first-run  — the workspace has no data yet; onboarding tone + one real next step.
+   · no-results — data exists but a filter matched nothing; the action clears the filter.
+   `.empty-sm` is the compact variant a table cell or an already-padded card needs. */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3.5rem 1.5rem;
+}
+.empty-icon {
+  display: grid;
+  place-items: center;
+  height: 3.5rem;
+  width: 3.5rem;
+  border-radius: 1rem;
+  background: rgb(var(--brand-soft));
+  color: #1ba770;
+  font-size: 26px;
+}
+.empty-title {
+  margin-top: 1rem;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: rgb(var(--ink));
+}
+.empty-text {
+  margin-top: 0.375rem;
+  max-width: 27rem;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgb(var(--muted));
+}
+.empty-actions {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.empty-sm {
+  padding: 2.25rem 1.25rem;
+}
+.empty-sm .empty-icon {
+  height: 2.75rem;
+  width: 2.75rem;
+  border-radius: 0.75rem;
+  font-size: 20px;
+  background: rgb(var(--line));
+  color: rgb(var(--muted));
+}
+.empty-sm .empty-title {
+  margin-top: 0.75rem;
+  font-size: 14px;
+}
+.empty-sm .empty-text {
+  font-size: 12.5px;
+}
+.empty-sm .empty-actions {
+  margin-top: 0.875rem;
+}

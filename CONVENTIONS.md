@@ -1,7 +1,7 @@
 # Eventa React — porting conventions
 
-This app is a 1:1 React/TypeScript port of the static kit at
-`../eventa-ui-kit`. **Visual fidelity is the priority**: a ported page should
+This app is a 1:1 React/TypeScript port of the static kit **eventa-ui-kit**
+(normally checked out beside this repo). **Visual fidelity is the priority**: a ported page should
 render pixel-identically to its HTML source. Refactor the *markup into
 components*, never the *design*.
 
@@ -113,6 +113,43 @@ The static kit used imperative DOM code. Port it to React state:
 Keep filtering/sorting semantics identical (same fields searched, same sort
 options, same empty-state copy).
 
+## Empty states
+
+An empty list means one of two different things, and they are not
+interchangeable. Getting it backwards gives a real instruction to the wrong
+person: telling an organizer with 400 attendees to "create your first event"
+because a search matched nothing.
+
+|              | when                              | says                                       | offers                             |
+| ------------ | --------------------------------- | ------------------------------------------ | ---------------------------------- |
+| **First run** | nothing exists yet, no filters set | what will fill this page, and why it is empty | the step that unblocks it          |
+| **No results** | a filter is hiding what exists    | the filters matched nothing                 | **Clear filters** — never "create" |
+
+```tsx
+const { params, set, clear, filtered } = useFilters({ defaults: { sort: 'recent' } })
+
+{rows.length === 0 &&
+  (filtered ? <NoResults noun="events" onClear={clear} /> : <EmptyState … />)}
+```
+
+- `filtered` is derived from the **URL**, not from a total the API returned — the
+  URL is the one thing that provably records a choice the organizer made. Pass
+  `defaults` for any value the page writes for its own default (a page that
+  always writes `sort=recent` would otherwise look filtered), and `ignore` for
+  params that are page state rather than filters (an open tab).
+- **First run replaces the whole working area**, filter controls included —
+  there is nothing to filter, so the controls are noise. **No-results replaces
+  only the rows**: the filters stay on screen, because changing them is the
+  entire remedy.
+- The first-run action is usually on **another page**. Attendees arrive by
+  publishing an event, so it links to the event form, not to an "add attendee"
+  button that could not work.
+- **A failure is not emptiness.** A `{ok: false}` panel or a `null` that means
+  "you may not see this" says nothing about whether the data exists — never
+  route either into the first-run branch. `src/features/overview/firstRun.ts`
+  is the worked example.
+- Copy comes from the kit verbatim; only the hrefs change.
+
 ## TypeScript
 
 - No `any`. Type the data modules and derive row types from them
@@ -128,3 +165,19 @@ options, same empty-state copy).
 3. Every interactive control in the source works (tabs switch, panels open,
    pagination pages, filters filter, toggles toggle).
 4. Row counts, totals, labels and copy match the source data exactly.
+
+## Definition of done for a page wired to the API
+
+Everything above, plus — see `AGENTS.md` §"Talking to the API" for the playbook:
+
+5. `pnpm test` green, and the feature's **mapper was written test-first**.
+6. `pnpm lint` reports no *new* problems.
+7. **Loading, empty and error states all render.** The skeleton appears while the
+   loader runs, and an API failure surfaces its message rather than a blank page
+   or a swallowed error. Empty is **two** states, not one — see §"Empty states":
+   check both the unfiltered page and one with a filter that matches nothing.
+8. Filters, search and paging live in the **URL**, so the back button works and a
+   filtered view can be shared. The list is not re-filtered client-side — the
+   API pages server-side and the tab counts would disagree with the rows.
+9. Money the caller may not see renders as "—", **never `฿0`**.
+10. The feature's demo `data/` module is **deleted** in the same commit.

@@ -1,50 +1,338 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useFetcher, useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
-  HeaderUser,
-  Button,
   Badge,
-  Icon,
+  Button,
   Card,
   DataTable,
-  EventPicker,
-  Panel,
-  PillTabs,
+  EmptyState,
+  HeaderUser,
+  Icon,
+  NoResults,
+  PageFooter,
+  PageHeader,
   Paginator,
-  usePagination,
-  Label,
-  Hint,
-  Input,
-  Select,
+  PillTabs,
   type PillTabItem,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import { num } from '@/lib/format'
+import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
-import { DISCOUNTS, DISCOUNT_STATUS_META } from '../data/discounts'
-import { EVENT_PICKER_OPTIONS } from '../data/events'
-import type { DiscountStatus } from '../types'
-import { ToggleSwitch } from '../components/ToggleSwitch'
+import { useFilters, useSearchBox } from '@/lib/useFilters'
+import { useIsFiltering } from '@/lib/usePendingPath'
+import type { ActionResult } from '@/app/loaders'
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal'
+import { DiscountPanel } from '../components/DiscountPanel'
+import type { DiscountTab, DiscountsData } from '../discounts.routes'
+import type { DiscountRow } from '../discounts.types'
 
-type DiscountTab = 'all' | DiscountStatus
+/**
+ * Promo codes (US-TKT-07..10/12). Layout ported from discounts.html.
+ *
+ * The table is what the API returned for these filters — the page does not
+ * re-slice it, so the paginator's count and the rows always agree.
+ */
 
-const GENERATE_WORDS = ['SAVE', 'PROMO', 'EVENT', 'EARLY', 'FEST', 'BKK'] as const
+const ALL_EVENTS = 'All events'
+const MAX_SEARCH_LENGTH = 120
+const COPY_RESET_MS = 1200
 
-/** Copy-to-clipboard button with a brief tick confirmation (per-row). */
+export default function DiscountsPage() {
+  const data = useLoaderData() as DiscountsData
+  // Nothing here is written as a default — an absent `tab` is "all" — so any
+  // parameter in the URL is a choice the organizer made.
+  const { params, set, clear, filtered } = useFilters()
+  const filtering = useIsFiltering()
+  const panel = useDisclosure()
+  const del = useDisclosure()
+  const [deleting, setDeleting] = useState<DiscountRow | null>(null)
+  const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+  const mutate = useFetcher<ActionResult>()
+
+  // Before the first code exists the tabs, filters and table have nothing to
+  // describe, so first run replaces the whole working area. Not `emptyReason`:
+  // the loader redirects a page past the end back to the last real one whenever
+  // any row matches, so landing here with `page=2` still means the list is
+  // empty for these filters — "they are still there" would be the one
+  // explanation that is false.
+  const firstRun = data.rows.length === 0 && !filtered
+
+  // Whether the workspace has an event to point a code at. `> 0` is the
+  // direction that proves something; `=== 0` only ever picks the more cautious
+  // copy, it never asserts the workspace is empty.
+  const hasEvents = data.events.length > 0
+
+  return (
+    <>
+      <PageHeader
+        title="Discounts"
+        subtitle="Create promo codes to boost registrations."
+        actions={
+          <>
+            <Button variant="primary" className="shrink-0" onClick={panel.onOpen}>
+              <Icon name="hgi-add-01" size={16} />
+              <span className="hidden sm:inline">New code</span>
+              <span className="sm:hidden">New</span>
+            </Button>
+            <HeaderUser />
+          </>
+        }
+      />
+
+      {firstRun ? (
+        <Card>
+          {/* The kit's copy says a code "needs an event with tickets to apply
+              to". That is not this product's contract: `eventId` is nullable —
+              "Omit or null to apply the code to every event" — and the panel
+              offers "All events", so a code applies workspace-wide when none is
+              chosen. Repeating the kit verbatim would state a requirement the
+              API does not have, and would send an organizer who already has
+              events to the event wizard. The wording only differs where that
+              claim was; the shape and the fallback branch are the kit's. */}
+          <EmptyState
+            icon="hgi-discount-tag-01"
+            title="No discount codes yet"
+            actions={
+              hasEvents
+                ? [
+                    { label: 'New code', onClick: panel.onOpen, icon: 'hgi-add-01' },
+                    { label: 'Set up ticket types', to: '/admin/tickets' },
+                  ]
+                : [
+                    {
+                      label: 'Create an event first',
+                      to: '/admin/event-form',
+                      icon: 'hgi-calendar-add-01',
+                    },
+                    { label: 'Set up ticket types', to: '/admin/tickets' },
+                  ]
+            }
+          >
+            {hasEvents ? (
+              <>
+                A code takes a percentage or a fixed ฿ amount off a ticket price — for one event, or
+                for every event at once. Set one up, then share it with the people you want to give
+                the discount to.
+              </>
+            ) : (
+              <>
+                A code takes a percentage or a fixed ฿ amount off a ticket price, so there has to be
+                a ticket on sale for it to come off. Create an event and its ticket types first,
+                then come back and set up a code.
+              </>
+            )}
+          </EmptyState>
+        </Card>
+      ) : (
+        <>
+          <PillTabs<DiscountTab>
+            items={TABS}
+            value={(params.get('tab') as DiscountTab) ?? 'all'}
+            onChange={(tab) => set({ tab: tab === 'all' ? null : tab })}
+          />
+
+          <div className={cn('mt-3', filtering && 'opacity-60 transition-opacity')}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full flex-1">
+                <Icon
+                  name="hgi-search-01"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                />
+                <input
+                  type="text"
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+                  placeholder="Search codes…"
+                  maxLength={MAX_SEARCH_LENGTH}
+                  aria-label="Search discount codes"
+                />
+              </div>
+              <div className="relative w-full sm:w-56">
+                <Icon
+                  name="hgi-calendar-03"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand"
+                />
+                <select
+                  value={params.get('eventId') ?? ''}
+                  onChange={(e) => set({ eventId: e.target.value || null })}
+                  className="select h-10 w-full border-0 bg-surface pl-9 font-medium"
+                  aria-label="Filter by event"
+                >
+                  <option value="">{ALL_EVENTS}</option>
+                  {data.events.map((event) => (
+                    <option key={event.id} value={event.id}>
+                      {event.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <Card className="mt-3 p-4">
+              <div className="overflow-x-auto">
+                <DataTable className="min-w-[860px]">
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Type</th>
+                      <th>Applies to</th>
+                      <th>Used / Limit</th>
+                      <th>Valid</th>
+                      <th>Status</th>
+                      <th className="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-[13px]">
+                    {data.rows.map((row) => (
+                      <DiscountTableRow
+                        key={row.id}
+                        row={row}
+                        onDelete={() => {
+                          setDeleting(row)
+                          del.onOpen()
+                        }}
+                        onToggle={() =>
+                          mutate.submit(
+                            {
+                              intent: row.status === 'disabled' ? 'enable' : 'disable',
+                              id: row.id,
+                            },
+                            { method: 'post' },
+                          )
+                        }
+                      />
+                    ))}
+                    {/* The filters stay above — putting them back is the way out. */}
+                    {data.rows.length === 0 && (
+                      <tr>
+                        <td colSpan={7}>
+                          <NoResults noun="discount codes" onClear={clear}>
+                            Nothing matches the current search, status tab and event filter. Try
+                            widening them to see more codes.
+                          </NoResults>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </DataTable>
+              </div>
+
+              <Paginator
+                {...data.window}
+                noun="discount codes"
+                onPage={(page) => set({ page })}
+                onSize={(size) => set({ limit: size, page: null })}
+              />
+            </Card>
+          </div>
+        </>
+      )}
+
+      {mutate.data?.ok === false && (
+        <p role="alert" className="mt-3 text-[13px] text-red-500">
+          {mutate.data.error}
+        </p>
+      )}
+
+      <PageFooter />
+
+      <DiscountPanel
+        open={panel.open}
+        onClose={panel.onClose}
+        events={data.events}
+        suggestion={data.suggestion}
+      />
+
+      <DeleteDiscountModal open={del.open} onClose={del.onClose} target={deleting} />
+    </>
+  )
+}
+
+const TABS: PillTabItem<DiscountTab>[] = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'expired', label: 'Expired' },
+  { value: 'disabled', label: 'Disabled' },
+]
+
+function DiscountTableRow({
+  row,
+  onDelete,
+  onToggle,
+}: {
+  row: DiscountRow
+  onDelete: () => void
+  onToggle: () => void
+}) {
+  const disabled = row.status === 'disabled'
+
+  return (
+    <tr>
+      <td>
+        <div className="flex items-center gap-1.5">
+          <span className="font-mono text-[12px] font-semibold uppercase tracking-wide text-ink">
+            {row.code}
+          </span>
+          <CopyCodeButton code={row.code} />
+        </div>
+      </td>
+      <td>
+        <Badge tone={row.offerTone}>{row.offer}</Badge>
+      </td>
+      <td className="text-muted">{row.appliesTo}</td>
+      <td>
+        <div className="w-28">
+          <p className="tnum text-[11px] text-muted">{row.usedLabel}</p>
+          {row.percent !== null && (
+            <div className="mt-1 h-1.5 w-full rounded-full bg-line">
+              <div className="h-1.5 rounded-full bg-brand" style={{ width: `${row.percent}%` }} />
+            </div>
+          )}
+        </div>
+      </td>
+      <td className="tnum text-muted">{row.valid}</td>
+      <td>
+        <Badge tone={row.statusTone}>
+          <Icon name={row.statusIcon} size={12} />
+          {row.statusLabel}
+        </Badge>
+      </td>
+      <td className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <button
+            type="button"
+            className="btn-icon"
+            title={disabled ? 'Enable code' : 'Disable code'}
+            onClick={onToggle}
+          >
+            <Icon name={disabled ? 'hgi-play' : 'hgi-pause'} size={16} />
+          </button>
+          <button type="button" className="btn-icon" title="Delete" onClick={onDelete}>
+            <Icon name="hgi-delete-02" size={16} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+/** Copy-to-clipboard with a brief tick — the code is meant to be pasted. */
 function CopyCodeButton({ code }: { code: string }) {
   const [copied, setCopied] = useState(false)
   const timer = useRef<number | undefined>(undefined)
+
+  useEffect(() => () => window.clearTimeout(timer.current), [])
 
   const onClick = () => {
     if (navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {})
     setCopied(true)
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setCopied(false), 1200)
+    timer.current = window.setTimeout(() => setCopied(false), COPY_RESET_MS)
   }
-
-  useEffect(() => () => window.clearTimeout(timer.current), [])
 
   return (
     <button type="button" className="btn-icon h-7 w-7" title="Copy code" onClick={onClick}>
@@ -57,336 +345,43 @@ function CopyCodeButton({ code }: { code: string }) {
   )
 }
 
-export default function DiscountsPage() {
-  const [tab, setTab] = useState<DiscountTab>('all')
-  const [query, setQuery] = useState('')
-  const [eventFilter, setEventFilter] = useState('')
+/**
+ * Deleting a code.
+ *
+ * The API refuses once it has been redeemed and says why — shown verbatim,
+ * because "disable it instead" is the answer, not an error.
+ */
+function DeleteDiscountModal({
+  open,
+  onClose,
+  target,
+}: {
+  open: boolean
+  onClose: () => void
+  target: DiscountRow | null
+}) {
+  const fetcher = useFetcher<ActionResult>()
+  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
+  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
 
-  const codePanel = useDisclosure()
-  const delModal = useDisclosure()
-
-  // New-code panel state.
-  const [code, setCode] = useState('')
-  const [discountType, setDiscountType] = useState<'percent' | 'fixed'>('percent')
-  const [active, setActive] = useState(true)
-
-  const counts = useMemo(() => {
-    const c: Record<DiscountStatus, number> = { active: 0, scheduled: 0, expired: 0, disabled: 0 }
-    for (const d of DISCOUNTS) c[d.status]++
-    return c
-  }, [])
-
-  const tabs: PillTabItem<DiscountTab>[] = [
-    { value: 'all', label: 'All', count: DISCOUNTS.length },
-    { value: 'active', label: 'Active', count: counts.active },
-    { value: 'scheduled', label: 'Scheduled', count: counts.scheduled },
-    { value: 'expired', label: 'Expired', count: counts.expired },
-    { value: 'disabled', label: 'Disabled', count: counts.disabled },
-  ]
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return DISCOUNTS.filter(
-      (d) =>
-        (tab === 'all' || d.status === tab) &&
-        // A code applying to "All events" always matches a specific-event filter.
-        (!eventFilter || d.event === eventFilter || d.event === 'All events') &&
-        (!q || d.code.toLowerCase().includes(q) || d.event.toLowerCase().includes(q)),
-    )
-  }, [tab, query, eventFilter])
-
-  const pag = usePagination(filtered)
-
-  const generateCode = () => {
-    const word = GENERATE_WORDS[Math.floor(Math.random() * GENERATE_WORDS.length)]!
-    const n = Math.floor(Math.random() * 90) + 10
-    setCode(word + n)
-  }
+  useEffect(() => {
+    if (!done || !open) return
+    toast.success('Discount code deleted.')
+    onClose()
+  }, [done, open, onClose])
 
   return (
-    <>
-      <PageHeader
-        title="Discounts"
-        subtitle="Create promo codes to boost registrations."
-        actions={
-          <>
-            <Button variant="primary" className="shrink-0" onClick={codePanel.onOpen}>
-              <Icon name="hgi-add-01" size={16} />
-              <span className="hidden sm:inline">New code</span>
-              <span className="sm:hidden">New</span>
-            </Button>
-            <HeaderUser />
-          </>
-        }
-      />
-
-      {/* pill tabs */}
-      <PillTabs
-        items={tabs}
-        value={tab}
-        onChange={(t) => {
-          setTab(t)
-          pag.setPage(1)
-        }}
-      />
-
-      {/* search + filter */}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full flex-1">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value)
-              pag.setPage(1)
-            }}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search codes…"
-          />
-        </div>
-        <div className="relative w-full sm:w-56">
-          <EventPicker
-            value={eventFilter || 'All events'}
-            onChange={(v) => {
-              setEventFilter(v === 'All events' ? '' : v)
-              pag.setPage(1)
-            }}
-            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
-          />
-        </div>
-      </div>
-
-      {/* table */}
-      <Card className="mt-3 p-4">
-        <div className="overflow-x-auto">
-          <DataTable className="min-w-[860px]">
-            <thead>
-              <tr>
-                <th>Code</th>
-                <th>Type</th>
-                <th>Applies to</th>
-                <th>Used / Limit</th>
-                <th>Valid</th>
-                <th>Status</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-[13px]">
-              {pag.slice.map((d) => {
-                const meta = DISCOUNT_STATUS_META[d.status]
-                const pct = d.limit ? Math.round((d.used / d.limit) * 100) : 0
-                return (
-                  <tr key={d.code}>
-                    <td>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[12px] font-semibold uppercase tracking-wide text-ink">
-                          {d.code}
-                        </span>
-                        <CopyCodeButton code={d.code} />
-                      </div>
-                    </td>
-                    <td>
-                      {d.type === 'fixed' ? (
-                        <Badge tone="blue">฿{d.value} off</Badge>
-                      ) : (
-                        <Badge tone="purple">{d.value}% off</Badge>
-                      )}
-                    </td>
-                    <td className="text-muted">{d.event}</td>
-                    <td>
-                      <div className="w-28">
-                        <p className="text-[11px] text-muted tnum">
-                          {num(d.used)} / {num(d.limit)}
-                        </p>
-                        <div className="mt-1 h-1.5 w-full rounded-full bg-line">
-                          <div
-                            className="h-1.5 rounded-full bg-brand"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="text-muted tnum">{d.valid}</td>
-                    <td>
-                      <Badge tone={meta.tone}>
-                        <Icon name={meta.icon} size={12} />
-                        {meta.label}
-                      </Badge>
-                    </td>
-                    <td className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          className="btn-icon"
-                          title="Edit"
-                          onClick={codePanel.onOpen}
-                        >
-                          <Icon name="hgi-edit-02" size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-icon"
-                          title="Delete"
-                          onClick={delModal.onOpen}
-                        >
-                          <Icon name="hgi-delete-02" size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-              {pag.slice.length === 0 && (
-                <tr>
-                  <td colSpan={7}>
-                    <div className="py-10 text-center text-[13px] text-muted">No matches.</div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </DataTable>
-        </div>
-
-        <Paginator
-          from={pag.from}
-          to={pag.to}
-          total={pag.total}
-          page={pag.page}
-          pageCount={pag.pageCount}
-          size={pag.size}
-          onPage={pag.setPage}
-          onSize={pag.setSize}
-          noun="discount codes"
-        />
-      </Card>
-
-      <PageFooter />
-
-      {/* New / edit discount code panel */}
-      <Panel
-        open={codePanel.open}
-        onClose={codePanel.onClose}
-        title="New discount code"
-        footer={
-          <>
-            <Button variant="soft" className="flex-1" onClick={codePanel.onClose}>
-              Cancel
-            </Button>
-            <Button variant="primary" className="flex-1" onClick={codePanel.onClose}>
-              Save code
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <Label>Code</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="text"
-                className="font-mono uppercase"
-                placeholder="e.g. SUMMER25"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-              />
-              <Button variant="soft" size="sm" className="shrink-0" onClick={generateCode}>
-                <Icon name="hgi-refresh" size={14} />
-                Generate
-              </Button>
-            </div>
-          </div>
-          <div>
-            <Label>Type</Label>
-            <div className="segmented w-full">
-              <button
-                type="button"
-                className={cn('flex-1', discountType === 'percent' && 'active')}
-                onClick={() => setDiscountType('percent')}
-              >
-                Percent
-              </button>
-              <button
-                type="button"
-                className={cn('flex-1', discountType === 'fixed' && 'active')}
-                onClick={() => setDiscountType('fixed')}
-              >
-                Fixed ฿
-              </button>
-            </div>
-          </div>
-          {discountType === 'percent' ? (
-            <div>
-              <Label>Percentage off</Label>
-              <div className="relative">
-                <Input type="number" min={1} max={100} step={1} className="pr-8" placeholder="25" />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-muted">
-                  %
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <Label>Amount off</Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-muted">
-                  ฿
-                </span>
-                <Input type="number" min={1} step={1} className="pl-8" placeholder="200" />
-              </div>
-            </div>
-          )}
-          <div>
-            <Label>Applies to</Label>
-            <Select defaultValue="All events">
-              {EVENT_PICKER_OPTIONS.map((e) => (
-                <option key={e}>{e}</option>
-              ))}
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Usage limit</Label>
-              <Input type="number" min={1} step={1} placeholder="500" />
-              <Hint>Total times this code can be redeemed.</Hint>
-            </div>
-            <div>
-              <Label>Per-user limit</Label>
-              <Input type="number" min={1} step={1} placeholder="1" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Start date</Label>
-              <Input type="date" />
-            </div>
-            <div>
-              <Label>End date</Label>
-              <Input type="date" />
-            </div>
-          </div>
-          <div>
-            <Label>Minimum order (฿)</Label>
-            <Input type="number" min={0} step={1} placeholder="0" />
-            <Hint>Leave at 0 for no minimum.</Hint>
-          </div>
-          <div className="flex items-center justify-between border-t border-hair pt-4">
-            <div>
-              <p className="text-[13px] font-medium text-ink">Active</p>
-              <Hint className="mt-0.5">Code can be applied at checkout while on</Hint>
-            </div>
-            <ToggleSwitch checked={active} onChange={setActive} />
-          </div>
-        </div>
-      </Panel>
-
-      {/* Delete confirm modal */}
-      <ConfirmDeleteModal
-        open={delModal.open}
-        onClose={delModal.onClose}
-        title="Delete discount code?"
-        message="This will permanently remove the code. Attendees who already redeemed it won't be affected."
-      />
-    </>
+    <ConfirmDeleteModal
+      open={open}
+      onClose={onClose}
+      title="Delete discount code?"
+      message={
+        refused ??
+        'This permanently removes the code. Attendees who already redeemed it are not affected.'
+      }
+      tone={refused ? 'error' : 'default'}
+      confirmLabel={fetcher.state === 'idle' ? 'Delete' : 'Deleting…'}
+      onConfirm={() => target && fetcher.submit({ intent: 'delete', id: target.id }, { method: 'post' })}
+    />
   )
 }
