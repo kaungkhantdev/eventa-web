@@ -34,8 +34,7 @@ export default function SettingsPaymentsPage() {
       <div className="space-y-3">
         {payments.testMode && <TestModeBanner />}
 
-        <ConnectionCard payments={payments} />
-        <KeysCard payments={payments} />
+        <GatewayCard payments={payments} />
 
         {/* Similar-sized cards, so the kit balances them side by side. */}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
@@ -69,42 +68,54 @@ function TestModeBanner() {
 /** Stripe's own brand purple, as the kit hard-codes it. */
 const STRIPE_PURPLE = 'bg-[#635BFF]'
 
-function ConnectionCard({ payments }: { payments: PaymentSettingsCard }) {
+/**
+ * The gateway: who it is on the left, the keys that make it so on the right.
+ *
+ * These were two stacked cards, and the split was arbitrary — "Stripe, not
+ * connected" is not a separate fact from "no keys are saved", it is the same
+ * one read back. Splitting them put a status card above the boxes that decide
+ * it and left both stretched across the full width with nothing in the middle.
+ * Side by side, a save changes the badge you are already looking at.
+ */
+function GatewayCard({ payments }: { payments: PaymentSettingsCard }) {
   return (
     <Card className="p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span
-            className={cn(
-              'grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-sm',
-              STRIPE_PURPLE,
-            )}
-          >
-            <Icon name="hgi-credit-card" size={20} />
-          </span>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-[15px] font-bold tracking-tight">{payments.provider}</h2>
-              <Badge tone={payments.statusTone}>{payments.statusLabel}</Badge>
-            </div>
-            <p className="mt-0.5 text-[12px] text-muted">
-              Your payment gateway for cards, PromptPay and wallets.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {payments.connected && (
-            <IntentForm intent="disconnect" done="Payment account disconnected.">
-              {(busy) => (
-                <Button variant="danger" size="sm" type="submit" disabled={busy}>
-                  Disconnect
-                </Button>
-              )}
-            </IntentForm>
-          )}
+      {/* Splits at `xl`, not `lg`: below that the sidebar has already taken its
+          share and a 248px column beside the keys would leave the boxes too
+          narrow to read a `pk_test_…` in. They stack instead. */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[248px_minmax(0,1fr)] xl:gap-5">
+        <ProviderPanel payments={payments} />
+        {/* `min-w-0` or the key fields' own grid refuses to shrink below its
+            content and pushes the column past the card. */}
+        <div className="min-w-0 border-t border-hair pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
+          <KeysPanel payments={payments} />
         </div>
       </div>
+    </Card>
+  )
+}
+
+function ProviderPanel({ payments }: { payments: PaymentSettingsCard }) {
+  return (
+    <div>
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            'grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-sm',
+            STRIPE_PURPLE,
+          )}
+        >
+          <Icon name="hgi-credit-card" size={20} />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-bold tracking-tight">{payments.provider}</h2>
+          <Badge tone={payments.statusTone}>{payments.statusLabel}</Badge>
+        </div>
+      </div>
+
+      <p className="mt-2.5 text-[12px] text-muted">
+        Your payment gateway for cards, PromptPay and wallets.
+      </p>
 
       {payments.warnings.map((warning) => (
         <p key={warning} role="alert" className="mt-2 text-[12px] text-amber-600">
@@ -112,25 +123,40 @@ function ConnectionCard({ payments }: { payments: PaymentSettingsCard }) {
         </p>
       ))}
 
-      {/* Three short facts, sat together on one line rather than spread across
-          thirds of the card. Two of them are "—" until a key is saved, and a
-          row of dashes stretched over the full width reads as a broken table
-          rather than as a status the page is still waiting to fill in. */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-hair pt-3 text-[12px]">
+      {/* Stacked, not spread over thirds of a full-width card: two of the three
+          read "—" until a key is saved, and a row of dashes at that width looks
+          like a broken table rather than a status waiting to be filled in. */}
+      <dl className="mt-3 space-y-1.5 border-t border-hair pt-3 text-[12px]">
         <Fact label="Account" value={payments.accountRef} mono />
         <Fact label="Connected" value={payments.connectedOn} />
         <Fact label="Settles in" value={payments.defaultCurrency} />
-      </div>
-    </Card>
+      </dl>
+
+      {payments.connected && (
+        <IntentForm intent="disconnect" done="Payment account disconnected.">
+          {(busy) => (
+            <Button
+              variant="danger"
+              size="sm"
+              type="submit"
+              disabled={busy}
+              className="mt-3 w-full"
+            >
+              Disconnect
+            </Button>
+          )}
+        </IntentForm>
+      )}
+    </div>
   )
 }
 
 function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <p className="flex items-center gap-2">
-      <span className="text-muted">{label}</span>
-      <span className={cn('font-semibold text-ink', mono && 'tnum')}>{value}</span>
-    </p>
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="shrink-0 text-muted">{label}</dt>
+      <dd className={cn('min-w-0 truncate font-semibold text-ink', mono && 'tnum')}>{value}</dd>
+    </div>
   )
 }
 
@@ -169,7 +195,7 @@ function refusalNote(
   return Object.keys(fields).length > 0 ? FIELDS_REFUSED : (failed.error ?? null)
 }
 
-function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
+function KeysPanel({ payments }: { payments: PaymentSettingsCard }) {
   const save = useFetcher<ActionResult>()
   const [mode, setMode] = useState<'test' | 'live'>(payments.testMode ? 'test' : 'live')
   const failed = save.data?.ok === false ? save.data : null
@@ -180,7 +206,7 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
   const busy = save.state !== 'idle'
 
   return (
-    <Card className="p-4">
+    <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[15px] font-bold tracking-tight">
           API keys
@@ -233,10 +259,9 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
         <input type="hidden" name="mode" value={mode} />
 
         {/* The kit's two-up grid, with a third column once there is room for
-            one. This card carries a field the kit never had — the signing
-            secret — and stretching it across the full 1600px made a `whsec_`
-            string sit in a box wide enough for a paragraph. */}
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            one. This panel carries a field the kit never had — the signing
+            secret — and it is a `whsec_` string, not a paragraph. */}
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-3">
           <div>
             <Label htmlFor="keys-pk">Publishable key</Label>
             <Input
@@ -304,7 +329,7 @@ function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
           </div>
         </div>
       </save.Form>
-    </Card>
+    </>
   )
 }
 
