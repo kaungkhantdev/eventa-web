@@ -19,10 +19,25 @@ import { toast } from './toast'
  * false for the duration of the next submit, so a second save announces itself
  * again rather than staying silent.
  */
-export function useSavedToast(succeeded: boolean, message: string): void {
+export function useSavedToast(
+  succeeded: boolean,
+  message: string,
+  /**
+   * Run once alongside the toast — closing the slide-over the save came from,
+   * usually. It is the same event, so it belongs on the same effect: a separate
+   * one watching the same flag would fire on its own schedule and could close
+   * the panel before the toast that explains why.
+   */
+  onDone?: () => void,
+): void {
   useEffect(() => {
     if (!succeeded) return
     toast.success(message)
+    onDone?.()
+    // `onDone` is deliberately absent: an inline arrow at the call site changes
+    // identity every render, and depending on it would re-fire the toast on
+    // each one. `succeeded` is the event, and it is what this reacts to.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [succeeded, message])
 }
 

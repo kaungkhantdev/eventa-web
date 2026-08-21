@@ -8,6 +8,7 @@ import {
   toProfileCard,
 } from './account.mapper'
 import {
+  toAuditRow,
   toMemberRow,
   toNotificationRow,
   toPermissionOption,
@@ -15,6 +16,8 @@ import {
   toSessionRow,
 } from './settings.mapper'
 import type {
+  AuditEntryWire,
+  AuditRow,
   LoginSessionWire,
   MemberRow,
   MemberWire,
@@ -68,6 +71,13 @@ const settingsApi = {
   disableTwoFactor: (code: string) => api.post<void>('/me/two-factor/disable', { code }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<void>('/auth/change-password', { currentPassword, newPassword }),
+
+  /**
+   * The audit trail behind the security screen's panel. Read-only, and capped:
+   * the panel shows recent activity, not the whole history — the export is
+   * there for anyone who needs all of it.
+   */
+  audit: () => api.list<AuditEntryWire>('/audit', { query: { limit: AUDIT_PAGE_SIZE } }),
 
   notifications: () => api.get<NotificationPrefWire[]>('/me/notification-preferences'),
   setNotification: (
@@ -188,17 +198,26 @@ export const rolesRoute = {
 
 /* ── security ─────────────────────────────────────────────────────────── */
 
+/** How much recent activity the audit panel shows before deferring to export. */
+const AUDIT_PAGE_SIZE = 20
+
 export interface SecurityData {
   sessions: SessionRow[]
   twoFactor: TwoFactorWire
+  audit: AuditRow[]
 }
 
 async function loadSecurity(): Promise<SecurityData> {
-  const [sessions, twoFactor] = await Promise.all([
+  const [sessions, twoFactor, audit] = await Promise.all([
     settingsApi.sessions(),
     settingsApi.twoFactor(),
+    settingsApi.audit(),
   ])
-  return { sessions: sessions.map(toSessionRow), twoFactor }
+  return {
+    sessions: sessions.map(toSessionRow),
+    twoFactor,
+    audit: audit.items.map(toAuditRow),
+  }
 }
 
 /**

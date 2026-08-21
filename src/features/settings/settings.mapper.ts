@@ -1,6 +1,8 @@
 import type { BadgeTone } from '@/components/ui'
 import { bangkokDate, bangkokTime, initials } from '@/lib/format'
 import type {
+  AuditEntryWire,
+  AuditRow,
   LoginSessionWire,
   MemberRow,
   MemberStatus,
@@ -92,6 +94,26 @@ export function toSessionRow(wire: LoginSessionWire): SessionRow {
     // clock, which in this product is Bangkok's.
     signedIn: `${bangkokDate(wire.signedInAt)} · ${bangkokTime(wire.signedInAt)}`,
     isCurrent: wire.isCurrent,
+  }
+}
+
+/**
+ * One audit entry, ready to render (US-ACC-07).
+ *
+ * Every fact except the title is optional at the source — an entry raised by a
+ * background job has no actor, one raised from a console has no IP — so the
+ * detail line is assembled from what is present. A template with holes in it
+ * would print stray separators around the gaps.
+ */
+export function toAuditRow(wire: AuditEntryWire): AuditRow {
+  return {
+    id: wire.id,
+    type: wire.type,
+    title: wire.title,
+    detail: [wire.meta, wire.actorName, wire.ipAddress].filter(Boolean).join(' · '),
+    // Somebody auditing their own account is reading their own clock, which in
+    // this product is Bangkok's.
+    when: `${bangkokDate(wire.occurredAt)} · ${bangkokTime(wire.occurredAt)}`,
   }
 }
 

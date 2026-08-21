@@ -4,9 +4,15 @@ import {
   toNotificationRow,
   toPermissionOption,
   toRoleCard,
+  toAuditRow,
   toSessionRow,
 } from './settings.mapper'
-import type { LoginSessionWire, MemberWire, RoleWire } from './settings.types'
+import type {
+  AuditEntryWire,
+  LoginSessionWire,
+  MemberWire,
+  RoleWire,
+} from './settings.types'
 
 const member = (over: Partial<MemberWire> = {}): MemberWire => ({
   id: 7690,
@@ -126,5 +132,60 @@ describe('toNotificationRow', () => {
 
     expect(row.smsAvailable).toBe(false)
     expect(row.smsEnabled).toBe(false)
+  })
+})
+
+/**
+ * The audit panel's rows (US-ACC-07).
+ *
+ * Every fact except the title is optional at the source — an entry raised by a
+ * background job has no actor, one raised from a console has no IP — so the
+ * detail line is built from what is actually present rather than a template
+ * with holes in it.
+ */
+describe('toAuditRow', () => {
+  const entry = (over: Partial<AuditEntryWire> = {}): AuditEntryWire => ({
+    id: 1,
+    type: 'signin',
+    title: 'Signed in',
+    meta: 'Chrome on macOS',
+    actorName: 'Harper Nelson',
+    ipAddress: '203.0.113.24',
+    occurredAt: '2026-08-21T03:02:00.000Z',
+    ...over,
+  })
+
+  it('joins the facts it has into one readable line', () => {
+    expect(toAuditRow(entry()).detail).toBe(
+      'Chrome on macOS · Harper Nelson · 203.0.113.24',
+    )
+  })
+
+  it('drops an absent actor rather than leaving a gap', () => {
+    expect(toAuditRow(entry({ actorName: null })).detail).toBe(
+      'Chrome on macOS · 203.0.113.24',
+    )
+  })
+
+  it('drops an absent IP', () => {
+    expect(toAuditRow(entry({ ipAddress: null })).detail).toBe(
+      'Chrome on macOS · Harper Nelson',
+    )
+  })
+
+  it('is empty, not a stray separator, when nothing but the title is known', () => {
+    expect(
+      toAuditRow(entry({ meta: null, actorName: null, ipAddress: null })).detail,
+    ).toBe('')
+  })
+
+  // Bangkok, because somebody auditing their own account reads their own clock.
+  it('shows when it happened in Bangkok time', () => {
+    expect(toAuditRow(entry()).when).toBe('Aug 21, 2026 · 10:02')
+  })
+
+  it('keeps the title and type through unchanged', () => {
+    const row = toAuditRow(entry({ type: 'pwd', title: 'Password changed' }))
+    expect(row).toMatchObject({ type: 'pwd', title: 'Password changed' })
   })
 })

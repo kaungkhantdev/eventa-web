@@ -232,6 +232,31 @@ export interface PaymentMethodRow {
   enabled: boolean
 }
 
+/** One audit entry as the API reports it (US-ACC-07). */
+export interface AuditEntryWire {
+  id: number
+  type: string
+  title: string
+  meta: string | null
+  actorName: string | null
+  ipAddress: string | null
+  occurredAt: string
+}
+
+/**
+ * An audit row as the kit draws it: the API supplies the facts, and the icon
+ * and tint come from a lookup keyed on `type`. `when` is already formatted in
+ * Asia/Bangkok — no page does that arithmetic itself.
+ */
+export interface AuditRow {
+  id: number
+  type: string
+  title: string
+  /** Actor, IP and anything else the entry carried, joined for one line. */
+  detail: string
+  when: string
+}
+
 export interface StoredKeysWire {
   mode: 'test' | 'live'
   publishableKey: string
