@@ -211,6 +211,19 @@ export interface OrganizationForm {
 }
 
 /** `GET /payment-settings` — how money reaches this workspace. */
+/**
+ * What the API says about stored keys. Note what is absent, deliberately: the
+ * secret key and the webhook signing secret. `secretKeyMasked` answers the only
+ * question the screen has — WHICH key is saved — and is useless for anything else.
+ */
+export interface StoredKeysWire {
+  mode: 'test' | 'live'
+  publishableKey: string
+  secretKeyMasked: string
+  webhookSecretSet: boolean
+  savedAt: string | null
+}
+
 export interface PaymentSettingsWire {
   provider: 'stripe'
   mode: 'test' | 'live'
@@ -241,4 +254,10 @@ export interface PaymentSettingsCard {
   emailReceipts: boolean
   testMode: boolean
   warnings: string[]
+  /** Last four of the stored secret — never the key. Empty when none is saved. */
+  secretKeyMasked: string
+  /** Whether a webhook signing secret is stored. Never the secret itself. */
+  webhookSecretSet: boolean
+  /** When the keys were last saved, already formatted. Empty when never. */
+  keysSavedOn: string
 }

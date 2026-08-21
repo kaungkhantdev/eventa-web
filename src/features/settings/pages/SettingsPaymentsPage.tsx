@@ -16,10 +16,9 @@ import type { PaymentSettingsCard } from '../settings.types'
  * account, which mode, what appears on a statement. Card numbers are entered
  * on the provider's own hosted fields and never enter this app.
  *
- * Connecting asks for one thing: the workspace's own Stripe account reference.
- * No secret key, and none is wanted — Eventa charges *on behalf of* that
- * account using the platform's key, so a tenant secret would be a liability
- * with nothing to spend it on.
+ * The workspace pastes its OWN Stripe keys. The secret is sent once, stored
+ * encrypted by the API, and never comes back — this page only ever sees a
+ * masked tail, enough to say which key is saved and useless for anything else.
  */
 export default function SettingsPaymentsPage() {
   const { payments } = useLoaderData() as PaymentsData
@@ -77,7 +76,7 @@ function ProviderCard({ payments }: { payments: PaymentSettingsCard }) {
         </p>
       </div>
 
-      {payments.connected ? (
+      {payments.connected && (
         <div className="mt-4 flex flex-wrap gap-2 border-t border-hair pt-4">
           <IntentForm intent="test" done="Connection is working.">
             {(busy) => (
@@ -95,9 +94,9 @@ function ProviderCard({ payments }: { payments: PaymentSettingsCard }) {
             )}
           </IntentForm>
         </div>
-      ) : (
-        <ConnectForm provider={payments.provider} />
       )}
+
+      <KeysCard payments={payments} />
     </Card>
   )
 }
@@ -132,68 +131,106 @@ function IntentForm({
 }
 
 /**
- * Connecting the workspace's own account (US-SET-08).
+ * The workspace's own Stripe keys (US-SET-08), as the UI kit draws this card.
  *
- * The account REFERENCE and nothing else. Eventa holds one platform key and
- * charges on behalf of this account, so there is no tenant secret to collect —
- * and collecting one would mean holding every organizer's Stripe credentials in
- * a single database, which is a far larger thing to protect than it is to
- * avoid. The reference is not a credential: on its own it authorises nothing.
+ * The secret goes up once and never comes back: the API stores it encrypted and
+ * answers with a masked tail, which is all this screen needs to say WHICH key is
+ * saved. So the field is empty on load rather than pre-filled — there is nothing
+ * to pre-fill it with, and a box that looks populated would invite an organizer
+ * to "save" a value the browser does not actually hold.
  *
- * The API verifies it with Stripe before saving, so a typo is refused here
- * rather than at a buyer's checkout.
+ * Mode is submitted with the keys because the two have to agree. The API refuses
+ * a live pair saved under Test: that combination takes real money from real
+ * people while the banner above says nothing is charged.
  */
-function ConnectForm({ provider }: { provider: string }) {
-  const connect = useFetcher<ActionResult>()
-  const failed = connect.data?.ok === false ? connect.data : null
-  const fieldError = failed?.fieldErrors?.accountId
-  useSavedToast(
-    connect.state === 'idle' && connect.data?.ok === true,
-    'Payment account connected.',
-  )
-  // Only what has no field of its own to sit under — otherwise the same
-  // sentence would be shown twice.
-  useFailureToast(connect.state === 'idle' && !fieldError ? (failed?.error ?? null) : null)
+function KeysCard({ payments }: { payments: PaymentSettingsCard }) {
+  const save = useFetcher<ActionResult>()
+  const failed = save.data?.ok === false ? save.data : null
+  const fields = failed?.fieldErrors ?? {}
+  const unattached = Object.keys(fields).length === 0 ? (failed?.error ?? null) : null
+  useSavedToast(save.state === 'idle' && save.data?.ok === true, 'Payment keys saved.')
+  useFailureToast(save.state === 'idle' ? unattached : null)
 
   return (
     <div className="mt-4 border-t border-hair pt-4">
-      <connect.Form method="post">
-        <input type="hidden" name="intent" value="connect" />
+      <p className="text-[13px] font-bold tracking-tight">API keys</p>
+      <p className="mt-0.5 text-[12px] text-muted">
+        In your Stripe Dashboard go to Developers → API keys, copy the two keys, and paste them
+        below.
+      </p>
 
-        <Label htmlFor="payments-account">{provider} account ID</Label>
-        <Input
-          id="payments-account"
-          name="accountId"
-          required
-          placeholder="acct_1A2b3C"
-          aria-describedby={fieldError ? 'payments-account-error' : undefined}
-        />
-        <FieldError id="payments-account-error" message={fieldError} />
+      <save.Form method="post" className="mt-3">
+        <input type="hidden" name="intent" value="keys" />
 
-        <Label htmlFor="payments-mode" className="mt-3">
-          Mode
-        </Label>
-        <Select id="payments-mode" name="mode" defaultValue="test">
+        <Label htmlFor="keys-mode">Mode</Label>
+        <Select id="keys-mode" name="mode" defaultValue={payments.testMode ? 'test' : 'live'}>
           <option value="test">Test — nothing is really charged</option>
           <option value="live">Live — real money</option>
         </Select>
+
+        <Label htmlFor="keys-pk" className="mt-3">
+          Publishable key
+        </Label>
+        <Input
+          id="keys-pk"
+          name="publishableKey"
+          required
+          className="font-mono text-[12px]"
+          placeholder="pk_test_..."
+          aria-describedby={fields.publishableKey ? 'keys-pk-error' : undefined}
+        />
+        <FieldError id="keys-pk-error" message={fields.publishableKey} />
+
+        <Label htmlFor="keys-sk" className="mt-3">
+          Secret key
+        </Label>
+        <Input
+          id="keys-sk"
+          name="secretKey"
+          type="password"
+          required
+          autoComplete="off"
+          className="font-mono text-[12px]"
+          placeholder={payments.secretKeyMasked || 'sk_test_...'}
+          aria-describedby={fields.secretKey ? 'keys-sk-error' : undefined}
+        />
+        <FieldError id="keys-sk-error" message={fields.secretKey} />
+        <Hint className="mt-1">
+          Starts with sk_. Stored encrypted — never shown again, and never sent to a browser.
+        </Hint>
+
+        <Label htmlFor="keys-whsec" className="mt-3">
+          Webhook signing secret
+        </Label>
+        <Input
+          id="keys-whsec"
+          name="webhookSecret"
+          type="password"
+          autoComplete="off"
+          className="font-mono text-[12px]"
+          placeholder={payments.webhookSecretSet ? 'Saved — leave blank to keep' : 'whsec_...'}
+        />
+        <Hint className="mt-1">
+          From the endpoint you register in Stripe for this workspace. Without it, payments are
+          taken but no ticket is issued.
+        </Hint>
+
 
         <Button
           variant="primary"
           size="sm"
           type="submit"
           className="mt-3 w-full"
-          disabled={connect.state !== 'idle'}
+          disabled={save.state !== 'idle'}
         >
-          {connect.state === 'idle' ? 'Connect' : 'Checking…'}
+          <Icon name="hgi-tick-02" size={15} />
+          {save.state === 'idle' ? 'Save keys' : 'Checking…'}
         </Button>
-      </connect.Form>
+      </save.Form>
 
-      <Hint className="mt-3">
-        Find this in your {provider} dashboard under Settings → Account details. Eventa never asks
-        for a secret key — payments are taken on your account using ours, and your card details stay
-        with {provider}.
-      </Hint>
+      {payments.keysSavedOn && (
+        <p className="mt-2 text-[11px] text-muted">Last saved {payments.keysSavedOn}</p>
+      )}
     </div>
   )
 }

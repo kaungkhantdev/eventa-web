@@ -1,5 +1,6 @@
 import { MASKED, bangkokDate, initials } from '@/lib/format'
 import type {
+  StoredKeysWire,
   OrganizationForm,
   OrganizationWire,
   PaymentSettingsCard,
@@ -64,7 +65,10 @@ const PROVIDER_NAMES: Record<string, string> = { stripe: 'Stripe' }
 /** How many characters of the account id are enough to tell two apart. */
 const ACCOUNT_TAIL = 3
 
-export function toPaymentSettingsCard(settings: PaymentSettingsWire): PaymentSettingsCard {
+export function toPaymentSettingsCard(
+  settings: PaymentSettingsWire,
+  keys?: StoredKeysWire,
+): PaymentSettingsCard {
   const connected = settings.status === 'connected'
   return {
     provider: PROVIDER_NAMES[settings.provider] ?? settings.provider,
@@ -81,6 +85,10 @@ export function toPaymentSettingsCard(settings: PaymentSettingsWire): PaymentSet
     emailReceipts: settings.emailReceipts,
     testMode: settings.testMode,
     warnings: settings.warnings ?? [],
+    // Never the key. The API only ever sends a tail, and this only passes it on.
+    secretKeyMasked: keys?.secretKeyMasked ?? '',
+    webhookSecretSet: keys?.webhookSecretSet ?? false,
+    keysSavedOn: keys?.savedAt ? bangkokDate(keys.savedAt) : '',
   }
 }
 

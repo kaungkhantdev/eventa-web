@@ -30,6 +30,7 @@ import type {
   OrganizationWire,
   PaymentSettingsCard,
   PaymentSettingsWire,
+  StoredKeysWire,
   ProfileCard,
   ProfileWire,
   SessionRow,
@@ -327,19 +328,28 @@ export interface PaymentsData {
 }
 
 export const paymentsRoute = {
-  loader: pageData(async (): Promise<PaymentsData> => ({
-    payments: toPaymentSettingsCard(await accountApi.paymentSettings()),
-  })),
+  loader: pageData(async (): Promise<PaymentsData> => {
+    const settings = await accountApi.paymentSettings()
+    // The stored-key summary is for the active mode only — the other mode's
+    // pair is untouched by this screen until the organizer switches to it.
+    const keys = await accountApi.storedPaymentKeys(settings.mode)
+    return { payments: toPaymentSettingsCard(settings, keys) }
+  }),
 
   action: pageAction(async ({ request }: LoaderArgs) => {
     const form = await request.formData()
     const intent = form.get('intent')
     if (intent === 'disconnect') return accountApi.disconnectPayments()
     if (intent === 'test') return accountApi.testPayments()
-    if (intent === 'connect') {
-      return accountApi.connectPayments({
-        accountId: field(form, 'accountId'),
+    if (intent === 'keys') {
+      const webhookSecret = field(form, 'webhookSecret')
+      return accountApi.savePaymentKeys({
         mode: field(form, 'mode') === 'live' ? 'live' : 'test',
+        publishableKey: field(form, 'publishableKey'),
+        secretKey: field(form, 'secretKey'),
+        // Omitted, not blanked: it comes from a different page in Stripe, so
+        // re-saving API keys says nothing about it.
+        ...(webhookSecret ? { webhookSecret } : {}),
       })
     }
     if (intent === 'method') {
@@ -398,12 +408,18 @@ export const accountApi = {
   setPaymentMethod: (method: string, enabled: boolean) =>
     api.patch<unknown>(`/payment-settings/methods/${method}`, { enabled }),
   /**
-   * The account reference the workspace's own Stripe account is known by, and
-   * nothing else. No secret key: Eventa charges on behalf of this account with
-   * the platform's key, so a tenant secret would be a liability with no use.
+   * The workspace's own Stripe keys. The secret goes up once and never comes
+   * back: the response carries a masked tail, which is all the screen needs to
+   * say WHICH key is saved.
    */
-  connectPayments: (body: { accountId: string; mode: 'test' | 'live' }) =>
-    api.post<PaymentSettingsWire>('/payment-settings/connect', body),
+  savePaymentKeys: (body: {
+    mode: 'test' | 'live'
+    publishableKey: string
+    secretKey: string
+    webhookSecret?: string
+  }) => api.post<StoredKeysWire>('/payment-settings/keys', body),
+  storedPaymentKeys: (mode: 'test' | 'live') =>
+    api.get<StoredKeysWire>(`/payment-settings/keys/${mode}`),
   testPayments: () => api.post<unknown>('/payment-settings/test'),
   disconnectPayments: () => api.post<unknown>('/payment-settings/disconnect'),
 }
