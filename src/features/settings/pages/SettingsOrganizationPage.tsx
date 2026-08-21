@@ -18,7 +18,7 @@ import type { OrganizationForm } from '../settings.types'
 const TIMEZONES = ['Asia/Bangkok', 'Asia/Singapore', 'Asia/Tokyo', 'Europe/London', 'UTC']
 
 export default function SettingsOrganizationPage() {
-  const { organization } = useLoaderData() as OrganizationData
+  const { organization, summary } = useLoaderData() as OrganizationData
   const save = useFetcher<ActionResult>()
   const error = save.data?.ok === false ? save.data.error : null
   /**
@@ -113,12 +113,17 @@ export default function SettingsOrganizationPage() {
           </save.Form>
         </Card>
 
-        <div>
+        <div className="space-y-3">
+          {/* Branding sits beside the company form rather than inside it: the
+              logo uploads the moment a file is chosen, not on Save, and putting
+              it in the form would imply otherwise. */}
+          <LogoCard
+            logoUrl={organization.logoUrl}
+            name={organization.name}
+            country={organization.country}
+            summary={summary}
+          />
           <FixedFacts organization={organization} />
-          {/* Branding sits beside the billing facts rather than inside the
-              company form: it is uploaded the moment a file is chosen, not on
-              Save, and putting it in the form would imply otherwise. */}
-          <LogoCard logoUrl={organization.logoUrl} name={organization.name} />
         </div>
       </div>
     </>

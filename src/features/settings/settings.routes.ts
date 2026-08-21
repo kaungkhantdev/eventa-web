@@ -30,6 +30,7 @@ import type {
   RoleWire,
   OrganizationForm,
   LogoUploadWire,
+  OrganizationSummaryWire,
   OrganizationWire,
   PaymentSettingsCard,
   PaymentMethodRow,
@@ -355,12 +356,17 @@ export const profileRoute = {
 
 export interface OrganizationData {
   organization: OrganizationForm
+  summary: OrganizationSummaryWire
 }
 
 export const organizationRoute = {
-  loader: pageData(async (): Promise<OrganizationData> => ({
-    organization: toOrganizationForm(await accountApi.organization()),
-  })),
+  loader: pageData(async (): Promise<OrganizationData> => {
+    const [organization, summary] = await Promise.all([
+      accountApi.organization(),
+      accountApi.organizationSummary(),
+    ])
+    return { organization: toOrganizationForm(organization), summary }
+  }),
 
   action: pageAction(async ({ request }: LoaderArgs) => {
     const form = await request.formData()
@@ -447,6 +453,9 @@ export const accountApi = {
   changeEmail: (email: string) => api.post<unknown>('/me/profile/email', { email }),
 
   organization: () => api.get<OrganizationWire>('/organization'),
+  /** Events hosted and team members. Its own call: `/organization` is the form. */
+  organizationSummary: () =>
+    api.get<OrganizationSummaryWire>('/organization/summary'),
   saveOrganization: (body: Record<string, unknown>) =>
     api.patch<OrganizationWire>('/organization', body),
 

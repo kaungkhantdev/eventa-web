@@ -257,6 +257,12 @@ export interface AuditRow {
   when: string
 }
 
+/** Counts beside the logo — derived by the API, never stored. */
+export interface OrganizationSummaryWire {
+  eventsHosted: number
+  teamMembers: number
+}
+
 export interface StoredKeysWire {
   mode: 'test' | 'live'
   publishableKey: string

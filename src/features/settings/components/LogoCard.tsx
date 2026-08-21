@@ -21,7 +21,18 @@ import { accountApi } from '../settings.routes'
 /** Kept in step with the API's own allow-list. */
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp']
 
-export function LogoCard({ logoUrl, name }: { logoUrl: string | null; name: string }) {
+export function LogoCard({
+  logoUrl,
+  name,
+  country,
+  summary,
+}: {
+  logoUrl: string | null
+  name: string
+  country: string
+  /** Counts the API derives; absent until the caller has them. */
+  summary?: { eventsHosted: number; teamMembers: number }
+}) {
   const file = useRef<HTMLInputElement>(null)
   const revalidator = useRevalidator()
   const [busy, setBusy] = useState(false)
@@ -66,8 +77,8 @@ export function LogoCard({ logoUrl, name }: { logoUrl: string | null; name: stri
   }
 
   return (
-    <Card className="mt-4 p-5">
-      <h3 className="text-[14px] font-bold tracking-tight">Logo</h3>
+    <Card className="p-5">
+      <h3 className="text-[14px] font-bold tracking-tight">Organization logo</h3>
       <p className="mt-0.5 text-[12px] text-muted">
         Shown on your public pages, invoices and receipts.
       </p>
@@ -109,6 +120,27 @@ export function LogoCard({ logoUrl, name }: { logoUrl: string | null; name: stri
       <p className="mt-3 text-[11.5px] text-muted">
         JPEG, PNG or WebP. A square image looks best.
       </p>
+
+      {/* The kit's identity block: who this workspace is, then the two figures
+          worth knowing about it. There is no plan or tier — this product has no
+          billing concept, and a badge claiming one would say otherwise. */}
+      <div className="mt-4 border-t border-hair pt-4">
+        <p className="truncate text-[15px] font-bold tracking-tight text-ink">{name}</p>
+        <p className="mt-0.5 text-[12px] text-muted">{country}</p>
+      </div>
+
+      {summary && (
+        <div className="mt-4 space-y-2 border-t border-hair pt-4 text-[12px]">
+          <p className="flex items-center justify-between gap-2">
+            <span className="text-muted">Events hosted</span>
+            <span className="tnum font-semibold text-ink">{summary.eventsHosted}</span>
+          </p>
+          <p className="flex items-center justify-between gap-2">
+            <span className="text-muted">Team members</span>
+            <span className="tnum font-semibold text-ink">{summary.teamMembers}</span>
+          </p>
+        </div>
+      )}
 
       {busy && <p className="mt-2 text-[12px] text-muted">Working…</p>}
       {error && (
