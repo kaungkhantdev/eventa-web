@@ -36,8 +36,11 @@ export default function SettingsPaymentsPage() {
 
         <GatewayCard payments={payments} />
 
-        {/* Similar-sized cards, so the kit balances them side by side. */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+        {/* Side by side, and stretched to the same height. The kit leaves these
+            `items-start`, which is right when two cards happen to come out the
+            same length — ours do not, because the method list is whatever the
+            API offers, so the bottom edge came out ragged. */}
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <MethodsCard methods={methods} />
           <PreferencesCard payments={payments} />
         </div>
@@ -593,10 +596,16 @@ function PreferencesCard({ payments }: { payments: PaymentSettingsCard }) {
   const busy = save.state !== 'idle'
 
   return (
-    <Card className="p-4">
+    <Card className="flex flex-col p-4">
       <h2 className="text-[15px] font-bold tracking-tight">Checkout preferences</h2>
 
-      <save.Form method="post" key={payments.statementDescriptor}>
+      {/* A column, so Save can be pushed to the foot of whatever height this
+          card is stretched to rather than floating halfway down it. */}
+      <save.Form
+        method="post"
+        key={payments.statementDescriptor}
+        className="flex flex-1 flex-col"
+      >
         <input type="hidden" name="saveCards" value={String(payments.saveCards)} />
         <input type="hidden" name="emailReceipts" value={String(payments.emailReceipts)} />
 
@@ -623,7 +632,7 @@ function PreferencesCard({ payments }: { payments: PaymentSettingsCard }) {
           </div>
         </div>
 
-        <div className="mt-3 space-y-1 border-t border-hair pt-2">
+        <div className="mb-3 mt-3 space-y-1 border-t border-hair pt-2">
           <PreferenceRow
             title="Save cards for faster checkout"
             description="Let returning attendees reuse a saved card"
@@ -640,7 +649,7 @@ function PreferencesCard({ payments }: { payments: PaymentSettingsCard }) {
           />
         </div>
 
-        <div className="mt-3 flex justify-end border-t border-hair pt-3">
+        <div className="mt-auto flex justify-end border-t border-hair pt-3">
           <Button variant="primary" size="sm" type="submit" disabled={busy}>
             <Icon name="hgi-tick-02" size={15} />
             {busy ? 'Saving…' : 'Save changes'}

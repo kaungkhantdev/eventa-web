@@ -88,12 +88,12 @@ export function LogoCard({
           <img
             src={logoUrl}
             alt={`${name} logo`}
-            className="h-20 w-20 shrink-0 rounded-2xl border border-hair object-contain"
+            className="h-20 w-20 shrink-0 rounded-full border border-hair object-contain"
           />
         ) : (
           // Not an empty box: the initial is what a workspace without a logo
           // already shows everywhere else. The kit's square gradient tile.
-          <span className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand to-emerald-400 text-[28px] font-bold text-white">
+          <span className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-emerald-400 text-[28px] font-bold text-white">
             {name.trim().charAt(0).toUpperCase() || '?'}
           </span>
         )}
