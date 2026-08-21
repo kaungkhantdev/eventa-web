@@ -5,6 +5,7 @@ import type {
   HomeWire,
   Language,
   MeetingWire,
+  SetupWire,
   RevenueRange,
   UpcomingEventWire,
 } from './overview.types'
@@ -23,6 +24,9 @@ export const UPCOMING_PREVIEW = 3
 export const overviewApi = {
   /** Greeting, today's sign-ups and the alert feed, in one read. */
   home: (language: Language) => api.get<HomeWire>('/dashboard/home', { query: { language } }),
+
+  /** How far this workspace has been set up — the first-run checklist. */
+  setup: () => api.get<SetupWire>('/dashboard/setup'),
 
   upcoming: () => api.get<UpcomingEventWire[]>('/events/upcoming'),
 

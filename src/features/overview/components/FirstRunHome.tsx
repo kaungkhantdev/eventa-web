@@ -1,6 +1,8 @@
 import { Link } from 'react-router'
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import type { SetupWire } from '../overview.types'
+import { stepStatesOf, type StepState } from '../setupSteps'
 import { TemplateShortcuts } from './TemplateShortcuts'
 
 /**
@@ -14,12 +16,18 @@ import { TemplateShortcuts } from './TemplateShortcuts'
  * The steps are in dependency order, which is also the backlog's epic order:
  * an event cannot be sold before the organization has tax details and a
  * connected payment account, and nothing can be discovered before it is
- * published. Progress is deliberately *not* tracked — the API exposes no
- * setup-state, and a tick mark this screen invented would be a lie about what
- * the server knows.
+ * published.
+ *
+ * Progress comes from the API (`GET /dashboard/setup`), never from anything
+ * this screen infers. Each step is a fact owned by the module that owns the
+ * decision, so a tick means the server said so. A step the caller may not be
+ * told about, or that failed to load, is drawn plainly: not ticked, and not
+ * pointed at either — see `stepStatesOf`.
  */
 
 interface Step {
+  /** The API fact that decides whether this step is done. */
+  fact: keyof SetupWire
   icon: string
   title: string
   detail: string
@@ -31,6 +39,7 @@ interface Step {
 const STEPS: Step[] = [
   {
     icon: 'hgi-building-03',
+    fact: 'organizationConfigured',
     title: 'Set up your organization',
     detail: 'Name, tax details and branding — these appear on every ticket and invoice.',
     to: '/admin/settings-organization',
@@ -39,6 +48,7 @@ const STEPS: Step[] = [
   },
   {
     icon: 'hgi-wallet-01',
+    fact: 'paymentsConnected',
     title: 'Connect payments',
     detail: 'Card and PromptPay via Stripe — required before you can charge for a ticket.',
     to: '/admin/settings-payments',
@@ -47,6 +57,7 @@ const STEPS: Step[] = [
   },
   {
     icon: 'hgi-calendar-add-01',
+    fact: 'eventCreated',
     title: 'Create your first event',
     detail: 'Title, date, venue and seating — save as a draft and finish it later.',
     to: '/admin/event-form',
@@ -55,6 +66,7 @@ const STEPS: Step[] = [
   },
   {
     icon: 'hgi-ticket-01',
+    fact: 'ticketTypeAdded',
     title: 'Add ticket types',
     detail: 'Free or paid, with capacity and a sales window. Add at least one to publish.',
     to: '/admin/tickets',
@@ -63,6 +75,7 @@ const STEPS: Step[] = [
   },
   {
     icon: 'hgi-browser',
+    fact: 'eventPublished',
     title: 'Publish your event page',
     detail: 'Pick a design, then share the link — this is where registrations come from.',
     to: '/admin/landing-pages',
@@ -71,7 +84,39 @@ const STEPS: Step[] = [
   },
 ]
 
-export function FirstRunHome() {
+/** Per state: the row, the number badge, the icon tile and the call to action. */
+const LOOKS: Record<StepState, { row: string; badge: string; tile: string; cta: string }> = {
+  current: {
+    row: 'border-brand/40 bg-brand-soft/50 ring-1 ring-brand/20',
+    badge: 'border-hair bg-surface text-muted',
+    tile: 'bg-surface text-brand',
+    cta: 'btn-primary',
+  },
+  done: {
+    row: 'border-hair hover:bg-line/40',
+    badge: 'border-brand/30 bg-brand-soft text-brand',
+    tile: 'bg-brand-soft text-brand',
+    cta: 'btn-ghost',
+  },
+  todo: {
+    row: 'border-hair hover:bg-line/40',
+    badge: 'border-hair bg-surface text-muted',
+    tile: 'bg-canvas text-muted',
+    cta: 'btn-soft',
+  },
+  // Nothing asserted either way: drawn exactly like a step still to do, but
+  // never pointed at, because we have no grounds to advise it.
+  unknown: {
+    row: 'border-hair hover:bg-line/40',
+    badge: 'border-hair bg-surface text-muted',
+    tile: 'bg-canvas text-muted',
+    cta: 'btn-soft',
+  },
+}
+
+export function FirstRunHome({ setup }: { setup: SetupWire }) {
+  const states = stepStatesOf(STEPS.map((step) => setup[step.fact]))
+
   return (
     <>
       <section className="rounded-2xl bg-surface p-5 lg:p-6">
@@ -89,23 +134,30 @@ export function FirstRunHome() {
         </div>
 
         <ol className="mt-5 space-y-2.5">
-          {STEPS.map((step, i) => (
+          {STEPS.map((step, i) => {
+            const state = states[i]
+            const look = LOOKS[state]
+            const done = state === 'done'
+            return (
             <li
               key={step.to}
               className={cn(
                 'flex items-center gap-3.5 rounded-xl border px-3.5 py-3 transition',
-                i === 0
-                  ? 'border-brand/40 bg-brand-soft/50 ring-1 ring-brand/20'
-                  : 'border-hair hover:bg-line/40',
+                look.row,
               )}
             >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hair bg-surface text-[12px] font-bold text-muted tnum">
-                {i + 1}
+              <span
+                className={cn(
+                  'grid h-8 w-8 shrink-0 place-items-center rounded-full border text-[12px] font-bold tnum',
+                  look.badge,
+                )}
+              >
+                {done ? <Icon name="hgi-tick-02" size={15} /> : i + 1}
               </span>
               <span
                 className={cn(
                   'hidden h-9 w-9 shrink-0 place-items-center rounded-lg sm:grid',
-                  i === 0 ? 'bg-surface text-brand' : 'bg-canvas text-muted',
+                  look.tile,
                 )}
               >
                 <Icon name={step.icon} size={18} />
@@ -119,15 +171,13 @@ export function FirstRunHome() {
               <span className="hidden shrink-0 text-[11px] text-muted tnum sm:block">
                 {step.minutes}
               </span>
-              <Link
-                to={step.to}
-                className={cn('btn btn-sm shrink-0', i === 0 ? 'btn-primary' : 'btn-soft')}
-              >
-                {step.cta}
-                {i === 0 && <Icon name="hgi-arrow-right-01" size={15} />}
+              <Link to={step.to} className={cn('btn btn-sm shrink-0', look.cta)}>
+                {done ? 'Review' : step.cta}
+                {state === 'current' && <Icon name="hgi-arrow-right-01" size={15} />}
               </Link>
             </li>
-          ))}
+            )
+          })}
         </ol>
 
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-hair pt-4">

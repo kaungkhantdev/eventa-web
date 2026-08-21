@@ -53,7 +53,7 @@ export default function HomePage() {
       </header>
 
       {firstRun ? (
-        <FirstRunHome />
+        <FirstRunHome setup={home.setup} />
       ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-3">

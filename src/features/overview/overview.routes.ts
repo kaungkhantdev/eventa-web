@@ -11,6 +11,7 @@ import {
 import { UPCOMING_PREVIEW, overviewApi } from './overview.api'
 import type {
   AlertRow,
+  SetupWire,
   MeetingRow,
   ShareSlice,
   TodayRegistrations,
@@ -39,6 +40,21 @@ export interface HomeData {
   meetings: Panel<TodayMeetings>
   upcoming: Panel<UpcomingCard[]>
   ring: Panel<ActivityRing>
+  /**
+   * How far setup has got, for the first-run checklist. Every fact is null
+   * when the read failed — unknown, so the checklist claims nothing rather
+   * than telling a set-up workspace to start again.
+   */
+  setup: SetupWire
+}
+
+/** What we know about setup when the read did not come back: nothing. */
+const NOTHING_KNOWN: SetupWire = {
+  organizationConfigured: null,
+  paymentsConnected: null,
+  eventCreated: null,
+  ticketTypeAdded: null,
+  eventPublished: null,
 }
 
 /** What the alert feed says when there is nothing outstanding (US-DASH-06). */
@@ -54,11 +70,14 @@ export const homeRoute = {
 
     // The greeting and the feeds it is built around are the page. The three
     // panels beside them are supplementary, so each is allowed to fail alone.
-    const [home, meetings, upcoming, ring] = await Promise.all([
+    const [home, meetings, upcoming, ring, setup] = await Promise.all([
       overviewApi.home(language),
       panel(overviewApi.todayMeetings()),
       panel(overviewApi.upcoming()),
       panel(overviewApi.activeEvents()),
+      // A panel, not a bare call: the checklist is supplementary, and a
+      // failure here should not take the whole page to the error boundary.
+      panel(overviewApi.setup()),
     ])
 
     return {
@@ -77,6 +96,7 @@ export const homeRoute = {
         slices: toShareSlices(page.items),
         active: page.meta.total,
       })),
+      setup: setup.ok ? setup.data : NOTHING_KNOWN,
     }
   }),
 }

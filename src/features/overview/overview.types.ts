@@ -263,3 +263,17 @@ export interface MeetingRow {
   who: string
   tint: string
 }
+
+/**
+ * How far the workspace has been set up, as the API reports it (US-DASH-01).
+ *
+ * Every field is nullable and null means WITHHELD or unknown — never "not
+ * done". See `stepStatesOf`, which is where that distinction is honoured.
+ */
+export interface SetupWire {
+  organizationConfigured: boolean | null
+  paymentsConnected: boolean | null
+  eventCreated: boolean | null
+  ticketTypeAdded: boolean | null
+  eventPublished: boolean | null
+}
