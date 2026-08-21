@@ -1,5 +1,6 @@
 import { useFetcher, useLoaderData } from 'react-router'
 import { Badge, Button, Card, Hint, Icon, Input, Label, Select, Textarea } from '@/components/ui'
+import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
 import type { ProfileData } from '../settings.routes'
@@ -20,6 +21,8 @@ export default function SettingsProfilePage() {
   const save = useFetcher<ActionResult>()
   const error = save.data?.ok === false ? save.data.error : null
   const saved = save.state === 'idle' && save.data?.ok === true
+  useSavedToast(saved, 'Profile saved.')
+  useFailureToast(save.state === 'idle' ? error : null)
 
   return (
     <>
@@ -152,6 +155,8 @@ function EmailForm({ profile }: { profile: ProfileCard }) {
   const change = useFetcher<ActionResult>()
   const error = change.data?.ok === false ? change.data.error : null
   const sent = change.state === 'idle' && change.data?.ok === true
+  useSavedToast(sent, 'Check the new address for a link.')
+  useFailureToast(change.state === 'idle' ? error : null)
 
   return (
     <div className="mt-4 border-t border-hair pt-4">

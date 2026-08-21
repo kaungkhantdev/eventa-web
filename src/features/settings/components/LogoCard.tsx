@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useRevalidator } from 'react-router'
 import { Button, Card, Icon } from '@/components/ui'
 import { messageOf } from '@/lib/api'
+import { toast } from '@/lib/toast'
 import { accountApi } from '../settings.routes'
 
 /**
@@ -42,6 +43,7 @@ export function LogoCard({ logoUrl, name }: { logoUrl: string | null; name: stri
       await accountApi.confirmLogo(issued.key)
       // The loader owns this page's data; re-read rather than keeping a copy.
       await revalidator.revalidate()
+      toast.success('Logo updated.')
     } catch (cause) {
       setError(messageOf(cause))
     } finally {
@@ -55,6 +57,7 @@ export function LogoCard({ logoUrl, name }: { logoUrl: string | null; name: stri
     try {
       await accountApi.removeLogo()
       await revalidator.revalidate()
+      toast.success('Logo removed.')
     } catch (cause) {
       setError(messageOf(cause))
     } finally {

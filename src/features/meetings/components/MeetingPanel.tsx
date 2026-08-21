@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, Hint, Input, Label, Panel, Select, Textarea } from '@/components/ui'
+import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
 import { MEETING_MODES, MEETING_TYPES } from '../meetings.routes'
 import type { MeetingDraft } from '../meetings.types'
@@ -32,7 +33,9 @@ export function MeetingPanel({
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
 
   useEffect(() => {
-    if (saved && open) onClose()
+    if (!saved || !open) return
+    toast.success('Meeting saved.')
+    onClose()
   }, [saved, open, onClose])
 
   return (

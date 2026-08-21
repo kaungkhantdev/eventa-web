@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, Hint, Input, Label, Panel, Select } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
 import type { EventOption } from '../tickets.routes'
 import type { TicketCard } from '../tickets.types'
@@ -45,7 +46,9 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
 
   // The save succeeded and the loader has already revalidated; close.
   useEffect(() => {
-    if (saved && open) onClose()
+    if (!saved || !open) return
+    toast.success('Ticket type saved.')
+    onClose()
   }, [saved, open, onClose])
 
   return (

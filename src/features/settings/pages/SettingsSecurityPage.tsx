@@ -12,6 +12,7 @@ import {
   PageFooter,
   PageHeader,
 } from '@/components/ui'
+import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import type { SecurityData } from '../settings.routes'
 import type { SessionRow } from '../settings.types'
@@ -51,6 +52,8 @@ function PasswordCard() {
   const fetcher = useFetcher<ActionResult>()
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const changed = fetcher.state === 'idle' && fetcher.data?.ok === true
+  useSavedToast(changed, 'Password changed.')
+  useFailureToast(fetcher.state === 'idle' ? error : null)
 
   return (
     <Card className="p-4">

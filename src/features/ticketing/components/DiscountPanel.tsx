@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, Hint, Icon, Input, Label, Panel, Select } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
 import type { EventOption } from '../tickets.routes'
 import type { DiscountType } from '../types'
@@ -46,7 +47,9 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
   }
 
   useEffect(() => {
-    if (saved && open) onClose()
+    if (!saved || !open) return
+    toast.success('Discount code saved.')
+    onClose()
   }, [saved, open, onClose])
 
   return (

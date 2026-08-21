@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, Input, Label, Panel, Textarea } from '@/components/ui'
+import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
 import type { SpeakerCard } from '../program.types'
 
@@ -24,7 +25,9 @@ export function SpeakerPanel({ open, onClose, editing, eventId, eventName }: Spe
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
 
   useEffect(() => {
-    if (saved && open) onClose()
+    if (!saved || !open) return
+    toast.success('Speaker saved.')
+    onClose()
   }, [saved, open, onClose])
 
   // Remount the form when the subject changes, so the defaults are re-read.

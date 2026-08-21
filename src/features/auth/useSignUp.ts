@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { messageOf } from '@/lib/api'
 import type { Persona } from '@/lib/persona'
+import { useFailureToast } from '@/lib/useSavedToast'
 import { authApi } from './api'
 import { checkEmailPathFor } from './personas'
 import { signUpInputOf } from './signUpInput'
@@ -29,6 +30,11 @@ export function useSignUp(persona: Persona) {
   const navigate = useNavigate()
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Announced as well as shown. The banner above the form stays exactly where
+  // it is — it is the record, and it is what a screen reader reaches by
+  // walking the form.
+  useFailureToast(error)
 
   async function submit(e: FormEvent<HTMLFormElement>, password: string, confirm: string) {
     e.preventDefault()

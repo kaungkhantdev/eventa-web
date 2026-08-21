@@ -17,6 +17,7 @@ import {
 import type { ActionResult } from '@/app/loaders'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { cn } from '@/lib/cn'
+import { toast } from '@/lib/toast'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
 import {
@@ -326,7 +327,9 @@ function CategoryPanel({
   // A saved category closes the panel; a refused one stays open with the API's
   // reason above the fields, so nothing typed is lost.
   useEffect(() => {
-    if (fetcher.state === 'idle' && fetcher.data?.ok) onClose()
+    if (fetcher.state !== 'idle' || !fetcher.data?.ok) return
+    toast.success('Category saved.')
+    onClose()
   }, [fetcher.state, fetcher.data, onClose])
 
   const save = () => {

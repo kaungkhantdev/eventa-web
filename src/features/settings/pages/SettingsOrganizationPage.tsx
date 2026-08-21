@@ -1,5 +1,6 @@
 import { useFetcher, useLoaderData } from 'react-router'
 import { Button, Card, Hint, Icon, Input, Label, Select } from '@/components/ui'
+import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import { LogoCard } from '../components/LogoCard'
 import { SettingsHeader } from '../components/SettingsHeader'
@@ -21,6 +22,8 @@ export default function SettingsOrganizationPage() {
   const save = useFetcher<ActionResult>()
   const error = save.data?.ok === false ? save.data.error : null
   const saved = save.state === 'idle' && save.data?.ok === true
+  useSavedToast(saved, 'Organization saved.')
+  useFailureToast(save.state === 'idle' ? error : null)
 
   return (
     <>

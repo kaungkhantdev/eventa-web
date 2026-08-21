@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, Hint, Input, Label, Panel, Select, Textarea } from '@/components/ui'
+import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
 import type { AgendaDay, SessionDraft, SessionType } from '../program.types'
 
@@ -45,7 +46,9 @@ export function SessionPanel({
   const clash = Boolean(error && /clash|already/i.test(error))
 
   useEffect(() => {
-    if (saved && open) onClose()
+    if (!saved || !open) return
+    toast.success('Session saved.')
+    onClose()
   }, [saved, open, onClose])
 
   return (

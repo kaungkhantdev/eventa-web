@@ -17,6 +17,7 @@ import {
   PastEnd,
   Select,
 } from '@/components/ui'
+import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters } from '@/lib/useFilters'
 import type { ActionResult } from '@/app/loaders'
@@ -218,7 +219,9 @@ function InvitePanel({
   const sent = fetcher.state === 'idle' && fetcher.data?.ok === true
 
   useEffect(() => {
-    if (sent && open) onClose()
+    if (!sent || !open) return
+    toast.success('Invitation sent.')
+    onClose()
   }, [sent, open, onClose])
 
   return (

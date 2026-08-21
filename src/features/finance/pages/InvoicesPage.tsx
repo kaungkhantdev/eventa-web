@@ -20,6 +20,7 @@ import {
   type PillTabItem,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -294,7 +295,9 @@ function VoidModal({
   const done = fetcher.state === 'idle' && fetcher.data?.ok === true
 
   useEffect(() => {
-    if (done && open) onClose()
+    if (!done || !open) return
+    toast.success('Invoice voided.')
+    onClose()
   }, [done, open, onClose])
 
   return (

@@ -1,5 +1,6 @@
 import { useFetcher, useLoaderData } from 'react-router'
 import { Badge, Button, Card, Hint, Icon, Input, Label } from '@/components/ui'
+import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
 import { Toggle } from '../components/Toggle'
@@ -113,6 +114,8 @@ function PreferencesCard({ payments }: { payments: PaymentSettingsCard }) {
   const save = useFetcher<ActionResult>()
   const error = save.data?.ok === false ? save.data.error : null
   const saved = save.state === 'idle' && save.data?.ok === true
+  useSavedToast(saved, 'Payment preferences saved.')
+  useFailureToast(save.state === 'idle' ? error : null)
 
   const setFlag = (field: 'saveCards' | 'emailReceipts', value: boolean) =>
     save.submit(

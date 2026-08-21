@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { messageOf } from '@/lib/api'
 import type { Persona } from '@/lib/persona'
+import { useFailureToast } from '@/lib/useSavedToast'
 import type { WorkspaceOption } from './types'
 import { authApi } from './api'
 import { credentialsOf } from './credentials'
@@ -30,6 +31,12 @@ export function useSignIn(persona: Persona) {
    * on screen and grows a picker; submitting again names one.
    */
   const [workspaces, setWorkspaces] = useState<WorkspaceOption[]>([])
+
+  // Announced as well as shown. The banner above the form stays exactly where
+  // it is — it is the record, and it is what a screen reader reaches by
+  // walking the form. `error` returns to null at the start of every attempt,
+  // so the same refusal twice announces itself twice.
+  useFailureToast(error)
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()

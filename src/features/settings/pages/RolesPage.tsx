@@ -14,6 +14,7 @@ import {
   Panel,
   Textarea,
 } from '@/components/ui'
+import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import type { ActionResult } from '@/app/loaders'
 import type { RolesData } from '../settings.routes'
@@ -133,7 +134,9 @@ function RolePanel({
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
 
   useEffect(() => {
-    if (saved && open) onClose()
+    if (!saved || !open) return
+    toast.success('Role saved.')
+    onClose()
   }, [saved, open, onClose])
 
   return (
