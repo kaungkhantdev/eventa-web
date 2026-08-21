@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Badge,
@@ -8,6 +8,7 @@ import {
   EmptyState,
   HeaderUser,
   Icon,
+  IconSelect,
   Input,
   Label,
   PageFooter,
@@ -16,7 +17,9 @@ import {
   Panel,
   PastEnd,
   PillTabs,
+  SearchableSelect,
   Select,
+  type ComboOption,
 } from '@/components/ui'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
@@ -43,6 +46,14 @@ export default function UsersPage() {
   )
   const firstRun =
     data.rows.length === 0 && emptyReason === 'first-run' && !filtered
+
+  // Built once for the whole table rather than per row: every member's picker
+  // offers the same roles, and a page of them would otherwise rebuild the list
+  // on each render and defeat the picker's own memoisation.
+  const roleOptions = useMemo<ComboOption[]>(
+    () => data.roles.map((role) => ({ value: String(role.id), label: role.name })),
+    [data.roles],
+  )
 
   return (
     <>
@@ -97,7 +108,7 @@ export default function UsersPage() {
               </thead>
               <tbody className="text-[13px]">
                 {data.rows.map((row) => (
-                  <MemberTableRow key={row.id} row={row} roles={data.roles} />
+                  <MemberTableRow key={row.id} row={row} roleOptions={roleOptions} />
                 ))}
                 {/* Two different empties, and telling somebody the wrong one
                     sends them looking in the wrong place. A filter that matched
@@ -152,7 +163,13 @@ interface RoleOption {
   name: string
 }
 
-function MemberTableRow({ row, roles }: { row: MemberRow; roles: RoleOption[] }) {
+function MemberTableRow({
+  row,
+  roleOptions,
+}: {
+  row: MemberRow
+  roleOptions: ComboOption[]
+}) {
   const act = useFetcher<ActionResult>()
   const busy = act.state !== 'idle'
 
@@ -171,19 +188,21 @@ function MemberTableRow({ row, roles }: { row: MemberRow; roles: RoleOption[] })
         </div>
       </td>
       <td>
-        <select
-          value={row.roleId}
-          onChange={(e) => submit({ intent: 'role', roleId: e.target.value })}
-          disabled={busy}
-          className="select h-9 border-0 bg-canvas font-medium"
-          aria-label={`Role for ${row.name}`}
-        >
-          {roles.map((role) => (
-            <option key={role.id} value={role.id}>
-              {role.name}
-            </option>
-          ))}
-        </select>
+        {/* A workspace can carry more roles than fit in a glance, so this is a
+            type-to-filter picker rather than a plain list. `relative` anchors
+            nothing here — it keeps the cell as the picker's own box while the
+            popup itself escapes to a portal, clear of the table's overflow. */}
+        <div className="relative">
+          <SearchableSelect
+            value={String(row.roleId)}
+            onChange={(roleId) => submit({ intent: 'role', roleId })}
+            options={roleOptions}
+            label={`Role for ${row.name}`}
+            noun="roles"
+            disabled={busy}
+            className="h-9 w-full border-0 bg-canvas font-medium"
+          />
+        </div>
       </td>
       <td>
         <Badge tone={row.statusTone}>{row.status}</Badge>
@@ -312,21 +331,21 @@ function UserFilters({
             placeholder="Search by name or email…"
           />
         </div>
-        <div className="w-full sm:w-52">
-          <Select
-            value={filters.roleId}
-            onChange={(event) => onChange({ roleId: event.target.value || null, page: 1 })}
-            aria-label="Filter by role"
-            className="h-10 w-full border-0 bg-surface font-medium"
-          >
-            <option value="">All roles</option>
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name}
-              </option>
-            ))}
-          </Select>
-        </div>
+        <IconSelect
+          icon="hgi-shield-user"
+          wrapperClassName="w-full sm:w-52"
+          value={filters.roleId}
+          onChange={(event) => onChange({ roleId: event.target.value || null, page: 1 })}
+          aria-label="Filter by role"
+          className="h-10 w-full border-0 bg-surface font-medium"
+        >
+          <option value="">All roles</option>
+          {roles.map((role) => (
+            <option key={role.id} value={role.id}>
+              {role.name}
+            </option>
+          ))}
+        </IconSelect>
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
@@ -18,6 +18,7 @@ import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import type { ActionResult } from '@/app/loaders'
+import { Toggle } from '../components/Toggle'
 import type { RolesData } from '../settings.routes'
 import type { PermissionOption, RoleCard } from '../settings.types'
 
@@ -157,6 +158,18 @@ export default function RolesPage() {
   )
 }
 
+/** The icon the kit puts beside each group heading in the edit panel. */
+const GROUP_ICONS: Record<string, string> = {
+  Events: 'hgi-calendar-03',
+  Registrations: 'hgi-user-add-01',
+  Finance: 'hgi-wallet-01',
+  Settings: 'hgi-settings-01',
+}
+
+const FALLBACK_GROUP_ICON = 'hgi-shield-user'
+
+type PermissionGroups = { name: string; permissions: PermissionOption[] }[]
+
 function RolePanel({
   open,
   onClose,
@@ -166,10 +179,9 @@ function RolePanel({
   open: boolean
   onClose: () => void
   editing: RoleCard | null
-  groups: { name: string; permissions: PermissionOption[] }[]
+  groups: PermissionGroups
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
 
   useEffect(() => {
@@ -182,7 +194,7 @@ function RolePanel({
     <Panel
       open={open}
       onClose={onClose}
-      title={editing ? `Edit ${editing.name}` : 'New role'}
+      title={editing ? 'Edit role & permissions' : 'New role'}
       footer={
         <>
           <Button variant="soft" className="flex-1" onClick={onClose}>
@@ -195,73 +207,158 @@ function RolePanel({
             form="role-form"
             disabled={fetcher.state !== 'idle'}
           >
-            {fetcher.state === 'idle' ? 'Save role' : 'Saving…'}
+            <SaveLabel editing={Boolean(editing)} busy={fetcher.state !== 'idle'} />
           </Button>
         </>
       }
     >
-      <fetcher.Form id="role-form" key={editing?.id ?? 'new'} method="post" className="space-y-4">
-        <input type="hidden" name="intent" value={editing ? 'permissions' : 'create'} />
-        {editing && <input type="hidden" name="roleId" value={editing.id} />}
-
-        {error && (
+      {/* Keyed so switching roles rebuilds the switches from the new role's
+          permissions — they are state, and state does not reset on its own. */}
+      <RoleForm key={editing?.id ?? 'new'} Form={fetcher.Form} editing={editing} groups={groups}>
+        {fetcher.data?.ok === false && (
           <p
             role="alert"
             className="rounded-lg bg-red-50 p-3 text-[13px] text-red-600 dark:bg-red-500/15 dark:text-red-300"
           >
-            {error}
+            {fetcher.data.error}
           </p>
         )}
-
-        {!editing && (
-          <>
-            <div>
-              <Label htmlFor="role-name">Name</Label>
-              <Input id="role-name" name="name" type="text" required placeholder="Box office" />
-            </div>
-            <div>
-              <Label htmlFor="role-description">Description</Label>
-              <Textarea
-                id="role-description"
-                name="description"
-                rows={2}
-                required
-                placeholder="What this role is for"
-              />
-            </div>
-          </>
-        )}
-
-        {editing?.isSystem && (
-          <Hint>
-            This is a built-in role. The API may refuse changes to it — it will say so if it does.
-          </Hint>
-        )}
-
-        {groups.map((group) => (
-          <fieldset key={group.name}>
-            <legend className="label">{group.name}</legend>
-            <div className="space-y-1.5 rounded-lg bg-canvas p-2">
-              {group.permissions.map((permission) => (
-                <label
-                  key={permission.key}
-                  className="flex items-center gap-2 text-[13px] text-ink"
-                >
-                  <input
-                    type="checkbox"
-                    name="permissions"
-                    value={permission.key}
-                    defaultChecked={editing?.permissions.includes(permission.key) ?? false}
-                    className="checkbox"
-                  />
-                  {permission.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        ))}
-      </fetcher.Form>
+      </RoleForm>
     </Panel>
+  )
+}
+
+function SaveLabel({ editing, busy }: { editing: boolean; busy: boolean }) {
+  if (busy) return <>{editing ? 'Saving…' : 'Creating…'}</>
+  return <>{editing ? 'Save changes' : 'Create role'}</>
+}
+
+/**
+ * The panel's body, ported from roles.html: a role name, then one bordered
+ * card per permission group with a switch on every row.
+ *
+ * The switches are React state rather than checkboxes, so what is submitted is
+ * a hidden field per granted permission. The API is sent the whole set, not a
+ * diff — `PUT /roles/:id/permissions` replaces it — so a switch turned off has
+ * to be an absent field, which is exactly what this produces.
+ */
+function RoleForm({
+  Form,
+  editing,
+  groups,
+  children,
+}: {
+  Form: ReturnType<typeof useFetcher<ActionResult>>['Form']
+  editing: RoleCard | null
+  groups: PermissionGroups
+  children: ReactNode
+}) {
+  const [granted, setGranted] = useState<Set<string>>(
+    () => new Set(editing?.permissions ?? []),
+  )
+
+  const set = (key: string, on: boolean) =>
+    setGranted((was) => {
+      const next = new Set(was)
+      if (on) next.add(key)
+      else next.delete(key)
+      return next
+    })
+
+  return (
+    <Form id="role-form" method="post" className="space-y-5">
+      {/* Wrapped in one `hidden` element on purpose: `space-y-5` spaces every
+          sibling that lacks the `hidden` attribute, and a bare run of hidden
+          inputs would push a gap above the first field. */}
+      <div hidden>
+        <input type="hidden" name="intent" value={editing ? 'permissions' : 'create'} />
+        {editing && <input type="hidden" name="roleId" value={editing.id} />}
+        {[...granted].map((key) => (
+          <input key={key} type="hidden" name="permissions" value={key} />
+        ))}
+      </div>
+
+      {children}
+
+      <div>
+        <Label htmlFor="role-name">Role name</Label>
+        {/* Read-only while editing, and greyed to say so. The API has no rename
+            — only `PUT /roles/:id/permissions` — and a box that takes typing
+            and discards it is worse than one that plainly does not. */}
+        <Input
+          id="role-name"
+          name="name"
+          type="text"
+          required
+          readOnly={Boolean(editing)}
+          defaultValue={editing?.name ?? ''}
+          placeholder="Box office"
+          className={editing ? 'text-muted' : undefined}
+          title={editing ? 'Renaming a role is not available yet' : undefined}
+        />
+        {editing ? <Hint>{editing.description}</Hint> : null}
+      </div>
+
+      {!editing && (
+        <div>
+          <Label htmlFor="role-description">Description</Label>
+          <Textarea
+            id="role-description"
+            name="description"
+            rows={2}
+            required
+            placeholder="What this role is for"
+          />
+        </div>
+      )}
+
+      {editing?.isSystem && (
+        <Hint>
+          This is a built-in role. The API may refuse changes to it — it will say so if it does.
+        </Hint>
+      )}
+
+      {groups.map((group) => (
+        <PermissionGroupCard
+          key={group.name}
+          group={group}
+          granted={granted}
+          onToggle={set}
+        />
+      ))}
+    </Form>
+  )
+}
+
+function PermissionGroupCard({
+  group,
+  granted,
+  onToggle,
+}: {
+  group: PermissionGroups[number]
+  granted: Set<string>
+  onToggle: (key: string, on: boolean) => void
+}) {
+  return (
+    <div>
+      <h4 className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+        <Icon name={GROUP_ICONS[group.name] ?? FALLBACK_GROUP_ICON} size={13} />
+        {group.name}
+      </h4>
+      <div className="divide-y divide-line rounded-lg border border-hair px-3">
+        {group.permissions.map((permission) => (
+          <div key={permission.key} className="flex items-center justify-between py-2.5">
+            <p className="text-[13px] text-ink">{permission.label}</p>
+            <Toggle
+              on={granted.has(permission.key)}
+              onChange={(next) => onToggle(permission.key, next)}
+              label={permission.label}
+              transition="transition-transform"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
