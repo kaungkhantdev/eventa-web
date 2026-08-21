@@ -77,12 +77,12 @@ export function LogoCard({ logoUrl, name }: { logoUrl: string | null; name: stri
           <img
             src={logoUrl}
             alt={`${name} logo`}
-            className="h-16 w-16 shrink-0 rounded-xl border border-hair object-contain"
+            className="h-16 w-16 shrink-0 rounded-full border border-hair object-contain"
           />
         ) : (
           // Not an empty box: the initial is what a workspace without a logo
           // already shows everywhere else.
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-brand-soft text-[22px] font-bold text-brand">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-brand-soft text-[22px] font-bold text-brand">
             {name.trim().charAt(0).toUpperCase() || '?'}
           </span>
         )}
