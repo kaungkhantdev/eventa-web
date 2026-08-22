@@ -3,6 +3,7 @@ import { ApiError, NetworkError, messageOf, session } from '@/lib/api'
 import type { Persona } from '@/lib/persona'
 import { authApi } from '@/features/auth/api'
 import { signInPathFor } from '@/features/auth/personas'
+import { returnTo } from '@/features/auth/redirect'
 import type { Me } from '@/features/auth/types'
 
 /**
@@ -179,8 +180,8 @@ function requirePersona(persona: Persona) {
  * so it can return them there rather than dumping everyone on a dashboard.
  */
 function signIn(persona: Persona): Response {
-  const from = window.location.pathname + window.location.search
-  const to = from && from !== '/' ? `?from=${encodeURIComponent(from)}` : ''
+  const from = returnTo(window.location.pathname, window.location.search)
+  const to = from ? `?from=${encodeURIComponent(from)}` : ''
   return redirect(`${signInPathFor(persona)}${to}`)
 }
 
