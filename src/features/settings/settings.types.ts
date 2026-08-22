@@ -300,7 +300,10 @@ export interface PaymentSettingsCard {
   statementDescriptor: string
   saveCards: boolean
   emailReceipts: boolean
+  /** The configured mode — seeds the Test/Live control even before any save. */
   testMode: boolean
+  /** True only when a CONNECTED workspace is on test keys — the banner's fact. */
+  takingTestPayments: boolean
   warnings: string[]
   /** The stored publishable key — public by design, so shown in full. */
   publishableKey: string

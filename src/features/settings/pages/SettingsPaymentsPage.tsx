@@ -32,7 +32,7 @@ export default function SettingsPaymentsPage() {
       />
 
       <div className="space-y-3">
-        {payments.testMode && <TestModeBanner />}
+        {payments.takingTestPayments && <TestModeBanner />}
 
         <GatewayCard payments={payments} />
 

@@ -150,7 +150,40 @@ describe('toPaymentSettingsCard', () => {
     expect(payments({ mode: 'test', testMode: true })).toMatchObject({
       statusLabel: 'Connected · test',
       statusTone: 'amber',
+      takingTestPayments: true,
     })
+  })
+
+  /**
+   * The banner is about a till that works but takes play money. A workspace
+   * with no keys saved has no till at all, and the API still reports
+   * `testMode` for it because test is what the mode defaults to.
+   *
+   * Warning them there anyway states two things that are not true: that they
+   * are "using Test keys" when they are using none, and — by saying only that
+   * REAL charges are not processed — that some charge is. The card underneath
+   * already says Not connected, with the empty boxes to fix it.
+   */
+  it('does not warn about test keys when no keys are saved at all', () => {
+    expect(
+      payments({ status: 'disconnected', mode: 'test', testMode: true }),
+    ).toMatchObject({
+      connected: false,
+      statusLabel: 'Not connected',
+      takingTestPayments: false,
+    })
+  })
+
+  it('does not warn a workspace that is live', () => {
+    expect(payments().takingTestPayments).toBe(false)
+  })
+
+  /**
+   * Kept separate from the banner on purpose: the Test/Live control seeds from
+   * the configured mode, which is a real answer even with nothing saved yet.
+   */
+  it('still reports the configured mode when nothing is connected', () => {
+    expect(payments({ status: 'disconnected', testMode: true }).testMode).toBe(true)
   })
 
   it('says so when nothing is connected', () => {
