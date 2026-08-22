@@ -74,4 +74,26 @@ describe('resend cool-off', () => {
     expect(() => startCooldown(EMAIL, NOW, null)).not.toThrow()
     expect(secondsRemaining(EMAIL, NOW, null)).toBe(0)
   })
+
+  /**
+   * A verification email and a reset link are two different sends: asking for
+   * a reset link must not inherit the wait from a sign-up made a moment ago on
+   * the same address, or the button would open jammed for no reason anyone on
+   * the page can see.
+   */
+  it('waits separately for each purpose on the same address', () => {
+    startCooldown(EMAIL, NOW, store)
+    expect(secondsRemaining(EMAIL, NOW, store, 'reset')).toBe(0)
+
+    startCooldown(EMAIL, NOW, store, 'reset')
+    expect(secondsRemaining(EMAIL, NOW + 18_000, store, 'reset')).toBe(42)
+    // And the verification wait is still its own, untouched by the reset send.
+    expect(secondsRemaining(EMAIL, NOW + 18_000, store)).toBe(42)
+  })
+
+  /** Existing keys predate purposes; the default must keep reading them. */
+  it('keeps the storage key the verification flow already wrote', () => {
+    startCooldown(EMAIL, NOW, store)
+    expect(store.raw.has(`eventa:resend-until:${EMAIL}`)).toBe(true)
+  })
 })
