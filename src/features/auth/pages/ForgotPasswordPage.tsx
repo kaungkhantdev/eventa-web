@@ -4,7 +4,13 @@ import { cn } from '@/lib/cn'
 import { Icon } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { authApi } from '@/features/auth/api'
-import { personaOfSearch, signInPathFor } from '@/features/auth/personas'
+import {
+  accountLabelFor,
+  forgotPathFor,
+  otherPersona,
+  personaOfSearch,
+  signInPathFor,
+} from '@/features/auth/personas'
 import {
   RESEND_COOLDOWN_MS,
   secondsRemaining,
@@ -86,7 +92,13 @@ export default function ForgotPasswordPage() {
   return (
     <AuthLayout
       title="Reset your password"
-      subtitle="Enter your email and we'll send a reset link."
+      // Names the realm, because the page cannot: the API answers identically
+      // for a registered and an unknown address (a reset form that told them
+      // apart would be a list of everyone with an account), so an attendee
+      // asking here is told "on its way" and waits for mail that was never
+      // written. Which realm is being searched comes from the URL, not from
+      // the lookup, so saying it out loud leaks nothing.
+      subtitle={`${accountLabelFor(persona)} — enter your email and we'll send a reset link.`}
       footer={
         <p className="mt-6 text-center text-[13px]">
           <Link
@@ -153,6 +165,21 @@ export default function ForgotPasswordPage() {
             </span>
           </div>
         )}
+
+        {/* Always here — before sending, after sending, for every address.
+            A hint that appeared only when the address turned out to belong to
+            the other realm would be the enumeration oracle the neutral message
+            exists to prevent: its presence alone would confirm the account. */}
+        <p className="text-[12.5px] text-muted">
+          {persona === 'admin' ? 'Bought tickets rather than run events?' : 'Run events here?'}{' '}
+          <Link
+            to={forgotPathFor(otherPersona(persona))}
+            className="font-semibold text-brand hover:underline"
+          >
+            Reset your {accountLabelFor(otherPersona(persona)).toLowerCase()}
+          </Link>{' '}
+          instead — the two are separate, and a reset asks only about this one.
+        </p>
 
         {/* The wait is shown rather than enforced in silence: the API refuses a
             rapid repeat regardless, and "in 42s" reads better than a bare 429. */}
