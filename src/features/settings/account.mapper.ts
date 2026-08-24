@@ -98,6 +98,9 @@ export function toPaymentSettingsCard(
     webhookSecretSet: keys?.webhookSecretSet ?? false,
     keysSavedOn: keys?.savedAt ? bangkokDate(keys.savedAt) : '',
     webhookUrl: settings.webhookUrl ?? '',
+    // Defaults to closed: a missing flag must not offer a tab whose save the
+    // server will refuse.
+    liveKeysAccepted: settings.liveKeysAccepted ?? false,
   }
 }
 

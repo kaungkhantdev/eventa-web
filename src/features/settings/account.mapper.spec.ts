@@ -115,6 +115,7 @@ const PAYMENTS: PaymentSettingsWire = {
   saveCards: true,
   emailReceipts: true,
   testMode: false,
+  liveKeysAccepted: true,
   webhookUrl: 'https://api.eventa.test/api/v1/public/payments/webhook/tok_abc',
 }
 
@@ -209,5 +210,30 @@ describe('toPaymentSettingsCard', () => {
   it('has no warnings unless the API sent some', () => {
     expect(payments().warnings).toEqual([])
     expect(payments({ warnings: ['Payouts are paused'] }).warnings).toEqual(['Payouts are paused'])
+  })
+
+  /**
+   * Whether the Live tab may be offered at all.
+   *
+   * Only the server knows: outside production it refuses live keys outright,
+   * because a live key there lets a seed script or a click round staging charge
+   * a real card. The page cannot work that out for itself.
+   */
+  describe('whether this server would take live keys', () => {
+    it('passes the API’s answer through', () => {
+      expect(payments({ liveKeysAccepted: true }).liveKeysAccepted).toBe(true)
+      expect(payments({ liveKeysAccepted: false }).liveKeysAccepted).toBe(false)
+    })
+
+    /**
+     * Closed by default. An older API that does not send the field would
+     * otherwise open a tab whose save is guaranteed to fail — and the failure
+     * mode of guessing wrong the other way is a live key where one is refused.
+     */
+    it('assumes not, when the API says nothing', () => {
+      expect(
+        payments({ liveKeysAccepted: undefined as unknown as boolean }).liveKeysAccepted,
+      ).toBe(false)
+    })
   })
 })

@@ -387,20 +387,27 @@ export const organizationRoute = {
 export interface PaymentsData {
   payments: PaymentSettingsCard
   methods: PaymentMethodRow[]
+  /** Which mode's keys are on screen — from `?mode=`, not component state. */
+  viewing: 'test' | 'live'
 }
 
 export const paymentsRoute = {
-  loader: pageData(async (): Promise<PaymentsData> => {
+  loader: pageData(async ({ request }): Promise<PaymentsData> => {
     const settings = await accountApi.paymentSettings()
-    // The stored-key summary is for the active mode only — the other mode's
-    // pair is untouched by this screen until the organizer switches to it.
+    // The Test/Live toggle is a URL parameter, so flipping it re-runs this
+    // loader and the boxes below show THAT mode's stored keys. As component
+    // state it only relabelled the form: the fields kept showing whatever the
+    // active mode had, and the toggle looked like a viewer that never viewed.
+    const asked = queryOf(request).get('mode')
+    const viewing = asked === 'live' || asked === 'test' ? asked : settings.mode
     const [keys, methods] = await Promise.all([
-      accountApi.storedPaymentKeys(settings.mode),
+      accountApi.storedPaymentKeys(viewing),
       accountApi.paymentMethods(),
     ])
     return {
       payments: toPaymentSettingsCard(settings, keys),
       methods: methods.map((m) => ({ method: m.method, enabled: m.enabled })),
+      viewing,
     }
   }),
 

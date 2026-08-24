@@ -3,6 +3,7 @@ import { useFetcher, useLoaderData } from 'react-router'
 import { Badge, Button, Card, FieldError, Hint, Icon, Input, Label, Select } from '@/components/ui'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
+import { useFilters } from '@/lib/useFilters'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
 import { Toggle } from '../components/Toggle'
@@ -22,7 +23,7 @@ import type { PaymentMethodRow, PaymentSettingsCard } from '../settings.types'
  * four-character tail, enough to say which key is saved and useless otherwise.
  */
 export default function SettingsPaymentsPage() {
-  const { payments, methods } = useLoaderData() as PaymentsData
+  const { payments, methods, viewing } = useLoaderData() as PaymentsData
 
   return (
     <>
@@ -34,7 +35,7 @@ export default function SettingsPaymentsPage() {
       <div className="space-y-3">
         {payments.takingTestPayments && <TestModeBanner />}
 
-        <GatewayCard payments={payments} />
+        <GatewayCard payments={payments} viewing={viewing} />
 
         {/* Side by side, and stretched to the same height. The kit leaves these
             `items-start`, which is right when two cards happen to come out the
@@ -80,7 +81,13 @@ const STRIPE_PURPLE = 'bg-[#635BFF]'
  * it and left both stretched across the full width with nothing in the middle.
  * Side by side, a save changes the badge you are already looking at.
  */
-function GatewayCard({ payments }: { payments: PaymentSettingsCard }) {
+function GatewayCard({
+  payments,
+  viewing,
+}: {
+  payments: PaymentSettingsCard
+  viewing: 'test' | 'live'
+}) {
   return (
     <Card className="p-4">
       {/* Splits at `xl`, not `lg`: below that the sidebar has already taken its
@@ -91,7 +98,7 @@ function GatewayCard({ payments }: { payments: PaymentSettingsCard }) {
         {/* `min-w-0` or the key fields' own grid refuses to shrink below its
             content and pushes the column past the card. */}
         <div className="min-w-0 border-t border-hair pt-4 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0">
-          <KeysPanel payments={payments} />
+          <KeysPanel payments={payments} mode={viewing} />
         </div>
       </div>
     </Card>
@@ -199,9 +206,15 @@ function refusalNote(
   return Object.keys(fields).length > 0 ? FIELDS_REFUSED : (failed.error ?? null)
 }
 
-function KeysPanel({ payments }: { payments: PaymentSettingsCard }) {
+function KeysPanel({
+  payments,
+  mode,
+}: {
+  payments: PaymentSettingsCard
+  mode: 'test' | 'live'
+}) {
   const save = useFetcher<ActionResult>()
-  const [mode, setMode] = useState<'test' | 'live'>(payments.testMode ? 'test' : 'live')
+  const { set } = useFilters()
   const failed = save.data?.ok === false ? save.data : null
   const fields = failed?.fieldErrors ?? {}
   useSavedToast(save.state === 'idle' && save.data?.ok === true, 'Payment keys saved.')
@@ -219,20 +232,36 @@ function KeysPanel({ payments }: { payments: PaymentSettingsCard }) {
           </span>
         </h2>
         <div className="flex items-center gap-2">
-          {/* Switching mode swaps which stored pair is being edited, so it also
-              swaps what "Save keys" writes — the two travel together. */}
+          {/* A workspace stores two independent key pairs. This picks which one
+              the boxes below show AND which one Save writes, which is why it
+              goes in the URL: flipping it re-runs the loader, so the fields are
+              that mode's stored keys rather than a relabelled copy of the
+              other's. It also means a link can point straight at either. */}
           <div className="segmented">
             <button
               type="button"
-              onClick={() => setMode('test')}
+              onClick={() => set({ mode: 'test' })}
               className={cn(mode === 'test' && 'active')}
             >
               Test
             </button>
             <button
               type="button"
-              onClick={() => setMode('live')}
-              className={cn(mode === 'live' && 'active')}
+              onClick={() => set({ mode: 'live' })}
+              // Disabled where the server would refuse the keys anyway: outside
+              // production a live key lets a seed script charge a real card, so
+              // the save is rejected. Offering the tab only to fail on submit
+              // is a worse way to say the same thing.
+              disabled={!payments.liveKeysAccepted}
+              title={
+                payments.liveKeysAccepted
+                  ? undefined
+                  : 'This server only accepts test keys — live keys are production-only.'
+              }
+              className={cn(
+                mode === 'live' && 'active',
+                !payments.liveKeysAccepted && 'cursor-not-allowed opacity-50',
+              )}
             >
               Live
             </button>
@@ -258,7 +287,9 @@ function KeysPanel({ payments }: { payments: PaymentSettingsCard }) {
         </span>
       </div>
 
-      <save.Form method="post">
+      {/* Keyed on the mode: these are uncontrolled inputs, so without it
+          React keeps the DOM node and the old mode's value stays typed in. */}
+      <save.Form method="post" key={mode}>
         <input type="hidden" name="intent" value="keys" />
         <input type="hidden" name="mode" value={mode} />
 
@@ -274,7 +305,9 @@ function KeysPanel({ payments }: { payments: PaymentSettingsCard }) {
               required
               className="font-mono text-[12px]"
               placeholder={`pk_${mode}_...`}
-              defaultValue={mode === 'test' ? payments.publishableKey : ''}
+              // The loader fetched this mode's stored pair, so it is that
+              // mode's key — not the active mode's shown under a Live label.
+              defaultValue={payments.publishableKey}
               aria-describedby={fields.publishableKey ? 'keys-pk-error' : undefined}
             />
             <FieldError id="keys-pk-error" message={fields.publishableKey} />

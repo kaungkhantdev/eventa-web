@@ -284,6 +284,8 @@ export interface PaymentSettingsWire {
   saveCards: boolean
   emailReceipts: boolean
   testMode: boolean
+  /** Whether THIS server accepts live keys — false outside production. */
+  liveKeysAccepted: boolean
   warnings?: string[]
 }
 
@@ -315,4 +317,6 @@ export interface PaymentSettingsCard {
   keysSavedOn: string
   /** This workspace's own webhook endpoint. Empty until keys are first saved. */
   webhookUrl: string
+  /** Whether this server would accept live keys at all — gates the Live tab. */
+  liveKeysAccepted: boolean
 }
