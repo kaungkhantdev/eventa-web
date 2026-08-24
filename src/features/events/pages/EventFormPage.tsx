@@ -6,6 +6,7 @@ import type { AdminOutletContext } from '@/layouts/AdminShell'
 import type { ActionResult } from '@/app/loaders'
 import { NotificationBell, SignedInChip } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { mapLinkFor } from '@/lib/mapLink'
 import { publishGaps, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
 import type { EventFormData } from '../eventForm.routes'
 import { EVENT_TYPES } from '../events.routes'
@@ -214,6 +215,9 @@ export default function EventFormPage() {
     initial.highlights.map((h) => ({ icon: h.icon ?? 'hgi-sparkles', label: h.text })),
   )
   const [coverImage, setCoverImage] = useState(initial.coverImage)
+  // Recomputed as they type, so it always points at what is actually in the
+  // boxes rather than at whatever was there when the page loaded.
+  const mapLink = mapLinkFor({ venueName: venue, address, city: initial.city })
   const [landingTpl, setLandingTpl] = useState<LandingTpl>(template)
   const [visibility, setVisibility] = useState('public')
 
@@ -657,7 +661,25 @@ export default function EventFormPage() {
                     />
                   </div>
                   <div>
-                    <label className="label">Address</label>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <label className="label">Address</label>
+                      {/* Built from what is typed, never stored: a saved link
+                          and an edited address drift apart, and the stale copy
+                          is the one that strands somebody outside the wrong
+                          building. Offered as a check BEFORE publishing — if
+                          it lands somewhere odd here, it will for attendees. */}
+                      {mapLink && (
+                        <a
+                          href={mapLink}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
+                        >
+                          <i className="hgi-stroke hgi-location-01 text-[13px]" />
+                          Check on map
+                        </a>
+                      )}
+                    </div>
                     <input
                       className="input"
                       type="text"
