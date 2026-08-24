@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { Icon } from '@/components/ui'
+import { Icon,
+  VenueMap,
+} from '@/components/ui'
 import type { LandingEvent } from '@/features/landing/types'
 
 /* Port of landing/noir.html — a wide "spotlight split" event page: a cover
@@ -75,6 +77,10 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
     { k: 'Category', v: ev.category },
     { k: 'Price', v: priceDetail },
   ].filter((r) => r.v)
+
+  // The address decides the pin; see mapLink.ts on why the venue name does
+  // not join the query.
+  const venue = { venueName: ev.venue, address: ev.address, city: ev.city }
 
   const footWhen = [ev.dateText, where].filter(Boolean).join('  ·  ')
   const year = String(new Date().getFullYear())
@@ -235,6 +241,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                     </div>
                   ))}
                 </dl>
+                {!isOnline && <VenueMap venue={venue} className="mt-3" />}
               </div>
             </div>
           </section>

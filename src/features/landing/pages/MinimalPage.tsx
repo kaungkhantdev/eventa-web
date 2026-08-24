@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { Icon } from '@/components/ui'
+import { Icon,
+  VenueMap,
+} from '@/components/ui'
 import type { LandingEvent } from '@/features/landing/types'
 
 /* Port of landing/minimal.html — a centered, editorial single-column event page.
@@ -77,6 +79,10 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
     { icon: 'hgi-ticket-01', k: 'Category', v: ev.category },
     { icon: 'hgi-wallet-01', k: 'Price', v: priceDisplay },
   ].filter((r) => r.v)
+
+  // The address decides the pin; see mapLink.ts on why the venue name does
+  // not join the query.
+  const venue = { venueName: ev.venue, address: ev.address, city: ev.city }
 
   const when = [ev.dateText, venueCity].filter(Boolean).join('  ·  ')
   const year = ev.dateText.match(/\b(20\d{2})\b/)?.[1] || String(new Date().getFullYear())
@@ -196,6 +202,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
                 </div>
               ))}
             </dl>
+            {!isOnline && <VenueMap venue={venue} className="mt-3" />}
           </section>
         )}
 

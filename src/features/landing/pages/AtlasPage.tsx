@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { LandingEvent } from '@/features/landing/types'
 
@@ -101,6 +102,9 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
     { icon: 'hgi-building-06', label: 'Category', value: ev.category },
     { icon: 'hgi-wallet-01', label: 'Price', value: priceDisplay },
   ].filter((r) => r.value)
+  // The address decides the pin; see mapLink.ts on why the venue name does
+  // not join the query.
+  const venue = { venueName: ev.venue, address: ev.address, city: ev.city }
 
   const whenLine = [ev.dateText, whereText].filter(Boolean).join('  ·  ')
   const year = new Date().getFullYear()
@@ -262,6 +266,7 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                     </div>
                   ))}
                 </dl>
+                {!isOnline && <VenueMap venue={venue} className="mt-3" />}
               </div>
             </div>
           </div>
