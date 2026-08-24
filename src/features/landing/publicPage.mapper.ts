@@ -46,7 +46,12 @@ export function toLandingEvent(page: PublicPageWire): LandingEvent {
     title: event.name,
     // The description does double duty: the hero strapline and the About body.
     // One sentence is what the organizer wrote; there is no second field.
-    tagline: event.description ?? '',
+    // Empty on purpose. The templates keep the kit's two slots — a one-line
+    // hook in the hero and the full text under "About the event" — but the API
+    // has only `description`. Filling both printed the same paragraph twice on
+    // every public page. It belongs in the section named for it; the hero line
+    // waits for a field of its own.
+    tagline: '',
     about: event.description ?? '',
     category: event.categoryName ?? event.type,
     dateText: dateTextOf(event.startAt, event.endAt, event.timezone),

@@ -133,9 +133,11 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
               <h1 className="reveal d1 mt-4 text-[32px] font-extrabold leading-[1.05] tracking-tight text-ink sm:text-[40px] lg:text-[44px]">
                 {ev.title}
               </h1>
-              <p className="reveal d2 mt-4 max-w-[52ch] text-[15px] leading-relaxed text-muted sm:text-[16px]">
-                {ev.tagline}
-              </p>
+              {ev.tagline && (
+                <p className="reveal d2 mt-4 max-w-[52ch] text-[15px] leading-relaxed text-muted sm:text-[16px]">
+                  {ev.tagline}
+                </p>
+              )}
               <div
                 className="reveal d3 mt-8 flex flex-col gap-x-8 gap-y-3.5 sm:flex-row sm:flex-wrap"
                 role="list"

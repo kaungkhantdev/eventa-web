@@ -141,7 +141,9 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
             </div>
           </div>
           <div className="px-6 py-6 sm:px-9 sm:py-7">
-            <p className="max-w-[62ch] text-[15px] leading-relaxed text-muted">{ev.tagline}</p>
+            {ev.tagline && (
+              <p className="max-w-[62ch] text-[15px] leading-relaxed text-muted">{ev.tagline}</p>
+            )}
             <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2.5">
               {heroFacts.map((f) => (
                 <span

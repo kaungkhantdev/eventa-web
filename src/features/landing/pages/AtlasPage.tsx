@@ -201,7 +201,9 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
         </a>
       </section>
 
-      {/* 2 · Lead line */}
+      {/* 2 · Lead line — the whole section IS the tagline, so it goes with it
+             rather than leaving a banded strip of empty surface. */}
+      {ev.tagline && (
       <section id="s-intro" className="border-b border-line bg-surface">
         <div className="mx-auto max-w-4xl px-4 py-12 text-center sm:px-6 sm:py-16">
           <p className="text-[19px] font-medium leading-relaxed text-ink sm:text-[24px]">
@@ -209,6 +211,7 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
           </p>
         </div>
       </section>
+      )}
 
       {/* 3 · Highlights (green band) */}
       {highlights.length > 0 && (

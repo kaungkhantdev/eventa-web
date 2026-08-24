@@ -126,9 +126,11 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
           <h1 className="reveal d1 mx-auto mt-5 max-w-[16ch] text-[2rem] font-extrabold leading-[1.05] tracking-tight text-ink sm:text-[2.6rem]">
             {title}
           </h1>
-          <p className="reveal d2 mx-auto mt-5 max-w-[52ch] text-[15px] leading-relaxed text-muted">
-            {ev.tagline}
-          </p>
+          {ev.tagline && (
+            <p className="reveal d2 mx-auto mt-5 max-w-[52ch] text-[15px] leading-relaxed text-muted">
+              {ev.tagline}
+            </p>
+          )}
 
           <ul className="reveal d3 mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 text-[13px] text-muted">
             {heroFacts.map((f) => (
