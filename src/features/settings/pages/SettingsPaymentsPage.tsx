@@ -136,19 +136,20 @@ function ProviderPanel({ payments }: { payments: PaymentSettingsCard }) {
       </dl>
 
       {payments.connected && (
-        <IntentForm intent="disconnect" done="Payment account disconnected.">
-          {(busy) => (
+        <IntentAction intent="disconnect" done="Payment account disconnected.">
+          {(busy, run) => (
             <Button
               variant="danger"
               size="sm"
-              type="submit"
+              type="button"
+              onClick={run}
               disabled={busy}
               className="mt-3 w-full"
             >
               Disconnect
             </Button>
           )}
-        </IntentForm>
+        </IntentAction>
       )}
     </div>
   )
@@ -455,14 +456,16 @@ function WebhookUrl({ url }: { url: string }) {
  */
 function TestConnectionButton() {
   return (
-    <IntentForm intent="test" done="Connection is working.">
-      {(busy) => (
-        <Button variant="soft" size="sm" type="submit" disabled={busy}>
+    <IntentAction intent="test" done="Connection is working.">
+      {(busy, run) => (
+        // `type="button"`: it lives inside the keys form, and a submit button
+        // there would save the keys instead of testing the saved ones.
+        <Button variant="soft" size="sm" type="button" onClick={run} disabled={busy}>
           <Icon name="hgi-plug-socket" size={14} />
           {busy ? 'Testing…' : 'Test connection'}
         </Button>
       )}
-    </IntentForm>
+    </IntentAction>
   )
 }
 
@@ -690,7 +693,7 @@ function PreferenceRow({
  * wording for two different things, and a failure from either appearing under
  * both.
  */
-function IntentForm({
+function IntentAction({
   intent,
   done,
   children,
@@ -698,17 +701,22 @@ function IntentForm({
   intent: string
   /** What the toast says when it worked — written for this action alone. */
   done: string
-  children: (busy: boolean) => ReactNode
+  children: (busy: boolean, run: () => void) => ReactNode
 }) {
   const act = useFetcher<ActionResult>()
   const error = act.data?.ok === false ? act.data.error : null
   useSavedToast(act.state === 'idle' && act.data?.ok === true, done)
   useFailureToast(act.state === 'idle' ? error : null)
 
+  // Posted from a click rather than a <form>, because "Test connection" sits
+  // inside the keys form. A nested <form> submits to the inner fetcher AND
+  // bubbles to the outer one, so pressing Test also ran Save keys — which is
+  // why a failed test appeared as a validation error under Secret key.
   return (
-    <act.Form method="post">
-      <input type="hidden" name="intent" value={intent} />
-      {children(act.state !== 'idle')}
-    </act.Form>
+    <>
+      {children(act.state !== 'idle', () =>
+        act.submit({ intent }, { method: 'post' }),
+      )}
+    </>
   )
 }
