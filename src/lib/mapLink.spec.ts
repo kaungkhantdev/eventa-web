@@ -16,7 +16,8 @@ describe('mapEmbedFor', () => {
     const url = mapEmbedFor(VENUE, 'AIza-not-a-real-key')
     expect(url).toContain('https://www.google.com/maps/embed/v1/place')
     expect(url).toContain('key=AIza-not-a-real-key')
-    expect(url).toContain('Siam%20Paragon')
+    // The street, not the venue name — see "when they disagree" above.
+    expect(url).toContain('999%2F9')
   })
 
   it('falls back to the keyless embed when none is', () => {
@@ -48,16 +49,18 @@ describe('mapEmbedFor', () => {
  * night is the stale one.
  */
 describe('mapLinkFor', () => {
-  it('searches for the venue and its address together', () => {
-    const url = mapLinkFor({ venueName: 'BITEC', address: '88 Bangna-Trad Rd' })
+  it('searches for a street address, with the city that places it', () => {
+    const url = mapLinkFor({ address: '88 Bangna-Trad Rd', city: 'Bangkok' })
     expect(url).toBe(
-      'https://www.google.com/maps/search/?api=1&query=BITEC%2C%2088%20Bangna-Trad%20Rd',
+      'https://www.google.com/maps/search/?api=1&query=88%20Bangna-Trad%20Rd%2C%20Bangkok',
     )
   })
 
-  it('adds the city, which is often what makes an address findable', () => {
-    const url = mapLinkFor({ venueName: 'BITEC', address: '88 Bangna-Trad Rd', city: 'Bangkok' })
-    expect(url).toContain('Bangkok')
+  it('combines the venue and its city when there is no street address', () => {
+    // The city is often what makes a venue name resolve — there are BITECs and
+    // Impact Arenas in more than one country.
+    const url = mapLinkFor({ venueName: 'BITEC', city: 'Bangkok' })
+    expect(url).toContain('BITEC%2C%20Bangkok')
   })
 
   it('works from a venue name alone — a known venue needs no street', () => {
@@ -88,5 +91,46 @@ describe('mapLinkFor', () => {
   it('does not repeat a part that already appears', () => {
     const url = mapLinkFor({ address: 'Bangna, Bangkok', city: 'Bangkok' })
     expect(url?.match(/Bangkok/g)).toHaveLength(1)
+  })
+
+  /**
+   * The rule that decides WHICH place is meant when the two fields disagree.
+   *
+   * "BITEC" is in Bang Na. "999/9 Rama I Rd, Pathum Wan" is fifteen kilometres
+   * away. Sent together, Google resolves the NAME and drops the pin at BITEC —
+   * so an organizer who corrected the address watched the map ignore them.
+   *
+   * A street address is the more specific claim and the one a geocoder is built
+   * to read, so it is sent alone. The venue name is for the human reading the
+   * page, not for the search.
+   */
+  describe('when the venue name and the street address disagree', () => {
+    it('trusts the street address, not the venue name', () => {
+      const url = mapLinkFor({
+        venueName: 'BITEC',
+        address: '999/9 Rama I Rd, Pathum Wan, Bangkok 10330',
+      })
+      expect(url).toContain('999%2F9')
+      expect(url).not.toContain('BITEC')
+    })
+
+    it('still adds the city when the address does not carry one', () => {
+      const url = mapLinkFor({ venueName: 'BITEC', address: '88 Bangna-Trad Rd', city: 'Bangkok' })
+      expect(url).toContain('Bangkok')
+      expect(url).not.toContain('BITEC')
+    })
+
+    /**
+     * "Hall 3" is a room, not an address — it cannot be found on its own, so
+     * the venue name is what makes it locatable. Only an address with a street
+     * name is trusted alone.
+     */
+    it('keeps the venue name when the address is only a room or a floor', () => {
+      expect(mapLinkFor({ venueName: 'BITEC', address: 'Hall 3' })).toContain('BITEC')
+    })
+
+    it('keeps the venue name when there is no address at all', () => {
+      expect(mapLinkFor({ venueName: 'BITEC', city: 'Bangkok' })).toContain('BITEC')
+    })
   })
 })

@@ -53,10 +53,43 @@ export function mapEmbedFor(venue: VenueParts, apiKey?: string): string | null {
   return `${MAPS_EMBED_V1}?key=${encodeURIComponent(key)}&q=${escaped}`
 }
 
-/** What to look for: the venue, its street and its city, without repetition. */
+/**
+ * Whether this address can be found on its own.
+ *
+ * A street address needs a number AND a word that is not just the number — "999/9
+ * Rama I Rd" qualifies, "Hall 3" and "3rd floor" do not. The second kind names a
+ * room inside a building, so it only means something next to the building's name.
+ */
+function isLocatableAddress(address: string): boolean {
+  const hasNumber = /\d/.test(address)
+  const words = address.split(/[\s,]+/).filter(Boolean)
+  return hasNumber && words.length >= 3
+}
+
+/**
+ * What to look for.
+ *
+ * When there is a real street address, that ALONE is the query. This is the
+ * whole rule, and it is not tidiness: "BITEC" is in Bang Na, "999/9 Rama I Rd,
+ * Pathum Wan" is fifteen kilometres away, and sent together Google resolves the
+ * name and drops the pin at the wrong one — so an organizer who fixed the
+ * address watched the map ignore the correction.
+ *
+ * A street address is the more specific claim and the thing a geocoder is built
+ * to read. The venue name is for the person reading the page.
+ *
+ * Without a locatable address, the name is what makes the place findable, and
+ * everything present is combined as before.
+ */
 function queryOf(venue: VenueParts): string | null {
+  const address = venue.address?.trim()
+  const sources =
+    address && isLocatableAddress(address)
+      ? [address, venue.city]
+      : [venue.venueName, venue.address, venue.city]
+
   const parts: string[] = []
-  for (const raw of [venue.venueName, venue.address, venue.city]) {
+  for (const raw of sources) {
     const part = raw?.trim()
     if (!part) continue
     // Case-insensitive, because "bangkok" typed in the address and "Bangkok"
