@@ -25,6 +25,7 @@ const event = (over: Partial<EventWire> = {}): EventWire => ({
   city: 'Bangkok',
   isOnline: false,
   capacity: 400,
+  coverImage: 'https://cdn.eventa.test/cover.jpg',
   version: 3,
   ...over,
 })
@@ -110,6 +111,20 @@ describe('hydrating the wizard from an event being edited', () => {
 
   it('carries the version every save has to send back', () => {
     expect(values().version).toBe(3)
+  })
+
+  /**
+   * `toUpdateBody` has always SENT `coverImage`, but nothing read it back — so
+   * a saved cover vanished the moment the wizard was reopened, and the next
+   * save wrote the empty string over it. A field that only travels one way is
+   * worse than one that does not travel: it deletes.
+   */
+  it('reads the cover image back, so reopening the wizard does not erase it', () => {
+    expect(values().coverImage).toBe('https://cdn.eventa.test/cover.jpg')
+  })
+
+  it('has no cover when the event has none', () => {
+    expect(toEventFormValues(event({ coverImage: null }), [], []).coverImage).toBe('')
   })
 
   it('starts empty for a brand-new event', () => {

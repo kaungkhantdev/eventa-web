@@ -12,6 +12,7 @@ import { EVENT_TYPES } from '../events.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
 import type { EventType } from '../types'
 import { HL_ICONS, LETTERS, STEPS, type Highlight } from '../eventForm.presentation'
+import { CoverImageField } from '../components/CoverImageField'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
    A five-step flow (Basics · Date & location · Seating · Tickets · Review)
@@ -212,6 +213,7 @@ export default function EventFormPage() {
   const [highlights, setHighlights] = useState<Highlight[]>(() =>
     initial.highlights.map((h) => ({ icon: h.icon ?? 'hgi-sparkles', label: h.text })),
   )
+  const [coverImage, setCoverImage] = useState(initial.coverImage)
   const [landingTpl, setLandingTpl] = useState<LandingTpl>(template)
   const [visibility, setVisibility] = useState('public')
 
@@ -249,6 +251,7 @@ export default function EventFormPage() {
     capacity,
     seatRows: rows,
     seatsPerRow: cols,
+    coverImage,
     highlights: highlights.map((h) => ({ text: h.label, icon: h.icon })),
     tickets,
   })
@@ -501,16 +504,7 @@ export default function EventFormPage() {
             {/* Cover image */}
             <section className="card p-4">
               <h3 className="text-[14px] font-bold tracking-tight">Cover image</h3>
-              <label className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-hair p-8 text-center transition-colors hover:border-brand">
-                <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-soft text-brand">
-                  <i className="hgi-stroke hgi-image-upload-01 text-[20px]" />
-                </span>
-                <p className="text-[13px] font-semibold text-ink">
-                  Drag &amp; drop or <span className="text-brand">browse</span>
-                </p>
-                <p className="text-[11px] text-muted">Recommended 1600×900px · PNG or JPG · up to 5MB</p>
-                <input type="file" className="hidden" accept="image/*" />
-              </label>
+              <CoverImageField value={coverImage} onChange={setCoverImage} />
             </section>
 
             {/* Highlights */}

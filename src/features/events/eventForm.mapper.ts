@@ -124,6 +124,7 @@ export function toEventFormValues(
     city: event.city ?? '',
     isOnline: event.isOnline,
     capacity: event.capacity === null ? '' : String(event.capacity),
+    coverImage: event.coverImage ?? '',
     tickets: tickets.map((ticket) => ({
       id: ticket.id,
       name: ticket.name,

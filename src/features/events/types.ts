@@ -54,6 +54,12 @@ export interface EventWire {
   city: string | null
   isOnline: boolean
   capacity: number | null
+  /**
+   * The landing page's hero image — null until one is uploaded, and absent
+   * from the list endpoints, which do not carry it. Optional for that reason,
+   * like `landingTemplateId` below.
+   */
+  coverImage?: string | null
   /** The public page's design — null until one has been chosen. */
   landingTemplateId?: string | null
   version: number
