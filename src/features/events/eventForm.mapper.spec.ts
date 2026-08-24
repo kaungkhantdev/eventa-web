@@ -22,6 +22,7 @@ const event = (over: Partial<EventWire> = {}): EventWire => ({
   startAt: '2026-07-18T02:00:00Z',
   endAt: '2026-07-19T11:00:00Z',
   venueName: 'BITEC',
+  venueAddress: '999/9 Rama I Rd, Pathum Wan, Bangkok 10330',
   city: 'Bangkok',
   isOnline: false,
   capacity: 400,
@@ -125,6 +126,20 @@ describe('hydrating the wizard from an event being edited', () => {
 
   it('has no cover when the event has none', () => {
     expect(toEventFormValues(event({ coverImage: null }), [], []).coverImage).toBe('')
+  })
+
+  /**
+   * The same one-way trip the cover image was on. `toUpdateBody` sends
+   * `venueAddress`, nothing read it back, so reopening the wizard blanked the
+   * street address and the next save wrote the empty string over it — leaving
+   * an event with a venue name and no way to find it.
+   */
+  it('reads the street address back, which the map link needs', () => {
+    expect(values().venueAddress).toBe('999/9 Rama I Rd, Pathum Wan, Bangkok 10330')
+  })
+
+  it('has no address when the event has none', () => {
+    expect(toEventFormValues(event({ venueAddress: null }), [], []).venueAddress).toBe('')
   })
 
   it('starts empty for a brand-new event', () => {

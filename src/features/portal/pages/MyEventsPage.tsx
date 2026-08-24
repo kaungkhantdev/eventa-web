@@ -6,6 +6,7 @@ import {
   Icon,
   PillTabs,
   Paginator,
+  VenueMap,
   type PillTabItem,
 } from '@/components/ui'
 import { authApi } from '@/features/auth/api'
@@ -123,6 +124,9 @@ function UpcomingCard({
             <Icon name="hgi-location-01" size={14} />
             {ev.where}
           </p>
+          {/* One map per card, but `loading="lazy"` inside VenueMap means only
+              the cards actually scrolled to ever fetch one. */}
+          {ev.venue && <VenueMap venue={ev.venue} title={`Where ${ev.title} is`} />}
         </div>
         <div className="mt-3.5 flex items-center gap-2 border-t border-hair pt-3.5">
           {/* An attendee's "Details" pointed into the organizer console, which

@@ -5,6 +5,7 @@ import {
   initials,
   satang,
 } from '@/lib/format'
+import type { VenueParts } from '@/lib/mapLink'
 import type { SessionWire, SpeakerWire } from '@/features/program/program.api'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
 import type {
@@ -57,6 +58,12 @@ export interface EventHeader {
   when: string
   /** `BITEC, Bangkok`, `Online`, or empty — never a stray comma. */
   where: string
+  /**
+   * The venue's parts, unjoined, for the map. `where` is a sentence for a
+   * human; a map needs the street address too, which `where` leaves out.
+   * Absent for an online event — there is nowhere to point at.
+   */
+  venue: VenueParts | null
   seed: string
   version: number
 }
@@ -69,6 +76,13 @@ export function toEventHeader(event: EventWire): EventHeader {
     status: STATUS_LABEL[event.status] ?? event.status,
     when: `${dateRange(event.startAt, event.endAt)} · ${bangkokTime(event.startAt)}`,
     where: placeOf(event),
+    venue: event.isOnline
+      ? null
+      : {
+          venueName: event.venueName,
+          address: event.venueAddress,
+          city: event.city,
+        },
     seed: event.slug,
     version: event.version,
   }

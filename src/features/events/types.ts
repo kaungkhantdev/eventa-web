@@ -51,6 +51,8 @@ export interface EventWire {
   startAt: string
   endAt: string | null
   venueName: string | null
+  /** The street address — what a map needs; a venue name alone rarely resolves. */
+  venueAddress?: string | null
   city: string | null
   isOnline: boolean
   capacity: number | null

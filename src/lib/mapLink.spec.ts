@@ -1,5 +1,44 @@
 import { describe, expect, it } from 'vitest'
-import { mapLinkFor } from './mapLink'
+import { mapEmbedFor, mapLinkFor } from './mapLink'
+
+/**
+ * The same place, as something that can go in an `<iframe>`.
+ *
+ * Two forms, because Google offers two: the documented Embed API, which needs
+ * a key, and the keyless `output=embed`, which does not. Which one is used is
+ * decided by whether a key has been configured — so the map works with no
+ * setup, and gets the supported endpoint the moment a key exists.
+ */
+describe('mapEmbedFor', () => {
+  const VENUE = { venueName: 'Siam Paragon', address: '999/9 Rama I Rd', city: 'Bangkok' }
+
+  it('uses the documented Embed API when a key is configured', () => {
+    const url = mapEmbedFor(VENUE, 'AIza-not-a-real-key')
+    expect(url).toContain('https://www.google.com/maps/embed/v1/place')
+    expect(url).toContain('key=AIza-not-a-real-key')
+    expect(url).toContain('Siam%20Paragon')
+  })
+
+  it('falls back to the keyless embed when none is', () => {
+    const url = mapEmbedFor(VENUE)
+    expect(url).toContain('output=embed')
+    expect(url).not.toContain('key=')
+  })
+
+  it('treats a blank key as no key — an empty `key=` is a broken request', () => {
+    expect(mapEmbedFor(VENUE, '   ')).toContain('output=embed')
+  })
+
+  it('shows nothing when there is nowhere to show', () => {
+    expect(mapEmbedFor({})).toBeNull()
+  })
+
+  it('escapes the query in both forms', () => {
+    const venue = { venueName: 'Hall #3 & Foyer' }
+    expect(mapEmbedFor(venue)).toContain('%23')
+    expect(mapEmbedFor(venue, 'k')).toContain('%23')
+  })
+})
 
 /**
  * A link to the venue on a map, built from what the organizer typed.

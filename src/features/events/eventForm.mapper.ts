@@ -121,6 +121,7 @@ export function toEventFormValues(
     endDate: event.endAt ? bangkokDayKey(event.endAt) : '',
     endTime: event.endAt ? bangkokTime(event.endAt) : '',
     venueName: event.venueName ?? '',
+    venueAddress: event.venueAddress ?? '',
     city: event.city ?? '',
     isOnline: event.isOnline,
     capacity: event.capacity === null ? '' : String(event.capacity),

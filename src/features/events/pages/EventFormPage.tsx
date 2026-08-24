@@ -4,7 +4,7 @@ import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import type { ActionResult } from '@/app/loaders'
-import { NotificationBell, SignedInChip } from '@/components/ui'
+import { NotificationBell, SignedInChip, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
 import { publishGaps, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
@@ -689,6 +689,12 @@ export default function EventFormPage() {
                     />
                   </div>
                 </div>
+                {/* The same map the attendee will see, while there is still
+                    time to correct the address that produced it. */}
+                <VenueMap
+                  venue={{ venueName: venue, address, city: initial.city }}
+                  title="Venue location preview"
+                />
               </div>
               <div className={cn('mt-3 space-y-3', !online && 'hidden')}>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">

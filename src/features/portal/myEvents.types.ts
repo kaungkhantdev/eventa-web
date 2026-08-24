@@ -1,3 +1,5 @@
+import type { VenueParts } from '@/lib/mapLink'
+
 /**
  * The attendee's own tickets and payments — `GET /me/tickets` and
  * `GET /me/payments`, as eventa-api describes them.
@@ -16,6 +18,8 @@ export interface MyRegistrationWire {
   /** The event's own zone — a ticket is for a place, not for the reader. */
   timezone: string
   venueName: string | null
+  /** Street address — a venue name alone rarely places a pin. */
+  venueAddress?: string | null
   city: string | null
   isOnline: boolean
   coverImage: string | null
@@ -64,6 +68,11 @@ export interface MyEventRow {
   /** `Sat, Jul 18, 2026 · 09:00`, in the event's own timezone. */
   when: string
   where: string
+  /**
+   * The venue's parts for the map. Null for an online event — there is nowhere
+   * to point at, and the API sends null for all three in that case anyway.
+   */
+  venue: VenueParts | null
   /** The tier bought, or `—` when the tier has since been deleted. */
   ticket: string
   ticketCount: number

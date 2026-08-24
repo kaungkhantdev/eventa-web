@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
-import { EmptyState, NoResults, NotificationBell, PastEnd, SignedInChip } from '@/components/ui'
+import {
+  EmptyState,
+  NoResults,
+  NotificationBell,
+  PastEnd,
+  SignedInChip,
+  VenueMap,
+} from '@/components/ui'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import type { ActionResult } from '@/app/loaders'
 import { cn } from '@/lib/cn'
@@ -528,8 +535,9 @@ function OverviewPanel({ header, overview }: { header: EventHeader; overview: Ov
             {header.where && (
               <div className="flex items-start gap-2.5 border-t border-line pt-3">
                 <i className="hgi-stroke hgi-location-01 text-[16px] mt-0.5 shrink-0 text-muted" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-ink">{header.where}</p>
+                  {header.venue && <VenueMap venue={header.venue} className="mt-2.5" />}
                 </div>
               </div>
             )}
