@@ -1,12 +1,14 @@
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { SellingFastRow } from '../overview.types'
-import { PanelEmpty, SectionHeader } from './PanelChrome'
+import { PanelEmptyPreview, SectionHeader } from './PanelChrome'
 
 /** Ticket types running low, scarcest first (US-DASH-11). */
 
 const NOTHING_LOW = 'No tickets running low.'
 const TIER_ICON = 'hgi-ticket-star'
+const NOTHING_SCARCE =
+  'Tiers close to selling out show up here, the scarcest first.'
 
 export function SellingFastPanel({ rows }: { rows: SellingFastRow[] }) {
   return (
@@ -14,7 +16,13 @@ export function SellingFastPanel({ rows }: { rows: SellingFastRow[] }) {
       <SectionHeader title="Tickets Selling Fast" link={{ to: '/admin/tickets', label: 'Manage' }} />
 
       {rows.length === 0 ? (
-        <PanelEmpty>{NOTHING_LOW}</PanelEmpty>
+        <PanelEmptyPreview
+          preview="tiers"
+          description={NOTHING_SCARCE}
+          action={{ label: 'Manage tickets', icon: 'hgi-ticket-01', to: '/admin/tickets' }}
+        >
+          {NOTHING_LOW}
+        </PanelEmptyPreview>
       ) : (
         <div className="mt-2">
           {rows.map((t, i) => (

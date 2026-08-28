@@ -120,3 +120,15 @@ export const DELTA_ICON = {
   up: 'hgi-arrow-up-right-01',
   down: 'hgi-arrow-down-right-01',
 }
+
+/**
+ * Whether the revenue trend has anything to draw.
+ *
+ * A period with no sales still comes back as a full series of zeroes, so the
+ * chart drew a flat line along the axis and an empty grid — which reads as a
+ * chart that failed rather than a month that earned nothing. Nought is a real
+ * answer, and it deserves saying rather than plotting.
+ */
+export function hasRevenue(values: readonly number[]): boolean {
+  return values.some((value) => value > 0)
+}

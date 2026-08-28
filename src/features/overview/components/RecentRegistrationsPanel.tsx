@@ -1,10 +1,11 @@
 import { cn } from '@/lib/cn'
 import type { RecentRow } from '../overview.types'
-import { PanelEmpty, SectionHeader } from './PanelChrome'
+import { PanelEmptyPreview, SectionHeader } from './PanelChrome'
 
 /** The latest registrations (US-DASH-12). */
 
 const NONE_YET = 'No registrations yet.'
+const NOTHING_IN = 'Every sign-up across your events lands here, newest first.'
 
 export function RecentRegistrationsPanel({ rows }: { rows: RecentRow[] }) {
   return (
@@ -15,7 +16,9 @@ export function RecentRegistrationsPanel({ rows }: { rows: RecentRow[] }) {
       />
 
       {rows.length === 0 ? (
-        <PanelEmpty>{NONE_YET}</PanelEmpty>
+        <PanelEmptyPreview preview="table" description={NOTHING_IN}>
+          {NONE_YET}
+        </PanelEmptyPreview>
       ) : (
         <div className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[560px] text-left">

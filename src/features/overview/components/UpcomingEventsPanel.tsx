@@ -2,15 +2,20 @@ import { Link } from 'react-router'
 import type { Panel } from '@/app/panels'
 import { cn } from '@/lib/cn'
 import type { UpcomingCard } from '../overview.types'
-import { PanelEmpty, PanelUnavailable, SectionHeader } from './PanelChrome'
+import { PanelEmptyPreview, PanelUnavailable, SectionHeader } from './PanelChrome'
 
 /** The next events and how full they are (US-DASH-04). */
 
 const NONE_UPCOMING = 'No upcoming events.'
+const NOTHING_SCHEDULED = 'Events you publish show up here as their date gets closer.'
 
 export function UpcomingEventsPanel({ upcoming }: { upcoming: Panel<UpcomingCard[]> }) {
   return (
-    <section className="rounded-2xl bg-surface p-4 xl:col-span-2">
+    // `flex flex-col`, because this card shares a grid row with Alerts and the
+    // taller of the two stretches the other. Left at the default the empty
+    // state stays pinned under the heading with the borrowed height dangling
+    // below it, which reads as a card that failed to finish rendering.
+    <section className="flex flex-col rounded-2xl bg-surface p-4 xl:col-span-2">
       <SectionHeader title="Upcoming Events" link={{ to: '/admin/events', label: 'See all' }} />
       {upcoming.ok ? <Cards cards={upcoming.data} /> : <PanelUnavailable error={upcoming.error} />}
     </section>
@@ -18,7 +23,21 @@ export function UpcomingEventsPanel({ upcoming }: { upcoming: Panel<UpcomingCard
 }
 
 function Cards({ cards }: { cards: UpcomingCard[] }) {
-  if (cards.length === 0) return <PanelEmpty>{NONE_UPCOMING}</PanelEmpty>
+  if (cards.length === 0) {
+    // Centred in whatever height the row hands this card, rather than sitting
+    // at the top of it.
+    return (
+      <div className="flex flex-1 flex-col justify-center">
+        <PanelEmptyPreview
+          preview="events"
+          description={NOTHING_SCHEDULED}
+          action={{ label: 'New event', icon: 'hgi-calendar-add-01', to: '/admin/event-form' }}
+        >
+          {NONE_UPCOMING}
+        </PanelEmptyPreview>
+      </div>
+    )
+  }
 
   return (
     <div className="mt-3.5 grid gap-3 sm:grid-cols-3">
