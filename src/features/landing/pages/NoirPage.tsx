@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { Icon,
   VenueMap,
+  RichText,
 } from '@/components/ui'
 import type { LandingEvent } from '@/features/landing/types'
 
@@ -227,7 +228,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                 <h2 id="lbl-about" className="text-[18px] font-bold text-ink">
                   About this event
                 </h2>
-                <p className="mt-4 text-[14.5px] leading-relaxed text-muted">{ev.about}</p>
+                <RichText html={ev.about} className="mt-4 text-[14.5px]" />
               </div>
               <div className="rounded-2xl bg-surface p-5 sm:p-6">
                 <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted">

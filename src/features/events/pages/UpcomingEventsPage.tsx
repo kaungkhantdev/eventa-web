@@ -7,10 +7,6 @@ import type { UpcomingCard } from '../types'
 
 /* admin/events-upcoming.html — a responsive card grid of the soonest events. */
 
-const hideOnError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-  e.currentTarget.style.display = 'none'
-}
-
 export default function UpcomingEventsPage() {
   const { cards } = useLoaderData() as UpcomingData
 
@@ -96,14 +92,10 @@ function UpcomingEventCard({ e }: { e: UpcomingCard }) {
         t.bg,
       )}
     >
+      {/* The type's gradient, with no photograph over it: `UpcomingEventDto`
+          carries no cover, and the slug-seeded stock image this replaced was
+          never this event's. */}
       <div className={cn('relative h-24 bg-gradient-to-br', t.grad)}>
-        <img
-          src={`https://picsum.photos/seed/${e.seed}/540/240`}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={hideOnError}
-        />
         <span className="absolute right-2.5 top-2.5 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-sm">
           {e.daysLeft === 0 ? 'Today' : `${e.daysLeft} ${e.daysLeft === 1 ? 'day' : 'days'} left`}
         </span>
@@ -132,26 +124,10 @@ function UpcomingEventCard({ e }: { e: UpcomingCard }) {
           </div>
         </div>
         <div className="mt-3.5 flex items-center gap-2 border-t border-black/5 pt-3 dark:border-white/10">
-          <div className="flex -space-x-2">
-            {[1, 2, 3].map((i) => (
-              <span
-                key={i}
-                className={cn(
-                  'relative grid h-6 w-6 place-items-center overflow-hidden rounded-full ring-2',
-                  t.solid,
-                  t.ring,
-                )}
-              >
-                <img
-                  src={`https://picsum.photos/seed/${e.seed}-a${i}/48/48`}
-                  alt=""
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  onError={hideOnError}
-                />
-              </span>
-            ))}
-          </div>
+          {/* The kit drew three faces here, invented by a photo service from
+              the slug. They were not attendees of this event and not people who
+              had agreed to appear on it; the count says the same thing without
+              inventing anybody. */}
           <span className="text-[12px] font-semibold text-ink">
             <span className="tnum">{e.sold}</span> attendees
           </span>

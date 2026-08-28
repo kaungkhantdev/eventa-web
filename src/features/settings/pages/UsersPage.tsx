@@ -205,7 +205,9 @@ function MemberTableRow({
         </div>
       </td>
       <td>
-        <Badge tone={row.statusTone}>{row.status}</Badge>
+        <Badge tone={row.statusTone} icon={row.statusIcon}>
+          {row.status}
+        </Badge>
         {act.data?.ok === false && (
           <p role="alert" className="mt-1 text-[11px] text-red-500">
             {act.data.error}

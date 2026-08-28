@@ -250,7 +250,9 @@ function PaymentTableRow({ row, onRefund }: { row: PaymentRow; onRefund: () => v
       </td>
       <td className="tnum font-semibold text-ink">{row.amount}</td>
       <td>
-        <Badge tone={row.statusTone}>{row.statusLabel}</Badge>
+        <Badge tone={row.statusTone} icon={row.statusIcon}>
+          {row.statusLabel}
+        </Badge>
       </td>
       <td className="tnum text-muted">
         {row.date}

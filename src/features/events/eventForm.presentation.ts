@@ -55,3 +55,44 @@ export const STEPS: WizardStep[] = [
 
 /** Row labels for the reserved-seating preview. */
 export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+/**
+ * Capacity for the summary rail — the number, or a dash when there is none.
+ *
+ * An unset capacity is not a capacity of nought. Rendering `0` says "nobody may
+ * come", which is the opposite of what a blank field means: as many as the
+ * ticket tiers allow. The same distinction the house rules draw for a masked
+ * amount, which shows "—" rather than ฿0.
+ */
+export function summaryCapacity(typed: string): string {
+  const capacity = Number(typed.trim())
+  if (!typed.trim() || !Number.isFinite(capacity) || capacity <= 0) return '—'
+  return capacity.toLocaleString('en-US')
+}
+
+/**
+ * What the wizard's last button says.
+ *
+ * A draft is published; an event that is already live is saved. Offering
+ * "Publish event" over a published conference describes an action the organizer
+ * cannot take and does not want, and leaves them hunting for the Save that the
+ * wizard has been doing quietly on every step.
+ */
+export function finalLabel(isDraft: boolean, saving: boolean): string {
+  if (isDraft) return saving ? 'Publishing…' : 'Publish event'
+  return saving ? 'Saving…' : 'Save changes'
+}
+
+/**
+ * The header's save button.
+ *
+ * "Save as draft" is only true for an event that does not exist yet — that
+ * click creates a draft. On one that already exists, published or not, the same
+ * click saves the open step and changes no status, and calling it "draft" read
+ * as an offer to unpublish. Nobody pressed it, so a one-field edit meant
+ * clicking Next to the end of the wizard.
+ */
+export function headerSaveLabel(exists: boolean, saving: boolean): string {
+  if (saving) return 'Saving…'
+  return exists ? 'Save changes' : 'Save as draft'
+}

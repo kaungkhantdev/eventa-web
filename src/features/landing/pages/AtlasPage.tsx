@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { VenueMap } from '@/components/ui'
+import { RichText, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { LandingEvent } from '@/features/landing/types'
 
@@ -247,7 +247,7 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                 <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
                   About the night
                 </h2>
-                <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">{ev.about}</p>
+                <RichText html={ev.about} className="mt-4 max-w-[70ch] text-[15px]" />
               </div>
               <div>
                 <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">

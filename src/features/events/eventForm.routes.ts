@@ -1,5 +1,6 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
+import { toast } from '@/lib/toast'
 import { ticketingApi } from '@/features/ticketing/ticketing.api'
 import { eventContentApi } from './eventContent.api'
 import { eventsApi } from './events.api'
@@ -73,6 +74,23 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
   const intent = String(form.get('intent') ?? 'save')
   const values = JSON.parse(String(form.get('values') ?? '{}')) as EventFormValues
 
+  /**
+   * What to do once the write lands, decided by the button rather than the
+   * intent — every step can be saved from the header, and each of them writes
+   * through a different intent.
+   *
+   * `notify` says the organizer ASKED to save, so the save is announced. A Next
+   * saves too, but silently: it is a side effect of moving on, and a toast on
+   * every step would be noise. `finish` additionally hands them back to the
+   * event, which only the last step's button does.
+   */
+  const notify = form.get('notify') === 'on'
+  const finish = form.get('finish') === 'on'
+  const done = (eventId: string): Response | void => {
+    if (notify) toast.success('Changes saved.')
+    if (finish) return redirect(`/admin/event-detail?id=${eventId}`)
+  }
+
   if (intent === 'create') {
     const created = await eventsApi.create(toCreateBody(values))
     // The id goes in the URL immediately: from here every step is an edit, and
@@ -84,8 +102,16 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
   if (!id) throw new Error('This event has not been created yet.')
 
   if (intent === 'tickets') {
+    // The event record too, not just the tiers. Capacity sits on this step,
+    // under the tier table, and `saveTickets` writes only tiers — so the number
+    // typed into Capacity never left the browser: the step reported itself
+    // saved, and reopening the wizard showed the field empty again.
+    //
+    // The event goes first, so a version conflict stops here rather than after
+    // half the step has been written.
+    await eventsApi.update(id, toUpdateBody(values))
     await saveTickets(id, values)
-    return
+    return done(id)
   }
 
   if (intent === 'remove-ticket') {
@@ -95,7 +121,7 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
 
   if (intent === 'seating') {
     await saveSeating(id, values)
-    return
+    return done(id)
   }
 
   if (intent === 'publish') {
@@ -119,6 +145,8 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
     id,
     values.highlights.filter((h) => h.text.trim()).map((h) => ({ text: h.text.trim(), icon: h.icon })),
   )
+
+  return done(id)
 }
 
 /**

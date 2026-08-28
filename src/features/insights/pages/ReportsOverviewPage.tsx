@@ -25,10 +25,10 @@ import {
   type RtRange,
 } from '../data/reportsOverview'
 
-const STATUS_TONE: Record<ReportEventStatus, BadgeTone> = {
-  Upcoming: 'blue',
-  Completed: 'gray',
-  Live: 'green',
+const STATUS_META: Record<ReportEventStatus, { tone: BadgeTone; icon: string }> = {
+  Upcoming: { tone: 'blue', icon: 'hgi-time-schedule' },
+  Completed: { tone: 'gray', icon: 'hgi-checkmark-badge-01' },
+  Live: { tone: 'green', icon: 'hgi-tick-02' },
 }
 
 const nf = (n: number) => n.toLocaleString('en-US')
@@ -247,7 +247,9 @@ export default function ReportsOverviewPage() {
                   <td className="font-semibold text-ink tnum">฿{nf(e.rev)}</td>
                   <td className="text-muted tnum">{e.att ? `${e.att}%` : '—'}</td>
                   <td>
-                    <Badge tone={STATUS_TONE[e.status]}>{e.status}</Badge>
+                    <Badge tone={STATUS_META[e.status].tone} icon={STATUS_META[e.status].icon}>
+                      {e.status}
+                    </Badge>
                   </td>
                 </tr>
               ))}

@@ -57,9 +57,9 @@ export interface EventWire {
   isOnline: boolean
   capacity: number | null
   /**
-   * The landing page's hero image — null until one is uploaded, and absent
-   * from the list endpoints, which do not carry it. Optional for that reason,
-   * like `landingTemplateId` below.
+   * The landing page's hero image — null until one is uploaded. Optional
+   * because the calendar's slimmer payload leaves it out; the list and detail
+   * endpoints both carry it (`EventListItemDto`, `EventResponseDto`).
    */
   coverImage?: string | null
   /** The public page's design — null until one has been chosen. */
@@ -131,8 +131,12 @@ export interface EventRow {
   status: EventStatus
   icon: string
   tone: Tone
-  /** Stable seed for the row's cover image, so it doesn't change per render. */
-  seed: string
+  /**
+   * The organizer's own cover, or null. Never a stand-in: the row used to seed
+   * a photo service from the slug, which put a stranger's photograph next to a
+   * real event and kept it there after a cover was uploaded.
+   */
+  cover: string | null
   version: number
 }
 
@@ -147,7 +151,6 @@ export interface UpcomingCard {
   fillPercent: number
   icon: string
   tone: Tone
-  seed: string
 }
 
 /** One event as the calendar renders it. */

@@ -170,8 +170,25 @@ export function toUpdateBody(values: EventFormValues) {
     isOnline: values.isOnline,
     onlineNote: values.onlineNote.trim(),
     coverImage: values.coverImage.trim(),
+    ...capacityOf(values.capacity),
     ...(values.version === null ? {} : { version: values.version }),
   }
+}
+
+/**
+ * Capacity, when there is one to send.
+ *
+ * Omitted rather than sent as 0 or null when blank, and that is the contract
+ * rather than a preference: `UpdateEventDto.capacity` is `@IsPositive()`, so
+ * both are refused, and omission is how the API is told "leave it alone".
+ *
+ * It follows that an existing capacity cannot be CLEARED from this wizard.
+ * Doing that needs the DTO to accept null, which starts in eventa-api.
+ */
+function capacityOf(typed: string): { capacity?: number } {
+  const capacity = Number(typed.trim())
+  if (!typed.trim() || !Number.isInteger(capacity) || capacity <= 0) return {}
+  return { capacity }
 }
 
 /**

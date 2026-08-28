@@ -521,16 +521,21 @@ function EventTableRow({
               COVER[r.tone],
             )}
           >
+            {/* The type icon on its tint is the fallback, already underneath.
+                No cover, no photograph: this used to seed picsum from the slug,
+                which put a stranger's event beside a real one. */}
             <Icon name={r.icon} size={22} />
-            <img
-              src={`https://picsum.photos/seed/${r.seed}/96/96`}
-              alt=""
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
+            {r.cover && (
+              <img
+                src={r.cover}
+                alt=""
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            )}
           </span>
           <div className="min-w-0">
             <p className="truncate text-[14.5px] font-bold tracking-tight text-ink">{r.name}</p>
@@ -553,10 +558,11 @@ function EventTableRow({
       <td className="py-4 pr-4">
         <span
           className={cn(
-            'inline-block rounded-full px-3 py-1 text-[12px] font-medium',
-            STATUS_PILL[r.status],
+            'inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-medium',
+            STATUS_PILL[r.status].cls,
           )}
         >
+          <Icon name={STATUS_PILL[r.status].icon} size={12} />
           {r.status}
         </span>
       </td>

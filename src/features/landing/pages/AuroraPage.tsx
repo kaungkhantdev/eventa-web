@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
-import { VenueMap } from '@/components/ui'
+import { RichText, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { LandingEvent } from '@/features/landing/types'
 
@@ -199,7 +199,7 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
                 <h2 id="lbl-about" className="text-[18px] font-bold tracking-tight text-ink">
                   About the event
                 </h2>
-                <p className="mt-3 max-w-[58ch] text-[14px] leading-relaxed text-muted">{ev.about}</p>
+                <RichText html={ev.about} className="mt-3 max-w-[70ch]" />
               </div>
               <div>
                 <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">

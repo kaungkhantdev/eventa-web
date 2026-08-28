@@ -37,19 +37,31 @@ export const COVER: Record<Tone, string> = {
 }
 
 /**
- * status → pill classes.
+ * status → pill classes and the glyph inside the pill.
  *
  * `Draft` and `Cancelled` have no counterpart in the static kit, which only ever
  * showed live events: they are rendered in the design system's neutral and
  * danger tones so that a real draft is legible rather than unstyled.
  */
-export const STATUS_PILL: Record<EventStatus, string> = {
-  Draft: 'bg-line text-muted',
-  Upcoming: 'bg-amber-50 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300',
-  Planned: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
-  Live: 'bg-brand-soft text-brand-dark dark:text-brand',
-  Completed: 'bg-brand-soft text-brand-dark dark:text-brand',
-  Cancelled: 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300',
+export const STATUS_PILL: Record<EventStatus, { cls: string; icon: string }> = {
+  Draft: { cls: 'bg-line text-muted', icon: 'hgi-note-edit' },
+  Upcoming: {
+    cls: 'bg-amber-50 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300',
+    icon: 'hgi-time-schedule',
+  },
+  Planned: {
+    cls: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
+    icon: 'hgi-calendar-03',
+  },
+  Live: { cls: 'bg-brand-soft text-brand-dark dark:text-brand', icon: 'hgi-tick-02' },
+  Completed: {
+    cls: 'bg-brand-soft text-brand-dark dark:text-brand',
+    icon: 'hgi-checkmark-badge-01',
+  },
+  Cancelled: {
+    cls: 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300',
+    icon: 'hgi-cancel-circle',
+  },
 }
 
 /** tone → event-pill classes inside a calendar cell. */
@@ -140,3 +152,20 @@ export const MONTHS = [
 ] as const
 
 export const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+
+/** Whether the browser took the link — the three things a copy button can say. */
+export type CopyState = 'idle' | 'copied' | 'failed'
+
+/**
+ * What the copy button reads.
+ *
+ * "Copied" is only ever shown when the clipboard actually accepted the text.
+ * It used to be set unconditionally, with the rejection swallowed, so a refused
+ * copy reported success and the organizer pasted nothing into the email they
+ * were writing — the one failure they had no way to notice.
+ */
+export function copyLabel(state: CopyState): string {
+  if (state === 'copied') return 'Copied'
+  if (state === 'failed') return 'Select and copy'
+  return 'Copy'
+}

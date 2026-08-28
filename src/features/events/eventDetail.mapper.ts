@@ -64,6 +64,15 @@ export interface EventHeader {
    * Absent for an online event — there is nowhere to point at.
    */
   venue: VenueParts | null
+  /**
+   * What the organizer wrote about the event. Plain text — the wizard stores
+   * what Quill produced as text, so it is rendered as text and never as HTML.
+   * Null when there is none, including when it is only whitespace.
+   */
+  description: string | null
+  /** The organizer's own cover, or null — the hero shows its gradient instead. */
+  cover: string | null
+  /** The slug. Names the downloaded flyer and seeds its QR, nothing visual. */
   seed: string
   version: number
 }
@@ -83,6 +92,8 @@ export function toEventHeader(event: EventWire): EventHeader {
           address: event.venueAddress,
           city: event.city,
         },
+    description: event.description?.trim() || null,
+    cover: event.coverImage ?? null,
     seed: event.slug,
     version: event.version,
   }

@@ -44,6 +44,8 @@ export interface PaymentRow {
   status: LedgerStatus
   statusLabel: string
   statusTone: BadgeTone
+  /** Hugeicons slug shown inside the status pill. */
+  statusIcon: string
   /** `Jul 18, 2026`, Bangkok. */
   date: string
   /** `10:24`, Bangkok. */

@@ -40,6 +40,8 @@ export interface PayoutRow {
   status: PayoutStatus
   statusLabel: string
   statusTone: BadgeTone
+  /** Hugeicons slug shown inside the status pill. */
+  statusIcon: string
   period: string
   requested: string
   /** `Jul 20, 2026`, or `—` while it has not landed. */
@@ -97,6 +99,8 @@ export interface InvoiceRow {
   status: InvoiceStatus
   statusLabel: string
   statusTone: BadgeTone
+  /** Hugeicons slug shown inside the status pill. */
+  statusIcon: string
   canVoid: boolean
   voidBlockedReason: string | null
 }
@@ -147,6 +151,8 @@ export interface TaxRow {
   status: TaxStatus
   statusLabel: string
   statusTone: BadgeTone
+  /** Hugeicons slug shown inside the status pill. */
+  statusIcon: string
   /** Set when it was filed after the deadline — recorded, never hidden. */
   lateNote: string | null
   canFile: boolean

@@ -324,8 +324,7 @@ function TicketTile({ card, onEdit, onShare, onDelete, onToggle }: TicketTilePro
         ) : (
           <p className="tnum text-[22px] font-bold tracking-tight">{card.price}</p>
         )}
-        <Badge tone={card.statusTone}>
-          <Icon name={card.statusIcon} size={12} />
+        <Badge tone={card.statusTone} icon={card.statusIcon}>
           {card.statusLabel}
         </Badge>
       </div>

@@ -115,7 +115,9 @@ export default function TaxesPage() {
                   <td className="tnum text-muted">{row.withholding}</td>
                   <td className="tnum text-muted">{row.remitted}</td>
                   <td>
-                    <Badge tone={row.statusTone}>{row.statusLabel}</Badge>
+                    <Badge tone={row.statusTone} icon={row.statusIcon}>
+          {row.statusLabel}
+        </Badge>
                     {row.lateNote && (
                       <span className="ml-1.5 text-[11px] text-amber-500">{row.lateNote}</span>
                     )}

@@ -19,11 +19,11 @@ import type {
 
 /** The rules behind the settings screens (US-ACC-*, US-SET-*). */
 
-const STATUS_TONE: Record<MemberStatus, BadgeTone> = {
-  Active: 'green',
-  Invited: 'amber',
-  Unconfirmed: 'amber',
-  Suspended: 'red',
+const STATUS_META: Record<MemberStatus, { tone: BadgeTone; icon: string }> = {
+  Active: { tone: 'green', icon: 'hgi-checkmark-badge-01' },
+  Invited: { tone: 'amber', icon: 'hgi-mail-send-01' },
+  Unconfirmed: { tone: 'amber', icon: 'hgi-clock-01' },
+  Suspended: { tone: 'red', icon: 'hgi-cancel-circle' },
 }
 
 export function toMemberRow(wire: MemberWire): MemberRow {
@@ -35,7 +35,8 @@ export function toMemberRow(wire: MemberWire): MemberRow {
     role: wire.role,
     roleId: wire.roleId,
     status: wire.status,
-    statusTone: STATUS_TONE[wire.status],
+    statusTone: STATUS_META[wire.status].tone,
+    statusIcon: STATUS_META[wire.status].icon,
     // The two states an admin acts on differently: an invitation can be sent
     // again, and a suspended member is reactivated rather than suspended.
     //

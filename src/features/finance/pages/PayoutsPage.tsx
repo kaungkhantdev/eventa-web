@@ -208,7 +208,9 @@ function PayoutTableRow({ row }: { row: PayoutRow }) {
       <td className="tnum text-muted">{row.bankAccount}</td>
       <td className="tnum font-semibold text-ink">{row.amount}</td>
       <td>
-        <Badge tone={row.statusTone}>{row.statusLabel}</Badge>
+        <Badge tone={row.statusTone} icon={row.statusIcon}>
+          {row.statusLabel}
+        </Badge>
         {row.failureReason && (
           <p role="alert" className="mt-1 text-[11px] text-red-500">
             {row.failureReason}

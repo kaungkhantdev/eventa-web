@@ -31,6 +31,8 @@ export interface MemberRow {
   roleId: number
   status: MemberStatus
   statusTone: BadgeTone
+  /** Hugeicons slug shown inside the status pill. */
+  statusIcon: string
   /** True while they have not accepted — the invite can be resent. */
   invited: boolean
   suspended: boolean

@@ -296,8 +296,7 @@ function DiscountTableRow({
       </td>
       <td className="tnum text-muted">{row.valid}</td>
       <td>
-        <Badge tone={row.statusTone}>
-          <Icon name={row.statusIcon} size={12} />
+        <Badge tone={row.statusTone} icon={row.statusIcon}>
           {row.statusLabel}
         </Badge>
       </td>

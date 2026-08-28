@@ -52,7 +52,7 @@ export function toEventRow(item: EventListItemWire): EventRow {
     status: STATUS_LABEL[item.status] ?? item.status,
     icon,
     tone,
-    seed: item.slug,
+    cover: item.coverImage ?? null,
     version: item.version,
   }
 }
@@ -75,7 +75,6 @@ export function toUpcomingCard(item: UpcomingEventWire): UpcomingCard {
     fillPercent: item.fillPercent,
     icon,
     tone,
-    seed: item.slug,
   }
 }
 

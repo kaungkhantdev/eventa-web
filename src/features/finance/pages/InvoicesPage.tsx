@@ -237,7 +237,9 @@ function InvoiceTableRow({ row, onVoid }: { row: InvoiceRow; onVoid: () => void 
       <td className="tnum text-muted">{row.vat}</td>
       <td className="tnum font-semibold text-ink">{row.amount}</td>
       <td>
-        <Badge tone={row.statusTone}>{row.statusLabel}</Badge>
+        <Badge tone={row.statusTone} icon={row.statusIcon}>
+          {row.statusLabel}
+        </Badge>
       </td>
       <td className="text-muted">
         <span className="tnum">{row.due}</span>

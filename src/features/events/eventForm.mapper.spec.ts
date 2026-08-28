@@ -229,6 +229,44 @@ describe('what PATCH /events/:id may carry', () => {
     expect(body.isOnline).toBe(true)
     expect(body.onlineNote).toBe('Zoom')
   })
+
+  /**
+   * The one-way trip the cover image and the street address were both on, run
+   * the other way round: the wizard READ `capacity` back and never sent it. So
+   * the field accepted a number, the step reported itself saved, and reopening
+   * the wizard showed it empty again — the value never left the browser.
+   */
+  describe('capacity', () => {
+    it('sends the capacity the organizer typed', () => {
+      const v = { ...toEventFormValues(event(), [], []), capacity: '250' }
+      expect(toUpdateBody(v).capacity).toBe(250)
+    })
+
+    it('sends a number, not the text of one', () => {
+      const v = { ...toEventFormValues(event(), [], []), capacity: '250' }
+      expect(typeof toUpdateBody(v).capacity).toBe('number')
+    })
+
+    /**
+     * Blank is omitted rather than sent as 0 or null, and that is the API's
+     * rule, not a preference: `UpdateEventDto.capacity` is `@IsPositive()`, so
+     * 0 and null are both refused. Omitting means "leave it alone".
+     *
+     * The cost is that an existing capacity cannot be CLEARED from here — that
+     * needs the DTO to accept null first, which starts in eventa-api.
+     */
+    it('omits a blank capacity rather than sending 0, which the API refuses', () => {
+      const v = { ...toEventFormValues(event(), [], []), capacity: '' }
+      expect(toUpdateBody(v)).not.toHaveProperty('capacity')
+    })
+
+    it('omits anything that is not a positive whole number', () => {
+      const base = toEventFormValues(event(), [], [])
+      for (const capacity of ['0', '-5', 'abc', '2.5']) {
+        expect(toUpdateBody({ ...base, capacity })).not.toHaveProperty('capacity')
+      }
+    })
+  })
 })
 
 describe('whether the event may be published yet', () => {

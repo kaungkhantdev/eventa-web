@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { Icon,
   VenueMap,
+  RichText,
 } from '@/components/ui'
 import type { LandingEvent } from '@/features/landing/types'
 
@@ -190,7 +191,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
         {ev.about && (
           <section id="about" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brand">About</h2>
-            <p className="mt-4 text-[15px] leading-[1.75] text-muted">{ev.about}</p>
+            <RichText html={ev.about} className="mt-4 text-[15px] leading-[1.75]" />
             <dl className="mt-8 divide-y divide-line rounded-2xl bg-surface px-5">
               {aboutRows.map((r) => (
                 <div key={r.k} className="flex items-center justify-between gap-4 py-3.5">

@@ -634,3 +634,48 @@ html.dark .segmented button.active {
 .empty-sm .empty-actions {
   margin-top: 0.875rem;
 }
+
+/* An event description, as the organizer formatted it.
+   The tag list matches the API's sanitiser allowlist exactly — anything not
+   listed there cannot reach this, so anything not styled here cannot appear. */
+.richtext {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgb(var(--muted));
+}
+.richtext :where(p) + :where(p) {
+  margin-top: 0.75em;
+}
+.richtext :where(h1, h2, h3) {
+  color: rgb(var(--ink));
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 1.25em;
+  margin-bottom: 0.35em;
+}
+.richtext :where(h1) { font-size: 1.25em; }
+.richtext :where(h2) { font-size: 1.12em; }
+.richtext :where(h3) { font-size: 1em; }
+.richtext :where(h1, h2, h3):first-child { margin-top: 0; }
+.richtext :where(strong) { color: rgb(var(--ink)); font-weight: 700; }
+.richtext :where(ul, ol) { margin: 0.6em 0; padding-left: 1.35em; }
+.richtext :where(ul) { list-style: disc; }
+.richtext :where(ol) { list-style: decimal; }
+.richtext :where(li) { margin: 0.2em 0; }
+.richtext :where(li)::marker { color: rgb(var(--muted)); }
+.richtext :where(blockquote) {
+  margin: 0.8em 0;
+  padding-left: 0.9em;
+  border-left: 2px solid rgb(var(--line));
+  color: rgb(var(--muted));
+}
+.richtext :where(a) {
+  color: rgb(var(--brand));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.richtext :where(a:hover) { color: rgb(var(--brand-dark)); }
+/* Quill's indent levels — the only class the sanitiser lets through. */
+.richtext :where(.ql-indent-1) { padding-left: 1.5em; }
+.richtext :where(.ql-indent-2) { padding-left: 3em; }
+.richtext :where(.ql-indent-3) { padding-left: 4.5em; }
