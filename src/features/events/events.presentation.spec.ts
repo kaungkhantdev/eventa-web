@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { copyLabel } from './events.presentation'
+import { copyLabel, eventDetailPath } from './events.presentation'
 
 /**
  * A copy button that cannot fail out loud is worse than one that cannot copy:
@@ -17,5 +17,15 @@ describe('copyLabel', () => {
   it('says what to do instead when the clipboard refused', () => {
     expect(copyLabel('failed')).toBe('Select and copy')
     expect(copyLabel('failed')).not.toBe('Copied')
+  })
+})
+
+describe('eventDetailPath', () => {
+  it('points at the event workspace', () => {
+    expect(eventDetailPath('evt-1')).toBe('/admin/event-detail?id=evt-1')
+  })
+
+  it('escapes the id, so it cannot add a second query parameter', () => {
+    expect(eventDetailPath('a&b=c')).toBe('/admin/event-detail?id=a%26b%3Dc')
   })
 })

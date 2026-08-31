@@ -11,6 +11,7 @@ import { publishGaps, type EventFormValues, type TicketDraft } from '../eventFor
 import type { EventFormData } from '../eventForm.routes'
 import { EVENT_TYPES } from '../events.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
+import { eventDetailPath } from '../events.presentation'
 import type { EventType } from '../types'
 import {
   HL_ICONS,
@@ -129,7 +130,9 @@ function isBlank(quill: Quill): boolean {
 }
 
 /* ---------- Description rich-text editor (Quill 2 · snow) ----------
-   Same toolbar and 250-char cap as the static kit's admin/event-form.html.
+   The static kit's toolbar, but its formatting is now KEPT: the editor stores
+   markup and the API sanitises it on write. The cap is DESC_MAX typed
+   characters, well above the kit's 250.
    Quill is instantiated imperatively so it works under React 19 without a
    wrapper lib; a ref guard makes it survive StrictMode's double-mount. */
 function DescriptionEditor({
@@ -416,6 +419,19 @@ export default function EventFormPage() {
           <i className="hgi-stroke hgi-arrow-left-01 text-[18px]" />
         </Link>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
+          {/* Only once the event exists: on a new one there is no workspace to
+              open yet. Editing is usually a detour from the event's own page,
+              and without this the way back was the browser's back button. */}
+          {initial.id && (
+            <Link
+              to={eventDetailPath(initial.id)}
+              className="btn btn-soft"
+              title="Open this event's workspace"
+            >
+              <i className="hgi-stroke hgi-eye text-[16px]" />
+              <span className="hidden sm:inline">View event</span>
+            </Link>
+          )}
           <button
             type="button"
             onClick={saveHere}

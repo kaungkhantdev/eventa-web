@@ -169,3 +169,14 @@ export function copyLabel(state: CopyState): string {
   if (state === 'failed') return 'Select and copy'
   return 'Copy'
 }
+
+/**
+ * Where an event's workspace lives.
+ *
+ * Named once because three screens build it — the table row, its kebab menu
+ * and the wizard's header — and a route that is spelled out in each of them is
+ * a route that gets renamed in two.
+ */
+export function eventDetailPath(id: string): string {
+  return `/admin/event-detail?id=${encodeURIComponent(id)}`
+}
