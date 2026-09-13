@@ -1,6 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { Button, HeaderUser, Icon, PageFooter, PageHeader, Panel } from '@/components/ui'
+import {
+  Button,
+  EventPicker,
+  HeaderUser,
+  Icon,
+  PageFooter,
+  PageHeader,
+  Panel,
+} from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { num } from '@/lib/format'
 import { FEEDBACK_EVENTS, portfolio, type QuestionType } from '../data/feedback'
@@ -64,6 +72,7 @@ export default function FeedbackPage() {
   }, [query])
 
   // New-survey question builder state.
+  const [surveyEvent, setSurveyEvent] = useState(FEEDBACK_EVENTS[0]?.slug ?? '')
   const [questions, setQuestions] = useState<NewQRow[]>(INITIAL_QUESTIONS)
   const [nextId, setNextId] = useState(INITIAL_QUESTIONS.length + 1)
 
@@ -268,11 +277,19 @@ export default function FeedbackPage() {
           </div>
           <div>
             <label className="label">Event</label>
-            <select className="select" defaultValue={FEEDBACK_EVENTS[0].name}>
-              {FEEDBACK_EVENTS.map((e) => (
-                <option key={e.slug}>{e.name}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <EventPicker
+                value={surveyEvent}
+                onChange={setSurveyEvent}
+                options={FEEDBACK_EVENTS.map((e) => ({
+                  id: e.slug,
+                  name: e.name,
+                  date: e.date,
+                }))}
+                allLabel={false}
+                placeholder="Choose event"
+              />
+            </div>
           </div>
           <div className="border-t border-hair pt-4">
             <div className="flex items-center justify-between">

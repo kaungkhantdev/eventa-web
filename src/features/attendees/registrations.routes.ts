@@ -4,7 +4,6 @@ import { ApiError } from '@/lib/api'
 import { satang } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
-import { eventsApi } from '@/features/events/events.api'
 import { registrationsApi, type ListRegistrationsQuery, type TierWire } from './registrations.api'
 import { toRegistrationRow } from './registrations.mapper'
 import type {
@@ -13,6 +12,7 @@ import type {
   RegistrationEntry,
   RegistrationWireStatus,
 } from './registrations.types'
+import { eventOptions as allEventOptions, type EventOption } from '@/features/events/eventOptions'
 
 /**
  * What the registrations queue loads, and what its controls do (US-REG-01..03).
@@ -94,12 +94,6 @@ export function tabCountsOf(counts: RegistrationCounts): TabCounts {
   }
 }
 
-/** One entry in the event filter. */
-export interface EventOption {
-  id: string
-  name: string
-}
-
 /** One tier the panel can book, already narrowed to what it needs. */
 export interface TierOption {
   id: string
@@ -137,11 +131,9 @@ const NO_COUNTS: RegistrationCounts = {
  * and must not take the registrations down with it. Any other failure still
  * propagates to the route's error element.
  */
+/** The shared builder, behind this route's own 403 guard. */
 async function eventOptions(): Promise<EventOption[]> {
-  return withoutForbidden(async () => {
-    const page = await eventsApi.list({ limit: EVENT_OPTIONS, sort: 'recent' })
-    return page.items.map((event) => ({ id: event.id, name: event.name }))
-  })
+  return withoutForbidden(() => allEventOptions(EVENT_OPTIONS))
 }
 
 /** The same, for the tiers the panel books against — `GET /tickets` is `evCreate` too. */
@@ -244,3 +236,7 @@ export const registrationsRoute = {
   loader: pageData(loadRegistrations),
   action: pageAction(runRegistrationsAction),
 }
+
+/* Re-exported: this route module is where the page and its panels read the
+   option shape from, and they should not each reach into the events feature. */
+export type { EventOption }

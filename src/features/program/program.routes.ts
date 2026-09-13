@@ -5,6 +5,9 @@ import { eventsApi } from '@/features/events/events.api'
 import { programApi, type SessionInput, type SpeakerInput } from './program.api'
 import { agendaDaysOf, sessionTypeOf, toAgendaBlock, toSpeakerCard } from './program.mapper'
 import type { AgendaBlock, AgendaDay, SpeakerCard } from './program.types'
+import { STATUS_LABEL } from '@/features/events/eventDetail.mapper'
+import type { EventStatus } from '@/features/events/types'
+import { bangkokDate } from '@/lib/format'
 
 /**
  * The agenda and the speaker directory (US-PROG-01..07).
@@ -24,6 +27,9 @@ export interface EventChoice {
   name: string
   startAt: string
   endAt: string | null
+  /** For the picker's row detail; `startAt` above is the programme's own clock. */
+  date: string
+  status: EventStatus
 }
 
 async function eventChoices(): Promise<EventChoice[]> {
@@ -33,6 +39,8 @@ async function eventChoices(): Promise<EventChoice[]> {
     name: event.name,
     startAt: event.startAt,
     endAt: event.endAt,
+    date: event.startAt ? bangkokDate(event.startAt) : '',
+    status: STATUS_LABEL[event.status],
   }))
 }
 

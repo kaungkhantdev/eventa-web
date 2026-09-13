@@ -3,11 +3,11 @@ import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { bangkokInstant } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
-import { eventsApi } from '@/features/events/events.api'
 import { ticketsApi, type ListTicketsQuery, type TicketInput } from './tickets.api'
 import { toTicketCard } from './tickets.mapper'
 import type { TicketCard, TicketCountsWire, TicketShareWire } from './tickets.types'
 import type { TicketStatus } from './types'
+import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 
 /**
  * The cross-event ticket inventory (US-TKT-01..06).
@@ -22,9 +22,6 @@ export type TicketTab = (typeof TICKET_TABS)[number]
 
 /** `@MaxLength(120)` on the DTO — past it the API answers 400, not a list. */
 const MAX_SEARCH = 120
-
-/** How many events the filter offers; the API's own maximum for one page. */
-const EVENT_OPTIONS = 100
 
 export function tabOf(params: URLSearchParams): TicketTab {
   return enumParam(params, 'tab', TICKET_TABS, 'all')
@@ -87,12 +84,6 @@ function instantOrNothing(value: FormDataEntryValue | null): string | undefined 
   return bangkokInstant(String(value ?? '')) ?? undefined
 }
 
-/** One entry in the event filter and the panel's event select. */
-export interface EventOption {
-  id: string
-  name: string
-}
-
 export interface TicketsData {
   cards: TicketCard[]
   window: PageWindow
@@ -122,11 +113,6 @@ async function loadTickets({ request }: LoaderArgs): Promise<TicketsData> {
     tabs: tabCountsOf(counts),
     events,
   }
-}
-
-async function eventOptions(): Promise<EventOption[]> {
-  const page = await eventsApi.list({ limit: EVENT_OPTIONS, sort: 'recent' })
-  return page.items.map((event) => ({ id: event.id, name: event.name }))
 }
 
 function withPage(current: string, page: number): string {
@@ -185,3 +171,7 @@ export const ticketShareRoute = {
     return ticketsApi.share(params.get('eventId') ?? '', params.get('ticketId') ?? '')
   }),
 }
+
+/* Re-exported: this route module is where the page and its panels read the
+   option shape from, and they should not each reach into the events feature. */
+export type { EventOption }

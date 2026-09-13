@@ -1,6 +1,14 @@
 import { useState } from 'react'
 import { Link, useFetcher, useLoaderData } from 'react-router'
-import { PageHeader, PageFooter, HeaderUser, ButtonLink, EmptyState, Icon } from '@/components/ui'
+import {
+  ButtonLink,
+  EmptyState,
+  EventPicker,
+  HeaderUser,
+  Icon,
+  PageFooter,
+  PageHeader,
+} from '@/components/ui'
 import type { ActionResult } from '@/app/loaders'
 import { cn } from '@/lib/cn'
 import type { LandingPagesData } from '../events.routes'
@@ -207,21 +215,24 @@ export default function LandingPagesPage() {
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
                 Preview with
               </p>
-              <div className="inline-flex max-w-full flex-wrap rounded-lg bg-canvas p-0.5 text-[12px] font-semibold">
-                {events.map((event) => (
-                  <button
-                    key={event.id}
-                    type="button"
-                    onClick={() => setPreviewSlug(event.slug)}
-                    aria-pressed={event.slug === previewSlug}
-                    className={cn(
-                      'max-w-[12rem] truncate rounded-md px-3 py-1.5 transition',
-                      event.slug === previewSlug ? 'bg-surface text-ink shadow-sm' : 'text-muted',
-                    )}
-                  >
-                    {event.name}
-                  </button>
-                ))}
+              {/* A row of pills wrapped into several lines once a workspace had
+                  more than a handful of events, and had no way to find one.
+                  Keyed by slug rather than id: the preview URL takes the slug,
+                  and the picker reports back whatever `id` it was given. */}
+              <div className="relative w-full sm:w-56">
+                <EventPicker
+                  value={previewSlug}
+                  onChange={setPreviewSlug}
+                  options={events.map((event) => ({
+                    id: event.slug,
+                    name: event.name,
+                    date: event.date,
+                    status: event.status,
+                  }))}
+                  allLabel={false}
+                  placeholder="Choose event"
+                  className="h-10 w-full border-0 bg-surface font-medium"
+                />
               </div>
             </div>
           )}

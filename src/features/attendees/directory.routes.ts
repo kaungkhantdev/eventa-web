@@ -3,7 +3,6 @@ import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { api, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
-import { eventsApi } from '@/features/events/events.api'
 import { toAttendeeRow } from './directory.mapper'
 import type {
   AttendeeRow,
@@ -13,6 +12,7 @@ import type {
   AttendeeWire,
   SegmentCountsWire,
 } from './directory.types'
+import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 
 /**
  * Everyone who has ever registered (US-CHK-06/07).
@@ -28,8 +28,6 @@ export const SORTS = ['recent', 'name', 'events', 'tickets'] as const
 export const TAGS: readonly AttendeeTag[] = ['VIP', 'Speaker', 'Sponsor', 'Student']
 
 const MAX_SEARCH = 120
-const EVENT_OPTIONS = 100
-
 interface DirectoryQuery extends Query {
   page?: number
   limit?: number
@@ -69,7 +67,7 @@ export interface DirectoryData {
   window: PageWindow
   counts: SegmentCountsWire
   /** The events an invitation can be sent for. */
-  events: { id: string; name: string }[]
+  events: EventOption[]
 }
 
 const NO_COUNTS: SegmentCountsWire = { all: 0, new: 0, checkedIn: 0, vip: 0 }
@@ -88,11 +86,6 @@ async function loadDirectory({ request }: LoaderArgs): Promise<DirectoryData> {
     counts: (page.meta.counts as SegmentCountsWire | undefined) ?? NO_COUNTS,
     events,
   }
-}
-
-async function eventOptions(): Promise<{ id: string; name: string }[]> {
-  const page = await eventsApi.list({ limit: EVENT_OPTIONS, sort: 'recent' })
-  return page.items.map((event) => ({ id: event.id, name: event.name }))
 }
 
 function withPage(current: string, page: number): string {

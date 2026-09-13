@@ -2,7 +2,14 @@
    event pickers. Ported verbatim from the static kit's shell.js EVENT_CATALOG
    (`data-event-picker="catalog"`). Cross-feature, so it lives in lib/. */
 
-export type EventStatus = 'Live' | 'Upcoming' | 'Completed' | 'Draft'
+/**
+ * The events feature's own status labels, rather than a second four-value copy
+ * of them. The demo rows below only ever use four, but the picker is now fed
+ * from the API too, where `Planned` and `Cancelled` both occur — and a status
+ * the dot map has no entry for renders an unpainted dot.
+ */
+export type { EventStatus } from '@/features/events/types'
+import type { EventStatus } from '@/features/events/types'
 
 export type CatalogEvent = {
   name: string
@@ -62,6 +69,8 @@ export const CATALOG_BY_NAME: Record<string, CatalogEvent> = Object.fromEntries(
 export const STATUS_DOT: Record<EventStatus, string> = {
   Live: 'bg-brand',
   Upcoming: 'bg-blue-500',
-  Completed: 'bg-gray-400',
+  Planned: 'bg-blue-500',
   Draft: 'bg-amber-500',
+  Completed: 'bg-gray-400',
+  Cancelled: 'bg-gray-400',
 }

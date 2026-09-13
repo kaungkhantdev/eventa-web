@@ -3,7 +3,6 @@ import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { api, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
-import { eventsApi } from '@/features/events/events.api'
 import { toMeetingCard } from './meetings.mapper'
 import type {
   MeetingBucket,
@@ -13,6 +12,7 @@ import type {
   MeetingType,
   MeetingWire,
 } from './meetings.types'
+import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 
 /**
  * Meetings with venues, sponsors, vendors and speakers (US-MTG-01..06).
@@ -36,8 +36,6 @@ export const MEETING_TYPES: readonly MeetingType[] = [
 export const MEETING_MODES: readonly MeetingMode[] = ['Video', 'In person', 'Phone']
 
 const MAX_SEARCH = 120
-const EVENT_OPTIONS = 100
-
 interface MeetingQuery extends Query {
   page?: number
   limit?: number
@@ -80,7 +78,7 @@ export interface MeetingsData {
   cards: MeetingCard[]
   window: PageWindow
   counts: MeetingCountsWire
-  events: { id: string; name: string }[]
+  events: EventOption[]
 }
 
 const NO_COUNTS: MeetingCountsWire = { all: 0, today: 0, upcoming: 0, past: 0 }
@@ -99,11 +97,6 @@ async function loadMeetings({ request }: LoaderArgs): Promise<MeetingsData> {
     counts: (page.meta.counts as MeetingCountsWire | undefined) ?? NO_COUNTS,
     events,
   }
-}
-
-async function eventOptions(): Promise<{ id: string; name: string }[]> {
-  const page = await eventsApi.list({ limit: EVENT_OPTIONS, sort: 'recent' })
-  return page.items.map((event) => ({ id: event.id, name: event.name }))
 }
 
 function withPage(current: string, page: number): string {

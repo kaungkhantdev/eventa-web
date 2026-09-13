@@ -1,6 +1,15 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
-import { Button, Hint, Input, Label, Panel, Select, Textarea } from '@/components/ui'
+import {
+  Button,
+  EventPicker,
+  Hint,
+  Input,
+  Label,
+  Panel,
+  Select,
+  Textarea,
+} from '@/components/ui'
 import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
 import { MEETING_MODES, MEETING_TYPES } from '../meetings.routes'
@@ -31,6 +40,16 @@ export function MeetingPanel({
   const saving = fetcher.state !== 'idle'
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
+
+  // Re-seeded from the meeting being edited each time the panel opens, so a
+  // reschedule does not inherit the previous one's event. Adjusted during
+  // render rather than in an effect, so the picker is right on the first paint.
+  const [eventId, setEventId] = useState(editing?.eventId ?? '')
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setEventId(editing?.eventId ?? '')
+  }
 
   useEffect(() => {
     if (!saved || !open) return
@@ -184,14 +203,16 @@ export function MeetingPanel({
 
         <div>
           <Label htmlFor="meeting-event">Event</Label>
-          <Select id="meeting-event" name="eventId" defaultValue={editing?.eventId ?? ''}>
-            <option value="">{ALL_EVENTS}</option>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </Select>
+          <EventPicker
+            id="meeting-event"
+            name="eventId"
+            value={eventId}
+            onChange={setEventId}
+            options={events}
+            allLabel={ALL_EVENTS}
+            allValue=""
+            placeholder={ALL_EVENTS}
+          />
         </div>
 
         <div>

@@ -4,7 +4,6 @@ import { api, type Query } from '@/lib/api'
 import { baht } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
-import { eventsApi } from '@/features/events/events.api'
 import { toBalances, toInvoiceRow, toPayoutRow, toTaxRow, type Balances } from './finance.mapper'
 import type {
   BalancesWire,
@@ -18,21 +17,16 @@ import type {
   TaxRow,
   VatLedgerWire,
 } from './finance.types'
+import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 
 /** Payouts, invoices and VAT periods (US-FIN-03..12). */
 
-const EVENT_OPTIONS = 100
 const MAX_SEARCH = 120
 
 function withPage(current: string, page: number): string {
   const url = new URL(current)
   url.searchParams.set('page', String(page))
   return url.pathname + url.search
-}
-
-async function eventOptions(): Promise<{ id: string; name: string }[]> {
-  const page = await eventsApi.list({ limit: EVENT_OPTIONS, sort: 'recent' })
-  return page.items.map((event) => ({ id: event.id, name: event.name }))
 }
 
 /* ── payouts ──────────────────────────────────────────────────────────── */
@@ -121,7 +115,7 @@ export interface InvoicesData {
   rows: InvoiceRow[]
   window: PageWindow
   tabs: TabCounts
-  events: { id: string; name: string }[]
+  events: EventOption[]
   exportQuery: Record<string, string>
 }
 

@@ -8,6 +8,8 @@
  * stores. See the task to expose the catalogue so both sides read one source.
  */
 
+import type { EventStatus } from './types'
+
 export type TemplateId = 'aurora' | 'noir' | 'minimal' | 'atlas'
 
 const TEMPLATE_IDS: readonly string[] = ['aurora', 'noir', 'minimal', 'atlas']
@@ -67,4 +69,7 @@ export interface PreviewEvent {
   slug: string
   /** The design it uses today — null until one has ever been chosen. */
   landingTemplateId: string | null
+  /** Row detail for the "Preview with" picker. */
+  date: string
+  status: EventStatus
 }

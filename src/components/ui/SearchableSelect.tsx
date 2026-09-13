@@ -36,6 +36,8 @@ export interface SearchableSelectProps {
   className?: string
   /** Right-hand detail for a row — a date, a status dot. */
   renderMeta?: (option: ComboOption) => ReactNode
+  /** Ties a <Label htmlFor> to the trigger, the way it tied to the <select>. */
+  id?: string
 }
 
 export function SearchableSelect({
@@ -49,6 +51,7 @@ export function SearchableSelect({
   disabled = false,
   className,
   renderMeta,
+  id,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -59,12 +62,13 @@ export function SearchableSelect({
     <>
       <button
         ref={triggerRef}
+        id={id}
         type="button"
         disabled={disabled}
         onClick={() => setOpen((was) => !was)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
+        aria-label={selected ? `${label}: ${selected.label}` : label}
         className={cn(
           'select inline-flex items-center text-left disabled:opacity-60',
           icon && 'pl-9',
