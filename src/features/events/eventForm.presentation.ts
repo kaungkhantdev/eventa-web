@@ -96,3 +96,77 @@ export function headerSaveLabel(exists: boolean, saving: boolean): string {
   if (saving) return 'Saving…'
   return exists ? 'Save changes' : 'Save as draft'
 }
+
+/* ------------------------------ landing preview --------------------------- */
+
+/** What the API has stored for this event; null while it has never been saved. */
+export interface SavedEvent {
+  slug: string
+  status: string
+  visibility: string
+}
+
+/** What is in the boxes right now — what a draft preview is built from. */
+export interface TypedEvent {
+  title: string
+  venue: string
+  online: boolean
+  highlights: Highlight[]
+}
+
+/**
+ * The statuses and visibility whose public page eventa-api will actually serve.
+ *
+ * Mirrored from its `public-pages.repository`, which returns a row only when
+ * the event is PUBLIC, one of these statuses, and has a `publishedAt`. Guessing
+ * wider than the server does is what turns a Preview button into a 404: a draft
+ * has no public page at all, and neither does an unlisted or private one.
+ */
+const LIVE_STATUSES: readonly string[] = ['planned', 'upcoming', 'live']
+const PUBLIC_VISIBILITY = 'public'
+
+/** The slug to preview by, or null when there is no public page to preview. */
+function publicSlugOf(saved: SavedEvent | null): string | null {
+  if (!saved || !saved.slug) return null
+  const served = saved.visibility === PUBLIC_VISIBILITY && LIVE_STATUSES.includes(saved.status)
+  return served ? saved.slug : null
+}
+
+/** The wizard's own fields, packed the way `toDraftPreview` unpacks them. */
+function draftParams(typed: TypedEvent): URLSearchParams {
+  const params = new URLSearchParams()
+  const title = typed.title.trim()
+  const venue = typed.venue.trim()
+  if (title) params.set('title', title)
+  if (venue) params.set('venue', venue)
+  if (typed.online) params.set('online', '1')
+  const packed = typed.highlights
+    .map((h) => (h.label.trim() ? `${h.icon}:${h.label.trim()}` : null))
+    .filter((entry): entry is string => entry !== null)
+  if (packed.length) params.set('hl', packed.join('|'))
+  return params
+}
+
+/**
+ * Where Preview goes.
+ *
+ * Two different pages behind one button, because there are two different
+ * things to look at. Once an event is live its page really exists, and the
+ * only honest preview is that page — the same URL an attendee opens, with the
+ * agenda, speakers, tickets and FAQs the organizer actually entered. Before
+ * then nothing is published, so the page is built from what is in the form,
+ * which shows the design and the typed copy and nothing borrowed.
+ *
+ * Note the first branch shows what is SAVED, not what is on screen: it is a
+ * fetch of the live page. The caller is responsible for saying so.
+ */
+export function landingPreviewHref(
+  template: string,
+  saved: SavedEvent | null,
+  typed: TypedEvent,
+): string {
+  const slug = publicSlugOf(saved)
+  const params = slug === null ? draftParams(typed) : new URLSearchParams({ event: slug })
+  const query = params.toString()
+  return `/landing/${template}${query ? `?${query}` : ''}`
+}

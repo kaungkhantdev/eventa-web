@@ -19,6 +19,7 @@ import {
   STEPS,
   finalLabel,
   headerSaveLabel,
+  landingPreviewHref,
   summaryCapacity,
   type Highlight,
 } from '../eventForm.presentation'
@@ -386,20 +387,30 @@ export default function EventFormPage() {
   const setHighlightField = (i: number, field: keyof Highlight, value: string) =>
     setHighlights((prev) => prev.map((h, j) => (j === i ? { ...h, [field]: value } : h)))
 
-  const previewLanding = () => {
-    const p = new URLSearchParams()
-    const t = title.trim()
-    const v = venue.trim()
-    if (t) p.set('title', t)
-    if (v) p.set('venue', v)
-    if (online) p.set('online', '1')
-    const hls = highlights
-      .map((h) => (h.label.trim() ? `${h.icon}:${h.label.trim()}` : null))
-      .filter((x): x is string => Boolean(x))
-    if (hls.length) p.set('hl', hls.join('|'))
-    const qs = p.toString()
-    window.open(`/landing/${landingTpl}${qs ? '?' + qs : ''}`, '_blank', 'noopener')
-  }
+  /**
+   * Recomputed as they type, so the draft branch previews what is in the boxes
+   * now rather than what was there when the page loaded.
+   */
+  const previewHref = landingPreviewHref(
+    landingTpl,
+    initial.id
+      ? { slug: initial.slug, status: initial.status ?? '', visibility: initial.visibility }
+      : null,
+    { title, venue, online, highlights },
+  )
+  /**
+   * A live event previews its real published page, so what is on screen but not
+   * yet saved will not appear there — said plainly rather than left to surprise
+   * somebody who just typed a new title.
+   */
+  const previewsSaved = previewHref.includes('event=')
+  const previewTitle = previewsSaved
+    ? 'Opens the live public page — unsaved changes are not shown'
+    : 'Opens a preview of this draft in a new tab'
+
+  /* A new tab, not a navigation: the wizard holds the open step's edits in
+     component state, so leaving the page would discard them. */
+  const previewLanding = () => window.open(previewHref, '_blank', 'noopener')
 
   return (
     <>
@@ -419,6 +430,18 @@ export default function EventFormPage() {
           <i className="hgi-stroke hgi-arrow-left-01 text-[18px]" />
         </Link>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
+          {/* In the header rather than only on the last step: the landing page
+              is what every step feeds, so "what will this look like?" is asked
+              while writing the description, not just at the end. */}
+          <button
+            type="button"
+            onClick={previewLanding}
+            className="btn btn-soft"
+            title={previewTitle}
+          >
+            <i className="hgi-stroke hgi-arrow-up-right-01 text-[16px]" />
+            <span className="hidden sm:inline">Preview</span>
+          </button>
           {/* Only once the event exists: on a new one there is no workspace to
               open yet. Editing is usually a detour from the event's own page,
               and without this the way back was the browser's back button. */}

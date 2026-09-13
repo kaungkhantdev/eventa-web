@@ -11,7 +11,7 @@ import {
   toUpdateBody,
   type EventFormValues,
 } from './eventForm.mapper'
-import { LANDING_TEMPLATES, type TemplateId } from './landingTemplates'
+import { isTemplateId, type TemplateId } from './landingTemplates'
 
 /**
  * The create/edit wizard (US-EVT-02..07).
@@ -32,18 +32,26 @@ export interface EventFormData {
 
 const DEFAULT_TEMPLATE: TemplateId = 'aurora'
 
-/** Which template `?template=` asked for; anything unknown falls back. */
-export function templateOf(params: URLSearchParams): TemplateId {
+/**
+ * Which design the wizard opens on; anything unknown falls back.
+ *
+ * `?template=` wins, because that is the landing gallery's "Use template" — an
+ * explicit choice made a moment ago. Failing that it is the event's own stored
+ * design: reading only the query parameter meant an event saved as Spotlight
+ * opened with Classic selected, and previewed itself with the wrong one.
+ */
+export function templateOf(params: URLSearchParams, stored?: string | null): TemplateId {
   const asked = params.get('template')
-  return LANDING_TEMPLATES.some((t) => t.id === asked) ? (asked as TemplateId) : DEFAULT_TEMPLATE
+  if (asked && isTemplateId(asked)) return asked
+  if (stored && isTemplateId(stored)) return stored
+  return DEFAULT_TEMPLATE
 }
 
 async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
   const params = queryOf(request)
   const id = params.get('id')
-  const template = templateOf(params)
 
-  if (!id) return { values: toEventFormValues(null, [], []), template }
+  if (!id) return { values: toEventFormValues(null, [], []), template: templateOf(params) }
 
   // Four independent reads; the wizard cannot render a half-loaded form, so
   // they go together and a failure lands on the route's error element.
@@ -64,7 +72,7 @@ async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
       seatRows: seating.seatMap ? String(seating.seatMap.rows) : '',
       seatsPerRow: seating.seatMap ? String(seating.seatMap.seatsPerRow) : '',
     },
-    template,
+    template: templateOf(params, event.landingTemplateId),
   }
 }
 

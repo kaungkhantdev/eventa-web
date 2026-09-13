@@ -64,6 +64,12 @@ export interface EventWire {
   coverImage?: string | null
   /** The public page's design — null until one has been chosen. */
   landingTemplateId?: string | null
+  /**
+   * `public` | `unlisted` | `private` (`EventResponseDto.visibility`). Only a
+   * `public` event is served by slug, so this decides whether a real public
+   * page exists to link to. Optional: the calendar's slimmer payload omits it.
+   */
+  visibility?: string
   version: number
 }
 

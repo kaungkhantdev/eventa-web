@@ -32,6 +32,10 @@ export interface HighlightDraft {
 export interface EventFormValues {
   id: string | null
   status: EventWireStatus | null
+  /** The public page's address; empty until the event exists. */
+  slug: string
+  /** `public` | `unlisted` | `private`; empty until the event exists. */
+  visibility: string
   name: string
   description: string
   type: EventType
@@ -64,6 +68,8 @@ function emptyValues(): EventFormValues {
   return {
     id: null,
     status: null,
+    slug: '',
+    visibility: '',
     name: '',
     description: '',
     type: DEFAULT_TYPE,
@@ -113,6 +119,8 @@ export function toEventFormValues(
     ...empty,
     id: event.id,
     status: event.status,
+    slug: event.slug,
+    visibility: event.visibility ?? '',
     name: event.name,
     description: event.description ?? '',
     type: event.type,

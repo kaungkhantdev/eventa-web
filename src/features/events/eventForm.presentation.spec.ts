@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { finalLabel, headerSaveLabel, summaryCapacity } from './eventForm.presentation'
+import {
+  finalLabel,
+  headerSaveLabel,
+  landingPreviewHref,
+  summaryCapacity,
+} from './eventForm.presentation'
 
 /**
  * The wizard's summary rail showed `0` for an event whose capacity was never
@@ -60,5 +65,88 @@ describe('headerSaveLabel', () => {
   it('reports the write in progress either way', () => {
     expect(headerSaveLabel(true, true)).toBe('Saving…')
     expect(headerSaveLabel(false, true)).toBe('Saving…')
+  })
+})
+
+/**
+ * Which preview the organizer gets.
+ *
+ * "Preview" has to mean the real attendee page wherever one exists, because
+ * that is the thing being checked. But eventa-api serves `/public/events/:slug`
+ * only for a PUBLIC, live, published event — a draft 404s. So the rule mirrors
+ * that gate rather than guessing, and falls back to rendering what is typed.
+ */
+describe('landingPreviewHref', () => {
+  const typed = {
+    title: 'Bangkok Trail Run',
+    venue: 'Lumpini Park',
+    online: false,
+    highlights: [],
+  }
+  const live = { slug: 'bangkok-trail-run-2026', status: 'upcoming', visibility: 'public' }
+
+  it('opens the real public page once the event is live', () => {
+    expect(landingPreviewHref('aurora', live, typed)).toBe(
+      '/landing/aurora?event=bangkok-trail-run-2026',
+    )
+  })
+
+  it('previews what is typed while the event is still a draft', () => {
+    const href = landingPreviewHref('noir', { ...live, status: 'draft' }, typed)
+    expect(href).not.toContain('event=')
+    expect(href).toContain('/landing/noir?')
+    expect(href).toContain('title=Bangkok+Trail+Run')
+  })
+
+  it('previews what is typed for an event that has never been saved', () => {
+    expect(landingPreviewHref('atlas', null, typed)).toBe(
+      '/landing/atlas?title=Bangkok+Trail+Run&venue=Lumpini+Park',
+    )
+  })
+
+  /* An unlisted or private event is published but NOT served by slug, so
+     pointing the preview at it would open the 404 page. */
+  it('previews what is typed when the page is not public', () => {
+    expect(landingPreviewHref('aurora', { ...live, visibility: 'unlisted' }, typed)).not.toContain(
+      'event=',
+    )
+    expect(landingPreviewHref('aurora', { ...live, visibility: 'private' }, typed)).not.toContain(
+      'event=',
+    )
+  })
+
+  it('never points at a published event with no slug', () => {
+    expect(landingPreviewHref('aurora', { ...live, slug: '' }, typed)).not.toContain('event=')
+  })
+
+  it('escapes the slug, so it cannot add a second query parameter', () => {
+    expect(landingPreviewHref('aurora', { ...live, slug: 'a&b=c' }, typed)).toBe(
+      '/landing/aurora?event=a%26b%3Dc',
+    )
+  })
+
+  it('packs the typed highlights as icon:label pairs', () => {
+    const href = landingPreviewHref('aurora', null, {
+      ...typed,
+      highlights: [
+        { icon: 'hgi-wifi-01', label: 'Free WiFi' },
+        { icon: 'hgi-gift', label: '' },
+      ],
+    })
+    // Read back the way `toDraftPreview` reads it, so this asserts the actual
+    // contract between the two rather than a guess at the encoding.
+    expect(new URLSearchParams(href.split('?')[1]).get('hl')).toBe('hgi-wifi-01:Free WiFi')
+  })
+
+  it('marks an online event, which has no venue to show', () => {
+    const href = landingPreviewHref('aurora', null, { ...typed, online: true, venue: '' })
+    expect(href).toContain('online=1')
+    expect(href).not.toContain('venue=')
+  })
+
+  it('asks for the bare template when nothing has been typed yet', () => {
+    expect(
+      landingPreviewHref('minimal', null, { title: '', venue: '', online: false, highlights: [] }),
+    ).toBe('/landing/minimal')
   })
 })
