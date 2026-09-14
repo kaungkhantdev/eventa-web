@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   EmptyState,
+  EventPicker,
   HeaderUser,
   Icon,
   NoResults,
@@ -169,25 +170,18 @@ export default function TicketsPage() {
                   aria-label="Search ticket types"
                 />
               </div>
+              {/* The wrapper keeps its `relative`: the picker draws its own
+                  leading icon absolutely, against the caller's ancestor. */}
               <div className="relative w-full sm:w-56">
-                <Icon
-                  name="hgi-calendar-03"
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand"
-                />
-                <select
+                <EventPicker
                   value={params.get('eventId') ?? ''}
-                  onChange={(e) => set({ eventId: e.target.value || null })}
-                  className="select h-10 w-full border-0 bg-surface pl-9 font-medium"
-                  aria-label="Filter by event"
-                >
-                  <option value="">{ALL_EVENTS}</option>
-                  {data.events.map((event) => (
-                    <option key={event.id} value={event.id}>
-                      {event.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(eventId) => set({ eventId: eventId || null })}
+                  options={data.events}
+                  allLabel={ALL_EVENTS}
+                  allValue=""
+                  placeholder={ALL_EVENTS}
+                  className="h-10 w-full border-0 bg-surface font-medium"
+                />
               </div>
             </div>
 
@@ -324,8 +318,7 @@ function TicketTile({ card, onEdit, onShare, onDelete, onToggle }: TicketTilePro
         ) : (
           <p className="tnum text-[22px] font-bold tracking-tight">{card.price}</p>
         )}
-        <Badge tone={card.statusTone}>
-          <Icon name={card.statusIcon} size={12} />
+        <Badge tone={card.statusTone} icon={card.statusIcon}>
           {card.statusLabel}
         </Badge>
       </div>

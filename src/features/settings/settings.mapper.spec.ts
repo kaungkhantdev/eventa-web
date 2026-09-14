@@ -4,9 +4,16 @@ import {
   toNotificationRow,
   toPermissionOption,
   toRoleCard,
+  describeDevice,
+  toAuditRow,
   toSessionRow,
 } from './settings.mapper'
-import type { LoginSessionWire, MemberWire, RoleWire } from './settings.types'
+import type {
+  AuditEntryWire,
+  LoginSessionWire,
+  MemberWire,
+  RoleWire,
+} from './settings.types'
 
 const member = (over: Partial<MemberWire> = {}): MemberWire => ({
   id: 7690,
@@ -126,5 +133,132 @@ describe('toNotificationRow', () => {
 
     expect(row.smsAvailable).toBe(false)
     expect(row.smsEnabled).toBe(false)
+  })
+})
+
+/**
+ * The audit panel's rows (US-ACC-07).
+ *
+ * Every fact except the title is optional at the source — an entry raised by a
+ * background job has no actor, one raised from a console has no IP — so the
+ * detail line is built from what is actually present rather than a template
+ * with holes in it.
+ */
+describe('toAuditRow', () => {
+  const entry = (over: Partial<AuditEntryWire> = {}): AuditEntryWire => ({
+    id: 1,
+    type: 'signin',
+    title: 'Signed in',
+    meta: 'Chrome on macOS',
+    actorName: 'Harper Nelson',
+    ipAddress: '203.0.113.24',
+    occurredAt: '2026-08-21T03:02:00.000Z',
+    ...over,
+  })
+
+  it('joins the facts it has into one readable line', () => {
+    expect(toAuditRow(entry()).detail).toBe(
+      'Chrome on macOS · Harper Nelson · 203.0.113.24',
+    )
+  })
+
+  it('drops an absent actor rather than leaving a gap', () => {
+    expect(toAuditRow(entry({ actorName: null })).detail).toBe(
+      'Chrome on macOS · 203.0.113.24',
+    )
+  })
+
+  it('drops an absent IP', () => {
+    expect(toAuditRow(entry({ ipAddress: null })).detail).toBe(
+      'Chrome on macOS · Harper Nelson',
+    )
+  })
+
+  it('is empty, not a stray separator, when nothing but the title is known', () => {
+    expect(
+      toAuditRow(entry({ meta: null, actorName: null, ipAddress: null })).detail,
+    ).toBe('')
+  })
+
+  // Bangkok, because somebody auditing their own account reads their own clock.
+  it('shows when it happened in Bangkok time', () => {
+    expect(toAuditRow(entry()).when).toBe('Aug 21, 2026 · 10:02')
+  })
+
+  it('keeps the title and type through unchanged', () => {
+    const row = toAuditRow(entry({ type: 'pwd', title: 'Password changed' }))
+    expect(row).toMatchObject({ type: 'pwd', title: 'Password changed' })
+  })
+})
+
+/**
+ * A device somebody can recognise (US-ACC-06).
+ *
+ * The card exists so an organizer can spot a sign-in that was not theirs, and
+ * the API sends a raw user-agent. Two rows reading "Mozilla/5.0 (Macintosh;
+ * Intel Mac OS X 10_15_7) AppleW…" defeat the entire purpose — they are
+ * identical, truncated, and say nothing about which is which.
+ */
+describe('describeDevice', () => {
+  it.each([
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36',
+      'Chrome on macOS',
+    ],
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+      'Safari on macOS',
+    ],
+    [
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      'Safari on iPhone',
+    ],
+    [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+      'Edge on Windows',
+    ],
+    [
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Chrome on Linux',
+    ],
+    [
+      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      'Chrome on Android',
+    ],
+    [
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:121.0) Gecko/20100101 Firefox/121.0',
+      'Firefox on macOS',
+    ],
+  ])('reads %s as %s', (agent, expected) => {
+    expect(describeDevice(agent)).toBe(expected)
+  })
+
+  /**
+   * Edge and Chrome both claim to be Chrome, and Chrome claims to be Safari.
+   * The order the checks run in is the whole rule, so it is pinned: the most
+   * specific claim wins.
+   */
+  it('does not call Edge "Chrome", though Edge says it is', () => {
+    expect(
+      describeDevice('Mozilla/5.0 (Windows NT 10.0) Chrome/120.0.0.0 Safari/537.36 Edg/120.0'),
+    ).toBe('Edge on Windows')
+  })
+
+  it('does not call Chrome "Safari", though Chrome says it is', () => {
+    expect(
+      describeDevice('Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/151.0 Safari/537.36'),
+    ).toBe('Chrome on macOS')
+  })
+
+  /**
+   * A UA nobody anticipated must still produce something, and must never be the
+   * raw string — an unreadable row is what this replaced.
+   */
+  it('falls back to something readable for an unknown agent', () => {
+    expect(describeDevice('SomeBot/1.0')).toBe('Unknown device')
+  })
+
+  it('handles a missing user-agent', () => {
+    expect(describeDevice('')).toBe('Unknown device')
   })
 })

@@ -1,7 +1,43 @@
 import { describe, expect, it } from 'vitest'
-import { safeRedirect } from './redirect'
+import { returnTo, safeRedirect } from './redirect'
 
 const HOME = '/admin/dashboard'
+
+describe('what the guard remembers to return to', () => {
+  it('remembers the page they were stopped on, query and all', () => {
+    expect(returnTo('/admin/registrations', '?tab=pending')).toBe(
+      '/admin/registrations?tab=pending',
+    )
+  })
+
+  it('remembers nothing for the root', () => {
+    expect(returnTo('/', '')).toBeNull()
+  })
+
+  /**
+   * The rule that keeps the guard and `guestOnly` from arguing.
+   *
+   * A guest screen can now redirect, so it can be the page somebody is
+   * "stopped on" — and remembering it would send them back to the sign-in
+   * form immediately after signing in. `guestOnly` would bounce them onward,
+   * so it self-heals, but by way of a nonsense URL and an extra hop.
+   */
+  it('remembers nothing for a screen you sign in or sign up on', () => {
+    expect(returnTo('/auth/login', '')).toBeNull()
+    expect(returnTo('/auth/register', '')).toBeNull()
+    expect(returnTo('/portal/login', '?from=%2Fportal%2Fmy-events')).toBeNull()
+    expect(returnTo('/portal/register', '')).toBeNull()
+  })
+
+  it('remembers nothing for what follows one, like check-email', () => {
+    expect(returnTo('/auth/register/check-email', '')).toBeNull()
+    expect(returnTo('/portal/register/check-email', '')).toBeNull()
+  })
+
+  it('still remembers a page that merely starts the same way', () => {
+    expect(returnTo('/portal/logins-report', '')).toBe('/portal/logins-report')
+  })
+})
 
 describe('where a sign-in returns you', () => {
   it('goes back where the guard stopped them', () => {

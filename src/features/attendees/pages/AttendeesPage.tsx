@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
   Card,
   EmptyState,
+  EventPicker,
   HeaderUser,
   Hint,
   Icon,
@@ -16,7 +17,6 @@ import {
   Panel,
   PastEnd,
   PillTabs,
-  Select,
   Textarea,
   type PillTabItem,
 } from '@/components/ui'
@@ -319,6 +319,10 @@ function InvitePanel({
   events: { id: string; name: string }[]
 }) {
   const fetcher = useFetcher<ActionResult>()
+  // An invite must name an event, so the picker starts on one rather than on a
+  // blank the browser can no longer enforce (`required` means nothing to the
+  // hidden input a custom picker submits through).
+  const [inviteEvent, setInviteEvent] = useState(events[0]?.id ?? '')
   const sending = fetcher.state !== 'idle'
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const sent = fetcher.state === 'idle' && fetcher.data?.ok === true
@@ -363,13 +367,15 @@ function InvitePanel({
 
         <div>
           <Label htmlFor="invite-event">Event</Label>
-          <Select id="invite-event" name="eventId" required defaultValue={events[0]?.id ?? ''}>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </Select>
+          <EventPicker
+            id="invite-event"
+            name="eventId"
+            value={inviteEvent}
+            onChange={setInviteEvent}
+            options={events}
+            allLabel={false}
+            placeholder="Choose an event"
+          />
         </div>
         <div>
           <Label htmlFor="invite-emails">Email addresses</Label>

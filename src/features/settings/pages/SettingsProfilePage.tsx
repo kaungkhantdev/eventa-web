@@ -90,7 +90,6 @@ export default function SettingsProfilePage() {
                 {error}
               </p>
             )}
-            {saved && <p className="mt-3 text-[13px] text-brand">Profile saved.</p>}
 
             <div className="mt-5 flex justify-end gap-2 border-t border-hair pt-4">
               <Button variant="primary" size="sm" type="submit" disabled={save.state !== 'idle'}>
@@ -202,7 +201,6 @@ function EmailForm({ profile }: { profile: ProfileCard }) {
           {error}
         </p>
       )}
-      {sent && <p className="mt-2 text-[13px] text-brand">Check the new address for a link.</p>}
     </div>
   )
 }

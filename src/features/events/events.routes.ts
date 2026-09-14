@@ -20,6 +20,8 @@ import type {
   Tone,
   UpcomingCard,
 } from './types'
+import { STATUS_LABEL } from './eventDetail.mapper'
+import { bangkokDate } from '@/lib/format'
 
 /**
  * What the events screens load, and what their controls do.
@@ -188,6 +190,8 @@ export const landingPagesRoute = {
         name: event.name,
         slug: event.slug,
         landingTemplateId: event.landingTemplateId ?? null,
+        date: event.startAt ? bangkokDate(event.startAt) : '',
+        status: STATUS_LABEL[event.status],
       })),
     }
   }),

@@ -46,8 +46,47 @@ const CHECK_EMAIL_PATH: Record<Persona, string> = {
   attendee: '/portal/register/check-email',
 }
 
+/**
+ * Where each audience resets a password. ONE page serves both, and the realm
+ * it searches comes from `?persona=` — so the link has to carry it.
+ *
+ * Reached without it, an attendee is looked for among organizers and never
+ * found, while the page answers "a link is on its way" regardless, because it
+ * must: a reset form that distinguished a registered address from an unknown
+ * one would be a list of everyone with an account.
+ */
+const FORGOT_PATH: Record<Persona, string> = {
+  admin: '/auth/forgot-password',
+  attendee: '/auth/forgot-password?persona=attendee',
+}
+
+/**
+ * What each audience's account is called, for a screen to say out loud.
+ *
+ * Naming the realm is safe where naming the ADDRESS's realm would not be: this
+ * comes from the URL the visitor is already looking at, not from a lookup, so
+ * it tells an attacker nothing they did not type themselves.
+ */
+const ACCOUNT_LABEL: Record<Persona, string> = {
+  admin: 'Organizer account',
+  attendee: 'Attendee account',
+}
+
 export function signInPathFor(persona: Persona): string {
   return SIGN_IN_PATH[persona]
+}
+
+export function forgotPathFor(persona: Persona): string {
+  return FORGOT_PATH[persona]
+}
+
+export function accountLabelFor(persona: Persona): string {
+  return ACCOUNT_LABEL[persona]
+}
+
+/** The audience this one is not — for offering the other door. */
+export function otherPersona(persona: Persona): Persona {
+  return persona === 'admin' ? 'attendee' : 'admin'
 }
 
 export function signUpPathFor(persona: Persona): string {

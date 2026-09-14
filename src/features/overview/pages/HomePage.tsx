@@ -2,6 +2,7 @@ import { useLoaderData, useOutletContext } from 'react-router'
 import { ButtonLink, HeaderUser, Icon } from '@/components/ui'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import { isFirstRun } from '../firstRun'
+import { nextEventSlug, registrationLinkFor } from '../shareLink'
 import { ActivityRingPanel } from '../components/ActivityRingPanel'
 import { FirstRunHome } from '../components/FirstRunHome'
 import { AlertsPanel } from '../components/AlertsPanel'
@@ -24,6 +25,11 @@ export default function HomePage() {
   const ctx = useOutletContext<AdminOutletContext | null>()
   // A workspace with nothing in it gets the guided start, not six empty panels.
   const firstRun = isFirstRun(home)
+  // The link an empty registrations panel offers to share. Read from the
+  // upcoming events the page already loaded rather than fetched again — the
+  // event waiting on sign-ups today is the soonest one.
+  const slug = nextEventSlug(upcoming)
+  const shareUrl = slug ? registrationLinkFor(window.location.origin, slug) : null
 
   return (
     <>
@@ -53,11 +59,11 @@ export default function HomePage() {
       </header>
 
       {firstRun ? (
-        <FirstRunHome />
+        <FirstRunHome setup={home.setup} />
       ) : (
         <>
           <div className="grid gap-4 lg:grid-cols-3">
-            {today && <TodayRegistrationsPanel today={today} />}
+            {today && <TodayRegistrationsPanel today={today} shareUrl={shareUrl} />}
             <TodayMeetingsPanel meetings={meetings} />
             <ActivityRingPanel ring={ring} />
           </div>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useSearchParams } from 'react-router'
+import { RichText, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { LandingEvent } from '@/features/landing/types'
 
@@ -77,6 +78,9 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
   ].filter((r) => r.value)
 
   const agenda = ev.agenda || []
+  // The address decides the pin; see mapLink.ts on why the venue name does
+  // not join the query.
+  const venue = { venueName: ev.venue, address: ev.address, city: ev.city }
   const whenLine = [ev.dateText, whereText].filter(Boolean).join('  ·  ')
   const year = new Date().getFullYear()
 
@@ -137,7 +141,9 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
             </div>
           </div>
           <div className="px-6 py-6 sm:px-9 sm:py-7">
-            <p className="max-w-[62ch] text-[15px] leading-relaxed text-muted">{ev.tagline}</p>
+            {ev.tagline && (
+              <p className="max-w-[62ch] text-[15px] leading-relaxed text-muted">{ev.tagline}</p>
+            )}
             <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2.5">
               {heroFacts.map((f) => (
                 <span
@@ -193,7 +199,7 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
                 <h2 id="lbl-about" className="text-[18px] font-bold tracking-tight text-ink">
                   About the event
                 </h2>
-                <p className="mt-3 max-w-[58ch] text-[14px] leading-relaxed text-muted">{ev.about}</p>
+                <RichText html={ev.about} className="mt-3 max-w-[70ch]" />
               </div>
               <div>
                 <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">
@@ -215,6 +221,7 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
                     </div>
                   ))}
                 </dl>
+                {!isOnline && <VenueMap venue={venue} className="mt-3" />}
               </div>
             </div>
           </section>

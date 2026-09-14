@@ -76,9 +76,24 @@ describe('an event as the organizer’s table shows it', () => {
     expect(row.version).toBe(4)
   })
 
-  it('seeds the cover image from the slug, so it is stable across renders', () => {
-    expect(toEventRow(event()).seed).toBe('tech-innovators-forum')
+  /**
+   * The cover the organizer uploaded, never a stand-in.
+   *
+   * The row used to carry a `seed` — the slug — which the table fed to
+   * picsum.photos. That put a plausible photograph of somebody else's event
+   * beside a real one, and kept it there after a real cover was uploaded.
+   * `coverImage` is on EventListItemDto; there was never a need to invent one.
+   */
+  it('carries the event own cover image', () => {
+    expect(toEventRow(event({ coverImage: 'https://cdn.test/c.jpg' })).cover).toBe(
+      'https://cdn.test/c.jpg',
+    )
   })
+
+  it('has no cover when the event has none, so nothing is invented', () => {
+    expect(toEventRow(event({ coverImage: null })).cover).toBeNull()
+  })
+
 })
 
 const upcoming = (over: Partial<UpcomingEventWire> = {}): UpcomingEventWire => ({

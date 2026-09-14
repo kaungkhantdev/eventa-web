@@ -6,6 +6,7 @@ import {
   Icon,
   PillTabs,
   Paginator,
+  VenueMap,
   type PillTabItem,
 } from '@/components/ui'
 import { authApi } from '@/features/auth/api'
@@ -84,13 +85,16 @@ function UpcomingCard({
   return (
     <article className="group overflow-hidden rounded-2xl bg-surface ring-2 ring-transparent transition hover:ring-brand">
       <div className={cn('relative h-24', look.header)}>
-        <img
-          src={ev.image ?? `https://picsum.photos/seed/${ev.slug}/540/240`}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={hideOnError}
-        />
+        {/* The event's own cover, or the card's gradient. */}
+        {ev.image && (
+          <img
+            src={ev.image}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={hideOnError}
+          />
+        )}
         {/* The API writes the phrase — "in 3 days" — and stops once it passes. */}
         {ev.countdown && (
           <span className="absolute right-2.5 top-2.5 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-sm">
@@ -123,6 +127,9 @@ function UpcomingCard({
             <Icon name="hgi-location-01" size={14} />
             {ev.where}
           </p>
+          {/* One map per card, but `loading="lazy"` inside VenueMap means only
+              the cards actually scrolled to ever fetch one. */}
+          {ev.venue && <VenueMap venue={ev.venue} title={`Where ${ev.title} is`} />}
         </div>
         <div className="mt-3.5 flex items-center gap-2 border-t border-hair pt-3.5">
           {/* An attendee's "Details" pointed into the organizer console, which
@@ -162,13 +169,15 @@ function PastCard({ ev }: { ev: MyEventRow }) {
   return (
     <article className="group overflow-hidden rounded-2xl bg-surface ring-2 ring-transparent transition hover:ring-hair">
       <div className="relative h-24 bg-line">
-        <img
-          src={ev.image ?? `https://picsum.photos/seed/${ev.slug}/540/240`}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover opacity-70 grayscale"
-          onError={hideOnError}
-        />
+        {ev.image && (
+          <img
+            src={ev.image}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover opacity-70 grayscale"
+            onError={hideOnError}
+          />
+        )}
         {/* Only claimed when they were actually scanned in — a past event they
             missed is still theirs, and saying "Attended" would be wrong. */}
         {ev.attended && (

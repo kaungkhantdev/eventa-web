@@ -51,6 +51,44 @@ describe('the event workspace header', () => {
     expect(toEventHeader(event()).where).toBe('BITEC, Bangkok')
   })
 
+  /**
+   * The hero shows the organizer's own cover or no photograph at all.
+   *
+   * It used to seed picsum.photos from the slug, which dressed every event in
+   * a stranger's crowd — and went on doing so after a real cover was uploaded.
+   */
+  it('carries the event own cover image', () => {
+    expect(toEventHeader(event({ coverImage: 'https://cdn.test/hero.jpg' })).cover).toBe(
+      'https://cdn.test/hero.jpg',
+    )
+  })
+
+  it('has no cover when the event has none', () => {
+    expect(toEventHeader(event({ coverImage: null })).cover).toBeNull()
+  })
+
+  /**
+   * The description the organizer wrote, shown back to them.
+   *
+   * The console never rendered it anywhere: the wizard demands one before it
+   * will publish, the public landing page shows it to attendees, and the
+   * organizer's own screen was the one place it could not be read.
+   */
+  it('carries the description', () => {
+    expect(toEventHeader(event({ description: 'Two days of talks.' })).description).toBe(
+      'Two days of talks.',
+    )
+  })
+
+  it('has no description when the event has none', () => {
+    expect(toEventHeader(event({ description: null })).description).toBeNull()
+  })
+
+  /** Whitespace-only is nothing to show, not a blank paragraph. */
+  it('treats a blank description as none', () => {
+    expect(toEventHeader(event({ description: '   ' })).description).toBeNull()
+  })
+
   it('says "Online" for an online event rather than an empty venue', () => {
     const header = toEventHeader(event({ isOnline: true, venueName: null, city: null }))
     expect(header.where).toBe('Online')

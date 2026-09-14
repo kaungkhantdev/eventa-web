@@ -8,6 +8,7 @@ import {
   toProfileCard,
 } from './account.mapper'
 import {
+  toAuditRow,
   toMemberRow,
   toNotificationRow,
   toPermissionOption,
@@ -15,6 +16,8 @@ import {
   toSessionRow,
 } from './settings.mapper'
 import type {
+  AuditEntryWire,
+  AuditRow,
   LoginSessionWire,
   MemberRow,
   MemberWire,
@@ -27,9 +30,13 @@ import type {
   RoleWire,
   OrganizationForm,
   LogoUploadWire,
+  OrganizationSummaryWire,
   OrganizationWire,
   PaymentSettingsCard,
+  PaymentMethodRow,
+  PaymentMethodWire,
   PaymentSettingsWire,
+  StoredKeysWire,
   ProfileCard,
   ProfileWire,
   SessionRow,
@@ -40,6 +47,8 @@ import type {
 
 const settingsApi = {
   members: (query: Query) => api.list<MemberWire>('/members', { query }),
+  /** The tab counts. Its own call: the list is one page, these describe all. */
+  memberCounts: (query: Query) => api.get<MemberCounts>('/members/counts', { query }),
   invite: (body: { name: string; email: string; roleId: number }) =>
     api.post<unknown>('/members', body),
   setRole: (id: number, roleId: number) => api.patch<unknown>(`/members/${id}`, { roleId }),
@@ -66,6 +75,13 @@ const settingsApi = {
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<void>('/auth/change-password', { currentPassword, newPassword }),
 
+  /**
+   * The audit trail behind the security screen's panel. Read-only, and capped:
+   * the panel shows recent activity, not the whole history — the export is
+   * there for anyone who needs all of it.
+   */
+  audit: () => api.list<AuditEntryWire>('/audit', { query: { limit: AUDIT_PAGE_SIZE } }),
+
   notifications: () => api.get<NotificationPrefWire[]>('/me/notification-preferences'),
   setNotification: (
     category: NotificationCategory,
@@ -75,21 +91,51 @@ const settingsApi = {
 
 /* ── users ────────────────────────────────────────────────────────────── */
 
+export interface MemberCounts {
+  all: number
+  active: number
+  invited: number
+  suspended: number
+}
+
 export interface UsersData {
   rows: MemberRow[]
   window: PageWindow
   roles: { id: number; name: string }[]
+  counts: MemberCounts
+  /** Echoed back so the controls show what the URL actually asked for. */
+  filters: { search: string; status: string; roleId: string }
 }
 
 async function loadUsers({ request }: LoaderArgs): Promise<UsersData> {
   const params = queryOf(request)
   const limit = intParam(params, 'limit', DEFAULT_PAGE_SIZE)
-  const [page, roles] = await Promise.all([
+  // Filters live in the URL, not component state: the API pages server-side, so
+  // the URL is the single source of truth and the back button works.
+  const filters = {
+    search: params.get('q') ?? '',
+    status: params.get('status') ?? '',
+    roleId: params.get('roleId') ?? '',
+  }
+  const narrowing = {
+    ...(filters.search ? { search: filters.search } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.roleId ? { roleId: Number(filters.roleId) } : {}),
+  }
+
+  const [page, roles, counts] = await Promise.all([
     settingsApi.members({
       page: intParam(params, 'page', 1),
       limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
+      ...narrowing,
     }),
     settingsApi.roles(),
+    // Status is left off deliberately — a tab shows its own total even while a
+    // different one is selected. Search and role narrow them.
+    settingsApi.memberCounts({
+      ...(filters.search ? { search: filters.search } : {}),
+      ...(filters.roleId ? { roleId: Number(filters.roleId) } : {}),
+    }),
   ])
 
   return {
@@ -98,6 +144,8 @@ async function loadUsers({ request }: LoaderArgs): Promise<UsersData> {
     // The invite form and the role switcher both need every role, not the ones
     // that happen to be held by somebody on this page.
     roles: roles.map((role) => ({ id: role.id, name: role.name })),
+    counts,
+    filters,
   }
 }
 
@@ -185,17 +233,26 @@ export const rolesRoute = {
 
 /* ── security ─────────────────────────────────────────────────────────── */
 
+/** How much recent activity the audit panel shows before deferring to export. */
+const AUDIT_PAGE_SIZE = 20
+
 export interface SecurityData {
   sessions: SessionRow[]
   twoFactor: TwoFactorWire
+  audit: AuditRow[]
 }
 
 async function loadSecurity(): Promise<SecurityData> {
-  const [sessions, twoFactor] = await Promise.all([
+  const [sessions, twoFactor, audit] = await Promise.all([
     settingsApi.sessions(),
     settingsApi.twoFactor(),
+    settingsApi.audit(),
   ])
-  return { sessions: sessions.map(toSessionRow), twoFactor }
+  return {
+    sessions: sessions.map(toSessionRow),
+    twoFactor,
+    audit: audit.items.map(toAuditRow),
+  }
 }
 
 /**
@@ -299,12 +356,17 @@ export const profileRoute = {
 
 export interface OrganizationData {
   organization: OrganizationForm
+  summary: OrganizationSummaryWire
 }
 
 export const organizationRoute = {
-  loader: pageData(async (): Promise<OrganizationData> => ({
-    organization: toOrganizationForm(await accountApi.organization()),
-  })),
+  loader: pageData(async (): Promise<OrganizationData> => {
+    const [organization, summary] = await Promise.all([
+      accountApi.organization(),
+      accountApi.organizationSummary(),
+    ])
+    return { organization: toOrganizationForm(organization), summary }
+  }),
 
   action: pageAction(async ({ request }: LoaderArgs) => {
     const form = await request.formData()
@@ -324,18 +386,47 @@ export const organizationRoute = {
 
 export interface PaymentsData {
   payments: PaymentSettingsCard
+  methods: PaymentMethodRow[]
+  /** Which mode's keys are on screen — from `?mode=`, not component state. */
+  viewing: 'test' | 'live'
 }
 
 export const paymentsRoute = {
-  loader: pageData(async (): Promise<PaymentsData> => ({
-    payments: toPaymentSettingsCard(await accountApi.paymentSettings()),
-  })),
+  loader: pageData(async ({ request }): Promise<PaymentsData> => {
+    const settings = await accountApi.paymentSettings()
+    // The Test/Live toggle is a URL parameter, so flipping it re-runs this
+    // loader and the boxes below show THAT mode's stored keys. As component
+    // state it only relabelled the form: the fields kept showing whatever the
+    // active mode had, and the toggle looked like a viewer that never viewed.
+    const asked = queryOf(request).get('mode')
+    const viewing = asked === 'live' || asked === 'test' ? asked : settings.mode
+    const [keys, methods] = await Promise.all([
+      accountApi.storedPaymentKeys(viewing),
+      accountApi.paymentMethods(),
+    ])
+    return {
+      payments: toPaymentSettingsCard(settings, keys),
+      methods: methods.map((m) => ({ method: m.method, enabled: m.enabled })),
+      viewing,
+    }
+  }),
 
   action: pageAction(async ({ request }: LoaderArgs) => {
     const form = await request.formData()
     const intent = form.get('intent')
     if (intent === 'disconnect') return accountApi.disconnectPayments()
     if (intent === 'test') return accountApi.testPayments()
+    if (intent === 'keys') {
+      const webhookSecret = field(form, 'webhookSecret')
+      return accountApi.savePaymentKeys({
+        mode: field(form, 'mode') === 'live' ? 'live' : 'test',
+        publishableKey: field(form, 'publishableKey'),
+        secretKey: field(form, 'secretKey'),
+        // Omitted, not blanked: it comes from a different page in Stripe, so
+        // re-saving API keys says nothing about it.
+        ...(webhookSecret ? { webhookSecret } : {}),
+      })
+    }
     if (intent === 'method') {
       return accountApi.setPaymentMethod(field(form, 'method'), form.get('enabled') === 'true')
     }
@@ -369,6 +460,9 @@ export const accountApi = {
   changeEmail: (email: string) => api.post<unknown>('/me/profile/email', { email }),
 
   organization: () => api.get<OrganizationWire>('/organization'),
+  /** Events hosted and team members. Its own call: `/organization` is the form. */
+  organizationSummary: () =>
+    api.get<OrganizationSummaryWire>('/organization/summary'),
   saveOrganization: (body: Record<string, unknown>) =>
     api.patch<OrganizationWire>('/organization', body),
 
@@ -389,8 +483,22 @@ export const accountApi = {
   paymentSettings: () => api.get<PaymentSettingsWire>('/payment-settings'),
   savePaymentPreferences: (body: Record<string, unknown>) =>
     api.patch<PaymentSettingsWire>('/payment-settings', body),
+  paymentMethods: () => api.get<PaymentMethodWire[]>('/payment-settings/methods'),
   setPaymentMethod: (method: string, enabled: boolean) =>
     api.patch<unknown>(`/payment-settings/methods/${method}`, { enabled }),
+  /**
+   * The workspace's own Stripe keys. The secret goes up once and never comes
+   * back: the response carries a masked tail, which is all the screen needs to
+   * say WHICH key is saved.
+   */
+  savePaymentKeys: (body: {
+    mode: 'test' | 'live'
+    publishableKey: string
+    secretKey: string
+    webhookSecret?: string
+  }) => api.post<StoredKeysWire>('/payment-settings/keys', body),
+  storedPaymentKeys: (mode: 'test' | 'live') =>
+    api.get<StoredKeysWire>(`/payment-settings/keys/${mode}`),
   testPayments: () => api.post<unknown>('/payment-settings/test'),
   disconnectPayments: () => api.post<unknown>('/payment-settings/disconnect'),
 }

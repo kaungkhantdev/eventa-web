@@ -20,6 +20,15 @@ const home = (over: Partial<HomeData> = {}): HomeData => ({
   meetings: { ok: true, data: { count: 0, rows: [] } },
   upcoming: { ok: true, data: [] },
   ring: { ok: true, data: { slices: [], active: 0 } },
+  // Not part of this rule: the checklist's contents decide nothing about
+  // whether the checklist is shown at all.
+  setup: {
+    organizationConfigured: false,
+    paymentsConnected: false,
+    eventCreated: false,
+    ticketTypeAdded: false,
+    eventPublished: false,
+  },
   ...over,
 })
 

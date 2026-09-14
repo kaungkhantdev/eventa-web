@@ -1,5 +1,15 @@
 import { useFetcher, useLoaderData } from 'react-router'
-import { Button, Card, Hint, Icon, Input, Label, Select } from '@/components/ui'
+import {
+  Button,
+  Card,
+  FieldError,
+  Hint,
+  Icon,
+  Input,
+  Label,
+  Select,
+  Textarea,
+} from '@/components/ui'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import { LogoCard } from '../components/LogoCard'
@@ -18,9 +28,16 @@ import type { OrganizationForm } from '../settings.types'
 const TIMEZONES = ['Asia/Bangkok', 'Asia/Singapore', 'Asia/Tokyo', 'Europe/London', 'UTC']
 
 export default function SettingsOrganizationPage() {
-  const { organization } = useLoaderData() as OrganizationData
+  const { organization, summary } = useLoaderData() as OrganizationData
   const save = useFetcher<ActionResult>()
   const error = save.data?.ok === false ? save.data.error : null
+  /**
+   * Refusals the API pinned to a field. Those render under their input; the
+   * banner below keeps only what belongs to no field in particular — a stale
+   * version, a dropped connection.
+   */
+  const fields = (save.data?.ok === false ? save.data.fieldErrors : undefined) ?? {}
+  const unattached = Object.keys(fields).length === 0 ? error : null
   const saved = save.state === 'idle' && save.data?.ok === true
   useSavedToast(saved, 'Organization saved.')
   useFailureToast(save.state === 'idle' ? error : null)
@@ -29,11 +46,23 @@ export default function SettingsOrganizationPage() {
     <>
       <SettingsHeader title="Organization" subtitle="Your company profile and branding." />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+        {/* Branding first, as the kit orders it. The logo uploads the moment a
+            file is chosen rather than on Save, so it stays out of the form. */}
+        <div className="space-y-3">
+          <LogoCard
+            logoUrl={organization.logoUrl}
+            name={organization.name}
+            country={organization.country}
+            summary={summary}
+          />
+          <FixedFacts organization={organization} />
+        </div>
+
         <Card className="p-5">
-          <h3 className="text-[14px] font-bold tracking-tight">Company details</h3>
+          <h3 className="text-[14px] font-bold tracking-tight">Organization details</h3>
           <p className="mt-0.5 text-[12px] text-muted">
-            What attendees see on your public pages, invoices and receipts.
+            Legal business info used on invoices and receipts.
           </p>
 
           <save.Form method="post" key={organization.version}>
@@ -42,13 +71,10 @@ export default function SettingsOrganizationPage() {
             <input type="hidden" name="version" value={organization.version} />
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
+              <div>
                 <Label htmlFor="org-name">Organization name</Label>
-                <Input id="org-name" name="name" required defaultValue={organization.name} />
-              </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor="org-address">Address</Label>
-                <Input id="org-address" name="address" defaultValue={organization.address} />
+                <Input id="org-name" name="name" required defaultValue={organization.name} aria-describedby={fields.name ? 'org-name-error' : undefined} />
+                <FieldError id="org-name-error" message={fields.name} />
               </div>
               <div>
                 <Label htmlFor="org-website">Website</Label>
@@ -58,11 +84,31 @@ export default function SettingsOrganizationPage() {
                   type="url"
                   placeholder="https://"
                   defaultValue={organization.website}
+                  aria-describedby={fields.website ? 'org-website-error' : undefined}
                 />
+                <FieldError id="org-website-error" message={fields.website} />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor="org-address">Address</Label>
+                <Textarea id="org-address" name="address" rows={3} defaultValue={organization.address} aria-describedby={fields.address ? 'org-address-error' : undefined} />
+                <FieldError id="org-address-error" message={fields.address} />
+              </div>
+              <div>
+                <Label htmlFor="org-currency">Currency</Label>
+                {/* The kit offers a picker. This one does not, because the API
+                    will not take a change: every invoice and receipt already
+                    issued was calculated in it. Shown in the kit's slot, in the
+                    state it is actually in, rather than as a control that looks
+                    live and silently does nothing. */}
+                <Select id="org-currency" value={organization.currency} disabled onChange={() => {}}>
+                  <option value={organization.currency}>{organization.currency}</option>
+                </Select>
+                <Hint>Fixed once money has moved. Contact support to change it.</Hint>
               </div>
               <div>
                 <Label htmlFor="org-tax-id">Tax ID</Label>
-                <Input id="org-tax-id" name="taxId" defaultValue={organization.taxId} />
+                <Input id="org-tax-id" name="taxId" defaultValue={organization.taxId} aria-describedby={fields.taxId ? 'org-tax-id-error' : undefined} />
+                <FieldError id="org-tax-id-error" message={fields.taxId} />
               </div>
               <div>
                 <Label htmlFor="org-timezone">Timezone</Label>
@@ -86,14 +132,18 @@ export default function SettingsOrganizationPage() {
               </div>
             </div>
 
-            {error && (
+            {unattached && (
               <p role="alert" className="mt-3 text-[13px] text-red-500">
-                {error}
+                {unattached}
               </p>
             )}
-            {saved && <p className="mt-3 text-[13px] text-brand">Organization saved.</p>}
 
-            <div className="mt-5 flex justify-end border-t border-hair pt-4">
+            <div className="mt-5 flex justify-end gap-2 border-t border-hair pt-4">
+              {/* `reset` rather than a navigation: the form is uncontrolled, so
+                  this puts every box back to what the loader supplied. */}
+              <Button variant="soft" size="sm" type="reset" disabled={save.state !== 'idle'}>
+                Cancel
+              </Button>
               <Button variant="primary" size="sm" type="submit" disabled={save.state !== 'idle'}>
                 <Icon name="hgi-tick-02" size={15} />
                 {save.state === 'idle' ? 'Save changes' : 'Saving…'}
@@ -102,13 +152,6 @@ export default function SettingsOrganizationPage() {
           </save.Form>
         </Card>
 
-        <div>
-          <FixedFacts organization={organization} />
-          {/* Branding sits beside the billing facts rather than inside the
-              company form: it is uploaded the moment a file is chosen, not on
-              Save, and putting it in the form would imply otherwise. */}
-          <LogoCard logoUrl={organization.logoUrl} name={organization.name} />
-        </div>
       </div>
     </>
   )
@@ -122,9 +165,9 @@ export default function SettingsOrganizationPage() {
  * accident.
  */
 function FixedFacts({ organization }: { organization: OrganizationForm }) {
+  // Currency moved into the form, in the kit's slot, so it is not repeated here.
   const facts = [
     { label: 'Workspace', value: organization.slug },
-    { label: 'Currency', value: organization.currency },
     { label: 'Country', value: organization.country },
     { label: 'VAT rate', value: organization.vatRate },
   ]

@@ -32,11 +32,11 @@ function amount(satang: number | null): string {
 
 /* ── payouts ──────────────────────────────────────────────────────────── */
 
-const PAYOUT_META: Record<PayoutStatus, { label: string; tone: BadgeTone }> = {
-  scheduled: { label: 'Scheduled', tone: 'blue' },
-  processing: { label: 'Processing', tone: 'amber' },
-  paid: { label: 'Paid', tone: 'green' },
-  failed: { label: 'Failed', tone: 'red' },
+const PAYOUT_META: Record<PayoutStatus, { label: string; tone: BadgeTone; icon: string }> = {
+  scheduled: { label: 'Scheduled', tone: 'blue', icon: 'hgi-time-schedule' },
+  processing: { label: 'Processing', tone: 'amber', icon: 'hgi-clock-01' },
+  paid: { label: 'Paid', tone: 'green', icon: 'hgi-checkmark-badge-01' },
+  failed: { label: 'Failed', tone: 'red', icon: 'hgi-alert-circle' },
 }
 
 export function toPayoutRow(wire: PayoutWire): PayoutRow {
@@ -49,6 +49,7 @@ export function toPayoutRow(wire: PayoutWire): PayoutRow {
     status: wire.status,
     statusLabel: meta.label,
     statusTone: meta.tone,
+    statusIcon: meta.icon,
     period: wire.periodCovered ?? MASKED,
     requested: bangkokDate(wire.requestedAt),
     completed: bangkokDate(wire.completedAt),
@@ -83,11 +84,11 @@ export function toBalances(wire: BalancesWire): Balances {
 
 /* ── invoices ─────────────────────────────────────────────────────────── */
 
-const INVOICE_META: Record<InvoiceStatus, { label: string; tone: BadgeTone }> = {
-  issued: { label: 'Issued', tone: 'blue' },
-  paid: { label: 'Paid', tone: 'green' },
-  overdue: { label: 'Overdue', tone: 'red' },
-  void: { label: 'Void', tone: 'gray' },
+const INVOICE_META: Record<InvoiceStatus, { label: string; tone: BadgeTone; icon: string }> = {
+  issued: { label: 'Issued', tone: 'blue', icon: 'hgi-invoice-01' },
+  paid: { label: 'Paid', tone: 'green', icon: 'hgi-checkmark-badge-01' },
+  overdue: { label: 'Overdue', tone: 'red', icon: 'hgi-alert-circle' },
+  void: { label: 'Void', tone: 'gray', icon: 'hgi-cancel-circle' },
 }
 
 export function toInvoiceRow(wire: InvoiceWire): InvoiceRow {
@@ -106,6 +107,7 @@ export function toInvoiceRow(wire: InvoiceWire): InvoiceRow {
     status: wire.status,
     statusLabel: meta.label,
     statusTone: meta.tone,
+    statusIcon: meta.icon,
     canVoid: wire.canVoid,
     voidBlockedReason: wire.voidBlockedReason,
   }
@@ -134,10 +136,10 @@ function plural(count: number, noun: string): string {
 
 /* ── VAT ──────────────────────────────────────────────────────────────── */
 
-const TAX_META: Record<TaxStatus, { label: string; tone: BadgeTone }> = {
-  upcoming: { label: 'Upcoming', tone: 'gray' },
-  due: { label: 'Due', tone: 'amber' },
-  filed: { label: 'Filed', tone: 'green' },
+const TAX_META: Record<TaxStatus, { label: string; tone: BadgeTone; icon: string }> = {
+  upcoming: { label: 'Upcoming', tone: 'gray', icon: 'hgi-time-schedule' },
+  due: { label: 'Due', tone: 'amber', icon: 'hgi-clock-01' },
+  filed: { label: 'Filed', tone: 'green', icon: 'hgi-checkmark-badge-01' },
 }
 
 export function toTaxRow(wire: TaxPeriodWire): TaxRow {
@@ -156,6 +158,7 @@ export function toTaxRow(wire: TaxPeriodWire): TaxRow {
     status: wire.status,
     statusLabel: meta.label,
     statusTone: meta.tone,
+    statusIcon: meta.icon,
     // Recorded rather than hidden: the Revenue Department's surcharge depends
     // on it, and the organizer is the one who will be asked about it.
     lateNote: wire.late ? 'Filed late' : null,

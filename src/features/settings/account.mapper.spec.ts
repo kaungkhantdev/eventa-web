@@ -115,12 +115,29 @@ const PAYMENTS: PaymentSettingsWire = {
   saveCards: true,
   emailReceipts: true,
   testMode: false,
+  liveKeysAccepted: true,
+  webhookUrl: 'https://api.eventa.test/api/v1/public/payments/webhook/tok_abc',
 }
 
 const payments = (patch: Partial<PaymentSettingsWire> = {}) =>
   toPaymentSettingsCard({ ...PAYMENTS, ...patch })
 
 describe('toPaymentSettingsCard', () => {
+  /**
+   * The organizer registers this in Stripe by hand, so it is passed through
+   * exactly as the API built it — and rendered empty, not as a broken URL,
+   * before the first key save mints a token.
+   */
+  it('carries the workspace’s own webhook endpoint', () => {
+    expect(payments().webhookUrl).toBe(
+      'https://api.eventa.test/api/v1/public/payments/webhook/tok_abc',
+    )
+  })
+
+  it('shows no webhook URL before one exists', () => {
+    expect(payments({ webhookUrl: null }).webhookUrl).toBe('')
+  })
+
   it('says which provider is connected, and in which mode', () => {
     expect(payments()).toMatchObject({
       provider: 'Stripe',
@@ -134,7 +151,40 @@ describe('toPaymentSettingsCard', () => {
     expect(payments({ mode: 'test', testMode: true })).toMatchObject({
       statusLabel: 'Connected · test',
       statusTone: 'amber',
+      takingTestPayments: true,
     })
+  })
+
+  /**
+   * The banner is about a till that works but takes play money. A workspace
+   * with no keys saved has no till at all, and the API still reports
+   * `testMode` for it because test is what the mode defaults to.
+   *
+   * Warning them there anyway states two things that are not true: that they
+   * are "using Test keys" when they are using none, and — by saying only that
+   * REAL charges are not processed — that some charge is. The card underneath
+   * already says Not connected, with the empty boxes to fix it.
+   */
+  it('does not warn about test keys when no keys are saved at all', () => {
+    expect(
+      payments({ status: 'disconnected', mode: 'test', testMode: true }),
+    ).toMatchObject({
+      connected: false,
+      statusLabel: 'Not connected',
+      takingTestPayments: false,
+    })
+  })
+
+  it('does not warn a workspace that is live', () => {
+    expect(payments().takingTestPayments).toBe(false)
+  })
+
+  /**
+   * Kept separate from the banner on purpose: the Test/Live control seeds from
+   * the configured mode, which is a real answer even with nothing saved yet.
+   */
+  it('still reports the configured mode when nothing is connected', () => {
+    expect(payments({ status: 'disconnected', testMode: true }).testMode).toBe(true)
   })
 
   it('says so when nothing is connected', () => {
@@ -160,5 +210,30 @@ describe('toPaymentSettingsCard', () => {
   it('has no warnings unless the API sent some', () => {
     expect(payments().warnings).toEqual([])
     expect(payments({ warnings: ['Payouts are paused'] }).warnings).toEqual(['Payouts are paused'])
+  })
+
+  /**
+   * Whether the Live tab may be offered at all.
+   *
+   * Only the server knows: outside production it refuses live keys outright,
+   * because a live key there lets a seed script or a click round staging charge
+   * a real card. The page cannot work that out for itself.
+   */
+  describe('whether this server would take live keys', () => {
+    it('passes the API’s answer through', () => {
+      expect(payments({ liveKeysAccepted: true }).liveKeysAccepted).toBe(true)
+      expect(payments({ liveKeysAccepted: false }).liveKeysAccepted).toBe(false)
+    })
+
+    /**
+     * Closed by default. An older API that does not send the field would
+     * otherwise open a tab whose save is guaranteed to fail — and the failure
+     * mode of guessing wrong the other way is a live key where one is refused.
+     */
+    it('assumes not, when the API says nothing', () => {
+      expect(
+        payments({ liveKeysAccepted: undefined as unknown as boolean }).liveKeysAccepted,
+      ).toBe(false)
+    })
   })
 })

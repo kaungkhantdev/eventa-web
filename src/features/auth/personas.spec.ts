@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  accountLabelFor,
   checkEmailPathFor,
+  forgotPathFor,
   homeFor,
+  otherPersona,
   personaOfSearch,
   personaOfSession,
   signInPathFor,
@@ -35,6 +38,36 @@ describe('two personas, never one login', () => {
   it('ends each persona’s sign-up on its own “check your email” page', () => {
     expect(checkEmailPathFor('admin')).toBe('/auth/register/check-email')
     expect(checkEmailPathFor('attendee')).toBe('/portal/register/check-email')
+  })
+
+  /**
+   * One page resets both, and the realm it searches comes from `?persona=`.
+   * Reached without it, an attendee is looked for among organizers and never
+   * found — while the page, which must answer neutrally, still says a link is
+   * on its way. So the page has to be able to name the realm it is in and
+   * offer the door to the other one.
+   */
+  it('addresses each persona’s reset to its own realm', () => {
+    expect(forgotPathFor('admin')).toBe('/auth/forgot-password')
+    expect(forgotPathFor('attendee')).toBe('/auth/forgot-password?persona=attendee')
+  })
+
+  it('names the account each persona holds, for a screen to say out loud', () => {
+    expect(accountLabelFor('admin')).toBe('Organizer account')
+    expect(accountLabelFor('attendee')).toBe('Attendee account')
+  })
+
+  it('knows which audience is the other one', () => {
+    expect(otherPersona('admin')).toBe('attendee')
+    expect(otherPersona('attendee')).toBe('admin')
+  })
+
+  /** The two together: the offer of the other door, from either side. */
+  it('points at the other realm’s reset from either side', () => {
+    expect(forgotPathFor(otherPersona('admin'))).toBe(
+      '/auth/forgot-password?persona=attendee',
+    )
+    expect(forgotPathFor(otherPersona('attendee'))).toBe('/auth/forgot-password')
   })
 })
 

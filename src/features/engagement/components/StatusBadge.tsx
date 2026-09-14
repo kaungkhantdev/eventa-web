@@ -1,4 +1,4 @@
-import { Badge, Icon, type BadgeTone } from '@/components/ui'
+import { Badge, type BadgeTone } from '@/components/ui'
 import type { FeedbackStatus } from '../data/feedback'
 
 /* Survey/event status pill — the static kit's STATUS map (tone + icon). */
@@ -18,8 +18,7 @@ export function StatusBadge({
 }) {
   const st = STATUS[status] ?? STATUS.Draft
   return (
-    <Badge tone={st.tone} className={className}>
-      <Icon name={st.icon} size={12} />
+    <Badge tone={st.tone} icon={st.icon} className={className}>
       {status}
     </Badge>
   )

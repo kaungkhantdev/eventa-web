@@ -4,14 +4,26 @@ import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import type { ActionResult } from '@/app/loaders'
-import { NotificationBell, SignedInChip } from '@/components/ui'
+import { NotificationBell, SignedInChip, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { mapLinkFor } from '@/lib/mapLink'
 import { publishGaps, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
 import type { EventFormData } from '../eventForm.routes'
 import { EVENT_TYPES } from '../events.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
+import { eventDetailPath } from '../events.presentation'
 import type { EventType } from '../types'
-import { HL_ICONS, LETTERS, STEPS, type Highlight } from '../eventForm.presentation'
+import {
+  HL_ICONS,
+  LETTERS,
+  STEPS,
+  finalLabel,
+  headerSaveLabel,
+  landingPreviewHref,
+  summaryCapacity,
+  type Highlight,
+} from '../eventForm.presentation'
+import { CoverImageField } from '../components/CoverImageField'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
    A five-step flow (Basics · Date & location · Seating · Tickets · Review)
@@ -22,7 +34,13 @@ type LocMode = 'inperson' | 'online'
 type Seating = 'ga' | 'reserved'
 type LandingTpl = (typeof LANDING_TEMPLATES)[number]['id']
 
-const DESC_MAX = 250
+/**
+ * The cap the counter shows, in CHARACTERS THE ORGANIZER TYPED — not markup.
+ * The API allows 10,000 characters of sanitised HTML, so this leaves roughly
+ * double the typed length as headroom for tags. Counting the markup instead
+ * would make the number jump when someone bolded a word.
+ */
+const DESC_MAX = 5000
 
 /** The API's publish requirements, in its own words — see events.service.ts. */
 const PUBLISH_REQUIREMENTS = [
@@ -107,8 +125,15 @@ function SeatPreview({ rows, cols }: { rows: number; cols: number }) {
   return <div className="flex flex-col items-center gap-1.5 overflow-x-auto">{rowEls}</div>
 }
 
+/** An emptied editor still holds one empty paragraph; that is not a description. */
+function isBlank(quill: Quill): boolean {
+  return quill.getLength() <= 1
+}
+
 /* ---------- Description rich-text editor (Quill 2 · snow) ----------
-   Same toolbar and 250-char cap as the static kit's admin/event-form.html.
+   The static kit's toolbar, but its formatting is now KEPT: the editor stores
+   markup and the API sanitises it on write. The cap is DESC_MAX typed
+   characters, well above the kit's 250.
    Quill is instantiated imperatively so it works under React 19 without a
    wrapper lib; a ref guard makes it survive StrictMode's double-mount. */
 function DescriptionEditor({
@@ -150,13 +175,17 @@ function DescriptionEditor({
       },
     })
 
-    if (initialText) quill.setText(initialText)
+    // `dangerouslyPasteHTML` by name only: this is the description the API just
+    // returned, and the API sanitises on write — see `rich-text.ts` there.
+    if (initialText) quill.clipboard.dangerouslyPasteHTML(initialText, 'silent')
     const sync = () => {
       const len = Math.max(0, quill.getLength() - 1)
       setCount(len)
-      // The API stores the description as text, so that is what is reported —
-      // the toolbar's formatting is a writing aid, not something that persists.
-      latest.current(quill.getText().trim())
+      // The MARKUP, not the text. `root.innerHTML` rather than
+      // `getSemanticHTML()` because Quill renders indentation as a
+      // `ql-indent-*` class, which the API's allowlist keeps, while the
+      // semantic form emits an inline style, which it strips.
+      latest.current(isBlank(quill) ? '' : quill.root.innerHTML)
     }
     sync()
     quill.on('text-change', () => {
@@ -212,6 +241,10 @@ export default function EventFormPage() {
   const [highlights, setHighlights] = useState<Highlight[]>(() =>
     initial.highlights.map((h) => ({ icon: h.icon ?? 'hgi-sparkles', label: h.text })),
   )
+  const [coverImage, setCoverImage] = useState(initial.coverImage)
+  // Recomputed as they type, so it always points at what is actually in the
+  // boxes rather than at whatever was there when the page loaded.
+  const mapLink = mapLinkFor({ venueName: venue, address, city: initial.city })
   const [landingTpl, setLandingTpl] = useState<LandingTpl>(template)
   const [visibility, setVisibility] = useState('public')
 
@@ -249,6 +282,7 @@ export default function EventFormPage() {
     capacity,
     seatRows: rows,
     seatsPerRow: cols,
+    coverImage,
     highlights: highlights.map((h) => ({ text: h.label, icon: h.icon })),
     tickets,
   })
@@ -261,6 +295,10 @@ export default function EventFormPage() {
   const isDraft = initial.status === null || initial.status === 'draft'
   const pct = Math.round(((cur + 1) / STEPS.length) * 100)
   const last = cur === STEPS.length - 1
+  // An event that already exists is being edited, whatever the wizard is
+  // called. Saying "Create event" over someone's published conference is the
+  // kind of small lie that makes people doubt whether Save did anything.
+  const heading = initial.id ? 'Edit event' : 'Create event'
   const rowsNum = Number(rows) || 0
   const colsNum = Number(cols) || 0
   const seatTotal = rowsNum * colsNum
@@ -278,18 +316,40 @@ export default function EventFormPage() {
    * The first save creates the event and puts its id in the URL, so the work
    * survives a refresh; each later step sends the call that step owns.
    */
-  const saveStep = () => {
+  /**
+   * Write whatever step is open. `extra` carries the caller's intent about
+   * feedback: a Next saves silently, the header's button announces it.
+   */
+  const saveStep = (extra: Record<string, string> = {}) => {
     if (!initial.id) {
-      if (canCreate) submit({ intent: 'create' })
+      if (canCreate) submit({ intent: 'create', ...extra })
       return
     }
-    if (cur === 2) submit({ intent: 'seating' })
-    else if (cur === 3) submit({ intent: 'tickets' })
-    else submit({ intent: 'save' })
+    if (cur === 2) submit({ intent: 'seating', ...extra })
+    else if (cur === 3) submit({ intent: 'tickets', ...extra })
+    else submit({ intent: 'save', ...extra })
   }
+
+  /**
+   * The header's save. It has always written the open step — but it was called
+   * "Save as draft" on an event that is already published, which reads as an
+   * offer to UNPUBLISH, and it confirmed nothing. So editing one field on step
+   * one meant clicking Next through every remaining step to reach a button that
+   * looked like it would save. Same write; it now says what it does and says
+   * when it is done.
+   */
+  const saveHere = () => saveStep({ notify: 'on' })
 
   const publish = () =>
     submit({ intent: 'publish', visibility, template: landingTpl, confirmPastStart: 'on' })
+
+  /**
+   * The last step's save on an event that is already live. Same write as every
+   * other step's Next — `finish` only tells the action this was the end of the
+   * wizard, so it can announce the save and hand the organizer back to the
+   * event instead of leaving them on a form with nothing left to do.
+   */
+  const saveAndFinish = () => submit({ intent: 'save', notify: 'on', finish: 'on' })
 
   const goTo = (i: number) => {
     setCur(Math.max(0, Math.min(STEPS.length - 1, i)))
@@ -327,20 +387,30 @@ export default function EventFormPage() {
   const setHighlightField = (i: number, field: keyof Highlight, value: string) =>
     setHighlights((prev) => prev.map((h, j) => (j === i ? { ...h, [field]: value } : h)))
 
-  const previewLanding = () => {
-    const p = new URLSearchParams()
-    const t = title.trim()
-    const v = venue.trim()
-    if (t) p.set('title', t)
-    if (v) p.set('venue', v)
-    if (online) p.set('online', '1')
-    const hls = highlights
-      .map((h) => (h.label.trim() ? `${h.icon}:${h.label.trim()}` : null))
-      .filter((x): x is string => Boolean(x))
-    if (hls.length) p.set('hl', hls.join('|'))
-    const qs = p.toString()
-    window.open(`/landing/${landingTpl}${qs ? '?' + qs : ''}`, '_blank', 'noopener')
-  }
+  /**
+   * Recomputed as they type, so the draft branch previews what is in the boxes
+   * now rather than what was there when the page loaded.
+   */
+  const previewHref = landingPreviewHref(
+    landingTpl,
+    initial.id
+      ? { slug: initial.slug, status: initial.status ?? '', visibility: initial.visibility }
+      : null,
+    { title, venue, online, highlights },
+  )
+  /**
+   * A live event previews its real published page, so what is on screen but not
+   * yet saved will not appear there — said plainly rather than left to surprise
+   * somebody who just typed a new title.
+   */
+  const previewsSaved = previewHref.includes('event=')
+  const previewTitle = previewsSaved
+    ? 'Opens the live public page — unsaved changes are not shown'
+    : 'Opens a preview of this draft in a new tab'
+
+  /* A new tab, not a navigation: the wizard holds the open step's edits in
+     component state, so leaving the page would discard them. */
+  const previewLanding = () => window.open(previewHref, '_blank', 'noopener')
 
   return (
     <>
@@ -360,9 +430,34 @@ export default function EventFormPage() {
           <i className="hgi-stroke hgi-arrow-left-01 text-[18px]" />
         </Link>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
+          {/* In the header rather than only on the last step: the landing page
+              is what every step feeds, so "what will this look like?" is asked
+              while writing the description, not just at the end. */}
           <button
             type="button"
-            onClick={saveStep}
+            onClick={previewLanding}
+            className="btn btn-soft"
+            title={previewTitle}
+          >
+            <i className="hgi-stroke hgi-arrow-up-right-01 text-[16px]" />
+            <span className="hidden sm:inline">Preview</span>
+          </button>
+          {/* Only once the event exists: on a new one there is no workspace to
+              open yet. Editing is usually a detour from the event's own page,
+              and without this the way back was the browser's back button. */}
+          {initial.id && (
+            <Link
+              to={eventDetailPath(initial.id)}
+              className="btn btn-soft"
+              title="Open this event's workspace"
+            >
+              <i className="hgi-stroke hgi-eye text-[16px]" />
+              <span className="hidden sm:inline">View event</span>
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={saveHere}
             disabled={saving || (!initial.id && !canCreate)}
             title={
               initial.id || canCreate
@@ -372,7 +467,7 @@ export default function EventFormPage() {
             className="btn btn-soft disabled:opacity-60"
           >
             <i className="hgi-stroke hgi-note-03 text-[16px]" />
-            <span className="hidden sm:inline">{saving ? 'Saving…' : 'Save as draft'}</span>
+            <span className="hidden sm:inline">{headerSaveLabel(initial.id !== null, saving)}</span>
             <span className="sm:hidden">Draft</span>
           </button>
           <NotificationBell />
@@ -400,9 +495,9 @@ export default function EventFormPage() {
               Events
             </Link>
             <i className="hgi-stroke hgi-arrow-right-01 text-[13px]" />
-            <span className="text-ink">Create event</span>
+            <span className="text-ink">{heading}</span>
           </nav>
-          <h1 className="mt-2 text-[22px] font-bold tracking-tight">Create event</h1>
+          <h1 className="mt-2 text-[22px] font-bold tracking-tight">{heading}</h1>
           <p className="mt-3 text-[13px] font-semibold text-ink tnum">{pct}% completed</p>
           <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-line">
             <div
@@ -501,16 +596,7 @@ export default function EventFormPage() {
             {/* Cover image */}
             <section className="card p-4">
               <h3 className="text-[14px] font-bold tracking-tight">Cover image</h3>
-              <label className="mt-3 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-hair p-8 text-center transition-colors hover:border-brand">
-                <span className="grid h-11 w-11 place-items-center rounded-full bg-brand-soft text-brand">
-                  <i className="hgi-stroke hgi-image-upload-01 text-[20px]" />
-                </span>
-                <p className="text-[13px] font-semibold text-ink">
-                  Drag &amp; drop or <span className="text-brand">browse</span>
-                </p>
-                <p className="text-[11px] text-muted">Recommended 1600×900px · PNG or JPG · up to 5MB</p>
-                <input type="file" className="hidden" accept="image/*" />
-              </label>
+              <CoverImageField value={coverImage} onChange={setCoverImage} />
             </section>
 
             {/* Highlights */}
@@ -663,7 +749,25 @@ export default function EventFormPage() {
                     />
                   </div>
                   <div>
-                    <label className="label">Address</label>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <label className="label">Address</label>
+                      {/* Built from what is typed, never stored: a saved link
+                          and an edited address drift apart, and the stale copy
+                          is the one that strands somebody outside the wrong
+                          building. Offered as a check BEFORE publishing — if
+                          it lands somewhere odd here, it will for attendees. */}
+                      {mapLink && (
+                        <a
+                          href={mapLink}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
+                        >
+                          <i className="hgi-stroke hgi-location-01 text-[13px]" />
+                          Check on map
+                        </a>
+                      )}
+                    </div>
                     <input
                       className="input"
                       type="text"
@@ -673,6 +777,12 @@ export default function EventFormPage() {
                     />
                   </div>
                 </div>
+                {/* The same map the attendee will see, while there is still
+                    time to correct the address that produced it. */}
+                <VenueMap
+                  venue={{ venueName: venue, address, city: initial.city }}
+                  title="Venue location preview"
+                />
               </div>
               <div className={cn('mt-3 space-y-3', !online && 'hidden')}>
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -1115,13 +1225,23 @@ export default function EventFormPage() {
             </button>
             <button
               type="button"
-              disabled={saving || (last ? gaps.length > 0 || !isDraft : cur === 1 && !canCreate)}
-              title={last && gaps.length ? `Still needs ${gaps.join(', ')}` : undefined}
+              disabled={
+                saving || (last ? isDraft && gaps.length > 0 : cur === 1 && !canCreate)
+              }
+              title={last && isDraft && gaps.length ? `Still needs ${gaps.join(', ')}` : undefined}
               onClick={() => {
                 // Each Next saves the step it is leaving, so nothing is held in
                 // the browser waiting for a final submit that may never come.
-                if (last) publish()
-                else {
+                //
+                // On the last step a draft is published; an event that is
+                // already live is simply saved. It used to offer "Publish
+                // event" here and disable it, which told an organizer editing a
+                // published event that their only option was one they could not
+                // take — and left the step with nothing to press.
+                if (last) {
+                  if (isDraft) publish()
+                  else saveAndFinish()
+                } else {
                   saveStep()
                   goTo(cur + 1)
                 }
@@ -1131,7 +1251,7 @@ export default function EventFormPage() {
               {last ? (
                 <>
                   <i className="hgi-stroke hgi-checkmark-circle-02 text-[16px]" />
-                  {saving ? 'Publishing…' : 'Publish event'}
+                  {finalLabel(isDraft, saving)}
                 </>
               ) : (
                 <>
@@ -1166,7 +1286,10 @@ export default function EventFormPage() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted">Capacity</span>
                   <span className="font-semibold text-ink tnum">
-                    {(Number(capacity) || 0).toLocaleString('en-US')}
+                    {/* An unset capacity is not a capacity of nought. `0` reads
+                        as "nobody may come", which is the opposite of "as many
+                        as the tickets allow". */}
+                    {summaryCapacity(capacity)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">

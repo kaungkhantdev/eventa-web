@@ -21,7 +21,18 @@ import { accountApi } from '../settings.routes'
 /** Kept in step with the API's own allow-list. */
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp']
 
-export function LogoCard({ logoUrl, name }: { logoUrl: string | null; name: string }) {
+export function LogoCard({
+  logoUrl,
+  name,
+  country,
+  summary,
+}: {
+  logoUrl: string | null
+  name: string
+  country: string
+  /** Counts the API derives; absent until the caller has them. */
+  summary?: { eventsHosted: number; teamMembers: number }
+}) {
   const file = useRef<HTMLInputElement>(null)
   const revalidator = useRevalidator()
   const [busy, setBusy] = useState(false)
@@ -66,49 +77,78 @@ export function LogoCard({ logoUrl, name }: { logoUrl: string | null; name: stri
   }
 
   return (
-    <Card className="mt-4 p-5">
-      <h3 className="text-[14px] font-bold tracking-tight">Logo</h3>
+    <Card className="p-5">
+      <h3 className="text-[14px] font-bold tracking-tight">Organization logo</h3>
       <p className="mt-0.5 text-[12px] text-muted">
         Shown on your public pages, invoices and receipts.
       </p>
 
-      <div className="mt-4 flex items-center gap-4">
+      <div className="mt-3 flex items-center gap-4">
         {logoUrl ? (
           <img
             src={logoUrl}
             alt={`${name} logo`}
-            className="h-16 w-16 shrink-0 rounded-full border border-hair object-contain"
+            className="h-20 w-20 shrink-0 rounded-full border border-hair object-contain"
           />
         ) : (
           // Not an empty box: the initial is what a workspace without a logo
-          // already shows everywhere else.
-          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-brand-soft text-[22px] font-bold text-brand">
+          // already shows everywhere else. The kit's square gradient tile.
+          <span className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-emerald-400 text-[28px] font-bold text-white">
             {name.trim().charAt(0).toUpperCase() || '?'}
           </span>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="soft"
-            size="sm"
-            type="button"
-            disabled={busy}
-            onClick={() => file.current?.click()}
-          >
-            <Icon name="hgi-image-upload" size={15} />
-            {logoUrl ? 'Replace' : 'Upload'}
-          </Button>
-          {logoUrl && (
-            <Button variant="ghost" size="sm" type="button" disabled={busy} onClick={() => void remove()}>
-              Remove
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="soft"
+              size="sm"
+              type="button"
+              disabled={busy}
+              onClick={() => file.current?.click()}
+            >
+              <Icon name="hgi-image-upload" size={15} />
+              {logoUrl ? 'Replace' : 'Upload'}
             </Button>
-          )}
+            {/* A text link, as the kit draws it — removing a logo should not
+                look as reachable as choosing one. */}
+            {logoUrl && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void remove()}
+                className="text-[12px] font-medium text-muted transition hover:text-red-500 disabled:opacity-50"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <p className="mt-2 text-[11px] leading-snug text-muted">
+            JPEG, PNG or WebP · square looks best
+          </p>
         </div>
       </div>
 
-      <p className="mt-3 text-[11.5px] text-muted">
-        JPEG, PNG or WebP. A square image looks best.
-      </p>
+      {/* The kit's identity block: who this workspace is, then the two figures
+          worth knowing about it. There is no plan or tier — this product has no
+          billing concept, and a badge claiming one would say otherwise. */}
+      <div className="mt-4 border-t border-hair pt-4">
+        <p className="truncate text-[15px] font-bold tracking-tight text-ink">{name}</p>
+        <p className="mt-0.5 text-[12px] text-muted">{country}</p>
+      </div>
+
+      {summary && (
+        <div className="mt-4 space-y-2 border-t border-hair pt-4 text-[12px]">
+          <p className="flex items-center justify-between gap-2">
+            <span className="text-muted">Events hosted</span>
+            <span className="tnum font-semibold text-ink">{summary.eventsHosted}</span>
+          </p>
+          <p className="flex items-center justify-between gap-2">
+            <span className="text-muted">Team members</span>
+            <span className="tnum font-semibold text-ink">{summary.teamMembers}</span>
+          </p>
+        </div>
+      )}
 
       {busy && <p className="mt-2 text-[12px] text-muted">Working…</p>}
       {error && (

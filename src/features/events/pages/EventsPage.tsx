@@ -21,7 +21,7 @@ import type { ListEmptyReason } from '@/lib/urlFilters'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
 import { EventCalendar } from '../components/EventCalendar'
-import { COVER, STATUS_PILL } from '../events.presentation'
+import { COVER, STATUS_PILL, eventDetailPath as detailPath } from '../events.presentation'
 import { EVENT_SORTS, EVENT_TYPES, type EventsData } from '../events.routes'
 import type { EventBucket, EventRow } from '../types'
 
@@ -454,7 +454,7 @@ function RowMenu({
       className="fixed z-50 w-56 rounded-xl border border-hair bg-surface p-1.5 shadow-xl"
       style={{ left: position.left, top: position.top }}
     >
-      <Link to={`/admin/event-detail?id=${row.id}`} onClick={onClose} className={MENU_ITEM}>
+      <Link to={detailPath(row.id)} onClick={onClose} className={MENU_ITEM}>
         <Icon name="hgi-view" size={15} className="text-muted" />
         View details
       </Link>
@@ -514,29 +514,44 @@ function EventTableRow({
   return (
     <tr className="border-t border-line align-middle transition hover:bg-line/40">
       <td className="py-4 pr-4">
-        <div className="flex items-center gap-3.5">
+        {/* A real link, not a click handler on the row. An anchor is reachable
+            by keyboard, opens in a new tab on middle-click, and shows its
+            destination on hover — none of which a clickable <tr> does, and it
+            leaves the kebab beside it clickable without a stopPropagation
+            dance. The whole cell is the target, so it is easy to hit. */}
+        <Link
+          to={detailPath(r.id)}
+          className="group flex items-center gap-3.5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        >
           <span
             className={cn(
               'relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl text-white shadow-sm',
               COVER[r.tone],
             )}
           >
+            {/* The type icon on its tint is the fallback, already underneath.
+                No cover, no photograph: this used to seed picsum from the slug,
+                which put a stranger's event beside a real one. */}
             <Icon name={r.icon} size={22} />
-            <img
-              src={`https://picsum.photos/seed/${r.seed}/96/96`}
-              alt=""
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
+            {r.cover && (
+              <img
+                src={r.cover}
+                alt=""
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            )}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[14.5px] font-bold tracking-tight text-ink">{r.name}</p>
+            <p className="truncate text-[14.5px] font-bold tracking-tight text-ink group-hover:underline">
+              {r.name}
+            </p>
             <p className="mt-0.5 truncate text-[12px] text-muted">{r.type}</p>
           </div>
-        </div>
+        </Link>
       </td>
       <td className="py-4 pr-4 whitespace-nowrap text-[13px] text-muted tnum">{r.date}</td>
       <td className="py-4 pr-4">
@@ -553,10 +568,11 @@ function EventTableRow({
       <td className="py-4 pr-4">
         <span
           className={cn(
-            'inline-block rounded-full px-3 py-1 text-[12px] font-medium',
-            STATUS_PILL[r.status],
+            'inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-medium',
+            STATUS_PILL[r.status].cls,
           )}
         >
+          <Icon name={STATUS_PILL[r.status].icon} size={12} />
           {r.status}
         </span>
       </td>

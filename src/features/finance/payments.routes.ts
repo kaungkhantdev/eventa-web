@@ -3,7 +3,6 @@ import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { api, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
-import { eventsApi } from '@/features/events/events.api'
 import { toPaymentRow } from './payments.mapper'
 import type {
   LedgerCountsWire,
@@ -12,6 +11,7 @@ import type {
   PaymentMethod,
   PaymentRow,
 } from './payments.types'
+import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 
 /**
  * The payments ledger (US-FIN-01/02).
@@ -28,8 +28,6 @@ export type LedgerTab = (typeof LEDGER_TABS)[number]
 export const METHODS: readonly PaymentMethod[] = ['Card', 'PromptPay', 'Bank transfer']
 
 const MAX_SEARCH = 120
-const EVENT_OPTIONS = 100
-
 interface LedgerQuery extends Query {
   page?: number
   limit?: number
@@ -76,7 +74,7 @@ export interface PaymentsData {
   rows: PaymentRow[]
   window: PageWindow
   tabs: TabCounts
-  events: { id: string; name: string }[]
+  events: EventOption[]
   /** The filters to export, so the CSV matches what is on screen. */
   exportQuery: Record<string, string>
 }
@@ -115,11 +113,6 @@ export function exportQueryOf(query: LedgerQuery): Record<string, string> {
     if (value !== undefined && value !== null && value !== '') out[key] = String(value)
   }
   return out
-}
-
-async function eventOptions(): Promise<{ id: string; name: string }[]> {
-  const page = await eventsApi.list({ limit: EVENT_OPTIONS, sort: 'recent' })
-  return page.items.map((event) => ({ id: event.id, name: event.name }))
 }
 
 function withPage(current: string, page: number): string {

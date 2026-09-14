@@ -22,9 +22,11 @@ const event = (over: Partial<EventWire> = {}): EventWire => ({
   startAt: '2026-07-18T02:00:00Z',
   endAt: '2026-07-19T11:00:00Z',
   venueName: 'BITEC',
+  venueAddress: '999/9 Rama I Rd, Pathum Wan, Bangkok 10330',
   city: 'Bangkok',
   isOnline: false,
   capacity: 400,
+  coverImage: 'https://cdn.eventa.test/cover.jpg',
   version: 3,
   ...over,
 })
@@ -110,6 +112,34 @@ describe('hydrating the wizard from an event being edited', () => {
 
   it('carries the version every save has to send back', () => {
     expect(values().version).toBe(3)
+  })
+
+  /**
+   * `toUpdateBody` has always SENT `coverImage`, but nothing read it back — so
+   * a saved cover vanished the moment the wizard was reopened, and the next
+   * save wrote the empty string over it. A field that only travels one way is
+   * worse than one that does not travel: it deletes.
+   */
+  it('reads the cover image back, so reopening the wizard does not erase it', () => {
+    expect(values().coverImage).toBe('https://cdn.eventa.test/cover.jpg')
+  })
+
+  it('has no cover when the event has none', () => {
+    expect(toEventFormValues(event({ coverImage: null }), [], []).coverImage).toBe('')
+  })
+
+  /**
+   * The same one-way trip the cover image was on. `toUpdateBody` sends
+   * `venueAddress`, nothing read it back, so reopening the wizard blanked the
+   * street address and the next save wrote the empty string over it — leaving
+   * an event with a venue name and no way to find it.
+   */
+  it('reads the street address back, which the map link needs', () => {
+    expect(values().venueAddress).toBe('999/9 Rama I Rd, Pathum Wan, Bangkok 10330')
+  })
+
+  it('has no address when the event has none', () => {
+    expect(toEventFormValues(event({ venueAddress: null }), [], []).venueAddress).toBe('')
   })
 
   it('starts empty for a brand-new event', () => {
@@ -198,6 +228,44 @@ describe('what PATCH /events/:id may carry', () => {
     const body = toUpdateBody(v)
     expect(body.isOnline).toBe(true)
     expect(body.onlineNote).toBe('Zoom')
+  })
+
+  /**
+   * The one-way trip the cover image and the street address were both on, run
+   * the other way round: the wizard READ `capacity` back and never sent it. So
+   * the field accepted a number, the step reported itself saved, and reopening
+   * the wizard showed it empty again — the value never left the browser.
+   */
+  describe('capacity', () => {
+    it('sends the capacity the organizer typed', () => {
+      const v = { ...toEventFormValues(event(), [], []), capacity: '250' }
+      expect(toUpdateBody(v).capacity).toBe(250)
+    })
+
+    it('sends a number, not the text of one', () => {
+      const v = { ...toEventFormValues(event(), [], []), capacity: '250' }
+      expect(typeof toUpdateBody(v).capacity).toBe('number')
+    })
+
+    /**
+     * Blank is omitted rather than sent as 0 or null, and that is the API's
+     * rule, not a preference: `UpdateEventDto.capacity` is `@IsPositive()`, so
+     * 0 and null are both refused. Omitting means "leave it alone".
+     *
+     * The cost is that an existing capacity cannot be CLEARED from here — that
+     * needs the DTO to accept null first, which starts in eventa-api.
+     */
+    it('omits a blank capacity rather than sending 0, which the API refuses', () => {
+      const v = { ...toEventFormValues(event(), [], []), capacity: '' }
+      expect(toUpdateBody(v)).not.toHaveProperty('capacity')
+    })
+
+    it('omits anything that is not a positive whole number', () => {
+      const base = toEventFormValues(event(), [], [])
+      for (const capacity of ['0', '-5', 'abc', '2.5']) {
+        expect(toUpdateBody({ ...base, capacity })).not.toHaveProperty('capacity')
+      }
+    })
   })
 })
 

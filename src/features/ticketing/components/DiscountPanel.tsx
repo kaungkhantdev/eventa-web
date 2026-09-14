@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
-import { Button, Hint, Icon, Input, Label, Panel, Select } from '@/components/ui'
+import { Button, EventPicker, Hint, Icon, Input, Label, Panel } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
@@ -31,6 +31,7 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
   const fetcher = useFetcher<ActionResult>()
   const [type, setType] = useState<DiscountType>('percent')
   const [code, setCode] = useState('')
+  const [eventId, setEventId] = useState('')
   const saving = fetcher.state !== 'idle'
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
@@ -43,6 +44,7 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
     if (open) {
       setType('percent')
       setCode('')
+      setEventId('')
     }
   }
 
@@ -178,14 +180,16 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
 
         <div>
           <Label htmlFor="discount-event">Applies to</Label>
-          <Select id="discount-event" name="eventId" defaultValue="">
-            <option value="">{ALL_EVENTS}</option>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </Select>
+          <EventPicker
+            id="discount-event"
+            name="eventId"
+            value={eventId}
+            onChange={setEventId}
+            options={events}
+            allLabel={ALL_EVENTS}
+            allValue=""
+            placeholder={ALL_EVENTS}
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3">

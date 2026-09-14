@@ -270,9 +270,24 @@ describe('the rest of the page', () => {
     expect(ev.slug).toBe('bangkok-trail-run-2026')
   })
 
-  it('uses the description as the about text and the tagline', () => {
+  it('uses the description as the about text', () => {
     expect(toLandingEvent(page()).about).toBe('A 21km trail run through Bang Krachao.')
-    expect(toLandingEvent(page()).tagline).toBe('A 21km trail run through Bang Krachao.')
+  })
+
+  /**
+   * The kit's templates have two slots — a one-line hook in the hero and the
+   * full description under "About the event" — and its sample data fills them
+   * with different sentences. The API has only `description`, and this filled
+   * BOTH with it, so every public page printed the same paragraph twice,
+   * once above the Register button and again fifty pixels below it.
+   *
+   * Shown once, in the section named for it. Inventing a hook by cutting the
+   * first sentence would still repeat that sentence verbatim; a hero line
+   * needs a field of its own before it can say anything a reader has not
+   * already read.
+   */
+  it('does not repeat the description as a hero tagline', () => {
+    expect(toLandingEvent(page()).tagline).toBe('')
   })
 
   it('leaves the about text empty rather than printing null', () => {

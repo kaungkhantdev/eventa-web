@@ -21,8 +21,17 @@ const KEY_PREFIX = 'eventa:resend-until:'
 
 export type CooldownStore = Pick<Storage, 'getItem' | 'setItem'>
 
-function keyFor(email: string): string {
-  return `${KEY_PREFIX}${email.toLowerCase()}`
+/**
+ * What is being re-sent. Two different sends for the same address are two
+ * different waits: asking for a reset link must not open jammed because a
+ * sign-up happened a moment ago. `verify` is the unlabelled original, so keys
+ * the verification flow already wrote keep reading.
+ */
+export type ResendPurpose = 'verify' | 'reset'
+
+function keyFor(email: string, purpose: ResendPurpose): string {
+  const label = purpose === 'verify' ? '' : `${purpose}:`
+  return `${KEY_PREFIX}${label}${email.toLowerCase()}`
 }
 
 /** Seconds still to wait, or 0 when the button is live. Never negative. */
@@ -30,8 +39,9 @@ export function secondsRemaining(
   email: string,
   now: number,
   store: CooldownStore | null = browserStore(),
+  purpose: ResendPurpose = 'verify',
 ): number {
-  const raw = read(store, keyFor(email))
+  const raw = read(store, keyFor(email, purpose))
   const until = Number(raw)
   // A hand-edited or half-written value is not a reason to jam the button.
   if (raw === null || !Number.isFinite(until)) return 0
@@ -43,8 +53,9 @@ export function startCooldown(
   email: string,
   now: number,
   store: CooldownStore | null = browserStore(),
+  purpose: ResendPurpose = 'verify',
 ): void {
-  write(store, keyFor(email), String(now + RESEND_COOLDOWN_MS))
+  write(store, keyFor(email, purpose), String(now + RESEND_COOLDOWN_MS))
 }
 
 /**

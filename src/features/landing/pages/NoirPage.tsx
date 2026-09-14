@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { Icon } from '@/components/ui'
+import { Icon,
+  VenueMap,
+  RichText,
+} from '@/components/ui'
 import type { LandingEvent } from '@/features/landing/types'
 
 /* Port of landing/noir.html — a wide "spotlight split" event page: a cover
@@ -76,6 +79,10 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
     { k: 'Price', v: priceDetail },
   ].filter((r) => r.v)
 
+  // The address decides the pin; see mapLink.ts on why the venue name does
+  // not join the query.
+  const venue = { venueName: ev.venue, address: ev.address, city: ev.city }
+
   const footWhen = [ev.dateText, where].filter(Boolean).join('  ·  ')
   const year = String(new Date().getFullYear())
   const emailHref = ev.contactEmail ? `mailto:${ev.contactEmail}` : '#'
@@ -127,9 +134,11 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
               <h1 className="reveal d1 mt-4 text-[32px] font-extrabold leading-[1.05] tracking-tight text-ink sm:text-[40px] lg:text-[44px]">
                 {ev.title}
               </h1>
-              <p className="reveal d2 mt-4 max-w-[52ch] text-[15px] leading-relaxed text-muted sm:text-[16px]">
-                {ev.tagline}
-              </p>
+              {ev.tagline && (
+                <p className="reveal d2 mt-4 max-w-[52ch] text-[15px] leading-relaxed text-muted sm:text-[16px]">
+                  {ev.tagline}
+                </p>
+              )}
               <div
                 className="reveal d3 mt-8 flex flex-col gap-x-8 gap-y-3.5 sm:flex-row sm:flex-wrap"
                 role="list"
@@ -219,7 +228,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                 <h2 id="lbl-about" className="text-[18px] font-bold text-ink">
                   About this event
                 </h2>
-                <p className="mt-4 text-[14.5px] leading-relaxed text-muted">{ev.about}</p>
+                <RichText html={ev.about} className="mt-4 text-[14.5px]" />
               </div>
               <div className="rounded-2xl bg-surface p-5 sm:p-6">
                 <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted">
@@ -235,6 +244,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                     </div>
                   ))}
                 </dl>
+                {!isOnline && <VenueMap venue={venue} className="mt-3" />}
               </div>
             </div>
           </section>

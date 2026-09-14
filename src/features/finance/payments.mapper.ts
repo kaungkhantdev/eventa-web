@@ -4,11 +4,11 @@ import type { LedgerEntryWire, LedgerStatus, PaymentMethod, PaymentRow } from '.
 
 /** The rules behind the payments ledger (US-FIN-01/02). */
 
-const STATUS_META: Record<LedgerStatus, { label: string; tone: BadgeTone }> = {
-  paid: { label: 'Paid', tone: 'green' },
-  pending: { label: 'Pending', tone: 'amber' },
-  refunded: { label: 'Refunded', tone: 'gray' },
-  failed: { label: 'Failed', tone: 'red' },
+const STATUS_META: Record<LedgerStatus, { label: string; tone: BadgeTone; icon: string }> = {
+  paid: { label: 'Paid', tone: 'green', icon: 'hgi-checkmark-badge-01' },
+  pending: { label: 'Pending', tone: 'amber', icon: 'hgi-clock-01' },
+  refunded: { label: 'Refunded', tone: 'gray', icon: 'hgi-cancel-circle' },
+  failed: { label: 'Failed', tone: 'red', icon: 'hgi-alert-circle' },
 }
 
 /** How each way of paying is drawn. Unknown methods still get a card glyph. */
@@ -36,6 +36,7 @@ export function toPaymentRow(wire: LedgerEntryWire): PaymentRow {
     status: wire.status,
     statusLabel: meta.label,
     statusTone: meta.tone,
+    statusIcon: meta.icon,
     date: bangkokDate(wire.paidAt),
     time: bangkokTime(wire.paidAt),
     // Refundability is the server's call — it knows the provider's window and

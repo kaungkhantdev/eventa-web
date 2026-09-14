@@ -1,5 +1,6 @@
 import { MASKED, bangkokDate, initials } from '@/lib/format'
 import type {
+  StoredKeysWire,
   OrganizationForm,
   OrganizationWire,
   PaymentSettingsCard,
@@ -64,7 +65,10 @@ const PROVIDER_NAMES: Record<string, string> = { stripe: 'Stripe' }
 /** How many characters of the account id are enough to tell two apart. */
 const ACCOUNT_TAIL = 3
 
-export function toPaymentSettingsCard(settings: PaymentSettingsWire): PaymentSettingsCard {
+export function toPaymentSettingsCard(
+  settings: PaymentSettingsWire,
+  keys?: StoredKeysWire,
+): PaymentSettingsCard {
   const connected = settings.status === 'connected'
   return {
     provider: PROVIDER_NAMES[settings.provider] ?? settings.provider,
@@ -80,7 +84,23 @@ export function toPaymentSettingsCard(settings: PaymentSettingsWire): PaymentSet
     saveCards: settings.saveCards,
     emailReceipts: settings.emailReceipts,
     testMode: settings.testMode,
+    // The banner's own fact, distinct from `testMode`: test keys are only a
+    // problem once they are TAKING money. With nothing connected the API still
+    // reports test — it is the default — and warning about "using Test keys"
+    // then states two falsehoods: they are using none, and implying charges
+    // are processed when there is no till at all. "Not connected" already
+    // covers that state, with the empty boxes underneath to fix it.
+    takingTestPayments: connected && settings.testMode,
     warnings: settings.warnings ?? [],
+    publishableKey: keys?.publishableKey ?? '',
+    // Never the key. The API only ever sends a tail, and this only passes it on.
+    secretKeyMasked: keys?.secretKeyMasked ?? '',
+    webhookSecretSet: keys?.webhookSecretSet ?? false,
+    keysSavedOn: keys?.savedAt ? bangkokDate(keys.savedAt) : '',
+    webhookUrl: settings.webhookUrl ?? '',
+    // Defaults to closed: a missing flag must not offer a tab whose save the
+    // server will refuse.
+    liveKeysAccepted: settings.liveKeysAccepted ?? false,
   }
 }
 

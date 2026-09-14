@@ -82,4 +82,29 @@ export const eventsApi = {
    * over — tickets and agenda, not registrations — so there is nothing to pass.
    */
   duplicate: (id: string) => api.post<EventWire>(`/events/${id}/duplicate`),
+
+  /**
+   * Two steps, because the bytes never pass through the API: ask for a
+   * capability, PUT the file straight to storage, then confirm to have it
+   * promoted and get the URL back.
+   *
+   * Not scoped to an event id: the wizard offers the cover on step 1, before a
+   * draft exists. The confirmed URL is a field value the event carries when the
+   * form is saved.
+   */
+  coverUploadUrl: (contentType: string, byteSize: number) =>
+    api.post<CoverUploadWire>('/events/cover/upload-url', { contentType, byteSize }),
+
+  confirmCover: (key: string) =>
+    api.post<{ coverImage: string }>('/events/cover', { key }),
+}
+
+/** The capability the API hands the browser to PUT one file, once. */
+export interface CoverUploadWire {
+  key: string
+  uploadUrl: string
+  /** Sent verbatim — they are covered by the signature. */
+  headers: Record<string, string>
+  expiresInSeconds: number
+  maxBytes: number
 }

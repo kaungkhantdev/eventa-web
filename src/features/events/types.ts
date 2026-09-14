@@ -51,11 +51,25 @@ export interface EventWire {
   startAt: string
   endAt: string | null
   venueName: string | null
+  /** The street address — what a map needs; a venue name alone rarely resolves. */
+  venueAddress?: string | null
   city: string | null
   isOnline: boolean
   capacity: number | null
+  /**
+   * The landing page's hero image — null until one is uploaded. Optional
+   * because the calendar's slimmer payload leaves it out; the list and detail
+   * endpoints both carry it (`EventListItemDto`, `EventResponseDto`).
+   */
+  coverImage?: string | null
   /** The public page's design — null until one has been chosen. */
   landingTemplateId?: string | null
+  /**
+   * `public` | `unlisted` | `private` (`EventResponseDto.visibility`). Only a
+   * `public` event is served by slug, so this decides whether a real public
+   * page exists to link to. Optional: the calendar's slimmer payload omits it.
+   */
+  visibility?: string
   version: number
 }
 
@@ -123,8 +137,12 @@ export interface EventRow {
   status: EventStatus
   icon: string
   tone: Tone
-  /** Stable seed for the row's cover image, so it doesn't change per render. */
-  seed: string
+  /**
+   * The organizer's own cover, or null. Never a stand-in: the row used to seed
+   * a photo service from the slug, which put a stranger's photograph next to a
+   * real event and kept it there after a cover was uploaded.
+   */
+  cover: string | null
   version: number
 }
 
@@ -139,7 +157,6 @@ export interface UpcomingCard {
   fillPercent: number
   icon: string
   tone: Tone
-  seed: string
 }
 
 /** One event as the calendar renders it. */

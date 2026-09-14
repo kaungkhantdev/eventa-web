@@ -3,12 +3,11 @@ import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { bangkokInstant } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
-import { eventsApi } from '@/features/events/events.api'
 import { discountsApi, type DiscountInput, type ListDiscountsQuery } from './discounts.api'
 import { toDiscountRow } from './discounts.mapper'
 import type { DiscountRow } from './discounts.types'
 import type { DiscountStatus, DiscountType } from './types'
-import type { EventOption } from './tickets.routes'
+import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 
 /** Promo codes (US-TKT-07..10/12). Filtered, counted and paged by the API. */
 
@@ -16,7 +15,6 @@ export const DISCOUNT_TABS = ['all', 'active', 'scheduled', 'expired', 'disabled
 export type DiscountTab = (typeof DISCOUNT_TABS)[number]
 
 const MAX_SEARCH = 120
-const EVENT_OPTIONS = 100
 const SATANG_PER_BAHT = 100
 
 export function tabOf(params: URLSearchParams): DiscountTab {
@@ -87,11 +85,6 @@ async function loadDiscounts({ request }: LoaderArgs): Promise<DiscountsData> {
     events,
     suggestion: suggestion.code,
   }
-}
-
-async function eventOptions(): Promise<EventOption[]> {
-  const page = await eventsApi.list({ limit: EVENT_OPTIONS, sort: 'recent' })
-  return page.items.map((event) => ({ id: event.id, name: event.name }))
 }
 
 function withPage(current: string, page: number): string {

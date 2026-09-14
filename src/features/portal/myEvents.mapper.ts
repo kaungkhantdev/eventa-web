@@ -27,6 +27,9 @@ export function toMyEventRow(wire: MyRegistrationWire): MyEventRow {
     slug: wire.eventSlug,
     when: `${bangkokDate(wire.startAt, wire.timezone)} · ${bangkokTime(wire.startAt, wire.timezone)}`,
     where: placeOf(wire),
+    venue: wire.isOnline
+      ? null
+      : { venueName: wire.venueName, address: wire.venueAddress, city: wire.city },
     // The booking is real even when the tier has since been deleted, so the
     // column says "—" rather than disappearing.
     ticket: wire.ticketTypeName ?? MASKED,

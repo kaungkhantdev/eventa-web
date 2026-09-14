@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Badge,
@@ -8,6 +8,7 @@ import {
   EmptyState,
   HeaderUser,
   Icon,
+  IconSelect,
   Input,
   Label,
   PageFooter,
@@ -15,13 +16,16 @@ import {
   Paginator,
   Panel,
   PastEnd,
+  PillTabs,
+  SearchableSelect,
   Select,
+  type ComboOption,
 } from '@/components/ui'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters } from '@/lib/useFilters'
 import type { ActionResult } from '@/app/loaders'
-import type { UsersData } from '../settings.routes'
+import type { MemberCounts, UsersData } from '../settings.routes'
 import type { MemberRow } from '../settings.types'
 
 /**
@@ -34,12 +38,22 @@ export default function UsersPage() {
   const data = useLoaderData() as UsersData
   const { set, clear, emptyReason } = useFilters({ total: data.window.total })
   const invite = useDisclosure()
-  // The list has no search, role filter or status tabs — the API pages it and
-  // nothing else — so the only way it comes back empty other than on a first
-  // run is a page number past the end. That still has to be told apart:
-  // emptying the last page by removing somebody must not tell an organizer with
-  // twenty colleagues to invite their first.
-  const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
+  // A first run has to be told apart from a search that found nobody, and from
+  // a page number past the end: emptying the last page by removing somebody
+  // must not tell an organizer with twenty colleagues to invite their first.
+  const filtered = Boolean(
+    data.filters.search || data.filters.status || data.filters.roleId,
+  )
+  const firstRun =
+    data.rows.length === 0 && emptyReason === 'first-run' && !filtered
+
+  // Built once for the whole table rather than per row: every member's picker
+  // offers the same roles, and a page of them would otherwise rebuild the list
+  // on each render and defeat the picker's own memoisation.
+  const roleOptions = useMemo<ComboOption[]>(
+    () => data.roles.map((role) => ({ value: String(role.id), label: role.name })),
+    [data.roles],
+  )
 
   return (
     <>
@@ -57,6 +71,15 @@ export default function UsersPage() {
           </>
         }
       />
+
+      {!firstRun && (
+        <UserFilters
+          filters={data.filters}
+          counts={data.counts}
+          roles={data.roles}
+          onChange={set}
+        />
+      )}
 
       {firstRun ? (
         <EmptyState
@@ -85,20 +108,33 @@ export default function UsersPage() {
               </thead>
               <tbody className="text-[13px]">
                 {data.rows.map((row) => (
-                  <MemberTableRow key={row.id} row={row} roles={data.roles} />
+                  <MemberTableRow key={row.id} row={row} roleOptions={roleOptions} />
                 ))}
-                {/* There is nothing on this page to blame on a filter: the page
-                    offers none, so an empty body past the first run means the
-                    page number ran off the end of the list. `clear` rather than
-                    `set({ page: null })` so a stale link carrying anything else
-                    is dropped too, and the button always lands somewhere. */}
+                {/* Two different empties, and telling somebody the wrong one
+                    sends them looking in the wrong place. A filter that matched
+                    nobody is their search; an empty page past the first is the
+                    page number running off the end. `clear` in both cases so a
+                    stale link carrying anything else is dropped too, and the
+                    button always lands somewhere. */}
                 {data.rows.length === 0 && (
                   <tr>
                     <td colSpan={4}>
-                      <PastEnd noun="users" onFirstPage={clear}>
-                        Nothing is on this page of the list — it may have got shorter since it was
-                        opened. The workspace&apos;s members are still there, back at the start.
-                      </PastEnd>
+                      {filtered ? (
+                        <EmptyState
+                          compact
+                          icon="hgi-search-01"
+                          title="Nobody matches that"
+                          actions={[{ label: 'Clear filters', onClick: clear }]}
+                        >
+                          No member of this workspace matches the filters above. Widen them, or
+                          check the spelling of the name or address.
+                        </EmptyState>
+                      ) : (
+                        <PastEnd noun="users" onFirstPage={clear}>
+                          Nothing is on this page of the list — it may have got shorter since it was
+                          opened. The workspace&apos;s members are still there, back at the start.
+                        </PastEnd>
+                      )}
                     </td>
                   </tr>
                 )}
@@ -127,7 +163,13 @@ interface RoleOption {
   name: string
 }
 
-function MemberTableRow({ row, roles }: { row: MemberRow; roles: RoleOption[] }) {
+function MemberTableRow({
+  row,
+  roleOptions,
+}: {
+  row: MemberRow
+  roleOptions: ComboOption[]
+}) {
   const act = useFetcher<ActionResult>()
   const busy = act.state !== 'idle'
 
@@ -146,22 +188,26 @@ function MemberTableRow({ row, roles }: { row: MemberRow; roles: RoleOption[] })
         </div>
       </td>
       <td>
-        <select
-          value={row.roleId}
-          onChange={(e) => submit({ intent: 'role', roleId: e.target.value })}
-          disabled={busy}
-          className="select h-9 border-0 bg-canvas font-medium"
-          aria-label={`Role for ${row.name}`}
-        >
-          {roles.map((role) => (
-            <option key={role.id} value={role.id}>
-              {role.name}
-            </option>
-          ))}
-        </select>
+        {/* A workspace can carry more roles than fit in a glance, so this is a
+            type-to-filter picker rather than a plain list. `relative` anchors
+            nothing here — it keeps the cell as the picker's own box while the
+            popup itself escapes to a portal, clear of the table's overflow. */}
+        <div className="relative">
+          <SearchableSelect
+            value={String(row.roleId)}
+            onChange={(roleId) => submit({ intent: 'role', roleId })}
+            options={roleOptions}
+            label={`Role for ${row.name}`}
+            noun="roles"
+            disabled={busy}
+            className="h-9 w-full border-0 bg-canvas font-medium"
+          />
+        </div>
       </td>
       <td>
-        <Badge tone={row.statusTone}>{row.status}</Badge>
+        <Badge tone={row.statusTone} icon={row.statusIcon}>
+          {row.status}
+        </Badge>
         {act.data?.ok === false && (
           <p role="alert" className="mt-1 text-[11px] text-red-500">
             {act.data.error}
@@ -202,6 +248,108 @@ function MemberTableRow({ row, roles }: { row: MemberRow; roles: RoleOption[] })
         </div>
       </td>
     </tr>
+  )
+}
+
+/** The tabs the kit draws, and what each one asks the API for. */
+const STATUS_TABS = [
+  { value: '', label: 'All', count: 'all' },
+  { value: 'Active', label: 'Active', count: 'active' },
+  { value: 'Invited', label: 'Invited', count: 'invited' },
+  { value: 'Suspended', label: 'Suspended', count: 'suspended' },
+] as const satisfies readonly {
+  value: string
+  label: string
+  count: keyof MemberCounts
+}[]
+
+/** Long enough that a fast typist gets one request, short enough to feel live. */
+const SEARCH_SETTLE_MS = 300
+
+/**
+ * Status tabs, search and a role filter (US-ACC-02), as the kit draws them.
+ *
+ * Every one of them goes into the URL rather than component state, because the
+ * API pages and counts server-side: the URL is what the loader reads, so it is
+ * the only place they can live without the rows, the counts and the paginator
+ * drifting apart. It also means the back button works and a filtered view can
+ * be linked to.
+ *
+ * Changing any filter resets to page 1. Staying on page 4 of a list that now
+ * has one page is how somebody lands on "no results" for a search that matched.
+ */
+function UserFilters({
+  filters,
+  counts,
+  roles,
+  onChange,
+}: {
+  filters: UsersData['filters']
+  counts: MemberCounts
+  roles: { id: number; name: string }[]
+  onChange: (patch: Record<string, string | number | null>) => void
+}) {
+  // Mirrors the URL so typing feels immediate, while the request waits for a
+  // pause. Seeded from the URL so a shared link shows its own term.
+  const [term, setTerm] = useState(filters.search)
+  const settle = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  const search = (next: string) => {
+    setTerm(next)
+    clearTimeout(settle.current)
+    settle.current = setTimeout(
+      () => onChange({ q: next || null, page: 1 }),
+      SEARCH_SETTLE_MS,
+    )
+  }
+
+  return (
+    <div className="mb-3 space-y-3">
+      {/* `PillTabs` already carries the kit's own container — the rounded
+          surface the pills sit in. Hand-rolling the buttons lost it. */}
+      <PillTabs
+        value={filters.status}
+        onChange={(status) => onChange({ status: status || null, page: 1 })}
+        items={STATUS_TABS.map((tab) => ({
+          value: tab.value,
+          label: tab.label,
+          count: counts[tab.count],
+        }))}
+      />
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:flex-1">
+          <Icon
+            name="hgi-search-01"
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+          />
+          <input
+            type="search"
+            value={term}
+            onChange={(event) => search(event.target.value)}
+            aria-label="Search users by name or email"
+            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+            placeholder="Search by name or email…"
+          />
+        </div>
+        <IconSelect
+          icon="hgi-shield-user"
+          wrapperClassName="w-full sm:w-52"
+          value={filters.roleId}
+          onChange={(event) => onChange({ roleId: event.target.value || null, page: 1 })}
+          aria-label="Filter by role"
+          className="h-10 w-full border-0 bg-surface font-medium"
+        >
+          <option value="">All roles</option>
+          {roles.map((role) => (
+            <option key={role.id} value={role.id}>
+              {role.name}
+            </option>
+          ))}
+        </IconSelect>
+      </div>
+    </div>
   )
 }
 

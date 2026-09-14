@@ -96,15 +96,9 @@ export default function SurveyPage() {
           <div className="card overflow-hidden">
             {/* event banner */}
             <div className="relative h-28 bg-gradient-to-br from-brand to-emerald-500">
-              <img
-                src={`https://picsum.photos/seed/${slug}/720/240`}
-                alt=""
-                loading="lazy"
-                className="absolute inset-0 h-full w-full object-cover opacity-90"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none'
-                }}
-              />
+              {/* No photograph: this page has no event payload to take a cover
+                  from, and the slug-seeded stock image it showed belonged to
+                  nobody. The gradient carries the banner on its own. */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/55 to-black/5" />
               <div className="absolute inset-x-0 bottom-0 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-white/80">

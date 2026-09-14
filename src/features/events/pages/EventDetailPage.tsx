@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
-import { EmptyState, NoResults, NotificationBell, PastEnd, SignedInChip } from '@/components/ui'
+import {
+  EmptyState,
+  Icon,
+  NoResults,
+  NotificationBell,
+  RichText,
+  PastEnd,
+  SignedInChip,
+  VenueMap,
+} from '@/components/ui'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import type { ActionResult } from '@/app/loaders'
 import { cn } from '@/lib/cn'
@@ -29,7 +38,7 @@ import {
   type RegistrationFilter,
 } from '../eventDetail.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
-import { STATUS_PILL } from '../events.presentation'
+import { STATUS_PILL, copyLabel, type CopyState } from '../events.presentation'
 
 /* ---------- Event detail — admin/event-detail.html ----------
    Pill tabs switch between Overview, Registrations (filter + paging),
@@ -55,6 +64,9 @@ const FILTER_LABEL: Record<RegistrationFilter, string> = {
   pending: 'Pending',
   refunded: 'Refunded',
 }
+
+/** Long enough to read, short enough to try again. */
+const COPIED_MS = 1500
 
 /** Payment status → pill classes, copied from the kit. */
 const PAYMENT_PILL: Record<string, string> = {
@@ -187,12 +199,16 @@ export default function EventDetailPage() {
 
       {/* hero cover */}
       <div className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-br from-brand to-emerald-500">
-        <img
-          src={`https://picsum.photos/seed/${header.seed}/1280/440`}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={(e) => e.currentTarget.remove()}
-        />
+        {/* The organizer's own cover, or the gradient behind it. A stock
+            photograph on a real event's page is a claim about that event. */}
+        {header.cover && (
+          <img
+            src={header.cover}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={(e) => e.currentTarget.remove()}
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 to-black/10" />
         <div className="relative flex min-h-[190px] flex-col justify-end p-5 sm:min-h-[230px] sm:p-6">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -378,16 +394,38 @@ function TabPanels({
 
 /* ---------- Overview ---------- */
 function OverviewPanel({ header, overview }: { header: EventHeader; overview: OverviewTiles }) {
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState<CopyState>('idle')
+  const urlRef = useRef<HTMLSpanElement>(null)
 
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(overview.publicUrl)
-    } catch {
-      /* the browser refused the clipboard — the link is on screen to copy by hand */
+  /**
+   * `navigator.clipboard` is absent outside a secure context and rejects when
+   * the browser withholds permission, so neither outcome is assumed. On a
+   * refusal the URL is selected instead, which turns a dead button into one
+   * keystroke — and the label says so rather than claiming it copied.
+   */
+  const copyLink = () => {
+    const settle = (state: CopyState) => {
+      setCopyState(state)
+      if (state === 'failed') selectUrl()
+      setTimeout(() => setCopyState('idle'), COPIED_MS)
     }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    const clipboard = navigator.clipboard
+    if (!clipboard) return settle('failed')
+    void clipboard.writeText(overview.publicUrl).then(
+      () => settle('copied'),
+      () => settle('failed'),
+    )
+  }
+
+  /** Put the caret round the link so ⌘C/Ctrl+C works without the clipboard API. */
+  const selectUrl = () => {
+    const node = urlRef.current
+    if (!node) return
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
   }
 
   const [sold, capacity] = overview.registrations.split('/')
@@ -441,11 +479,29 @@ function OverviewPanel({ header, overview }: { header: EventHeader; overview: Ov
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="space-y-4 xl:col-span-2">
+          {/* About — the organizer's own description, read back to them.
+              Rendered as TEXT, never as HTML: the wizard stores what Quill
+              produced via `getText()`, so there is no markup to honour here and
+              interpreting it as any would be an injection route through a field
+              the organizer types into.
+
+              Absent rather than empty when there is no description: a heading
+              over nothing is worse than no heading. */}
+          {header.description && (
+            <section className="rounded-2xl bg-surface p-4 lg:p-5">
+              <h2 className="text-[16px] font-bold tracking-tight">About</h2>
+              <RichText html={header.description} className="mt-2.5" />
+            </section>
+          )}
+
           {/* Landing page */}
           <section className="rounded-2xl bg-surface p-4 lg:p-5">
             <div className="flex items-center justify-between">
               <h2 className="text-[16px] font-bold tracking-tight">Landing page</h2>
-              <span className={cn('badge', STATUS_PILL[header.status])}>{header.status}</span>
+              <span className={cn('badge', STATUS_PILL[header.status].cls)}>
+                <Icon name={STATUS_PILL[header.status].icon} size={12} />
+                {header.status}
+              </span>
             </div>
             <div className="mt-4 flex flex-col gap-4 sm:flex-row">
               <div className="w-full shrink-0 sm:w-52">
@@ -480,7 +536,14 @@ function OverviewPanel({ header, overview }: { header: EventHeader; overview: Ov
                 </p>
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-canvas px-3 py-2">
                   <i className="hgi-stroke hgi-link-01 text-[14px] shrink-0 text-muted" />
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                  {/* `title`, because the span truncates: when the clipboard
+                      refuses, reading the link is the fallback and a clipped
+                      one cannot be read. */}
+                  <span
+                    ref={urlRef}
+                    title={overview.publicUrl}
+                    className="min-w-0 flex-1 select-all truncate text-[12px] text-muted"
+                  >
                     {overview.publicUrl}
                   </span>
                   <button
@@ -488,7 +551,7 @@ function OverviewPanel({ header, overview }: { header: EventHeader; overview: Ov
                     onClick={copyLink}
                     className="shrink-0 text-[11px] font-semibold text-brand hover:underline"
                   >
-                    {copied ? 'Copied' : 'Copy'}
+                    {copyLabel(copyState)}
                   </button>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -528,8 +591,9 @@ function OverviewPanel({ header, overview }: { header: EventHeader; overview: Ov
             {header.where && (
               <div className="flex items-start gap-2.5 border-t border-line pt-3">
                 <i className="hgi-stroke hgi-location-01 text-[16px] mt-0.5 shrink-0 text-muted" />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold text-ink">{header.where}</p>
+                  {header.venue && <VenueMap venue={header.venue} className="mt-2.5" />}
                 </div>
               </div>
             )}

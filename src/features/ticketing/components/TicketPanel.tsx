@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
-import { Button, Hint, Input, Label, Panel, Select } from '@/components/ui'
+import { Button, EventPicker, Hint, Input, Label, Panel } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
@@ -30,6 +30,7 @@ const FORM_ID = 'ticket-form'
 export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps) {
   const fetcher = useFetcher<ActionResult>()
   const [isFree, setIsFree] = useState(false)
+  const [eventId, setEventId] = useState('')
   const saving = fetcher.state !== 'idle'
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
@@ -41,7 +42,10 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
-    if (open) setIsFree(editing?.isFree ?? false)
+    if (open) {
+      setIsFree(editing?.isFree ?? false)
+      setEventId(editing?.eventId ?? '')
+    }
   }
 
   // The save succeeded and the loader has already revalidated; close.
@@ -102,29 +106,17 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
 
         <div>
           <Label htmlFor="ticket-event">Event</Label>
-          <Select
+          <EventPicker
             id="ticket-event"
             name="eventId"
-            required
-            defaultValue={editing?.eventId ?? ''}
+            value={eventId}
+            onChange={setEventId}
+            options={events}
+            allLabel={false}
+            placeholder="Choose an event"
             disabled={Boolean(editing)}
-          >
-            <option value="" disabled>
-              Choose an event
-            </option>
-            {events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </Select>
-          {editing && (
-            <>
-              <Hint>A tier belongs to its event and cannot be moved.</Hint>
-              {/* A disabled select is not submitted, so the id travels beside it. */}
-              <input type="hidden" name="eventId" value={editing.eventId} />
-            </>
-          )}
+          />
+          {editing && <Hint>A tier belongs to its event and cannot be moved.</Hint>}
         </div>
 
         <div>

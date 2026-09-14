@@ -1,6 +1,8 @@
 import type { BadgeTone } from '@/components/ui'
 import { bangkokDate, bangkokTime, initials } from '@/lib/format'
 import type {
+  AuditEntryWire,
+  AuditRow,
   LoginSessionWire,
   MemberRow,
   MemberStatus,
@@ -17,11 +19,11 @@ import type {
 
 /** The rules behind the settings screens (US-ACC-*, US-SET-*). */
 
-const STATUS_TONE: Record<MemberStatus, BadgeTone> = {
-  Active: 'green',
-  Invited: 'amber',
-  Unconfirmed: 'amber',
-  Suspended: 'red',
+const STATUS_META: Record<MemberStatus, { tone: BadgeTone; icon: string }> = {
+  Active: { tone: 'green', icon: 'hgi-checkmark-badge-01' },
+  Invited: { tone: 'amber', icon: 'hgi-mail-send-01' },
+  Unconfirmed: { tone: 'amber', icon: 'hgi-clock-01' },
+  Suspended: { tone: 'red', icon: 'hgi-cancel-circle' },
 }
 
 export function toMemberRow(wire: MemberWire): MemberRow {
@@ -33,7 +35,8 @@ export function toMemberRow(wire: MemberWire): MemberRow {
     role: wire.role,
     roleId: wire.roleId,
     status: wire.status,
-    statusTone: STATUS_TONE[wire.status],
+    statusTone: STATUS_META[wire.status].tone,
+    statusIcon: STATUS_META[wire.status].icon,
     // The two states an admin acts on differently: an invitation can be sent
     // again, and a suspended member is reactivated rather than suspended.
     //
@@ -83,15 +86,79 @@ function humanise(key: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
 }
 
+/**
+ * Browsers lie about each other, so the order here IS the rule: Edge claims to
+ * be Chrome, Chrome claims to be Safari, and every one of them opens with
+ * "Mozilla/5.0". The most specific claim has to be tested first.
+ */
+const BROWSERS: readonly (readonly [RegExp, string])[] = [
+  [/\bEdg[e/]/, 'Edge'],
+  [/\bOPR\/|\bOpera\b/, 'Opera'],
+  [/\bFirefox\//, 'Firefox'],
+  [/\bChrome\//, 'Chrome'],
+  [/\bSafari\//, 'Safari'],
+]
+
+/** Same rule: iPhone and iPad are Mac-like, so they are checked before macOS. */
+const PLATFORMS: readonly (readonly [RegExp, string])[] = [
+  [/\biPhone\b/, 'iPhone'],
+  [/\biPad\b/, 'iPad'],
+  [/\bAndroid\b/, 'Android'],
+  [/\bWindows\b/, 'Windows'],
+  [/\bMac OS X\b|\bMacintosh\b/, 'macOS'],
+  [/\bLinux\b|\bX11\b/, 'Linux'],
+]
+
+const UNKNOWN_DEVICE = 'Unknown device'
+
+/**
+ * A device an organizer can recognise (US-ACC-06).
+ *
+ * The sessions card exists so somebody can spot a sign-in that was not theirs.
+ * The API sends a raw user-agent, and two rows of truncated
+ * "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleW…" are identical on
+ * screen — which makes the one question the card asks impossible to answer.
+ *
+ * Deliberately coarse. A version number would age the row without helping
+ * anybody recognise it, and a UA nobody anticipated returns a plain label
+ * rather than falling back to the raw string this replaced.
+ */
+export function describeDevice(userAgent: string): string {
+  const browser = BROWSERS.find(([pattern]) => pattern.test(userAgent))?.[1]
+  const platform = PLATFORMS.find(([pattern]) => pattern.test(userAgent))?.[1]
+  if (!browser || !platform) return UNKNOWN_DEVICE
+  return `${browser} on ${platform}`
+}
+
 export function toSessionRow(wire: LoginSessionWire): SessionRow {
   return {
     id: wire.id,
-    device: wire.device,
+    device: describeDevice(wire.device),
     ipAddress: wire.ipAddress,
     // Somebody checking whether a sign-in was theirs is reading their own
     // clock, which in this product is Bangkok's.
     signedIn: `${bangkokDate(wire.signedInAt)} · ${bangkokTime(wire.signedInAt)}`,
     isCurrent: wire.isCurrent,
+  }
+}
+
+/**
+ * One audit entry, ready to render (US-ACC-07).
+ *
+ * Every fact except the title is optional at the source — an entry raised by a
+ * background job has no actor, one raised from a console has no IP — so the
+ * detail line is assembled from what is present. A template with holes in it
+ * would print stray separators around the gaps.
+ */
+export function toAuditRow(wire: AuditEntryWire): AuditRow {
+  return {
+    id: wire.id,
+    type: wire.type,
+    title: wire.title,
+    detail: [wire.meta, wire.actorName, wire.ipAddress].filter(Boolean).join(' · '),
+    // Somebody auditing their own account is reading their own clock, which in
+    // this product is Bangkok's.
+    when: `${bangkokDate(wire.occurredAt)} · ${bangkokTime(wire.occurredAt)}`,
   }
 }
 

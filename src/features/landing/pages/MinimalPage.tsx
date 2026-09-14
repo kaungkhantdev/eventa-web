@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { Icon } from '@/components/ui'
+import { Icon,
+  VenueMap,
+  RichText,
+} from '@/components/ui'
 import type { LandingEvent } from '@/features/landing/types'
 
 /* Port of landing/minimal.html — a centered, editorial single-column event page.
@@ -78,6 +81,10 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
     { icon: 'hgi-wallet-01', k: 'Price', v: priceDisplay },
   ].filter((r) => r.v)
 
+  // The address decides the pin; see mapLink.ts on why the venue name does
+  // not join the query.
+  const venue = { venueName: ev.venue, address: ev.address, city: ev.city }
+
   const when = [ev.dateText, venueCity].filter(Boolean).join('  ·  ')
   const year = ev.dateText.match(/\b(20\d{2})\b/)?.[1] || String(new Date().getFullYear())
   const emailHref = ev.contactEmail ? `mailto:${ev.contactEmail}` : '#'
@@ -120,9 +127,11 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
           <h1 className="reveal d1 mx-auto mt-5 max-w-[16ch] text-[2rem] font-extrabold leading-[1.05] tracking-tight text-ink sm:text-[2.6rem]">
             {title}
           </h1>
-          <p className="reveal d2 mx-auto mt-5 max-w-[52ch] text-[15px] leading-relaxed text-muted">
-            {ev.tagline}
-          </p>
+          {ev.tagline && (
+            <p className="reveal d2 mx-auto mt-5 max-w-[52ch] text-[15px] leading-relaxed text-muted">
+              {ev.tagline}
+            </p>
+          )}
 
           <ul className="reveal d3 mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 text-[13px] text-muted">
             {heroFacts.map((f) => (
@@ -182,7 +191,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
         {ev.about && (
           <section id="about" className="mx-auto max-w-[720px] border-t border-line px-6 py-14">
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.16em] text-brand">About</h2>
-            <p className="mt-4 text-[15px] leading-[1.75] text-muted">{ev.about}</p>
+            <RichText html={ev.about} className="mt-4 text-[15px] leading-[1.75]" />
             <dl className="mt-8 divide-y divide-line rounded-2xl bg-surface px-5">
               {aboutRows.map((r) => (
                 <div key={r.k} className="flex items-center justify-between gap-4 py-3.5">
@@ -196,6 +205,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
                 </div>
               ))}
             </dl>
+            {!isOnline && <VenueMap venue={venue} className="mt-3" />}
           </section>
         )}
 

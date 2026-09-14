@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { RichText, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { LandingEvent } from '@/features/landing/types'
 
@@ -101,6 +102,9 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
     { icon: 'hgi-building-06', label: 'Category', value: ev.category },
     { icon: 'hgi-wallet-01', label: 'Price', value: priceDisplay },
   ].filter((r) => r.value)
+  // The address decides the pin; see mapLink.ts on why the venue name does
+  // not join the query.
+  const venue = { venueName: ev.venue, address: ev.address, city: ev.city }
 
   const whenLine = [ev.dateText, whereText].filter(Boolean).join('  ·  ')
   const year = new Date().getFullYear()
@@ -197,7 +201,9 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
         </a>
       </section>
 
-      {/* 2 · Lead line */}
+      {/* 2 · Lead line — the whole section IS the tagline, so it goes with it
+             rather than leaving a banded strip of empty surface. */}
+      {ev.tagline && (
       <section id="s-intro" className="border-b border-line bg-surface">
         <div className="mx-auto max-w-4xl px-4 py-12 text-center sm:px-6 sm:py-16">
           <p className="text-[19px] font-medium leading-relaxed text-ink sm:text-[24px]">
@@ -205,6 +211,7 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
           </p>
         </div>
       </section>
+      )}
 
       {/* 3 · Highlights (green band) */}
       {highlights.length > 0 && (
@@ -240,7 +247,7 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                 <h2 className="mt-1 text-[26px] font-extrabold tracking-tight text-ink sm:text-[32px]">
                   About the night
                 </h2>
-                <p className="mt-4 max-w-[58ch] text-[15px] leading-relaxed text-muted">{ev.about}</p>
+                <RichText html={ev.about} className="mt-4 max-w-[70ch] text-[15px]" />
               </div>
               <div>
                 <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-muted">
@@ -262,6 +269,7 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                     </div>
                   ))}
                 </dl>
+                {!isOnline && <VenueMap venue={venue} className="mt-3" />}
               </div>
             </div>
           </div>

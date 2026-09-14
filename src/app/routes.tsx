@@ -10,6 +10,7 @@ import RootLayout, { RootFallback } from '@/layouts/RootLayout'
 import NotFoundPage from '@/features/system/pages/NotFoundPage'
 import { RouteError } from '@/features/system/components/RouteError'
 import { ADMIN_ROUTE_ID, adminShellLoader } from '@/app/loaders'
+import { guestOnly } from '@/features/auth/guestOnly'
 
 /* Route manifest. Admin screens are nested under the shell and each declares a
    `handle.page` id — the static kit's `data-page` — which drives sidebar
@@ -419,12 +420,16 @@ export const router = createBrowserRouter([
     errorElement: ERROR_ELEMENT,
     children: [
       {
+        // `guestOnly` on the four sign-in and sign-up screens: with a session
+        // already in hand these are a dead end that only offers ways to damage
+        // it. It sends home only a visitor of the SAME persona, so switching
+        // audiences still works — see `guestOnly.ts`.
         path: '/auth/login',
-        ...page(() => import('@/features/auth/pages/LoginPage')),
+        ...page(() => import('@/features/auth/pages/LoginPage'), guestOnly('admin')),
       },
       {
         path: '/auth/register',
-        ...page(() => import('@/features/auth/pages/RegisterPage')),
+        ...page(() => import('@/features/auth/pages/RegisterPage'), guestOnly('admin')),
       },
       {
         path: '/auth/register/check-email',
@@ -446,7 +451,7 @@ export const router = createBrowserRouter([
       },
       {
         path: '/portal/login',
-        ...page(() => import('@/features/portal/pages/PortalLoginPage')),
+        ...page(() => import('@/features/portal/pages/PortalLoginPage'), guestOnly('attendee')),
       },
       {
         // One route for the four designs: `/landing/aurora?event=<slug>` shows
@@ -498,7 +503,10 @@ export const router = createBrowserRouter([
         // the organizer's at /auth/register for the same reason the logins are
         // separate: different audience, different copy, different realm.
         path: '/portal/register',
-        ...page(() => import('@/features/portal/pages/PortalRegisterPage')),
+        ...page(
+          () => import('@/features/portal/pages/PortalRegisterPage'),
+          guestOnly('attendee'),
+        ),
       },
       {
         path: '/portal/register/check-email',

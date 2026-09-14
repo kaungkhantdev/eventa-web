@@ -32,6 +32,10 @@ export interface HighlightDraft {
 export interface EventFormValues {
   id: string | null
   status: EventWireStatus | null
+  /** The public page's address; empty until the event exists. */
+  slug: string
+  /** `public` | `unlisted` | `private`; empty until the event exists. */
+  visibility: string
   name: string
   description: string
   type: EventType
@@ -64,6 +68,8 @@ function emptyValues(): EventFormValues {
   return {
     id: null,
     status: null,
+    slug: '',
+    visibility: '',
     name: '',
     description: '',
     type: DEFAULT_TYPE,
@@ -113,6 +119,8 @@ export function toEventFormValues(
     ...empty,
     id: event.id,
     status: event.status,
+    slug: event.slug,
+    visibility: event.visibility ?? '',
     name: event.name,
     description: event.description ?? '',
     type: event.type,
@@ -121,9 +129,11 @@ export function toEventFormValues(
     endDate: event.endAt ? bangkokDayKey(event.endAt) : '',
     endTime: event.endAt ? bangkokTime(event.endAt) : '',
     venueName: event.venueName ?? '',
+    venueAddress: event.venueAddress ?? '',
     city: event.city ?? '',
     isOnline: event.isOnline,
     capacity: event.capacity === null ? '' : String(event.capacity),
+    coverImage: event.coverImage ?? '',
     tickets: tickets.map((ticket) => ({
       id: ticket.id,
       name: ticket.name,
@@ -168,8 +178,25 @@ export function toUpdateBody(values: EventFormValues) {
     isOnline: values.isOnline,
     onlineNote: values.onlineNote.trim(),
     coverImage: values.coverImage.trim(),
+    ...capacityOf(values.capacity),
     ...(values.version === null ? {} : { version: values.version }),
   }
+}
+
+/**
+ * Capacity, when there is one to send.
+ *
+ * Omitted rather than sent as 0 or null when blank, and that is the contract
+ * rather than a preference: `UpdateEventDto.capacity` is `@IsPositive()`, so
+ * both are refused, and omission is how the API is told "leave it alone".
+ *
+ * It follows that an existing capacity cannot be CLEARED from this wizard.
+ * Doing that needs the DTO to accept null, which starts in eventa-api.
+ */
+function capacityOf(typed: string): { capacity?: number } {
+  const capacity = Number(typed.trim())
+  if (!typed.trim() || !Number.isInteger(capacity) || capacity <= 0) return {}
+  return { capacity }
 }
 
 /**

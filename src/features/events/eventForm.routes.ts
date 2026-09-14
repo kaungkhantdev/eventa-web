@@ -1,5 +1,6 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
+import { toast } from '@/lib/toast'
 import { ticketingApi } from '@/features/ticketing/ticketing.api'
 import { eventContentApi } from './eventContent.api'
 import { eventsApi } from './events.api'
@@ -10,7 +11,7 @@ import {
   toUpdateBody,
   type EventFormValues,
 } from './eventForm.mapper'
-import { LANDING_TEMPLATES, type TemplateId } from './landingTemplates'
+import { isTemplateId, type TemplateId } from './landingTemplates'
 
 /**
  * The create/edit wizard (US-EVT-02..07).
@@ -31,18 +32,26 @@ export interface EventFormData {
 
 const DEFAULT_TEMPLATE: TemplateId = 'aurora'
 
-/** Which template `?template=` asked for; anything unknown falls back. */
-export function templateOf(params: URLSearchParams): TemplateId {
+/**
+ * Which design the wizard opens on; anything unknown falls back.
+ *
+ * `?template=` wins, because that is the landing gallery's "Use template" — an
+ * explicit choice made a moment ago. Failing that it is the event's own stored
+ * design: reading only the query parameter meant an event saved as Spotlight
+ * opened with Classic selected, and previewed itself with the wrong one.
+ */
+export function templateOf(params: URLSearchParams, stored?: string | null): TemplateId {
   const asked = params.get('template')
-  return LANDING_TEMPLATES.some((t) => t.id === asked) ? (asked as TemplateId) : DEFAULT_TEMPLATE
+  if (asked && isTemplateId(asked)) return asked
+  if (stored && isTemplateId(stored)) return stored
+  return DEFAULT_TEMPLATE
 }
 
 async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
   const params = queryOf(request)
   const id = params.get('id')
-  const template = templateOf(params)
 
-  if (!id) return { values: toEventFormValues(null, [], []), template }
+  if (!id) return { values: toEventFormValues(null, [], []), template: templateOf(params) }
 
   // Four independent reads; the wizard cannot render a half-loaded form, so
   // they go together and a failure lands on the route's error element.
@@ -63,7 +72,7 @@ async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
       seatRows: seating.seatMap ? String(seating.seatMap.rows) : '',
       seatsPerRow: seating.seatMap ? String(seating.seatMap.seatsPerRow) : '',
     },
-    template,
+    template: templateOf(params, event.landingTemplateId),
   }
 }
 
@@ -72,6 +81,23 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
   const form = await request.formData()
   const intent = String(form.get('intent') ?? 'save')
   const values = JSON.parse(String(form.get('values') ?? '{}')) as EventFormValues
+
+  /**
+   * What to do once the write lands, decided by the button rather than the
+   * intent — every step can be saved from the header, and each of them writes
+   * through a different intent.
+   *
+   * `notify` says the organizer ASKED to save, so the save is announced. A Next
+   * saves too, but silently: it is a side effect of moving on, and a toast on
+   * every step would be noise. `finish` additionally hands them back to the
+   * event, which only the last step's button does.
+   */
+  const notify = form.get('notify') === 'on'
+  const finish = form.get('finish') === 'on'
+  const done = (eventId: string): Response | void => {
+    if (notify) toast.success('Changes saved.')
+    if (finish) return redirect(`/admin/event-detail?id=${eventId}`)
+  }
 
   if (intent === 'create') {
     const created = await eventsApi.create(toCreateBody(values))
@@ -84,8 +110,16 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
   if (!id) throw new Error('This event has not been created yet.')
 
   if (intent === 'tickets') {
+    // The event record too, not just the tiers. Capacity sits on this step,
+    // under the tier table, and `saveTickets` writes only tiers — so the number
+    // typed into Capacity never left the browser: the step reported itself
+    // saved, and reopening the wizard showed the field empty again.
+    //
+    // The event goes first, so a version conflict stops here rather than after
+    // half the step has been written.
+    await eventsApi.update(id, toUpdateBody(values))
     await saveTickets(id, values)
-    return
+    return done(id)
   }
 
   if (intent === 'remove-ticket') {
@@ -95,7 +129,7 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
 
   if (intent === 'seating') {
     await saveSeating(id, values)
-    return
+    return done(id)
   }
 
   if (intent === 'publish') {
@@ -119,6 +153,8 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
     id,
     values.highlights.filter((h) => h.text.trim()).map((h) => ({ text: h.text.trim(), icon: h.icon })),
   )
+
+  return done(id)
 }
 
 /**

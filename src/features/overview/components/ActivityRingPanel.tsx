@@ -1,7 +1,7 @@
 import type { Panel } from '@/app/panels'
 import type { ActivityRing } from '../overview.routes'
 import type { ShareSlice } from '../overview.types'
-import { PanelEmpty, PanelUnavailable, SectionHeader } from './PanelChrome'
+import { PanelEmptyPreview, PanelUnavailable, SectionHeader } from './PanelChrome'
 
 /**
  * Which active events are driving sign-ups (US-DASH-05).
@@ -19,6 +19,7 @@ const STROKE = 4.5
 const TOP = 25
 
 const NO_ACTIVE_EVENTS = 'No active events.'
+const NOTHING_LIVE = 'Once an event is live and selling, its share of sign-ups shows here.'
 
 export function ActivityRingPanel({ ring }: { ring: Panel<ActivityRing> }) {
   return (
@@ -30,7 +31,17 @@ export function ActivityRingPanel({ ring }: { ring: Panel<ActivityRing> }) {
 }
 
 function Ring({ ring }: { ring: ActivityRing }) {
-  if (ring.slices.length === 0) return <PanelEmpty>{NO_ACTIVE_EVENTS}</PanelEmpty>
+  if (ring.slices.length === 0) {
+    return (
+      <PanelEmptyPreview
+        preview="ring"
+        description={NOTHING_LIVE}
+        action={{ label: 'View events', icon: 'hgi-calendar-03', to: '/admin/events' }}
+      >
+        {NO_ACTIVE_EVENTS}
+      </PanelEmptyPreview>
+    )
+  }
 
   return (
     <div className="mt-4 flex flex-1 items-center gap-5">

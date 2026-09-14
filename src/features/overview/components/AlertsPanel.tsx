@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { AlertRow } from '../overview.types'
-import { PanelEmpty, SectionHeader } from './PanelChrome'
+import { PanelEmptyPreview, SectionHeader } from './PanelChrome'
 
 /**
  * What needs acting on (US-DASH-06).
@@ -12,6 +12,9 @@ import { PanelEmpty, SectionHeader } from './PanelChrome'
  * appears — an alert about money is simply absent for someone without finance
  * access, rather than shown and refused.
  */
+const NOTHING_WRONG =
+  "We'll flag failed payments, cancellations and check-in problems here."
+
 export function AlertsPanel({ alerts, emptyMessage }: { alerts: AlertRow[]; emptyMessage: string }) {
   return (
     <section className="rounded-2xl bg-surface p-4 xl:col-span-1">
@@ -21,7 +24,9 @@ export function AlertsPanel({ alerts, emptyMessage }: { alerts: AlertRow[]; empt
       />
 
       {alerts.length === 0 ? (
-        <PanelEmpty>{emptyMessage}</PanelEmpty>
+        <PanelEmptyPreview preview="alerts" description={NOTHING_WRONG}>
+          {emptyMessage}
+        </PanelEmptyPreview>
       ) : (
         <div className="mt-3.5 space-y-3.5">
           {alerts.map((a) => (

@@ -7,6 +7,7 @@ import {
   DataTable,
   DownloadButton,
   EmptyState,
+  EventPicker,
   HeaderUser,
   Icon,
   Input,
@@ -138,19 +139,17 @@ export default function InvoicesPage() {
               aria-label="Search invoices"
             />
           </div>
-          <select
-            value={params.get('eventId') ?? ''}
-            onChange={(e) => set({ eventId: e.target.value || null })}
-            className="select h-10 border-0 bg-surface font-medium sm:w-52"
-            aria-label="Filter by event"
-          >
-            <option value="">{ALL_EVENTS}</option>
-            {data.events.map((event) => (
-              <option key={event.id} value={event.id}>
-                {event.name}
-              </option>
-            ))}
-          </select>
+          <div className="relative sm:w-52">
+            <EventPicker
+              value={params.get('eventId') ?? ''}
+              onChange={(eventId) => set({ eventId: eventId || null })}
+              options={data.events}
+              allLabel={ALL_EVENTS}
+              allValue=""
+              placeholder={ALL_EVENTS}
+              className="h-10 w-full border-0 bg-surface font-medium"
+            />
+          </div>
         </div>
 
         <Card className="mt-3 p-4">
@@ -237,7 +236,9 @@ function InvoiceTableRow({ row, onVoid }: { row: InvoiceRow; onVoid: () => void 
       <td className="tnum text-muted">{row.vat}</td>
       <td className="tnum font-semibold text-ink">{row.amount}</td>
       <td>
-        <Badge tone={row.statusTone}>{row.statusLabel}</Badge>
+        <Badge tone={row.statusTone} icon={row.statusIcon}>
+          {row.statusLabel}
+        </Badge>
       </td>
       <td className="text-muted">
         <span className="tnum">{row.due}</span>
