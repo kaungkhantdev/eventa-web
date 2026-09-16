@@ -4,6 +4,7 @@ import {
   Button,
   EventPicker,
   Hint,
+  Icon,
   Input,
   Label,
   Panel,
@@ -13,6 +14,7 @@ import {
 import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
 import { MEETING_MODES, MEETING_TYPES } from '../meetings.routes'
+import { meetingSaveLabel } from '../meetings.presentation'
 import type { MeetingDraft } from '../meetings.types'
 
 /** Schedule or reschedule a meeting (US-MTG-01/02). */
@@ -51,11 +53,17 @@ export function MeetingPanel({
     if (open) setEventId(editing?.eventId ?? '')
   }
 
+  // A boolean rather than `editing` itself in the dependencies: the draft is an
+  // object, and depending on it would re-run this on any identity change.
+  const isNew = editing === null
+
   useEffect(() => {
     if (!saved || !open) return
-    toast.success('Meeting saved.')
+    // Matches the button that was pressed: scheduling sent the invites out,
+    // rescheduling only moved a meeting that already existed.
+    toast.success(isNew ? 'Meeting scheduled.' : 'Meeting saved.')
     onClose()
-  }, [saved, open, onClose])
+  }, [saved, open, onClose, isNew])
 
   return (
     <Panel
@@ -74,7 +82,8 @@ export function MeetingPanel({
             </Button>
           )}
           <Button variant="primary" className="flex-1" type="submit" form={FORM_ID} disabled={saving}>
-            {saving ? 'Saving…' : 'Save meeting'}
+            {!saving && !editing && <Icon name="hgi-calendar-add-01" size={16} />}
+            {meetingSaveLabel(Boolean(editing), saving)}
           </Button>
         </>
       }
@@ -164,6 +173,7 @@ export function MeetingPanel({
                 </option>
               ))}
             </Select>
+            <Hint>A Meet link is generated automatically.</Hint>
           </div>
         </div>
 
@@ -219,6 +229,21 @@ export function MeetingPanel({
           <Label htmlFor="meeting-notes">Notes</Label>
           <Textarea id="meeting-notes" name="notes" rows={3} defaultValue={editing?.notes ?? ''} />
         </div>
+
+        {/* What scheduling actually does, from the kit — the guests are emailed
+            without the organizer sending anything, which is worth saying before
+            the button rather than after. Only on a new meeting: rescheduling
+            does not re-invite anybody. */}
+        {!editing && (
+          <div className="flex items-start gap-2 rounded-lg border border-hair bg-canvas p-3">
+            <Icon name="hgi-calendar-check-in-01" size={16} className="mt-0.5 text-muted" />
+            <p className="text-[12px] text-muted">
+              A <span className="font-medium text-ink">Google Meet</span> link and{' '}
+              <span className="font-medium text-ink">Google Calendar</span> invite are emailed to
+              each guest, with a reminder 15 minutes before.
+            </p>
+          </div>
+        )}
       </fetcher.Form>
     </Panel>
   )
