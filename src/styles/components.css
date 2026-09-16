@@ -679,3 +679,31 @@ html.dark .segmented button.active {
 .richtext :where(.ql-indent-1) { padding-left: 1.5em; }
 .richtext :where(.ql-indent-2) { padding-left: 3em; }
 .richtext :where(.ql-indent-3) { padding-left: 4.5em; }
+
+/* Route change — the content area fades in whenever it shows something new.
+   See lib/routeTransition.ts for when it replays.
+
+   Opacity ONLY, deliberately: a `transform` on this wrapper would make it the
+   containing block for every `position: fixed` descendant, and the row menus
+   and slide-over panels inside pages are fixed without being portaled. They
+   would be positioned against this box instead of the viewport for as long as
+   the animation ran.
+
+   Short enough that it reads as the page settling rather than as an effect —
+   past ~250ms a fade on every navigation starts to feel like latency. */
+@keyframes route-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.route-frame {
+  animation: route-in 160ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-frame {
+    animation: none;
+  }
+}
