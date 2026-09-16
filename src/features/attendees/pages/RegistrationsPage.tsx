@@ -518,7 +518,7 @@ function AddRegistrationPanel({
             type="checkbox"
             name="sendConfirmation"
             defaultChecked
-            className="h-4 w-4 accent-brand"
+            className="checkbox"
           />
         </label>
         {refusal && (

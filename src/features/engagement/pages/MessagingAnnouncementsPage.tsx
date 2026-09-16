@@ -153,12 +153,12 @@ export default function MessagingAnnouncementsPage() {
             <Label>Channel</Label>
             <div className="flex gap-2">
               <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-hair px-3 py-2 text-[13px] text-ink">
-                <input type="checkbox" className="h-3.5 w-3.5 accent-brand" defaultChecked />
+                <input type="checkbox" className="checkbox" defaultChecked />
                 <i className="hgi-stroke hgi-mail-01 text-[15px] text-muted" />
                 Email
               </label>
               <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-hair px-3 py-2 text-[13px] text-ink">
-                <input type="checkbox" className="h-3.5 w-3.5 accent-brand" defaultChecked />
+                <input type="checkbox" className="checkbox" defaultChecked />
                 <i className="hgi-stroke hgi-smart-phone-01 text-[15px] text-muted" />
                 SMS
               </label>

@@ -1422,7 +1422,7 @@ function TicketPanel({
           <label className="flex cursor-pointer items-center gap-2.5 rounded-lg bg-canvas p-3">
             <input
               type="checkbox"
-              className="h-4 w-4 accent-[#1ba770]"
+              className="checkbox"
               checked={isFree}
               onChange={(e) => setIsFree(e.target.checked)}
             />
