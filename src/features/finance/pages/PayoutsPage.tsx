@@ -83,7 +83,13 @@ export default function PayoutsPage() {
                 to: PAYOUT_SETTINGS,
                 icon: 'hgi-link-square-02',
               },
-              { label: 'Create your first event', to: '/admin/event-form' },
+              /* Not "Create your first event": this loader has no events list
+                 to check, and offering it to a workspace whose events are
+                 already selling is a dead end. The events page answers both
+                 cases correctly on its own — it offers creating one when there
+                 are none. The real prerequisite here is the payout account
+                 above, which is why that leads. */
+              { label: 'See your events', to: '/admin/events' },
             ]}
           >
             A payout moves your ticket sales from Eventa to your bank. Connect a payout account

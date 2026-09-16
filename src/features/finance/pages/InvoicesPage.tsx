@@ -49,6 +49,8 @@ export default function InvoicesPage() {
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
   const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
+  // Already loaded for the event filter, so this costs no extra request.
+  const hasEvents = data.events.length > 0
 
   const header = (
     <PageHeader
@@ -97,7 +99,12 @@ export default function InvoicesPage() {
                 to: '/admin/settings-organization',
                 icon: 'hgi-building-03',
               },
-              { label: 'Create your first event', to: '/admin/event-form' },
+              // Only worth offering to a workspace that has none. With events
+              // already published, the reason there are no invoices is that no
+              // order has been raised against one, not a missing event.
+              hasEvents
+                ? { label: 'See your events', to: '/admin/events' }
+                : { label: 'Create your first event', to: '/admin/event-form' },
             ]}
           >
             A tax invoice is raised against one order at a time, and keeps its number for good —
