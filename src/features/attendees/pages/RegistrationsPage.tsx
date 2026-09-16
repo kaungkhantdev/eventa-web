@@ -162,8 +162,6 @@ export default function RegistrationsPage() {
               aria-label="Search registrations"
             />
           </div>
-          {/* The wrapper keeps its `relative`: the picker draws its own leading
-              icon absolutely, against the caller's positioned ancestor. */}
           <div className="relative w-full sm:w-52">
             <EventPicker
               value={params.get('eventId') ?? ''}
