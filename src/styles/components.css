@@ -679,3 +679,80 @@ html.dark .segmented button.active {
 .richtext :where(.ql-indent-1) { padding-left: 1.5em; }
 .richtext :where(.ql-indent-2) { padding-left: 3em; }
 .richtext :where(.ql-indent-3) { padding-left: 4.5em; }
+
+/* Route change — the content area fades in whenever it shows something new.
+   See lib/routeTransition.ts for when it replays.
+
+   Opacity ONLY, deliberately: a `transform` on this wrapper would make it the
+   containing block for every `position: fixed` descendant, and the row menus
+   and slide-over panels inside pages are fixed without being portaled. They
+   would be positioned against this box instead of the viewport for as long as
+   the animation ran.
+
+   Short enough that it reads as the page settling rather than as an effect —
+   past ~250ms a fade on every navigation starts to feel like latency. */
+@keyframes route-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.route-frame {
+  animation: route-in 160ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-frame {
+    animation: none;
+  }
+}
+
+/* Checkbox — round, and the only definition of `.checkbox` in the app.
+
+   The class was already being used in two places but had never been written,
+   so those boxes rendered as raw browser defaults: a different size, border
+   and tick from every other checkbox on the screen. The rest were each styled
+   by hand at the call site, in six different ways.
+
+   `appearance: none` is what makes the shape ours at all — `accent-color`,
+   which most of these used, tints the native control but cannot reround it.
+   That puts the tick on us too, so it is drawn rather than inherited.
+
+   A round box is conventionally a radio (pick one) rather than a checkbox
+   (pick many). It is safe here because this app has no visible native radios —
+   all five are `sr-only` behind styled cards — so nothing round on screen
+   means "pick one". The tick is what carries the difference and is drawn at
+   full contrast for it. */
+.checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(var(--hair));
+  background-color: rgb(var(--surface));
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 64%;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.checkbox:checked {
+  border-color: var(--color-brand);
+  background-color: var(--color-brand);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23fff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+}
+.checkbox:focus-visible {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px rgba(27, 167, 112, 0.15);
+}
+.checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

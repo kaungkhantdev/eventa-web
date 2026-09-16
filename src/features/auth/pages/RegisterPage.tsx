@@ -184,7 +184,7 @@ export default function RegisterPage() {
             id="terms"
             name="acceptTerms"
             type="checkbox"
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-hair accent-brand"
+            className="checkbox mt-0.5"
             required
           />
           I agree to the{' '}

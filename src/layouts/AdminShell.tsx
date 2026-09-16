@@ -11,6 +11,7 @@ import { AdminPageSkeleton } from '@/app/pageSkeletons'
 import { useTheme } from '@/lib/useTheme'
 import { usePendingPath } from '@/lib/usePendingPath'
 import { cn } from '@/lib/cn'
+import { ROUTE_FRAME, routeFrameKey } from '@/lib/routeTransition'
 
 /* Double sidebar: an icon rail of modules plus a labeled panel of grouped
    sub-nav. Faithful port of the markup shell.js injected in the static kit.
@@ -193,7 +194,13 @@ export default function AdminShell() {
       </div>
 
       <main className="min-w-0 flex-1 overflow-y-auto px-5 py-4 lg:px-7">
-        <div className="mx-auto w-full max-w-[1600px]">
+        {/* Keyed so the fade replays on both halves of a navigation — the
+            skeleton arriving, then the page replacing it. A filter or a page
+            number leaves the key alone, so the table below does not flash. */}
+        <div
+          key={routeFrameKey(pendingAdmin, location.pathname)}
+          className={cn(ROUTE_FRAME, 'mx-auto w-full max-w-[1600px]')}
+        >
           {pendingAdmin ? (
             <AdminPageSkeleton path={pendingAdmin} />
           ) : (

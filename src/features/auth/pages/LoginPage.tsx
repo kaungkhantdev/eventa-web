@@ -132,7 +132,7 @@ export default function LoginPage() {
                 <input
                   type="checkbox"
                   name="rememberMe"
-                  className="h-3.5 w-3.5 rounded border-hair accent-brand"
+                  className="checkbox"
                 />
                 Remember me
               </label>
