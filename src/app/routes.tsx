@@ -333,7 +333,10 @@ const adminChildren = [
   },
   {
     path: 'notifications',
-    ...page(() => import('@/features/engagement/pages/NotificationsPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/NotificationsPage'),
+      () => import('@/features/engagement/notifications.routes').then((m) => m.notificationsRoute),
+    ),
     handle: { page: 'notifications' },
   },
   {
