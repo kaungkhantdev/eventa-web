@@ -47,6 +47,17 @@ function zone(timeZone?: string): string {
 export function satang(amount: number | null): string {
   if (amount === null) return MASKED
   if (amount === 0) return FREE
+  return satangAmount(amount)
+}
+
+/**
+ * The same conversion with no special case for zero.
+ *
+ * A price of nothing is "Free"; a SUM of nothing is ฿0. A report column that
+ * has to add up, or a payout of no money, would read as nonsense with a word in
+ * it — and the reader cannot subtract "Free" from a total.
+ */
+export function satangAmount(amount: number): string {
   return baht(Math.round(amount / SATANG_PER_BAHT))
 }
 

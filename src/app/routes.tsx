@@ -288,7 +288,10 @@ const adminChildren = [
   },
   {
     path: 'reports-income',
-    ...page(() => import('@/features/insights/pages/ReportsIncomePage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsIncomePage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.incomeReportRoute),
+    ),
     handle: { page: 'reports-income' },
   },
   {
@@ -303,12 +306,19 @@ const adminChildren = [
   },
   {
     path: 'reports-registrations',
-    ...page(() => import('@/features/insights/pages/ReportsRegistrationsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsRegistrationsPage'),
+      () =>
+        import('@/features/insights/insights.routes').then((m) => m.registrationsReportRoute),
+    ),
     handle: { page: 'reports-registrations' },
   },
   {
     path: 'reports-attendance',
-    ...page(() => import('@/features/insights/pages/ReportsAttendancePage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsAttendancePage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.attendanceReportRoute),
+    ),
     handle: { page: 'reports-attendance' },
   },
   {
