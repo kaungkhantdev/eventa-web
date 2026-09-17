@@ -27,9 +27,19 @@ const RAIL_OFF =
   'grid h-9 w-9 place-items-center rounded-lg text-white/55 transition hover:bg-white/10 hover:text-brand'
 
 const LEAF_ON =
-  'block rounded-lg py-1.5 pl-9 pr-2.5 text-[13px] font-semibold bg-brand-soft text-brand'
+  'relative block rounded-lg py-1.5 pl-9 pr-2.5 text-[13px] font-semibold bg-brand-soft text-brand'
 const LEAF_OFF =
-  'block rounded-lg py-1.5 pl-9 pr-2.5 text-[13px] font-medium text-muted transition hover:bg-brand-soft/60 hover:text-brand'
+  'relative block rounded-lg py-1.5 pl-9 pr-2.5 text-[13px] font-medium text-muted transition hover:bg-brand-soft/60 hover:text-brand'
+
+/* The marker on the active leaf, on top of the soft-green fill. Absolutely
+   positioned rather than a border or an inline element: either would widen the
+   active leaf and push its label sideways, so every leaf in the panel would
+   shift as you moved between pages. Both states keep identical padding. */
+function LeafMarker() {
+  return (
+    <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-brand" />
+  )
+}
 
 function RailButton({ mod, active }: { mod: NavModule; active: boolean }) {
   return (
@@ -62,13 +72,17 @@ function PanelGroup({ group, page }: { group: NavGroup; page: string }) {
       </button>
       {open && (
         <ul className="mt-0.5 space-y-0.5">
-          {group.items.map((it) => (
-            <li key={it.page}>
-              <Link to={it.to} className={it.page === page ? LEAF_ON : LEAF_OFF}>
-                {it.label}
-              </Link>
-            </li>
-          ))}
+          {group.items.map((it) => {
+            const on = it.page === page
+            return (
+              <li key={it.page}>
+                <Link to={it.to} className={on ? LEAF_ON : LEAF_OFF}>
+                  {on && <LeafMarker />}
+                  {it.label}
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
