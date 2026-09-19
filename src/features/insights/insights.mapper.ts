@@ -1,9 +1,17 @@
 import { MASKED, bangkokDate, num, satangAmount } from '@/lib/format'
+import type { BadgeTone } from '@/components/ui'
+import { eventDetailPath } from '@/features/events/events.presentation'
 import type {
   AttendanceRowWire,
   AttendanceTotalsWire,
   ChangeWire,
+  EventLifecycle,
+  DiscountRowWire,
+  DiscountStanding,
+  EventPerformanceRowWire,
   IncomeReportWire,
+  LedgerOutcome,
+  LedgerRowWire,
   MoneyWire,
   RegistrationsReportWire,
   SplitWire,
@@ -195,5 +203,135 @@ export function toIncomeTiles(
     refunds: tile(money(totals.refundsSatang), changes.refundsSatang),
     fees: tile(money(totals.feesSatang), changes.feesSatang),
     net: tile(money(totals.netSatang), changes.netSatang),
+  }
+}
+
+/* ── event performance (US-RPT-04) ─────────────────────────────────────── */
+
+/** How each stage of the lifecycle reads. Cancelled is the kit's fourth tone. */
+const LIFECYCLE_BADGE: Record<EventLifecycle, { label: string; tone: BadgeTone }> = {
+  upcoming: { label: 'Upcoming', tone: 'blue' },
+  live: { label: 'Live', tone: 'green' },
+  completed: { label: 'Completed', tone: 'gray' },
+  // Not in the static kit, which only ever showed three. A cancelled event
+  // badged "Completed" would read as one that simply finished.
+  cancelled: { label: 'Cancelled', tone: 'red' },
+}
+
+export interface EventPerformanceRow {
+  id: string
+  name: string
+  /** "Jul 18, 2026 · BITEC" — the day, and where, when anyone said. */
+  meta: string
+  href: string
+  registrations: string
+  revenue: string
+  attendanceRate: string
+  status: { label: string; tone: BadgeTone }
+}
+
+export function toEventPerformanceRow(
+  row: EventPerformanceRowWire,
+): EventPerformanceRow {
+  return {
+    id: row.eventId,
+    name: row.eventName,
+    meta: [bangkokDate(row.startAt), row.venue].filter(Boolean).join(' · '),
+    href: eventDetailPath(row.eventId),
+    registrations: num(row.registrations),
+    // Null is the reader being told nothing, not the event earning nothing.
+    revenue: row.revenueSatang === null ? MASKED : money(row.revenueSatang),
+    attendanceRate: rate(row.attendanceRate),
+    status: LIFECYCLE_BADGE[row.lifecycle],
+  }
+}
+
+/* ── discount payback (US-RPT-10) ──────────────────────────────────────── */
+
+/** Matching the kit's own three, plus the one it never showed. */
+const STANDING_BADGE: Record<DiscountStanding, { label: string; tone: BadgeTone }> = {
+  active: { label: 'Active', tone: 'green' },
+  scheduled: { label: 'Scheduled', tone: 'blue' },
+  expired: { label: 'Expired', tone: 'gray' },
+  // Switched off by hand. The kit had no such badge because its data had no
+  // such code; rendering it as "Expired" would blame the calendar.
+  disabled: { label: 'Disabled', tone: 'red' },
+}
+
+export interface DiscountReportRow {
+  id: string
+  code: string
+  terms: string
+  scope: string
+  redemptions: string
+  discount: string
+  influenced: string
+  returnRatio: string
+  status: { label: string; tone: BadgeTone }
+}
+
+export function toDiscountRow(row: DiscountRowWire): DiscountReportRow {
+  return {
+    id: row.discountId,
+    code: row.code,
+    // A percentage code's wording is finished by the API; a fixed one's is
+    // finished here, because its amount is satang until it reaches the edge.
+    terms: row.terms ?? `${money(row.fixedValueSatang ?? 0)} off`,
+    scope: row.scope,
+    redemptions: num(row.redemptions),
+    discount: money(row.discountSatang),
+    influenced: money(row.influencedSatang),
+    // "×4.0" reads as a multiple; a bare 4 next to money columns reads as ฿4.
+    returnRatio: row.returnRatio === null ? MASKED : `×${row.returnRatio.toFixed(1)}`,
+    status: STANDING_BADGE[row.standing],
+  }
+}
+
+/* ── transaction ledger (US-RPT-06) ────────────────────────────────────── */
+
+const OUTCOME_BADGE: Record<LedgerOutcome, { label: string; tone: BadgeTone }> = {
+  succeeded: { label: 'Succeeded', tone: 'green' },
+  refunded: { label: 'Refunded', tone: 'gray' },
+  pending: { label: 'Pending', tone: 'amber' },
+  failed: { label: 'Failed', tone: 'red' },
+}
+
+export interface TransactionRow {
+  id: string
+  reference: string
+  date: string
+  person: string
+  event: string
+  method: string
+  /** Already signed and formatted: "-฿1,250" for a refund. */
+  amount: string
+  /** True for a refund, so the screen can colour the amount as money leaving. */
+  outgoing: boolean
+  type: string
+  href: string
+  status: { label: string; tone: BadgeTone }
+}
+
+/**
+ * A ledger entry.
+ *
+ * The sign is applied HERE, not on the wire: the API keeps every amount
+ * positive so its sums cannot be poisoned, and a refund reads as "-฿1,250"
+ * only once it reaches a screen that can also colour it.
+ */
+export function toTransactionRow(row: LedgerRowWire): TransactionRow {
+  const outgoing = row.kind === 'refund'
+  return {
+    id: row.id,
+    reference: row.reference,
+    date: bangkokDate(row.at),
+    person: row.personName,
+    event: row.eventName,
+    method: row.method,
+    amount: `${outgoing ? '-' : ''}${money(row.amountSatang)}`,
+    outgoing,
+    type: outgoing ? 'Refund' : 'Payment',
+    href: `/admin/payments?q=${encodeURIComponent(row.reference)}`,
+    status: OUTCOME_BADGE[row.outcome],
   }
 }

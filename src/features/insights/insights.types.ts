@@ -33,7 +33,7 @@ interface ReportWire<Row, Totals> {
 }
 
 /** An event's identity, carried by every report row. */
-interface RowEvent {
+export interface RowEvent {
   eventId: string
   eventName: string
   startAt: string
@@ -97,4 +97,104 @@ export interface MoneyWire {
 
 export type IncomeReportWire = ReportWire<RowEvent & MoneyWire, MoneyWire> & {
   changes: Record<keyof MoneyWire, ChangeWire>
+}
+
+/* ── event performance (US-RPT-04) ─────────────────────────────────────── */
+
+/**
+ * Where an event is in its life.
+ *
+ * Worked out by the API from the clock — `events.status` is not maintained past
+ * publication, so it is deliberately NOT what this reports.
+ */
+export type EventLifecycle = 'upcoming' | 'live' | 'completed' | 'cancelled'
+
+export interface EventPerformanceRowWire extends RowEvent {
+  /** The venue, or "Online". Null where an in-person event named none. */
+  venue: string | null
+  city: string | null
+  lifecycle: EventLifecycle
+  /** Confirmed seats — what the ranking is by. */
+  registrations: number
+  /** Net of VAT and refunds, all time. Null when the reader may not see money. */
+  revenueSatang: number | null
+  /** Null for an event that has not started, and for one that issued nothing. */
+  attendanceRate: number | null
+}
+
+export interface EventsReportWire {
+  period: ReportPeriodWire
+  rows: EventPerformanceRowWire[]
+  matchedEvents: number
+}
+
+/* ── discount payback (US-RPT-10) ──────────────────────────────────────── */
+
+export type DiscountStanding = 'active' | 'scheduled' | 'expired' | 'disabled'
+
+export interface DiscountRowWire {
+  discountId: string
+  code: string
+  standing: DiscountStanding
+  /** A percentage code's terms, e.g. "25% off". Null for a fixed one. */
+  terms: string | null
+  /** What a FIXED code takes off, integer satang. Null for a percentage one. */
+  fixedValueSatang: number | null
+  scope: string
+  redemptions: number
+  discountSatang: number
+  /** Order value the code drove — deliberately NOT the income report's net. */
+  influencedSatang: number
+  /** Null for a code nobody has used, and for one that cost nothing. */
+  returnRatio: number | null
+}
+
+export interface DiscountsReportWire {
+  period: ReportPeriodWire
+  rows: DiscountRowWire[]
+  matchedCodes: number
+  totals: {
+    activeCodes: number
+    redemptions: number
+    discountSatang: number
+    influencedSatang: number
+    returnRatio: number | null
+  }
+}
+
+/* ── transaction ledger (US-RPT-06) ────────────────────────────────────── */
+
+export type LedgerKind = 'payment' | 'refund'
+export type LedgerOutcome = 'succeeded' | 'pending' | 'refunded' | 'failed'
+
+export interface LedgerRowWire {
+  id: string
+  kind: LedgerKind
+  /** A payment's txn; a refund's is derived from its parent's. */
+  reference: string
+  at: string
+  personName: string
+  eventId: string
+  eventName: string
+  /** As the schema knows it — `Card`, never a brand. */
+  method: string
+  /** Always positive; the minus sign belongs to the screen. */
+  amountSatang: number
+  outcome: LedgerOutcome
+  paymentId: string
+}
+
+export interface TransactionsReportWire {
+  period: ReportPeriodWire
+  rows: LedgerRowWire[]
+  matchedEntries: number
+  totals: {
+    entries: number
+    payments: number
+    failed: number
+    refunds: number
+    collectedSatang: number
+    refundedSatang: number
+    successRate: number | null
+  }
 }

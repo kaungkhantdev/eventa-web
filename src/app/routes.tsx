@@ -296,7 +296,11 @@ const adminChildren = [
   },
   {
     path: 'reports-transactions',
-    ...page(() => import('@/features/insights/pages/ReportsTransactionsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsTransactionsPage'),
+      () =>
+        import('@/features/insights/insights.routes').then((m) => m.transactionsReportRoute),
+    ),
     handle: { page: 'reports-transactions' },
   },
   {
@@ -323,12 +327,18 @@ const adminChildren = [
   },
   {
     path: 'reports-discounts',
-    ...page(() => import('@/features/insights/pages/ReportsDiscountsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsDiscountsPage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.discountsReportRoute),
+    ),
     handle: { page: 'reports-discounts' },
   },
   {
     path: 'reports-events',
-    ...page(() => import('@/features/insights/pages/ReportsEventsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsEventsPage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.eventsReportRoute),
+    ),
     handle: { page: 'reports-events' },
   },
   {

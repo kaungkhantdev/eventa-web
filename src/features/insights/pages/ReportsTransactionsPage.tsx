@@ -1,65 +1,40 @@
-import { useMemo, useState } from 'react'
+import { Link, useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
-  HeaderUser,
+  Badge,
   Button,
+  HeaderUser,
   Icon,
-  EventPicker,
+  PageFooter,
+  PageHeader,
   Paginator,
-  usePagination,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import { baht } from '@/lib/format'
-import {
-  TRANSACTIONS,
-  TXN_TYPE_BADGE,
-  TXN_STATUS_BADGE,
-  type Transaction,
-} from '../data/reportsTransactions'
+import { useFilters } from '@/lib/useFilters'
+import { ReportEmptyRow } from '../components/ReportEmptyRow'
+import { ReportFilters } from '../components/ReportFilters'
+import { StatTile } from '../components/StatTile'
+import type { TransactionsReportData } from '../insights.routes'
 
-function AmountCell({ r }: { r: Transaction }) {
-  return r.type === 'Refund' ? (
-    <span className="font-semibold text-red-500">-{baht(r.amount)}</span>
-  ) : (
-    <span className="font-semibold text-ink">{baht(r.amount)}</span>
-  )
-}
-
+/**
+ * The transaction ledger (US-RPT-06). Layout ported from the kit.
+ *
+ * Read-only by design: this report never changes money. A reference links
+ * through to the payment, which is where refunding lives.
+ *
+ * A refund is its own row, showing "-฿1,250" in the warning colour — the API
+ * keeps every amount positive so its sums cannot be poisoned, and the sign is
+ * applied once, at the edge.
+ */
 export default function ReportsTransactionsPage() {
-  const [event, setEvent] = useState<string>('All events')
-  const [q, setQ] = useState('')
-
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase()
-    return TRANSACTIONS.filter((r) => {
-      if (!(event === 'All events' || r.event === event)) return false
-      if (!query) return true
-      return (
-        (r.ref + ' ' + r.attendee + ' ' + r.event + ' ' + r.method + ' ' + r.type + ' ' + r.status)
-          .toLowerCase()
-          .indexOf(query) !== -1
-      )
-    })
-  }, [event, q])
-
-  const pager = usePagination(filtered)
-  const { setPage } = pager
-
-  const onSearch = (v: string) => {
-    setQ(v)
-    setPage(1)
-  }
-  const onEvent = (v: string) => {
-    setEvent(v)
-    setPage(1)
-  }
+  const data = useLoaderData() as TransactionsReportData
+  const { set, clear, emptyReason } = useFilters({ total: data.window.total })
+  const { tiles } = data
 
   return (
     <>
       <PageHeader
         title="Transactions"
-        subtitle="Every charge and refund across all events."
+        subtitle="Every payment and refund across all events."
         actions={
           <>
             <Button variant="primary">
@@ -71,98 +46,29 @@ export default function ReportsTransactionsPage() {
         }
       />
 
-      {/* filter bar: search + event */}
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:w-64">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => onSearch(e.target.value)}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search reference, attendee or event…"
-          />
-        </div>
-        <div className="relative w-full sm:w-52">
-          <EventPicker
-            value={event}
-            onChange={onEvent}
-            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
-          />
-        </div>
-      </div>
+      <ReportFilters events={data.events} />
 
-      {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-exchange-01 text-[16px]" />
-            Transactions
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">1,482</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              6.4%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-wallet-01 text-[16px]" />
-            Payments
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">฿3.55M</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              11.2%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-delivery-return-01 text-[16px]" />
-            Refunds
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">41</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-down-right-01 text-[13px]" />
-              8.3%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-checkmark-badge-01 text-[16px]" />
-            Success rate
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">98.6%</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              0.3%
-            </span>
-          </div>
-        </div>
+        <StatTile icon="hgi-invoice-01" label="Transactions" value={tiles.entries} />
+        <StatTile icon="hgi-wallet-01" label="Payments" value={tiles.collected} />
+        <StatTile icon="hgi-delivery-return-01" label="Refunds" value={tiles.refunds} />
+        <StatTile icon="hgi-checkmark-badge-01" label="Success rate" value={tiles.successRate} />
       </div>
 
-      {/* detailed table: all transactions */}
       <section className="card mt-3 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[15px] font-bold tracking-tight">All transactions</h2>
-            <p className="mt-0.5 text-[12px] text-muted">Payments & refunds ledger</p>
+            <h2 className="text-[15px] font-bold tracking-tight">Transactions</h2>
+            <p className="mt-0.5 text-[12px] text-muted">Payments &amp; refunds ledger</p>
           </div>
         </div>
         <div className="mt-3 overflow-x-auto">
-          <table className="data-table min-w-[880px]">
+          <table className="data-table min-w-[720px]">
             <thead>
               <tr>
                 <th>Reference</th>
                 <th>Date</th>
-                <th>Attendee</th>
+                <th>Payer</th>
                 <th>Event</th>
                 <th>Method</th>
                 <th className="text-right">Amount ฿</th>
@@ -171,46 +77,50 @@ export default function ReportsTransactionsPage() {
               </tr>
             </thead>
             <tbody className="text-[13px]">
-              {pager.slice.length ? (
-                pager.slice.map((r) => (
-                  <tr key={r.ref}>
-                    <td className="font-semibold text-ink tnum">{r.ref}</td>
-                    <td className="whitespace-nowrap text-muted">{r.date}</td>
-                    <td className="text-ink">{r.attendee}</td>
-                    <td className="text-muted">{r.event}</td>
-                    <td className="text-muted">{r.method}</td>
-                    <td className="text-right tnum">
-                      <AmountCell r={r} />
-                    </td>
+              {data.rows.length ? (
+                data.rows.map((row) => (
+                  <tr key={row.id}>
                     <td>
-                      <span className={cn('badge', TXN_TYPE_BADGE[r.type])}>{r.type}</span>
+                      <Link
+                        to={row.href}
+                        className="font-semibold text-ink hover:text-brand hover:underline tnum"
+                      >
+                        {row.reference}
+                      </Link>
                     </td>
+                    <td className="text-muted">{row.date}</td>
+                    <td className="text-ink">{row.person}</td>
+                    <td className="text-muted">{row.event}</td>
+                    <td className="text-muted">{row.method}</td>
+                    <td
+                      className={cn(
+                        'text-right font-semibold tnum',
+                        row.outgoing ? 'text-red-500' : 'text-ink',
+                      )}
+                    >
+                      {row.amount}
+                    </td>
+                    <td className="text-muted">{row.type}</td>
                     <td>
-                      <span className={cn('badge', TXN_STATUS_BADGE[r.status])}>{r.status}</span>
+                      <Badge tone={row.status.tone}>{row.status.label}</Badge>
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={8} className="py-10 text-center text-[13px] text-muted">
-                    No transactions for this selection.
-                  </td>
-                </tr>
+                <ReportEmptyRow colSpan={8} noun="transactions" reason={emptyReason} onClear={clear}>
+                  No payment or refund matches the current search and event filter. Try a different
+                  reference or payer, or widen the period.
+                </ReportEmptyRow>
               )}
             </tbody>
           </table>
         </div>
 
         <Paginator
-          from={pager.from}
-          to={pager.to}
-          total={pager.total}
-          page={pager.page}
-          pageCount={pager.pageCount}
-          size={pager.size}
-          onPage={pager.setPage}
-          onSize={pager.setSize}
+          {...data.window}
           noun="transactions"
+          onPage={(page) => set({ page })}
+          onSize={(size) => set({ limit: size, page: null })}
         />
       </section>
 

@@ -2,10 +2,17 @@ import { describe, expect, it } from 'vitest'
 import {
   toAttendanceRow,
   toDelta,
+  toDiscountRow,
+  toEventPerformanceRow,
   toIncomeRow,
   toRegistrationRow,
 } from './insights.mapper'
-import type { AttendanceRowWire, ChangeWire } from './insights.types'
+import type {
+  AttendanceRowWire,
+  ChangeWire,
+  DiscountRowWire,
+  EventPerformanceRowWire,
+} from './insights.types'
 
 /**
  * The reports' view models.
@@ -160,5 +167,115 @@ describe('toIncomeRow', () => {
       settledSatang: 0,
     })
     expect(empty.gross).toBe('฿0')
+  })
+})
+
+describe('toEventPerformanceRow', () => {
+  const row = (over: Partial<EventPerformanceRowWire> = {}) =>
+    toEventPerformanceRow({
+      ...EVENT,
+      venue: 'BITEC',
+      city: 'Bangkok',
+      lifecycle: 'completed',
+      registrations: 412,
+      revenueSatang: 824_000,
+      attendanceRate: 92,
+      ...over,
+    })
+
+  it('reads the meta line as the day and the venue', () => {
+    expect(row().meta).toBe('Jul 18, 2026 · BITEC')
+  })
+
+  it('gives the day alone when nobody said where', () => {
+    expect(row({ venue: null }).meta).toBe('Jul 18, 2026')
+  })
+
+  it('reads satang as Baht', () => {
+    expect(row().revenue).toBe('฿8,240')
+  })
+
+  it('masks revenue the reader may not see, rather than showing zero', () => {
+    // The API sends null for a reader without finance access. "฿0" would be a
+    // claim about the event instead of about the reader.
+    expect(row({ revenueSatang: null }).revenue).toBe('—')
+  })
+
+  it('shows a real ฿0 for an event that took nothing', () => {
+    expect(row({ revenueSatang: 0 }).revenue).toBe('฿0')
+  })
+
+  it('shows a dash for an event that has not happened', () => {
+    expect(row({ attendanceRate: null }).attendanceRate).toBe('—')
+  })
+
+  it('badges each stage of the lifecycle', () => {
+    expect(row({ lifecycle: 'upcoming' }).status).toEqual({
+      label: 'Upcoming',
+      tone: 'blue',
+    })
+    expect(row({ lifecycle: 'live' }).status.tone).toBe('green')
+    expect(row({ lifecycle: 'completed' }).status.tone).toBe('gray')
+  })
+
+  it('badges a cancelled event as cancelled, not completed', () => {
+    // It would otherwise read as an event that simply finished.
+    expect(row({ lifecycle: 'cancelled' }).status).toEqual({
+      label: 'Cancelled',
+      tone: 'red',
+    })
+  })
+
+  it('links the row to that event', () => {
+    expect(row().href).toContain(EVENT.eventId)
+  })
+})
+
+describe('toDiscountRow', () => {
+  const row = (over: Partial<DiscountRowWire> = {}) =>
+    toDiscountRow({
+      discountId: 'd-1',
+      code: 'EARLYBIRD',
+      standing: 'active',
+      terms: '25% off',
+      fixedValueSatang: null,
+      scope: 'Tech Summit 2026',
+      redemptions: 40,
+      discountSatang: 200_000,
+      influencedSatang: 800_000,
+      returnRatio: 4,
+      ...over,
+    })
+
+  it('keeps a percentage code’s wording as the API gave it', () => {
+    expect(row().terms).toBe('25% off')
+  })
+
+  it('finishes a fixed code’s wording here, where satang becomes Baht', () => {
+    const fixed = row({ terms: null, fixedValueSatang: 20_000 })
+    expect(fixed.terms).toBe('฿200 off')
+  })
+
+  it('reads the return as a multiple, not as money', () => {
+    // A bare "4" beside two Baht columns reads as ฿4.
+    expect(row().returnRatio).toBe('×4.0')
+  })
+
+  it('shows a dash for a code with no return to report', () => {
+    expect(row({ returnRatio: null }).returnRatio).toBe('—')
+  })
+
+  it('badges each standing', () => {
+    expect(row().status).toEqual({ label: 'Active', tone: 'green' })
+    expect(row({ standing: 'scheduled' }).status.tone).toBe('blue')
+    expect(row({ standing: 'expired' }).status.tone).toBe('gray')
+  })
+
+  it('badges a disabled code as disabled, not expired', () => {
+    // It was switched off by hand; blaming the calendar would be wrong.
+    expect(row({ standing: 'disabled' }).status).toEqual({
+      label: 'Disabled',
+      tone: 'red',
+    })
   })
 })
