@@ -354,7 +354,10 @@ const adminChildren = [
   },
   {
     path: 'messaging-templates',
-    ...page(() => import('@/features/engagement/pages/MessagingTemplatesPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/MessagingTemplatesPage'),
+      async () => (await import('@/features/engagement/templates.routes')).messageTemplatesRoute,
+    ),
     handle: { page: 'messaging-templates' },
   },
   {

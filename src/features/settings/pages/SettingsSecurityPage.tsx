@@ -10,13 +10,13 @@ import {
   Label,
   Panel,
   PageFooter,
+  Toggle,
 } from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
-import { Toggle } from '../components/Toggle'
 import type { SecurityData } from '../settings.routes'
 import type { AuditRow, SessionRow } from '../settings.types'
 

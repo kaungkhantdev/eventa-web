@@ -13,12 +13,12 @@ import {
   PageHeader,
   Panel,
   Textarea,
+  Toggle,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import type { ActionResult } from '@/app/loaders'
-import { Toggle } from '../components/Toggle'
 import type { RolesData } from '../settings.routes'
 import type { PermissionOption, RoleCard } from '../settings.types'
 
