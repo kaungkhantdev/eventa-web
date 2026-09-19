@@ -362,7 +362,11 @@ const adminChildren = [
   },
   {
     path: 'messaging-announcements',
-    ...page(() => import('@/features/engagement/pages/MessagingAnnouncementsPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/MessagingAnnouncementsPage'),
+      async () =>
+        (await import('@/features/engagement/announcements.routes')).announcementsRoute,
+    ),
     handle: { page: 'messaging-announcements' },
   },
   {

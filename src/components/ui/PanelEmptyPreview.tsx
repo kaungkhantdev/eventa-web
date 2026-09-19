@@ -99,6 +99,7 @@ export type PreviewKind =
   | 'tiers'
   | 'chart'
   | 'bars'
+  | 'announcements'
 
 /**
  * Fades the preview out downwards so the message sits on clear ground.
@@ -276,6 +277,25 @@ const PREVIEWS: Record<PreviewKind, Preview> = {
               <Block className="h-2 w-1/3" />
             </span>
             <Block className="h-2.5 w-8" />
+          </PreviewRow>
+        )}
+      />
+    ),
+  },
+  // A sent broadcast: its icon tile, then the subject over the message and the
+  // line naming the event, the count and the day.
+  announcements: {
+    place: 'absolute inset-x-0 top-1/3',
+    render: () => (
+      <Stack
+        row={() => (
+          <PreviewRow>
+            <Block className="h-10 w-10 rounded-xl" />
+            <span className="flex-1 space-y-1.5">
+              <Block className="h-2.5 w-2/5" />
+              <Block className="h-2 w-3/4" />
+              <Block className="h-2 w-1/3" />
+            </span>
           </PreviewRow>
         )}
       />
