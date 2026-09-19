@@ -8,6 +8,7 @@ import {
   Paginator,
 } from '@/components/ui'
 import { useFilters } from '@/lib/useFilters'
+import { ReportEmptyRow } from '../components/ReportEmptyRow'
 import { ReportFilters } from '../components/ReportFilters'
 import { StatTile } from '../components/StatTile'
 import type { IncomeReportData } from '../insights.routes'
@@ -21,7 +22,7 @@ import type { IncomeReportData } from '../insights.routes'
  */
 export default function ReportsIncomePage() {
   const data = useLoaderData() as IncomeReportData
-  const { set } = useFilters()
+  const { set, clear, emptyReason } = useFilters({ total: data.window.total })
   const { tiles } = data
 
   return (
@@ -43,10 +44,10 @@ export default function ReportsIncomePage() {
       <ReportFilters events={data.events} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile icon="hgi-money-bag-02" label="Gross revenue" tile={tiles.gross} />
-        <StatTile icon="hgi-delivery-return-01" label="Refunds" tile={tiles.refunds} />
-        <StatTile icon="hgi-credit-card" label="Processing fees" tile={tiles.fees} />
-        <StatTile icon="hgi-wallet-01" label="Net revenue" tile={tiles.net} />
+        <StatTile icon="hgi-money-bag-02" label="Gross revenue" {...tiles.gross} />
+        <StatTile icon="hgi-delivery-return-01" label="Refunds" {...tiles.refunds} />
+        <StatTile icon="hgi-credit-card" label="Processing fees" {...tiles.fees} />
+        <StatTile icon="hgi-wallet-01" label="Net revenue" {...tiles.net} />
       </div>
 
       <section className="card mt-3 p-4">
@@ -84,11 +85,14 @@ export default function ReportsIncomePage() {
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={5} className="py-10 text-center text-[13px] text-muted">
-                    No income for this selection.
-                  </td>
-                </tr>
+                <ReportEmptyRow
+                  colSpan={5}
+                  noun="events"
+                  reason={emptyReason}
+                  onClear={clear}
+                >
+                  No event took money under the current search and event filter. Try widening the period.
+                </ReportEmptyRow>
               )}
             </tbody>
           </table>

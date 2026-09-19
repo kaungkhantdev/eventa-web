@@ -8,6 +8,7 @@ import {
   Paginator,
 } from '@/components/ui'
 import { useFilters } from '@/lib/useFilters'
+import { ReportEmptyRow } from '../components/ReportEmptyRow'
 import { ReportFilters } from '../components/ReportFilters'
 import { StatTile } from '../components/StatTile'
 import type { AttendanceReportData } from '../insights.routes'
@@ -21,7 +22,7 @@ import type { AttendanceReportData } from '../insights.routes'
  */
 export default function ReportsAttendancePage() {
   const data = useLoaderData() as AttendanceReportData
-  const { set } = useFilters()
+  const { set, clear, emptyReason } = useFilters({ total: data.window.total })
   const { tiles } = data
 
   return (
@@ -43,14 +44,14 @@ export default function ReportsAttendancePage() {
       <ReportFilters events={data.events} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile icon="hgi-user-check-01" label="Checked in" tile={tiles.checkedIn} />
+        <StatTile icon="hgi-user-check-01" label="Checked in" {...tiles.checkedIn} />
         <StatTile
           icon="hgi-checkmark-badge-01"
           label="Attendance rate"
-          tile={tiles.attendanceRate}
+          {...tiles.attendanceRate}
         />
-        <StatTile icon="hgi-user-remove-01" label="No-shows" tile={tiles.noShows} />
-        <StatTile icon="hgi-clock-01" label="On-time" tile={tiles.onTimeRate} />
+        <StatTile icon="hgi-user-remove-01" label="No-shows" {...tiles.noShows} />
+        <StatTile icon="hgi-clock-01" label="On-time" {...tiles.onTimeRate} />
       </div>
 
       <section className="card mt-3 p-4">
@@ -90,11 +91,14 @@ export default function ReportsAttendancePage() {
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={5} className="py-10 text-center text-[13px] text-muted">
-                    No attendance for this selection.
-                  </td>
-                </tr>
+                <ReportEmptyRow
+                  colSpan={5}
+                  noun="events"
+                  reason={emptyReason}
+                  onClear={clear}
+                >
+                  No event with attendance matches the current search and event filter. Try widening the period.
+                </ReportEmptyRow>
               )}
             </tbody>
           </table>

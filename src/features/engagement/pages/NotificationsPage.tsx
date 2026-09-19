@@ -1,6 +1,15 @@
 import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
-import { Button, HeaderUser, Icon, PageFooter, PageHeader, PillTabs } from '@/components/ui'
+import {
+  Button,
+  Card,
+  EmptyState,
+  HeaderUser,
+  Icon,
+  PageFooter,
+  PageHeader,
+  PillTabs,
+} from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useFilters } from '@/lib/useFilters'
 import type { NotificationView } from '../notifications.mapper'
@@ -67,8 +76,12 @@ export default function NotificationsPage() {
   const hasOlder = data.groups.some((group) => !group.recent)
   const showOlderButton = !showOlder && hasOlder
   // Only the Unread tab has a "caught up" state — an empty All feed means the
-  // workspace has had no activity, which is a different sentence.
+  // workspace has had no activity, which is a different sentence entirely.
   const caughtUp = data.tab === 'unread' && data.counts.unread === 0
+  // The API has already applied the tab, so no groups means nothing to show for
+  // it. Distinct from `visible`, which can be empty while older activity waits
+  // behind the reveal.
+  const nothingToShow = data.groups.length === 0
 
   const onTab = (tab: NotificationTab) => {
     setShowOlder(false)
@@ -108,7 +121,10 @@ export default function NotificationsPage() {
         onChange={onTab}
       />
 
-      {visible.length > 0 && (
+      {/* Gated on the groups the API returned, not on the visible ones: with
+          only older activity, `visible` is empty and the reveal that would
+          bring it back lives inside this block. */}
+      {!nothingToShow && (
         <div className="mt-4 space-y-4 rounded-2xl bg-surface p-2 sm:p-3">
           {visible.map((group) => (
             <section key={group.bucket}>
@@ -133,16 +149,34 @@ export default function NotificationsPage() {
         </div>
       )}
 
-      {caughtUp && (
-        <p className="py-10 text-center text-[13px] text-muted">
-          You&rsquo;re all caught up — no unread notifications.
-        </p>
-      )}
-
-      {data.tab === 'all' && data.counts.all === 0 && (
-        <p className="py-10 text-center text-[13px] text-muted">
-          Nothing has happened yet. Registrations, payments and payouts will appear here.
-        </p>
+      {nothingToShow && (
+        <Card className="mt-4">
+          {caughtUp ? (
+            // Deliberately NOT the no-results state: being caught up is good
+            // news, and "nothing matches your filters" would read as a miss.
+            <EmptyState
+              icon="hgi-tick-double-01"
+              title="You’re all caught up"
+              actions={[{ label: 'Show all activity', onClick: () => onTab('all') }]}
+            >
+              Nothing here is unread. Anything new will appear as it happens.
+            </EmptyState>
+          ) : (
+            // First run. The way forward is on an earlier screen — this feed is
+            // filled by what happens across your events, not by anything that
+            // can be added here.
+            <EmptyState
+              icon="hgi-notification-03"
+              title="No activity yet"
+              actions={[
+                { label: 'See your events', to: '/admin/events', icon: 'hgi-calendar-03' },
+              ]}
+            >
+              Registrations, payments, declined cards and payouts land here as they happen.
+              Nothing has in the last 30 days.
+            </EmptyState>
+          )}
+        </Card>
       )}
 
       <PageFooter />

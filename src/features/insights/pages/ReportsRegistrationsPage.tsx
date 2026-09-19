@@ -8,6 +8,7 @@ import {
   Paginator,
 } from '@/components/ui'
 import { useFilters } from '@/lib/useFilters'
+import { ReportEmptyRow } from '../components/ReportEmptyRow'
 import { ReportFilters } from '../components/ReportFilters'
 import { StatTile } from '../components/StatTile'
 import type { RegistrationsReportData } from '../insights.routes'
@@ -21,7 +22,7 @@ import type { RegistrationsReportData } from '../insights.routes'
  */
 export default function ReportsRegistrationsPage() {
   const data = useLoaderData() as RegistrationsReportData
-  const { set } = useFilters()
+  const { set, clear, emptyReason } = useFilters({ total: data.window.total })
   const { tiles } = data
 
   return (
@@ -43,10 +44,10 @@ export default function ReportsRegistrationsPage() {
       <ReportFilters events={data.events} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatTile icon="hgi-user-add-01" label="Total registrations" tile={tiles.total} />
-        <StatTile icon="hgi-checkmark-badge-01" label="Confirmed" tile={tiles.confirmed} />
-        <StatTile icon="hgi-clock-01" label="Pending" tile={tiles.pending} />
-        <StatTile icon="hgi-cancel-circle" label="Cancelled" tile={tiles.cancelled} />
+        <StatTile icon="hgi-user-add-01" label="Total registrations" {...tiles.total} />
+        <StatTile icon="hgi-checkmark-badge-01" label="Confirmed" {...tiles.confirmed} />
+        <StatTile icon="hgi-clock-01" label="Pending" {...tiles.pending} />
+        <StatTile icon="hgi-cancel-circle" label="Cancelled" {...tiles.cancelled} />
       </div>
 
       <section className="card mt-3 p-4">
@@ -86,11 +87,14 @@ export default function ReportsRegistrationsPage() {
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-[13px] text-muted">
-                    No registrations for this selection.
-                  </td>
-                </tr>
+                <ReportEmptyRow
+                  colSpan={6}
+                  noun="registrations"
+                  reason={emptyReason}
+                  onClear={clear}
+                >
+                  No registrations match the current search and event filter. Try a different spelling, or widen the period.
+                </ReportEmptyRow>
               )}
             </tbody>
           </table>

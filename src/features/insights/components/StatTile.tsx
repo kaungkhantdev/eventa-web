@@ -1,6 +1,6 @@
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import type { Delta, Tile } from '../insights.mapper'
+import type { Delta } from '../insights.mapper'
 
 /**
  * One headline figure and how it moved — the kit's stat card, from the API.
@@ -26,12 +26,19 @@ const ARROW = {
 export function StatTile({
   icon,
   label,
-  tile,
+  value,
+  delta,
   wide,
 }: {
   icon: string
   label: string
-  tile: Tile
+  value: string
+  /**
+   * Omitted where there is no previous period to compare against — a lifetime
+   * figure has none, and a chip permanently reading "—" looks like data that
+   * failed to load rather than a comparison that does not exist.
+   */
+  delta?: Delta
   /** The odd card out on a two-column grid, as the kit lays it out. */
   wide?: boolean
 }) {
@@ -42,16 +49,18 @@ export function StatTile({
         {label}
       </div>
       <div className="mt-2 flex items-end justify-between">
-        <p className="text-[22px] font-bold tracking-tight tnum">{tile.value}</p>
-        <span
-          className={cn(
-            'flex items-center gap-0.5 text-[12px] font-semibold',
-            TONE[tile.delta.tone],
-          )}
-        >
-          {tile.delta.direction && <Icon name={ARROW[tile.delta.direction]} size={13} />}
-          {tile.delta.text}
-        </span>
+        <p className="text-[22px] font-bold tracking-tight tnum">{value}</p>
+        {delta && (
+          <span
+            className={cn(
+              'flex items-center gap-0.5 text-[12px] font-semibold',
+              TONE[delta.tone],
+            )}
+          >
+            {delta.direction && <Icon name={ARROW[delta.direction]} size={13} />}
+            {delta.text}
+          </span>
+        )}
       </div>
     </div>
   )
