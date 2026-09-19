@@ -12,6 +12,7 @@ import type {
   IncomeReportWire,
   LedgerOutcome,
   LedgerRowWire,
+  OverviewWire,
   MoneyWire,
   RegistrationsReportWire,
   SplitWire,
@@ -334,4 +335,85 @@ export function toTransactionRow(row: LedgerRowWire): TransactionRow {
     href: `/admin/payments?q=${encodeURIComponent(row.reference)}`,
     status: OUTCOME_BADGE[row.outcome],
   }
+}
+
+/* ── the overview (US-RPT-01/03) ───────────────────────────────────────── */
+
+/**
+ * The kit's brand tint ramp, applied BY POSITION.
+ *
+ * The mix arrives largest-first, so the biggest slice takes the strongest tint
+ * the way the static page did. Not `hashIndex`, which is for lists that have no
+ * order of their own — here the order is the point.
+ */
+const MIX_RAMP = ['#1ba770', '#4cbd96', '#9fe0cd', '#d1d5db']
+
+/** A tile, already formatted, with its chip when there is one to show. */
+export interface OverviewTile {
+  value: string
+  delta?: Delta
+}
+
+/**
+ * A figure the reader may not be allowed to see.
+ *
+ * A null KPI is the API withholding it; a null `value` inside one is the figure
+ * genuinely not existing. Both read as "—", and neither is ฿0.
+ */
+function tileOf(
+  kpi: { value: number | null; change: ChangeWire } | null,
+  format: (value: number) => string,
+): OverviewTile {
+  if (kpi === null) return { value: MASKED }
+  return {
+    value: kpi.value === null ? MASKED : format(kpi.value),
+    delta: toDelta(kpi.change),
+  }
+}
+
+export function toOverviewTiles(kpis: OverviewWire['kpis']) {
+  return {
+    revenue: tileOf(kpis.revenueSatang, money),
+    registrations: tileOf(kpis.registrations, num),
+    attendance: tileOf(kpis.attendanceRate, percent),
+    averageTicket: tileOf(kpis.averageTicketSatang, money),
+    refundRate: tileOf(kpis.refundRate, percent),
+  }
+}
+
+export interface MixSlice {
+  name: string
+  seats: string
+  percent: number
+  color: string
+}
+
+export function toMixSlices(mix: OverviewWire['ticketMix']): MixSlice[] {
+  return mix.map((slice, index) => ({
+    name: slice.ticketTypeName,
+    seats: num(slice.seats),
+    percent: slice.percent,
+    color: MIX_RAMP[index % MIX_RAMP.length],
+  }))
+}
+
+/**
+ * The revenue chart's axis labels.
+ *
+ * Read from the bucket each point opens on, so they say what the granularity
+ * means — days inside a month, "Wk n" across a quarter, month names across a
+ * year — rather than repeating a date nobody can fit on an axis.
+ */
+export function toTrendLabels(
+  points: { at: string }[],
+  granularity: 'day' | 'week' | 'month',
+): string[] {
+  return points.map((point, index) => {
+    const at = new Date(`${point.at}T00:00:00.000Z`)
+    if (granularity === 'month') {
+      return at.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
+    }
+    if (granularity === 'week') return `Wk ${index + 1}`
+    return String(at.getUTCDate())
+  })
 }

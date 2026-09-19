@@ -2,6 +2,7 @@ import { Link, useLoaderData, useOutletContext } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import {
   Badge,
+  DownloadButton,
   NotificationBell,
   PageFooter,
   Paginator,
@@ -52,6 +53,11 @@ export default function ReportsEventsPage() {
           </p>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
+          <DownloadButton
+            path="/reports/events.csv"
+            query={data.exportQuery}
+            filename="eventa-events.csv"
+          />
           <NotificationBell />
           <SignedInChip />
         </div>

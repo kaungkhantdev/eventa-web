@@ -4,20 +4,27 @@ import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 import { api, type Query } from '@/lib/api'
 import { MASKED, num, satangAmount } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
+import { OVERVIEW_RANGES } from './insights.types'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import {
   toAttendanceRow,
   toAttendanceTiles,
   toDiscountRow,
   toEventPerformanceRow,
+  toMixSlices,
+  toOverviewTiles,
   toTransactionRow,
+  toTrendLabels,
   toIncomeRow,
   toIncomeTiles,
   toRegistrationRow,
   toRegistrationTiles,
+  toDelta,
   type AttendanceReportRow,
+  type Delta,
   type DiscountReportRow,
   type EventPerformanceRow,
+  type MixSlice,
   type TransactionRow,
   type IncomeReportRow,
   type RegistrationReportRow,
@@ -25,6 +32,8 @@ import {
 import type {
   AttendanceReportWire,
   DiscountsReportWire,
+  OverviewRange,
+  OverviewWire,
   TransactionsReportWire,
   EventsReportWire,
   IncomeReportWire,
@@ -58,6 +67,7 @@ const reportsApi = {
     api.get<DiscountsReportWire>('/reports/discounts', { query }),
   transactions: (query: Query) =>
     api.get<TransactionsReportWire>('/reports/transactions', { query }),
+  overview: (query: Query) => api.get<OverviewWire>('/reports/overview', { query }),
 }
 
 /** What every report page hands its screen, whatever its rows look like. */
@@ -67,6 +77,8 @@ interface ReportData<Row, Tiles> {
   window: PageWindow
   period: ReportPeriodWire
   events: EventOption[]
+  /** The filters to export under, paging dropped. */
+  exportQuery: Record<string, string>
 }
 
 export type RegistrationsReportData = ReportData<
@@ -111,6 +123,19 @@ function windowOf(matchedEvents: number, query: { page: number; limit: number })
   })
 }
 
+/**
+ * The filters to export under — the query minus paging, since an export is the
+ * whole filtered set rather than the page on screen.
+ */
+function exportQuery(query: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(query)) {
+    if (key === 'page' || key === 'limit') continue
+    if (value !== undefined && value !== null && value !== '') out[key] = String(value)
+  }
+  return out
+}
+
 /** A page past the end is a dead view; send the reader to the last real one. */
 function guardPage(request: Request, matchedEvents: number, query: { page: number; limit: number }) {
   const pages = Math.ceil(matchedEvents / query.limit)
@@ -131,6 +156,7 @@ async function loadRegistrations({ request }: LoaderArgs): Promise<Registrations
     window: windowOf(report.matchedEvents, query),
     period: report.period,
     events,
+    exportQuery: exportQuery(query),
   }
 }
 
@@ -145,6 +171,7 @@ async function loadAttendance({ request }: LoaderArgs): Promise<AttendanceReport
     window: windowOf(report.matchedEvents, query),
     period: report.period,
     events,
+    exportQuery: exportQuery(query),
   }
 }
 
@@ -159,6 +186,7 @@ async function loadIncome({ request }: LoaderArgs): Promise<IncomeReportData> {
     window: windowOf(report.matchedEvents, query),
     period: report.period,
     events,
+    exportQuery: exportQuery(query),
   }
 }
 
@@ -174,6 +202,7 @@ export interface EventsReportData {
   window: PageWindow
   period: ReportPeriodWire
   events: EventOption[]
+  exportQuery: Record<string, string>
 }
 
 async function loadEvents({ request }: LoaderArgs): Promise<EventsReportData> {
@@ -190,6 +219,7 @@ async function loadEvents({ request }: LoaderArgs): Promise<EventsReportData> {
     window: windowOf(report.matchedEvents, query),
     period: report.period,
     events,
+    exportQuery: exportQuery(query),
   }
 }
 
@@ -212,6 +242,7 @@ export interface DiscountsReportData {
   window: PageWindow
   period: ReportPeriodWire
   events: EventOption[]
+  exportQuery: Record<string, string>
 }
 
 async function loadDiscounts({ request }: LoaderArgs): Promise<DiscountsReportData> {
@@ -231,6 +262,7 @@ async function loadDiscounts({ request }: LoaderArgs): Promise<DiscountsReportDa
     window: windowOf(report.matchedCodes, query),
     period: report.period,
     events,
+    exportQuery: exportQuery(query),
   }
 }
 
@@ -246,6 +278,7 @@ export interface TransactionsReportData {
   window: PageWindow
   period: ReportPeriodWire
   events: EventOption[]
+  exportQuery: Record<string, string>
 }
 
 async function loadTransactions({
@@ -271,9 +304,77 @@ async function loadTransactions({
     window: windowOf(report.matchedEntries, query),
     period: report.period,
     events,
+    exportQuery: exportQuery(query),
   }
 }
 
+/** How many events the overview previews before "View all". */
+const TOP_EVENTS = 6
+
+/**
+ * Workspace health at a glance (US-RPT-01/03/04).
+ *
+ * Two calls: the overview's own figures, and the top events — which serve both
+ * the "registrations by event" bars and the Top events table, since the two
+ * rank by the same thing and showing them from one response is what keeps them
+ * agreeing.
+ *
+ * There is deliberately no "sales by channel". No source, channel or UTM column
+ * exists anywhere in the schema, so the panel could only ever have been
+ * invented; it is dropped rather than faked.
+ */
+export interface OverviewData {
+  range: OverviewRange
+  tiles: ReturnType<typeof toOverviewTiles>
+  revenue: {
+    total: string
+    delta: Delta
+    labels: string[]
+    values: number[]
+  } | null
+  mix: MixSlice[]
+  /** The donut's centre: the registrations the mix accounts for. */
+  mixTotal: string
+  bars: { id: string; name: string; count: string; width: number }[]
+  topEvents: EventPerformanceRow[]
+  period: ReportPeriodWire
+}
+
+async function loadOverview({ request }: LoaderArgs): Promise<OverviewData> {
+  const params = queryOf(request)
+  const range = enumParam(params, 'range', OVERVIEW_RANGES, 'year')
+  const [report, events] = await Promise.all([
+    reportsApi.overview({ range }),
+    reportsApi.events({ range, page: 1, limit: TOP_EVENTS }),
+  ])
+
+  const busiest = events.rows[0]?.registrations ?? 0
+  return {
+    range,
+    tiles: toOverviewTiles(report.kpis),
+    revenue: report.revenue && {
+      total: satangAmount(report.revenue.totalSatang),
+      delta: toDelta(report.revenue.change),
+      labels: toTrendLabels(report.revenue.points, report.revenue.granularity),
+      // Baht, not satang: the axis formats what it is given, and satang would
+      // put two zeroes on every tick.
+      values: report.revenue.points.map((point) => Math.round(point.netSatang / 100)),
+    },
+    mix: toMixSlices(report.ticketMix),
+    mixTotal: num(report.ticketMix.reduce((sum, slice) => sum + slice.seats, 0)),
+    bars: events.rows.map((row) => ({
+      id: row.eventId,
+      name: row.eventName,
+      count: num(row.registrations),
+      // Relative to the busiest, so the longest bar fills the track.
+      width: busiest === 0 ? 0 : Math.round((row.registrations / busiest) * 100),
+    })),
+    topEvents: events.rows.map(toEventPerformanceRow),
+    period: report.period,
+  }
+}
+
+export const overviewReportRoute = { loader: pageData(loadOverview) }
 export const transactionsReportRoute = { loader: pageData(loadTransactions) }
 export const discountsReportRoute = { loader: pageData(loadDiscounts) }
 export const eventsReportRoute = { loader: pageData(loadEvents) }

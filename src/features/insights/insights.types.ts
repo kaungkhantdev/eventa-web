@@ -198,3 +198,34 @@ export interface TransactionsReportWire {
     successRate: number | null
   }
 }
+
+/* ── the overview (US-RPT-01/03) ───────────────────────────────────────── */
+
+export const OVERVIEW_RANGES = ['7d', '30d', '90d', 'year'] as const
+export type OverviewRange = (typeof OVERVIEW_RANGES)[number]
+
+export interface KpiWire {
+  /** Null when genuinely unknown — never a stand-in zero. */
+  value: number | null
+  change: ChangeWire
+}
+
+export interface OverviewWire {
+  period: ReportPeriodWire
+  kpis: {
+    registrations: KpiWire
+    attendanceRate: KpiWire
+    /** Null throughout without finance access — withheld, not zeroed. */
+    revenueSatang: KpiWire | null
+    averageTicketSatang: KpiWire | null
+    refundRate: KpiWire | null
+  }
+  revenue: {
+    granularity: 'day' | 'week' | 'month'
+    totalSatang: number
+    change: ChangeWire
+    /** Every bucket in the window; a quiet one is zero, not absent. */
+    points: { at: string; netSatang: number }[]
+  } | null
+  ticketMix: { ticketTypeName: string; seats: number; percent: number }[]
+}

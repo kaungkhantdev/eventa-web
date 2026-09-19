@@ -283,7 +283,10 @@ const adminChildren = [
   },
   {
     path: 'reports',
-    ...page(() => import('@/features/insights/pages/ReportsOverviewPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsOverviewPage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.overviewReportRoute),
+    ),
     handle: { page: 'reports' },
   },
   {

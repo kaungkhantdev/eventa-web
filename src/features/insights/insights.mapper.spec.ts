@@ -4,6 +4,9 @@ import {
   toDelta,
   toDiscountRow,
   toEventPerformanceRow,
+  toMixSlices,
+  toOverviewTiles,
+  toTrendLabels,
   toIncomeRow,
   toRegistrationRow,
 } from './insights.mapper'
@@ -277,5 +280,90 @@ describe('toDiscountRow', () => {
       label: 'Disabled',
       tone: 'red',
     })
+  })
+})
+
+describe('toOverviewTiles', () => {
+  const kpi = (value: number | null) => ({ value, change: change() })
+
+  it('formats each tile in its own unit', () => {
+    const tiles = toOverviewTiles({
+      registrations: kpi(1340),
+      attendanceRate: kpi(79),
+      revenueSatang: kpi(346_000_00),
+      averageTicketSatang: kpi(821_00),
+      refundRate: kpi(2.7),
+    })
+    expect(tiles.registrations.value).toBe('1,340')
+    expect(tiles.attendance.value).toBe('79%')
+    expect(tiles.revenue.value).toBe('฿346,000')
+    expect(tiles.averageTicket.value).toBe('฿821')
+    expect(tiles.refundRate.value).toBe('2.7%')
+  })
+
+  it('masks a whole tile the reader may not see, and drops its chip', () => {
+    // The API sends null for the money tiles without finance access. A chip
+    // would claim a comparison nobody is entitled to.
+    const tiles = toOverviewTiles({
+      registrations: kpi(10),
+      attendanceRate: kpi(50),
+      revenueSatang: null,
+      averageTicketSatang: null,
+      refundRate: null,
+    })
+    expect(tiles.revenue.value).toBe('—')
+    expect(tiles.revenue.delta).toBeUndefined()
+  })
+
+  it('masks a figure that does not exist, but keeps its chip', () => {
+    // Different fact: the reader may see it, there just is not one.
+    const tiles = toOverviewTiles({
+      registrations: kpi(10),
+      attendanceRate: kpi(null),
+      revenueSatang: kpi(0),
+      averageTicketSatang: kpi(null),
+      refundRate: kpi(null),
+    })
+    expect(tiles.attendance.value).toBe('—')
+    expect(tiles.attendance.delta).toBeDefined()
+    // A real zero is still a zero.
+    expect(tiles.revenue.value).toBe('฿0')
+  })
+})
+
+describe('toMixSlices', () => {
+  it('gives the biggest slice the strongest tint', () => {
+    const slices = toMixSlices([
+      { ticketTypeName: 'General', seats: 300, percent: 75 },
+      { ticketTypeName: 'VIP', seats: 100, percent: 25 },
+    ])
+    expect(slices[0].color).not.toBe(slices[1].color)
+    expect(slices[0].name).toBe('General')
+    expect(slices[0].seats).toBe('300')
+  })
+
+  it('keeps colouring past the end of the ramp', () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({
+      ticketTypeName: `Tier ${i}`,
+      seats: 1,
+      percent: 16.7,
+    }))
+    expect(toMixSlices(many)).toHaveLength(6)
+  })
+})
+
+describe('toTrendLabels', () => {
+  const points = [{ at: '2026-01-01' }, { at: '2026-02-01' }, { at: '2026-03-01' }]
+
+  it('names the months across a year', () => {
+    expect(toTrendLabels(points, 'month')).toEqual(['Jan', 'Feb', 'Mar'])
+  })
+
+  it('numbers the weeks across a quarter', () => {
+    expect(toTrendLabels(points, 'week')).toEqual(['Wk 1', 'Wk 2', 'Wk 3'])
+  })
+
+  it('uses the day of the month inside a month', () => {
+    expect(toTrendLabels([{ at: '2026-07-08' }], 'day')).toEqual(['8'])
   })
 })

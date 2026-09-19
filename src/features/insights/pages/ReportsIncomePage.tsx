@@ -1,8 +1,7 @@
 import { useLoaderData } from 'react-router'
 import {
-  Button,
+  DownloadButton,
   HeaderUser,
-  Icon,
   PageFooter,
   PageHeader,
   Paginator,
@@ -32,10 +31,11 @@ export default function ReportsIncomePage() {
         subtitle="Gross revenue, refunds & fees across all events."
         actions={
           <>
-            <Button variant="primary">
-              <Icon name="hgi-download-01" size={16} />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
+            <DownloadButton
+              path="/reports/income.csv"
+              query={data.exportQuery}
+              filename="eventa-income.csv"
+            />
             <HeaderUser />
           </>
         }

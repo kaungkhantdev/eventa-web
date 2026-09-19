@@ -1,9 +1,8 @@
 import { useLoaderData } from 'react-router'
 import {
   Badge,
-  Button,
+  DownloadButton,
   HeaderUser,
-  Icon,
   PageFooter,
   PageHeader,
   Paginator,
@@ -39,10 +38,11 @@ export default function ReportsDiscountsPage() {
         subtitle="Promotion usage and the revenue it influenced."
         actions={
           <>
-            <Button variant="primary">
-              <Icon name="hgi-download-01" size={16} />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
+            <DownloadButton
+              path="/reports/discounts.csv"
+              query={data.exportQuery}
+              filename="eventa-discounts.csv"
+            />
             <HeaderUser />
           </>
         }
