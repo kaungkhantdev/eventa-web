@@ -1,7 +1,7 @@
-import { Icon } from '@/components/ui'
+import { Icon, PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { SellingFastRow } from '../overview.types'
-import { PanelEmptyPreview, SectionHeader } from './PanelChrome'
+import { SectionHeader } from './PanelChrome'
 
 /** Ticket types running low, scarcest first (US-DASH-11). */
 

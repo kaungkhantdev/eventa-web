@@ -1,7 +1,8 @@
+import { PanelEmptyPreview } from '@/components/ui'
 import type { Panel } from '@/app/panels'
 import type { ActivityRing } from '../overview.routes'
 import type { ShareSlice } from '../overview.types'
-import { PanelEmptyPreview, PanelUnavailable, SectionHeader } from './PanelChrome'
+import { PanelUnavailable, SectionHeader } from './PanelChrome'
 
 /**
  * Which active events are driving sign-ups (US-DASH-05).

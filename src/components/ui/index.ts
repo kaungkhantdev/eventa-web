@@ -29,6 +29,7 @@ export {
 export { TableWrap, DataTable, EmptyRow } from './DataTable'
 export { Skeleton, SkeletonText, SkeletonCircle, SkeletonScreen } from './Skeleton'
 export { EmptyState, NoResults, PastEnd, type EmptyAction } from './EmptyState'
+export { PanelEmptyPreview, type PreviewKind } from './PanelEmptyPreview'
 export {
   AreaChart,
   DonutChart,

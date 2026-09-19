@@ -1,9 +1,8 @@
 import { useSearchParams } from 'react-router'
-import { AreaChart, Icon, Segmented } from '@/components/ui'
+import { AreaChart, Icon, PanelEmptyPreview, Segmented } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { hasRevenue } from '../overview.presentation'
 import type { RevenueChart, RevenueRange } from '../overview.types'
-import { PanelEmptyPreview } from './PanelChrome'
 
 /**
  * The revenue trend with its Week / Month / Year toggle (US-DASH-09).

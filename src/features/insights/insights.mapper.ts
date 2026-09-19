@@ -417,3 +417,16 @@ export function toTrendLabels(
     return String(at.getUTCDate())
   })
 }
+
+/**
+ * Whether a period earned anything at all.
+ *
+ * Decided on the exact satang total, never on the charted points: those are
+ * rounded to whole Baht for the axis, so a period that took ฿0.40 would have
+ * every point sitting at zero and be declared empty while the revenue tile
+ * beside it read ฿0.40. Nought is a real answer and deserves saying rather
+ * than plotting — but only when it is actually nought.
+ */
+export function earnedSomething(totalSatang: number): boolean {
+  return totalSatang > 0
+}

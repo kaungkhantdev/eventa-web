@@ -7,6 +7,7 @@ import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/li
 import { OVERVIEW_RANGES } from './insights.types'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import {
+  earnedSomething,
   toAttendanceRow,
   toAttendanceTiles,
   toDiscountRow,
@@ -331,6 +332,8 @@ export interface OverviewData {
     delta: Delta
     labels: string[]
     values: number[]
+    /** False when the period took nothing — the chart says so instead. */
+    earned: boolean
   } | null
   mix: MixSlice[]
   /** The donut's centre: the registrations the mix accounts for. */
@@ -359,6 +362,7 @@ async function loadOverview({ request }: LoaderArgs): Promise<OverviewData> {
       // Baht, not satang: the axis formats what it is given, and satang would
       // put two zeroes on every tick.
       values: report.revenue.points.map((point) => Math.round(point.netSatang / 100)),
+      earned: earnedSomething(report.revenue.totalSatang),
     },
     mix: toMixSlices(report.ticketMix),
     mixTotal: num(report.ticketMix.reduce((sum, slice) => sum + slice.seats, 0)),

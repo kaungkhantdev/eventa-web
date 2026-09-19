@@ -1,8 +1,9 @@
+import { PanelEmptyPreview } from '@/components/ui'
 import { Link } from 'react-router'
 import type { Panel } from '@/app/panels'
 import { cn } from '@/lib/cn'
 import type { UpcomingCard } from '../overview.types'
-import { PanelEmptyPreview, PanelUnavailable, SectionHeader } from './PanelChrome'
+import { PanelUnavailable, SectionHeader } from './PanelChrome'
 
 /** The next events and how full they are (US-DASH-04). */
 

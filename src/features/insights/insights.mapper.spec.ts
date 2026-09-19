@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  earnedSomething,
   toAttendanceRow,
   toDelta,
   toDiscountRow,
@@ -365,5 +366,18 @@ describe('toTrendLabels', () => {
 
   it('uses the day of the month inside a month', () => {
     expect(toTrendLabels([{ at: '2026-07-08' }], 'day')).toEqual(['8'])
+  })
+})
+
+describe('earnedSomething', () => {
+  it('says a period with nothing in it earned nothing', () => {
+    expect(earnedSomething(0)).toBe(false)
+  })
+
+  it('does not call 40 satang nothing', () => {
+    // The chart's points are rounded to whole Baht, so every one of them would
+    // be zero here. Deciding from those would print "No revenue in this period"
+    // next to a tile reading ฿0.40.
+    expect(earnedSomething(40)).toBe(true)
   })
 })

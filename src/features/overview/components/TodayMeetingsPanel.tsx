@@ -1,9 +1,9 @@
 import { Link } from 'react-router'
-import { Icon } from '@/components/ui'
+import { Icon, PanelEmptyPreview } from '@/components/ui'
 import type { Panel } from '@/app/panels'
 import { cn } from '@/lib/cn'
 import type { TodayMeetings } from '../overview.routes'
-import { CountBadge, PanelEmptyPreview, PanelUnavailable, SectionHeader } from './PanelChrome'
+import { CountBadge, PanelUnavailable, SectionHeader } from './PanelChrome'
 
 /** Today's meetings (US-DASH-03). Markup ported from admin/home.html. */
 

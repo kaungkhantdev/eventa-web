@@ -3,11 +3,11 @@ import {
   AreaChart,
   Badge,
   DonutChart,
-  EmptyState,
   HeaderUser,
   Icon,
   PageFooter,
   PageHeader,
+  PanelEmptyPreview,
   PillTabs,
   type PillTabItem,
 } from '@/components/ui'
@@ -28,6 +28,9 @@ import type { OverviewRange } from '../insights.types'
  * or UTM column exists anywhere in the schema, so it could only ever have been
  * invented — it needs capture at checkout before it can be reported on.
  */
+
+const NO_REVENUE = 'No revenue in this period.'
+const NOTHING_CLEARED = 'Paid registrations show up here as soon as the first one clears.'
 
 const RANGE_TABS: PillTabItem<OverviewRange>[] = [
   { value: '7d', label: '7 days' },
@@ -117,16 +120,24 @@ export default function ReportsOverviewPage() {
               )}
             </div>
           </div>
-          {data.revenue && (
-            <div className="mt-2">
-              <AreaChart
-                labels={data.revenue.labels}
-                values={data.revenue.values}
-                format={(value) => bahtCompact(value)}
-                ariaLabel="Revenue trend"
-              />
-            </div>
-          )}
+          {data.revenue &&
+            (data.revenue.earned ? (
+              <div className="mt-2">
+                <AreaChart
+                  labels={data.revenue.labels}
+                  values={data.revenue.values}
+                  format={(value) => bahtCompact(value)}
+                  ariaLabel="Revenue trend"
+                />
+              </div>
+            ) : (
+              /* A period with no sales still comes back as a full series of
+                 zeroes, which draws a flat line along the axis and reads as a
+                 chart that failed rather than a period that earned nothing. */
+              <PanelEmptyPreview preview="chart" description={NOTHING_CLEARED}>
+                {NO_REVENUE}
+              </PanelEmptyPreview>
+            ))}
         </section>
 
         <section className="card p-4 xl:col-span-1">
@@ -168,9 +179,12 @@ export default function ReportsOverviewPage() {
               </div>
             </>
           ) : (
-            <EmptyState compact icon="hgi-ticket-01" title="Nothing sold yet">
-              Once tickets sell, this shows which types people chose.
-            </EmptyState>
+            <PanelEmptyPreview
+              preview="ring"
+              description="Once tickets sell, this shows which types people chose."
+            >
+              Nothing sold yet.
+            </PanelEmptyPreview>
           )}
         </section>
       </div>
@@ -200,9 +214,12 @@ export default function ReportsOverviewPage() {
             ))}
           </div>
         ) : (
-          <EmptyState compact icon="hgi-user-add-01" title="No sign-ups in this period">
-            Widen the range, or check back once registrations start coming in.
-          </EmptyState>
+          <PanelEmptyPreview
+            preview="bars"
+            description="Widen the range, or check back once registrations start coming in."
+          >
+            No sign-ups in this period.
+          </PanelEmptyPreview>
         )}
       </section>
 
@@ -257,21 +274,17 @@ export default function ReportsOverviewPage() {
               ) : (
                 <tr>
                   <td colSpan={5}>
-                    <EmptyState
-                      compact
-                      icon="hgi-analytics-up"
-                      title="No events in this period"
-                      actions={[
-                        {
-                          label: 'See your events',
-                          to: '/admin/events',
-                          icon: 'hgi-calendar-03',
-                        },
-                      ]}
+                    <PanelEmptyPreview
+                      preview="table"
+                      description="A report describes what has already happened. Widen the range, or start from your events."
+                      action={{
+                        label: 'See your events',
+                        to: '/admin/events',
+                        icon: 'hgi-calendar-03',
+                      }}
                     >
-                      A report describes what has already happened. Widen the range, or
-                      start from your events.
-                    </EmptyState>
+                      No events in this period.
+                    </PanelEmptyPreview>
                   </td>
                 </tr>
               )}
