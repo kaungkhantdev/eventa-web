@@ -379,12 +379,19 @@ const adminChildren = [
   },
   {
     path: 'feedback',
-    ...page(() => import('@/features/engagement/pages/FeedbackPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/FeedbackPage'),
+      async () => (await import('@/features/engagement/surveys.routes')).feedbackRoute,
+    ),
     handle: { page: 'feedback' },
   },
   {
     path: 'feedback-detail',
-    ...page(() => import('@/features/engagement/pages/FeedbackDetailPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/FeedbackDetailPage'),
+      async () =>
+        (await import('@/features/engagement/surveys.routes')).feedbackDetailRoute,
+    ),
     handle: { page: 'feedback' },
   },
   {
@@ -550,7 +557,10 @@ export const router = createBrowserRouter([
       },
       {
         path: '/portal/survey',
-        ...page(() => import('@/features/portal/pages/SurveyPage')),
+        ...livePage(
+          () => import('@/features/portal/pages/SurveyPage'),
+          async () => (await import('@/features/portal/survey.routes')).portalSurveyRoute,
+        ),
       },
       {
         // A published event at its own public URL — the canonical shape the
