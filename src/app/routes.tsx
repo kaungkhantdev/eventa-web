@@ -371,7 +371,10 @@ const adminChildren = [
   },
   {
     path: 'messaging-log',
-    ...page(() => import('@/features/engagement/pages/MessagingLogPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/MessagingLogPage'),
+      async () => (await import('@/features/engagement/deliveries.routes')).deliveriesRoute,
+    ),
     handle: { page: 'messaging-log' },
   },
   {
