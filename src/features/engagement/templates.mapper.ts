@@ -1,4 +1,8 @@
-import type { MessageChannel, MessageTemplateWire } from './templates.types'
+import type {
+  MessageChannel,
+  MessageTemplateWire,
+  TemplateWording,
+} from './templates.types'
 
 /**
  * One automated message, as a card (US-MSG-01).
@@ -38,6 +42,15 @@ export interface TemplateCard {
   standing: TemplateStanding | null
   /** The question to ask before switching this off. Null when none is needed. */
   confirmOff: ConfirmOff | null
+  /** Merge fields the editor may offer. Empty means no editor at all. */
+  tags: string[]
+  wording: TemplateWording
+  /**
+   * Whether this workspace has written its own wording. The editor says
+   * "Eventa's wording" rather than showing empty boxes as if something failed
+   * to load.
+   */
+  edited: boolean
 }
 
 /**
@@ -104,6 +117,9 @@ export function toTemplateCard(wire: MessageTemplateWire): TemplateCard {
     switchable,
     standing: switchable ? null : (STANDING[wire.delivery] ?? null),
     confirmOff: confirmOff(wire, switchable),
+    tags: wire.tags,
+    wording: wire.wording,
+    edited: Object.values(wire.wording).some((value) => value !== null),
   }
 }
 

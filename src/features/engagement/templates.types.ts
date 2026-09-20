@@ -16,6 +16,14 @@ export type MessageChannel = 'email' | 'sms'
  */
 export type TemplateDelivery = 'controlled' | 'planned'
 
+/** What an organizer has written. Null means Eventa's own copy is used. */
+export interface TemplateWording {
+  subjectEn: string | null
+  bodyEn: string | null
+  subjectTh: string | null
+  bodyTh: string | null
+}
+
 export interface MessageTemplateWire {
   slug: string
   title: string
@@ -25,4 +33,7 @@ export interface MessageTemplateWire {
   /** A message attendees are entitled to — switching it off asks first. */
   expected: boolean
   active: boolean
+  /** Merge fields this message can fill. Empty for one nothing sends. */
+  tags: string[]
+  wording: TemplateWording
 }

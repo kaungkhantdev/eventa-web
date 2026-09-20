@@ -9,6 +9,11 @@ const templatesApi = {
   list: () => api.get<MessageTemplateWire[]>('/message-templates'),
   setActive: (slug: string, active: boolean) =>
     api.patch<MessageTemplateWire[]>(`/message-templates/${slug}`, { active }),
+  setWording: (slug: string, wording: unknown) =>
+    api.patch<MessageTemplateWire[]>(
+      `/message-templates/${slug}/wording`,
+      wording,
+    ),
 }
 
 export interface TemplatesData {
@@ -36,10 +41,26 @@ async function loadTemplates(): Promise<TemplatesData> {
  */
 async function runTemplatesAction({ request }: LoaderArgs): Promise<null> {
   const form = await request.formData()
-  await templatesApi.setActive(
-    String(form.get('slug') ?? ''),
-    form.get('active') === 'true',
-  )
+  const slug = String(form.get('slug') ?? '')
+
+  if (String(form.get('intent') ?? '') === 'wording') {
+    // Sent as written, including the blanks: an emptied field is how an
+    // organizer asks for Eventa's own copy back, so it has to reach the API
+    // rather than being dropped as "nothing changed".
+    await templatesApi.setWording(slug, {
+      en: {
+        subject: String(form.get('subjectEn') ?? ''),
+        body: String(form.get('bodyEn') ?? ''),
+      },
+      th: {
+        subject: String(form.get('subjectTh') ?? ''),
+        body: String(form.get('bodyTh') ?? ''),
+      },
+    })
+    return null
+  }
+
+  await templatesApi.setActive(slug, form.get('active') === 'true')
   return null
 }
 

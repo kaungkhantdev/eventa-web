@@ -10,6 +10,8 @@ const wire = (over: Partial<MessageTemplateWire> = {}): MessageTemplateWire => (
   delivery: 'controlled',
   expected: true,
   active: true,
+  tags: ['{{first_name}}', '{{event_name}}'],
+  wording: { subjectEn: null, bodyEn: null, subjectTh: null, bodyTh: null },
   ...over,
 })
 
@@ -60,5 +62,26 @@ describe('the card itself', () => {
     // message gets a real icon rather than a guess built from its name.
     const card = toTemplateCard(wire({ slug: 'survey-invite' }))
     expect(card.icon).toBe('hgi-mail-01')
+  })
+})
+
+describe('whose wording is being sent', () => {
+  it('says Eventa’s own when nobody has written any', () => {
+    // Empty boxes with no explanation read as something that failed to load.
+    expect(toTemplateCard(wire()).edited).toBe(false)
+  })
+
+  it('notices a single field somebody wrote', () => {
+    const card = toTemplateCard(
+      wire({
+        wording: {
+          subjectEn: 'You’re in',
+          bodyEn: null,
+          subjectTh: null,
+          bodyTh: null,
+        },
+      }),
+    )
+    expect(card.edited).toBe(true)
   })
 })
