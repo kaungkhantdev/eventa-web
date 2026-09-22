@@ -57,6 +57,17 @@ export const STEPS: WizardStep[] = [
 export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
 /**
+ * What the waitlist switch says under it (US-REG-04). Reserved seating has no
+ * waitlist: a freed seat would have to be one particular seat, picked for
+ * somebody who is not at the map to pick it — so the switch says why it is off
+ * instead of looking broken.
+ */
+export const WAITLIST_HINT: Record<'ga' | 'reserved', string> = {
+  ga: 'Let attendees join a waitlist once capacity is reached.',
+  reserved: 'Waitlists are for general admission — a freed seat can’t be offered without choosing it.',
+}
+
+/**
  * Capacity for the summary rail — the number, or a dash when there is none.
  *
  * An unset capacity is not a capacity of nought. Rendering `0` says "nobody may

@@ -65,6 +65,11 @@ describe('what it was', () => {
     expect(kindLabel('cancellation-notice')).toBe('Cancellation notice')
   })
 
+  it('tells a lapsed waitlist offer apart from the offer itself (US-REG-04)', () => {
+    expect(kindLabel('waitlist-offer')).toBe('Waitlist offer')
+    expect(kindLabel('waitlist-offer-expired')).toBe('Waitlist offer expired')
+  })
+
   it('names a broadcast after the announcement it was', () => {
     expect(kindLabel('announcement')).toBe('Announcement')
   })

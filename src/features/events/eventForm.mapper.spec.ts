@@ -26,6 +26,7 @@ const event = (over: Partial<EventWire> = {}): EventWire => ({
   city: 'Bangkok',
   isOnline: false,
   capacity: 400,
+  waitlistEnabled: false,
   coverImage: 'https://cdn.eventa.test/cover.jpg',
   version: 3,
   ...over,
@@ -265,6 +266,24 @@ describe('what PATCH /events/:id may carry', () => {
       for (const capacity of ['0', '-5', 'abc', '2.5']) {
         expect(toUpdateBody({ ...base, capacity })).not.toHaveProperty('capacity')
       }
+    })
+  })
+
+  describe('the waitlist (US-REG-04)', () => {
+    it('reads the switch back, so reopening the wizard does not turn it off', () => {
+      expect(toEventFormValues(event({ waitlistEnabled: true }), [], []).waitlistEnabled).toBe(
+        true,
+      )
+    })
+
+    it('starts off for a brand-new event', () => {
+      expect(toEventFormValues(null, [], []).waitlistEnabled).toBe(false)
+    })
+
+    it('sends the switch either way — off is a decision, not an omission', () => {
+      const base = toEventFormValues(event(), [], [])
+      expect(toUpdateBody({ ...base, waitlistEnabled: true }).waitlistEnabled).toBe(true)
+      expect(toUpdateBody({ ...base, waitlistEnabled: false }).waitlistEnabled).toBe(false)
     })
   })
 })

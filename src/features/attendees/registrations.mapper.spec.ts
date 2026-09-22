@@ -24,6 +24,9 @@ const entry = (o: Partial<RegistrationEntry> = {}): RegistrationEntry => ({
   approveBlockedReason: null,
   canReject: false,
   rejectBlockedReason: null,
+  canOffer: false,
+  waitlistPosition: null,
+  offerExpiresAt: null,
   ...o,
 })
 
@@ -130,5 +133,43 @@ describe('a registration row, as the queue shows it (US-REG-01)', () => {
       expect(row.canApprove).toBe(false)
       expect(row.canReject).toBe(false)
     })
+  })
+})
+
+describe('the waitlist, as the organizer works it (US-REG-04)', () => {
+  const waiting = (position: number) =>
+    toRegistrationRow(entry({ status: 'waitlisted', canOffer: true, waitlistPosition: position }))
+
+  it('says who is next', () => {
+    expect(waiting(1).statusNote).toBe('Next in line')
+  })
+
+  it('says where everybody else stands', () => {
+    expect(waiting(3).statusNote).toBe('#3 in line')
+  })
+
+  it('warns that offering someone further back passes people over', () => {
+    // The API records it; the organizer should know before they click.
+    expect(waiting(1).offerHint).toBe('Offer a seat')
+    expect(waiting(3).offerHint).toBe(
+      'Offer a seat — 2 people ahead of them will be passed over, and that is recorded',
+    )
+    expect(waiting(2).offerHint).toMatch(/1 person ahead of them/)
+  })
+
+  it('passes the server’s say on whether a seat can be offered', () => {
+    expect(waiting(1).canOffer).toBe(true)
+    expect(toRegistrationRow(entry()).canOffer).toBe(false)
+  })
+
+  it('says until when an open offer holds the seat, on Bangkok’s clock', () => {
+    const row = toRegistrationRow(
+      entry({ status: 'pending', paymentStatus: 'pending', offerExpiresAt: '2026-08-02T03:00:00Z' }),
+    )
+    expect(row.statusNote).toBe('Offer open until Aug 2, 2026 10:00')
+  })
+
+  it('has nothing to add for an ordinary registration', () => {
+    expect(toRegistrationRow(entry()).statusNote).toBeNull()
   })
 })

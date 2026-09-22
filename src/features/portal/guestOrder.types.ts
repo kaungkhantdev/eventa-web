@@ -83,6 +83,12 @@ export interface GuestOrder {
   /** True while the money is still owed, so the page can say so plainly. */
   awaitingPayment: boolean
   /**
+   * In line for a sold-out ticket (US-REG-04): nothing held, nothing owed yet,
+   * no tickets — and not lapsed, which is what those three facts would
+   * otherwise say.
+   */
+  onWaitlist: boolean
+  /**
    * The instant the seats stop being held, ISO — `null` when none are.
    *
    * Raw rather than formatted because the page counts down against it, and a

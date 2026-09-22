@@ -40,6 +40,17 @@ export interface DecisionOutcome {
   ticketCount: number
 }
 
+/**
+ * What offering a waitlisted registration a seat did (US-REG-04): a paid one
+ * is `offered`, held until `offerExpiresAt`; a free one is `confirmed` at once.
+ */
+export interface OfferOutcome {
+  outcome: 'offered' | 'already_offered' | 'confirmed'
+  reference: string
+  offerExpiresAt: string | null
+  ticketCount: number
+}
+
 export interface AddedRegistration {
   orderId: string
   reference: string
@@ -75,6 +86,12 @@ export const registrationsApi = {
   add: (input: NewRegistration) => api.post<AddedRegistration>('/registrations', input),
 
   approve: (id: string) => api.post<DecisionOutcome>(`/registrations/${id}/approve`, {}),
+
+  /**
+   * Offer someone on the waitlist a seat. Refused with the API's own sentence
+   * when nothing is free — "raise its capacity, or wait for one to free up".
+   */
+  offer: (id: string) => api.post<OfferOutcome>(`/registrations/${id}/offer`, {}),
 
   /**
    * Rejecting is terminal, so the API refuses without `confirm` rather than

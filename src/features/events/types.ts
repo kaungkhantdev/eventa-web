@@ -57,6 +57,11 @@ export interface EventWire {
   isOnline: boolean
   capacity: number | null
   /**
+   * Attendees may join a waitlist once a general-admission ticket sells out
+   * (US-REG-04). Optional: only the full event response carries it.
+   */
+  waitlistEnabled?: boolean
+  /**
    * The landing page's hero image — null until one is uploaded. Optional
    * because the calendar's slimmer payload leaves it out; the list and detail
    * endpoints both carry it (`EventListItemDto`, `EventResponseDto`).

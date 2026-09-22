@@ -48,6 +48,8 @@ const KIND_LABEL: Record<string, string> = {
   'payment-receipt': 'Payment receipt',
   'event-reminder': 'Event reminder',
   'waitlist-offer': 'Waitlist offer',
+  // Sent under the offer's own switch, logged apart so it is not read as one.
+  'waitlist-offer-expired': 'Waitlist offer expired',
   'post-event-thankyou': 'Post-event thank-you',
   announcement: 'Announcement',
   'refund-notice': 'Refund notice',

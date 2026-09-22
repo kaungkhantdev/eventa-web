@@ -38,6 +38,8 @@ export interface CheckoutTierWire {
   maxPerOrder: number
   /** `null` means unlimited — emphatically not "none left". */
   remaining: number | null
+  /** Sold out, and a buyer may join its waitlist instead (US-REG-04). */
+  waitlist: boolean
 }
 
 export interface CheckoutSeatWire {
@@ -81,6 +83,17 @@ export interface OrderSummaryWire {
   paymentRequired: boolean
 }
 
+/** `POST /public/checkout/waitlist` — where the buyer now stands. */
+export interface WaitlistJoinedWire {
+  orderId: string
+  reference: string
+  eventName: string
+  ticketTypeName: string
+  quantity: number
+  /** 1 is next in line. */
+  position: number
+}
+
 export interface CheckoutHoldWire {
   holdIds: number[]
   expiresAt: string
@@ -120,6 +133,8 @@ export interface TierOption {
   isFree: boolean
   /** False when this tier cannot be bought — paused, sold out, not yet open. */
   selectable: boolean
+  /** Sold out with its waitlist open: chosen to JOIN the line, not to buy. */
+  waitlist: boolean
   /** Why not, in words, or `null` when it can be selected. */
   unavailableReason: string | null
   minPerOrder: number
@@ -170,6 +185,18 @@ export interface SummaryLines {
   serviceFee: string
   total: string
   paymentRequired: boolean
+}
+
+/** What the page says once the buyer has joined the waitlist. */
+export interface WaitlistPlace {
+  /** Their own page for this registration — the offer will link there too. */
+  orderId: string
+  reference: string
+  eventName: string
+  /** e.g. `2 × General admission`. */
+  ticketsLabel: string
+  /** e.g. `You're 3rd in line`. */
+  place: string
 }
 
 /** What the success step says once the order exists. */

@@ -4,7 +4,7 @@ import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import type { ActionResult } from '@/app/loaders'
-import { NotificationBell, SignedInChip, VenueMap } from '@/components/ui'
+import { NotificationBell, SignedInChip, Toggle, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
 import { publishGaps, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
@@ -17,6 +17,7 @@ import {
   HL_ICONS,
   LETTERS,
   STEPS,
+  WAITLIST_HINT,
   finalLabel,
   headerSaveLabel,
   landingPreviewHref,
@@ -238,6 +239,7 @@ export default function EventFormPage() {
   const [address, setAddress] = useState(initial.venueAddress)
   const [onlineNote, setOnlineNote] = useState(initial.onlineNote)
   const [capacity, setCapacity] = useState(initial.capacity)
+  const [waitlist, setWaitlist] = useState(initial.waitlistEnabled)
   const [highlights, setHighlights] = useState<Highlight[]>(() =>
     initial.highlights.map((h) => ({ icon: h.icon ?? 'hgi-sparkles', label: h.text })),
   )
@@ -280,6 +282,8 @@ export default function EventFormPage() {
     onlineNote: online ? onlineNote : '',
     seatingMode: seating,
     capacity,
+    // Reserved seating has no waitlist, whatever the switch was left at.
+    waitlistEnabled: waitlist && seating === 'ga',
     seatRows: rows,
     seatsPerRow: cols,
     coverImage,
@@ -1036,6 +1040,23 @@ export default function EventFormPage() {
                   <p className="hint">
                     Total headcount. Each ticket tier carries its own sales window.
                   </p>
+                </div>
+              </div>
+              {/* The kit's "Enable waitlist" row, verbatim; its "Require
+                  approval" sibling stays out until something honours it. */}
+              <div className="mt-4 space-y-3 border-t border-line pt-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-ink">Enable waitlist</p>
+                    <p className="text-[11px] text-muted">{WAITLIST_HINT[seating]}</p>
+                  </div>
+                  <Toggle
+                    on={waitlist && seating === 'ga'}
+                    onChange={setWaitlist}
+                    label="Enable waitlist"
+                    disabled={seating !== 'ga'}
+                    transition="transition-transform"
+                  />
                 </div>
               </div>
             </section>

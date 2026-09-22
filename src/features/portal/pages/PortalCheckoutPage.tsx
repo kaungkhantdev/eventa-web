@@ -4,6 +4,7 @@ import { EmptyState, Icon, Input, Label } from '@/components/ui'
 import { useTheme } from '@/lib/useTheme'
 import { cn } from '@/lib/cn'
 import { PaymentHandoff } from '../components/PaymentHandoff'
+import { WaitlistBar, WaitlistNote, WaitlistOverlay } from '../components/WaitlistPanel'
 import type { CheckoutData, CheckoutResult } from '../checkout.routes'
 import type {
   CheckoutView,
@@ -54,12 +55,18 @@ export default function PortalCheckoutPage() {
   const tier = checkout.tiers.find((option) => option.id === tierId) ?? null
   const count = mode === 'reserved' ? seatIds.length : quantity
 
+  // A sold-out ticket with its waitlist open is chosen to JOIN the line, not
+  // to buy: no price to work out, no payment step, a different button.
+  const onWaitlist = tier?.waitlist === true
+
   const quote = useFetcher<CheckoutResult>()
   const booking = useFetcher<CheckoutResult>()
+  const joining = useFetcher<CheckoutResult>()
 
   const summary = quote.data?.ok && quote.data.intent === 'quote' ? quote.data.summary : null
   const booked = booking.data?.ok && booking.data.intent === 'book' ? booking.data : null
-  const error = errorOf(booking.data) ?? errorOf(quote.data)
+  const joined = joining.data?.ok && joining.data.intent === 'waitlist' ? joining.data.place : null
+  const error = errorOf(joining.data) ?? errorOf(booking.data) ?? errorOf(quote.data)
 
   // `quote` is a fresh object on every render, and this page re-renders on each
   // of the fetcher's own state changes. Held in a ref rather than listed as a
@@ -74,11 +81,11 @@ export default function PortalCheckoutPage() {
   // here: the fee, any discount and the VAT are the server's arithmetic.
   const chosenTierId = tier?.id
   useEffect(() => {
-    if (!chosenTierId || count < 1) return
+    if (!chosenTierId || count < 1 || onWaitlist) return
     ask.current(quoteBody(eventId, mode, chosenTierId, quantity, seatIds, discountCode), {
       method: 'post',
     })
-  }, [eventId, mode, chosenTierId, quantity, seatIds, discountCode, count])
+  }, [eventId, mode, chosenTierId, quantity, seatIds, discountCode, count, onWaitlist])
 
   return (
     <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
@@ -100,6 +107,7 @@ export default function PortalCheckoutPage() {
               />
             ))}
           </div>
+          {onWaitlist && <WaitlistNote />}
         </section>
 
         <section>
@@ -135,7 +143,7 @@ export default function PortalCheckoutPage() {
           <BuyerFields />
         </section>
 
-        {checkout.paymentRequired && (
+        {checkout.paymentRequired && !onWaitlist && (
           <section className="mt-6">
             <StepHeading>4 · Payment</StepHeading>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_300px]">
@@ -160,19 +168,24 @@ export default function PortalCheckoutPage() {
         )}
       </main>
 
-      <StickyBar
-        checkout={checkout}
-        tier={tier}
-        count={count}
-        quantity={quantity}
-        seatIds={seatIds}
-        method={method}
-        discountCode={discountCode}
-        summary={summary}
-        fetcher={booking}
-      />
+      {onWaitlist && tier ? (
+        <WaitlistBar eventId={eventId} tier={tier} quantity={quantity} fetcher={joining} />
+      ) : (
+        <StickyBar
+          checkout={checkout}
+          tier={tier}
+          count={count}
+          quantity={quantity}
+          seatIds={seatIds}
+          method={method}
+          discountCode={discountCode}
+          summary={summary}
+          fetcher={booking}
+        />
+      )}
 
       {booked && <SuccessOverlay order={booked.order} payment={booked.payment} />}
+      {joined && <WaitlistOverlay place={joined} />}
     </div>
   )
 }
@@ -284,17 +297,19 @@ function TierButton({
   selected: boolean
   onSelect: () => void
 }) {
+  // Sold out still chooses, when choosing means joining its waitlist.
+  const choosable = tier.selectable || tier.waitlist
   return (
     <button
       type="button"
       onClick={onSelect}
-      disabled={!tier.selectable}
+      disabled={!choosable}
       className={cn(
         'flex items-center justify-between rounded-xl border p-3.5 text-left transition',
         selected
           ? 'border-brand bg-brand-soft ring-1 ring-brand'
           : 'border-hair bg-surface hover:border-brand/40',
-        !tier.selectable && 'cursor-not-allowed opacity-55 hover:border-hair',
+        !choosable && 'cursor-not-allowed opacity-55 hover:border-hair',
       )}
     >
       <span>

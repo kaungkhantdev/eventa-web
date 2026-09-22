@@ -14,6 +14,8 @@ import type {
   SeatRow,
   SummaryLines,
   TierOption,
+  WaitlistJoinedWire,
+  WaitlistPlace,
 } from './checkout.types'
 
 /**
@@ -35,6 +37,7 @@ const UNAVAILABLE: Record<string, string> = {
 }
 
 const UNAVAILABLE_FALLBACK = 'Unavailable'
+const WAITLIST_OPEN = 'Sold out · join the waitlist'
 
 /**
  * Where "Back to event" goes.
@@ -85,16 +88,48 @@ function modeOf(event: CheckoutEventWire): BookingMode {
  */
 function toTierOption(tier: CheckoutTierWire, maxPerBooking: number): TierOption {
   const limits = [tier.maxPerOrder, maxPerBooking]
-  if (tier.remaining !== null) limits.push(tier.remaining)
+  // What is left does not limit a waitlist request: nothing is, by definition.
+  if (tier.remaining !== null && !tier.waitlist) limits.push(tier.remaining)
   return {
     id: tier.id,
     name: tier.name,
     price: tier.priceLabel,
     isFree: tier.isFree,
     selectable: tier.canSelect,
-    unavailableReason: tier.canSelect ? null : (UNAVAILABLE[tier.status] ?? UNAVAILABLE_FALLBACK),
+    waitlist: tier.waitlist,
+    unavailableReason: unavailableReasonOf(tier),
     minPerOrder: tier.minPerOrder,
     maxPerOrder: Math.min(...limits),
+  }
+}
+
+function unavailableReasonOf(tier: CheckoutTierWire): string | null {
+  if (tier.canSelect) return null
+  if (tier.waitlist) return WAITLIST_OPEN
+  return UNAVAILABLE[tier.status] ?? UNAVAILABLE_FALLBACK
+}
+
+/** 1 → "next"; the rest ordinally, as a person would say it. */
+export function placeInLine(position: number): string {
+  if (position <= 1) return "You're next in line"
+  return `You're ${position}${ordinalSuffix(position)} in line`
+}
+
+function ordinalSuffix(n: number): string {
+  const teen = n % 100
+  if (teen >= 11 && teen <= 13) return 'th'
+  return ORDINAL[n % 10] ?? 'th'
+}
+
+const ORDINAL: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' }
+
+export function toWaitlistPlace(joined: WaitlistJoinedWire): WaitlistPlace {
+  return {
+    orderId: joined.orderId,
+    reference: joined.reference,
+    eventName: joined.eventName,
+    ticketsLabel: `${joined.quantity} × ${joined.ticketTypeName}`,
+    place: placeInLine(joined.position),
   }
 }
 

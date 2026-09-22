@@ -34,6 +34,16 @@ export const EXPIRED_STATE: OrderState = {
   detail: 'The seats were released because the payment was not completed in time.',
 }
 
+/** In line for a sold-out ticket, with no seat offered yet (US-REG-04). */
+const WAITLISTED = 'waitlisted'
+
+export const WAITLIST_STATE: OrderState = {
+  label: 'On the waitlist',
+  tone: 'amber',
+  detail:
+    "Nothing is charged while you wait. If a place opens up we'll email you, and hold it for a limited time while you pay.",
+}
+
 export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
   const holdLive = isHoldLive(wire, now)
   return {
@@ -52,14 +62,18 @@ export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
     total: satang(wire.totalSatang),
     tickets: wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName)),
     awaitingPayment: isOwed(wire),
+    onWaitlist: wire.status === WAITLISTED,
     holdExpiresAt: wire.holdExpiresAt,
     payable: isOwed(wire) && wire.status === 'pending' && holdLive,
   }
 }
 
-/** Money still outstanding — placed, priced, and nothing has cleared. */
+/**
+ * Money still outstanding — placed, priced, and nothing has cleared. Not while
+ * merely waiting in line: nothing is owed until a seat has been offered.
+ */
 function isOwed(wire: GuestOrderWire): boolean {
-  return wire.paymentRequired && wire.paymentStatus !== 'paid'
+  return wire.paymentRequired && wire.paymentStatus !== 'paid' && wire.status !== WAITLISTED
 }
 
 /**
@@ -106,6 +120,7 @@ function stateOf(wire: GuestOrderWire, holdLive: boolean): OrderState {
   if (wire.paymentStatus === 'refunded') {
     return { label: 'Refunded', tone: 'gray', detail: 'The payment has been returned.' }
   }
+  if (wire.status === WAITLISTED) return WAITLIST_STATE
   // Expired covers two moments that look identical to the buyer: the API has
   // swept the order, or the hold has lapsed and the sweep is seconds behind.
   // Both mean the seats went back on sale, so both have to say so — waiting for

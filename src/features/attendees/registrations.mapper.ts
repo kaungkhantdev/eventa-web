@@ -1,4 +1,4 @@
-import { MASKED, bangkokDate, initials, satang } from '@/lib/format'
+import { MASKED, bangkokDate, bangkokTime, initials, satang } from '@/lib/format'
 import type {
   Registration,
   RegistrationEntry,
@@ -43,5 +43,35 @@ export function toRegistrationRow(entry: RegistrationEntry): Registration {
     approveBlockedReason: entry.approveBlockedReason,
     canReject: entry.canReject,
     rejectBlockedReason: entry.rejectBlockedReason,
+    canOffer: entry.canOffer,
+    offerHint: offerHintOf(entry.waitlistPosition),
+    statusNote: statusNoteOf(entry),
   }
+}
+
+/**
+ * Where a waitlist entry stands, or until when an offer holds its seat
+ * (US-REG-04). The deadline is on Bangkok's clock, the one the attendee's
+ * email gives them.
+ */
+function statusNoteOf(entry: RegistrationEntry): string | null {
+  if (entry.status === 'waitlisted' && entry.waitlistPosition !== null) {
+    return entry.waitlistPosition <= 1 ? 'Next in line' : `#${entry.waitlistPosition} in line`
+  }
+  if (entry.status === 'pending' && entry.offerExpiresAt) {
+    const until = entry.offerExpiresAt
+    return `Offer open until ${bangkokDate(until)} ${bangkokTime(until)}`
+  }
+  return null
+}
+
+/**
+ * Offering a seat to someone further back is allowed — the story says so —
+ * but it passes people over, and the API records that. Said before the click.
+ */
+function offerHintOf(position: number | null): string {
+  const ahead = (position ?? 1) - 1
+  if (ahead <= 0) return 'Offer a seat'
+  const people = ahead === 1 ? '1 person' : `${ahead} people`
+  return `Offer a seat — ${people} ahead of them will be passed over, and that is recorded`
 }

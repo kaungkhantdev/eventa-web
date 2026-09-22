@@ -50,6 +50,12 @@ export interface RegistrationEntry {
   approveBlockedReason: string | null
   canReject: boolean
   rejectBlockedReason: string | null
+  /** On the waitlist, so a seat may be offered (US-REG-04). */
+  canOffer: boolean
+  /** Place in line for its ticket, 1 = next; null unless waitlisted. */
+  waitlistPosition: number | null
+  /** When a waitlist offer lapses and passes on; set once one is made. */
+  offerExpiresAt: string | null
 }
 
 /** Live tab totals for the whole filtered queue, whichever tab is open. */
@@ -81,4 +87,9 @@ export interface Registration {
   approveBlockedReason: string | null
   canReject: boolean
   rejectBlockedReason: string | null
+  canOffer: boolean
+  /** What the Offer button says it will do — including who it passes over. */
+  offerHint: string
+  /** A line under the badge: place in line, or until when an offer holds. */
+  statusNote: string | null
 }

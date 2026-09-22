@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { toCheckoutView, toPaymentStep, toPlacedOrder, toSummaryLines } from './checkout.mapper'
+import {
+  placeInLine,
+  toCheckoutView,
+  toPaymentStep,
+  toPlacedOrder,
+  toSummaryLines,
+  toWaitlistPlace,
+} from './checkout.mapper'
 import type {
   CheckoutTierWire,
   CheckoutViewWire,
@@ -19,6 +26,7 @@ const TIER: CheckoutTierWire = {
   minPerOrder: 1,
   maxPerOrder: 8,
   remaining: 80,
+  waitlist: false,
 }
 
 const VIEW: CheckoutViewWire = {
@@ -213,6 +221,62 @@ const SUMMARY: OrderSummaryWire = {
   },
   paymentRequired: true,
 }
+
+describe('the waitlist (US-REG-04)', () => {
+  const soldOut = { status: 'soldout', canSelect: false, remaining: 0 }
+
+  it('lets a sold-out ticket be chosen when its waitlist is open', () => {
+    const option = tier({ ...soldOut, waitlist: true })
+    expect(option.waitlist).toBe(true)
+    expect(option.selectable).toBe(false)
+    expect(option.unavailableReason).toBe('Sold out · join the waitlist')
+  })
+
+  it('does not cap the request at the none that are left', () => {
+    // Nothing is left by definition; how many they want to wait for is the
+    // tier's own limit.
+    expect(tier({ ...soldOut, waitlist: true }).maxPerOrder).toBe(8)
+  })
+
+  it('leaves a sold-out ticket with no waitlist simply sold out', () => {
+    const option = tier(soldOut)
+    expect(option.waitlist).toBe(false)
+    expect(option.unavailableReason).toBe('Sold out')
+  })
+
+  describe('placeInLine', () => {
+    it('calls the front of the line next', () => {
+      expect(placeInLine(1)).toBe("You're next in line")
+    })
+
+    it('counts everybody else ordinally', () => {
+      expect(placeInLine(2)).toBe("You're 2nd in line")
+      expect(placeInLine(3)).toBe("You're 3rd in line")
+      expect(placeInLine(4)).toBe("You're 4th in line")
+      expect(placeInLine(11)).toBe("You're 11th in line")
+      expect(placeInLine(22)).toBe("You're 22nd in line")
+    })
+  })
+
+  it('says where the buyer now stands', () => {
+    expect(
+      toWaitlistPlace({
+        orderId: 'o-1',
+        reference: 'ORD-AAAA1111',
+        eventName: 'Founders Coffee Connect',
+        ticketTypeName: 'General admission',
+        quantity: 2,
+        position: 3,
+      }),
+    ).toEqual({
+      orderId: 'o-1',
+      reference: 'ORD-AAAA1111',
+      eventName: 'Founders Coffee Connect',
+      ticketsLabel: '2 × General admission',
+      place: "You're 3rd in line",
+    })
+  })
+})
 
 describe('toSummaryLines', () => {
   const lines = (patch: Partial<OrderSummaryWire> = {}) =>

@@ -30,9 +30,12 @@ const TONES: Record<OrderState['tone'], string> = {
 /** Where somebody whose order lapsed can start again. */
 const DISCOVER = '/portal/discover'
 
-/** An expired order is owed nothing — it was never charged and never will be. */
-function receiptHeading({ canPay, lapsed }: { canPay: boolean; lapsed: boolean }): string {
-  if (lapsed) return 'Order total'
+/**
+ * An expired order is owed nothing — it was never charged and never will be —
+ * and a waitlist entry is owed nothing YET. Neither was paid.
+ */
+function receiptHeading({ canPay, unpaid }: { canPay: boolean; unpaid: boolean }): string {
+  if (unpaid) return 'Order total'
   return canPay ? 'What you owe' : 'What you paid'
 }
 
@@ -83,9 +86,14 @@ export default function GuestOrderPage() {
         {/* Only the genuinely odd case. An unpaid order is explained by the
             panel above it, and saying "no tickets yet" underneath would be a
             second, vaguer answer to a question already answered. */}
-        {order.tickets.length === 0 && !order.awaitingPayment && <NothingToShow />}
+        {order.tickets.length === 0 && !order.awaitingPayment && !order.onWaitlist && (
+          <NothingToShow />
+        )}
 
-        <Receipt order={order} heading={receiptHeading({ canPay, lapsed })} />
+        <Receipt
+          order={order}
+          heading={receiptHeading({ canPay, unpaid: lapsed || order.onWaitlist })}
+        />
         <KeepThem order={order} />
 
         <p className="mt-8 text-center text-[11px] text-muted/70">

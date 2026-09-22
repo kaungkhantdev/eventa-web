@@ -122,6 +122,33 @@ describe('toGuestOrder', () => {
     })
   })
 
+  describe('on the waitlist (US-REG-04)', () => {
+    const WAITING: Partial<GuestOrderWire> = {
+      status: 'waitlisted',
+      paymentStatus: 'pending',
+      paymentRequired: true,
+      tickets: [],
+      holdExpiresAt: null,
+    }
+
+    it('says they are waiting — not that an order expired', () => {
+      // No hold and nothing paid is exactly what a lapsed order looks like;
+      // a waitlist entry has never had either, and has not lapsed.
+      expect(order(WAITING).state).toMatchObject({ label: 'On the waitlist', tone: 'amber' })
+      expect(order(WAITING).onWaitlist).toBe(true)
+    })
+
+    it('owes nothing yet, and offers nothing to pay', () => {
+      expect(order(WAITING)).toMatchObject({ awaitingPayment: false, payable: false })
+    })
+
+    it('becomes an ordinary unpaid order once a seat is offered', () => {
+      const offered = order({ ...UNPAID, holdExpiresAt: '2026-08-18T05:00:00.000Z' })
+      expect(offered).toMatchObject({ onWaitlist: false, payable: true })
+      expect(offered.state.label).toBe('Awaiting payment')
+    })
+  })
+
   describe('payable', () => {
     it('is true while the money is owed and the seats are still held', () => {
       expect(order(UNPAID)).toMatchObject({

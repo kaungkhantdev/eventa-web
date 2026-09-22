@@ -338,6 +338,7 @@ function QueueRow({ r, canManage }: { r: Registration; canManage: boolean }) {
             <i className={cn('hgi-stroke', badge.icon, 'text-[12px]')} />
             {r.status}
           </span>
+          {r.statusNote && <p className="mt-1 text-[11px] text-muted">{r.statusNote}</p>}
         </td>
         <td className="text-right">
           <div className="flex items-center justify-end gap-1">
@@ -378,17 +379,33 @@ function DecideButtons({
   return (
     <fetcher.Form method="post" className="flex items-center gap-1">
       <input type="hidden" name="id" value={row.id} />
-      <button
-        type="submit"
-        name="intent"
-        value="approve"
-        disabled={!row.canApprove || busy}
-        title={row.approveBlockedReason ?? 'Approve'}
-        className="btn-icon text-brand disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <i className="hgi-stroke hgi-checkmark-circle-02 text-[16px]" />
-        <span className="sr-only">Approve {row.name}</span>
-      </button>
+      {/* Someone on the waitlist is offered a seat rather than approved: a
+          paid one has to pay for it by a deadline (US-REG-04). */}
+      {row.canOffer ? (
+        <button
+          type="submit"
+          name="intent"
+          value="offer"
+          disabled={busy}
+          title={row.offerHint}
+          className="btn-icon text-brand disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <i className="hgi-stroke hgi-ticket-02 text-[16px]" />
+          <span className="sr-only">Offer {row.name} a seat</span>
+        </button>
+      ) : (
+        <button
+          type="submit"
+          name="intent"
+          value="approve"
+          disabled={!row.canApprove || busy}
+          title={row.approveBlockedReason ?? 'Approve'}
+          className="btn-icon text-brand disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <i className="hgi-stroke hgi-checkmark-circle-02 text-[16px]" />
+          <span className="sr-only">Approve {row.name}</span>
+        </button>
+      )}
       <button
         type="submit"
         name="intent"

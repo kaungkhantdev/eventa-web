@@ -197,7 +197,8 @@ function withPage(current: string, page: number): string {
 }
 
 /**
- * Working the queue: approve, reject, or enter a booking taken at the door.
+ * Working the queue: approve, reject, offer a waitlisted attendee a seat, or
+ * enter a booking taken at the door.
  *
  * A refusal comes back through `pageAction` as the API's own sentence and is
  * shown beside the control that was used — the server decides what may be done
@@ -209,6 +210,11 @@ async function runRegistrationsAction({ request }: LoaderArgs): Promise<void> {
 
   if (intent === 'approve') {
     await registrationsApi.approve(String(form.get('id') ?? ''))
+    return
+  }
+
+  if (intent === 'offer') {
+    await registrationsApi.offer(String(form.get('id') ?? ''))
     return
   }
 
