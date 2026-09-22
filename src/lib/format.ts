@@ -122,6 +122,22 @@ export function bangkokInstant(date: string, time = '00:00'): string | null {
 }
 
 /**
+ * A `datetime-local` value (`YYYY-MM-DDTHH:mm`), picked on the Bangkok clock →
+ * the UTC instant the API stores. The field carries no zone of its own; read
+ * as the browser's, it would move a scheduled send by the organizer's distance
+ * from Thailand. Empty in, null out: an empty field is not "now".
+ */
+export function bangkokInstantOfLocal(value: string): string | null {
+  const [date = '', time = ''] = value.split('T')
+  return bangkokInstant(date, time)
+}
+
+/** An instant → the `datetime-local` value showing it on the Bangkok clock. */
+export function bangkokLocalInput(instant: string): string {
+  return `${bangkokDayKey(instant)}T${bangkokTime(instant)}`
+}
+
+/**
  * A pair of instants → the dates as a public page spells them, e.g.
  * `Sat–Sun, Jul 18–19, 2026`.
  *
