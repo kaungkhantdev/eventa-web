@@ -16,6 +16,7 @@ import {
 import type { EventOption } from '@/features/events/eventOptions'
 import { useSavedToast } from '@/lib/useSavedToast'
 import type { DeliveryMode } from '../announcements.routes'
+import { unattachedError } from '../refusal'
 
 /** The kit's "Delivery" control, in its order. */
 const DELIVERY: { value: DeliveryMode; label: string }[] = [
@@ -68,6 +69,7 @@ export function ComposePanel({
 
   const change = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }))
   const refused = send.data?.ok === false ? send.data : null
+  const banner = unattachedError(refused)
 
   useSavedToast(send.state === 'idle' && send.data?.ok === true, DONE[submitted], () => {
     setDraft(EMPTY)
@@ -104,9 +106,9 @@ export function ComposePanel({
         }
       >
         <div className="space-y-4">
-          {refused && (
+          {banner && (
             <p role="alert" className="text-[13px] text-red-500">
-              {refused.error}
+              {banner}
             </p>
           )}
           <MessageFields draft={draft} events={events} onChange={change} />

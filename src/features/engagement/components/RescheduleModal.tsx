@@ -4,6 +4,7 @@ import type { ActionResult } from '@/app/loaders'
 import { Button, FieldError, Hint, Input, Label, Modal } from '@/components/ui'
 import { toast } from '@/lib/toast'
 import type { AnnouncementRow } from '../announcements.mapper'
+import { unattachedError } from '../refusal'
 import type { RowDialog } from '../useRowDialog'
 
 const FORM_ID = 'reschedule-announcement'
@@ -24,6 +25,7 @@ export function RescheduleModal({ dialog }: { dialog: RowDialog<AnnouncementRow>
   // belongs to the announcement now on screen.
   const move = useFetcher<ActionResult>({ key: `announcement-reschedule-${session}` })
   const refused = move.data?.ok === false ? move.data : null
+  const banner = unattachedError(refused)
   const done = move.state === 'idle' && move.data?.ok === true
 
   useEffect(() => {
@@ -48,9 +50,9 @@ export function RescheduleModal({ dialog }: { dialog: RowDialog<AnnouncementRow>
         </>
       }
     >
-      {refused && (
+      {banner && (
         <p role="alert" className="mb-3 text-[13px] text-red-500">
-          {refused.error}
+          {banner}
         </p>
       )}
       <move.Form id={FORM_ID} method="post">
