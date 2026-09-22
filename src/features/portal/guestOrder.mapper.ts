@@ -44,6 +44,37 @@ export const WAITLIST_STATE: OrderState = {
     "Nothing is charged while you wait. If a place opens up we'll email you, and hold it for a limited time while you pay.",
 }
 
+/** Turned down by the organizer (US-REG-02). */
+const REJECTED = 'rejected'
+const AWAITING_APPROVAL = 'Awaiting approval'
+
+/** Paid for, and waiting for the organizer's decision (US-REG-02). */
+export const AWAITING_APPROVAL_PAID_STATE: OrderState = {
+  label: AWAITING_APPROVAL,
+  tone: 'amber',
+  detail:
+    "Your payment was received. The organizer reviews each registration — your tickets are emailed to you once it's approved, and your payment is refunded in full if it isn't.",
+}
+
+/** Free, and waiting for the organizer's decision (US-REG-02). */
+export const AWAITING_APPROVAL_FREE_STATE: OrderState = {
+  label: AWAITING_APPROVAL,
+  tone: 'amber',
+  detail:
+    "The organizer reviews each registration. Your ticket is emailed to you once it's approved.",
+}
+
+const NOT_APPROVED = 'The organizer did not approve this registration.'
+
+/** What became of a rejected registration's money — nothing to say if none was taken. */
+const REJECTED_MONEY: Readonly<Partial<Record<string, string>>> = {
+  refunded: 'Your payment has been refunded.',
+  paid: 'Your payment is being refunded.',
+}
+
+/** Statuses that owe nothing, whatever the payment fields say. */
+const OWES_NOTHING: ReadonlySet<string> = new Set([WAITLISTED, REJECTED])
+
 export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
   const holdLive = isHoldLive(wire, now)
   return {
@@ -63,6 +94,8 @@ export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
     tickets: wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName)),
     awaitingPayment: isOwed(wire),
     onWaitlist: wire.status === WAITLISTED,
+    awaitingApproval: wire.awaitingApproval,
+    ticketsExplained: ticketsExplained(wire),
     holdExpiresAt: wire.holdExpiresAt,
     payable: isOwed(wire) && wire.status === 'pending' && holdLive,
   }
@@ -70,10 +103,37 @@ export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
 
 /**
  * Money still outstanding — placed, priced, and nothing has cleared. Not while
- * merely waiting in line: nothing is owed until a seat has been offered.
+ * merely waiting in line: nothing is owed until a seat has been offered. Not
+ * while awaiting approval: a paid one has paid, a free one never owed. And not
+ * once turned down.
  */
 function isOwed(wire: GuestOrderWire): boolean {
-  return wire.paymentRequired && wire.paymentStatus !== 'paid' && wire.status !== WAITLISTED
+  return (
+    wire.paymentRequired &&
+    wire.paymentStatus !== 'paid' &&
+    !wire.awaitingApproval &&
+    !OWES_NOTHING.has(wire.status)
+  )
+}
+
+/** The state banner already says why there is no ticket. */
+function ticketsExplained(wire: GuestOrderWire): boolean {
+  return isOwed(wire) || wire.awaitingApproval || OWES_NOTHING.has(wire.status)
+}
+
+function rejectedState(paymentStatus: string): OrderState {
+  const money = REJECTED_MONEY[paymentStatus]
+  return {
+    label: 'Not approved',
+    tone: 'red',
+    detail: money ? `${NOT_APPROVED} ${money}` : NOT_APPROVED,
+  }
+}
+
+function awaitingApprovalState(wire: GuestOrderWire): OrderState {
+  return wire.paymentStatus === 'paid'
+    ? AWAITING_APPROVAL_PAID_STATE
+    : AWAITING_APPROVAL_FREE_STATE
 }
 
 /**
@@ -117,10 +177,14 @@ function stateOf(wire: GuestOrderWire, holdLive: boolean): OrderState {
   if (wire.status === 'cancelled') {
     return { label: 'Cancelled', tone: 'red', detail: 'This registration was cancelled.' }
   }
+  // Before the refund check: "not approved" is why the money came back.
+  if (wire.status === REJECTED) return rejectedState(wire.paymentStatus)
   if (wire.paymentStatus === 'refunded') {
     return { label: 'Refunded', tone: 'gray', detail: 'The payment has been returned.' }
   }
   if (wire.status === WAITLISTED) return WAITLIST_STATE
+  // Before expiry: waiting for a decision has no hold to lapse.
+  if (wire.awaitingApproval) return awaitingApprovalState(wire)
   // Expired covers two moments that look identical to the buyer: the API has
   // swept the order, or the hold has lapsed and the sweep is seconds behind.
   // Both mean the seats went back on sale, so both have to say so — waiting for

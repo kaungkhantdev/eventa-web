@@ -27,6 +27,8 @@ const entry = (o: Partial<RegistrationEntry> = {}): RegistrationEntry => ({
   canOffer: false,
   waitlistPosition: null,
   offerExpiresAt: null,
+  awaitingApproval: false,
+  rejectRefunds: false,
   ...o,
 })
 
@@ -133,6 +135,65 @@ describe('a registration row, as the queue shows it (US-REG-01)', () => {
       expect(row.canApprove).toBe(false)
       expect(row.canReject).toBe(false)
     })
+  })
+})
+
+describe('a registration awaiting approval (US-REG-02 — pay first)', () => {
+  const waiting = (o: Partial<RegistrationEntry> = {}) =>
+    entry({
+      status: 'pending',
+      paymentStatus: 'paid',
+      confirmedAt: null,
+      awaitingApproval: true,
+      canApprove: true,
+      canReject: true,
+      rejectRefunds: true,
+      ...o,
+    })
+
+  it('says it has been paid for and waits for a decision', () => {
+    expect(toRegistrationRow(waiting()).statusNote).toBe('Paid · awaiting approval')
+  })
+
+  it('says a free one simply waits for a decision', () => {
+    const free = waiting({ paymentStatus: 'pending', totalSatang: 0, rejectRefunds: false })
+    expect(toRegistrationRow(free).statusNote).toBe('Awaiting approval')
+  })
+
+  it('says rejecting it refunds the payment, before the click', () => {
+    expect(toRegistrationRow(waiting()).rejectLabel).toBe('Reject and refund')
+  })
+
+  it('calls an ordinary rejection just that', () => {
+    expect(toRegistrationRow(waiting({ rejectRefunds: false })).rejectLabel).toBe('Reject')
+    expect(toRegistrationRow(entry()).rejectLabel).toBe('Reject')
+  })
+
+  it('flags a rejection whose refund has not gone through yet', () => {
+    const rejected = waiting({ status: 'rejected', awaitingApproval: false })
+    expect(toRegistrationRow(rejected).statusNote).toBe('Payment not yet refunded')
+  })
+
+  it('has nothing to add once the refund has gone through', () => {
+    const refunded = waiting({
+      status: 'rejected',
+      paymentStatus: 'refunded',
+      awaitingApproval: false,
+      rejectRefunds: false,
+    })
+    expect(toRegistrationRow(refunded).statusNote).toBeNull()
+  })
+
+  it('leaves approve and reject to the server — including a reject the caller may not refund', () => {
+    const row = toRegistrationRow(
+      waiting({
+        canReject: false,
+        rejectBlockedReason: 'Rejecting this registration refunds its payment, and refunds need the refund permission — ask an Admin.',
+      }),
+    )
+    expect(row.canApprove).toBe(true)
+    expect(row.canReject).toBe(false)
+    expect(row.rejectBlockedReason).toMatch(/refund permission/)
   })
 })
 

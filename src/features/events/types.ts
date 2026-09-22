@@ -62,6 +62,12 @@ export interface EventWire {
    */
   waitlistEnabled?: boolean
   /**
+   * Each registration waits for the organizer to approve it; a paid one pays
+   * first, and rejecting it refunds the payment (US-REG-02). Optional: only
+   * the full event response carries it.
+   */
+  requiresApproval?: boolean
+  /**
    * The landing page's hero image — null until one is uploaded. Optional
    * because the calendar's slimmer payload leaves it out; the list and detail
    * endpoints both carry it (`EventListItemDto`, `EventResponseDto`).

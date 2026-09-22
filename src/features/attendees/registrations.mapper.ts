@@ -15,6 +15,11 @@ const STATUS_LABEL: Record<RegistrationWireStatus, RegistrationStatus> = {
   rejected: 'Rejected',
 }
 
+const PAID = 'paid'
+const REJECT = 'Reject'
+/** Said before the click: this rejection gives the buyer's money back (US-REG-02). */
+const REJECT_AND_REFUND = 'Reject and refund'
+
 /**
  * One queue row, display-ready (US-REG-01).
  *
@@ -43,6 +48,7 @@ export function toRegistrationRow(entry: RegistrationEntry): Registration {
     approveBlockedReason: entry.approveBlockedReason,
     canReject: entry.canReject,
     rejectBlockedReason: entry.rejectBlockedReason,
+    rejectLabel: entry.rejectRefunds ? REJECT_AND_REFUND : REJECT,
     canOffer: entry.canOffer,
     offerHint: offerHintOf(entry.waitlistPosition),
     statusNote: statusNoteOf(entry),
@@ -52,11 +58,19 @@ export function toRegistrationRow(entry: RegistrationEntry): Registration {
 /**
  * Where a waitlist entry stands, or until when an offer holds its seat
  * (US-REG-04). The deadline is on Bangkok's clock, the one the attendee's
- * email gives them.
+ * email gives them. A registration awaiting approval says so (US-REG-02) —
+ * "Pending" alone reads as "not paid yet" — and a rejection still holding the
+ * buyer's money says the refund has not gone through.
  */
 function statusNoteOf(entry: RegistrationEntry): string | null {
   if (entry.status === 'waitlisted' && entry.waitlistPosition !== null) {
     return entry.waitlistPosition <= 1 ? 'Next in line' : `#${entry.waitlistPosition} in line`
+  }
+  if (entry.status === 'pending' && entry.awaitingApproval) {
+    return entry.paymentStatus === PAID ? 'Paid · awaiting approval' : 'Awaiting approval'
+  }
+  if (entry.status === 'rejected' && entry.paymentStatus === PAID) {
+    return 'Payment not yet refunded'
   }
   if (entry.status === 'pending' && entry.offerExpiresAt) {
     const until = entry.offerExpiresAt

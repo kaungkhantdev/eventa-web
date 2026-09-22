@@ -36,6 +36,12 @@ export interface GuestOrderWire {
   lines: GuestOrderLineWire[]
   tickets: IssuedTicketWire[]
   paymentRequired: boolean
+  /**
+   * Waiting for the organizer's approval (US-REG-02): paid for if it cost
+   * anything, ticketed only once approved. `paymentRequired` is false and
+   * `holdExpiresAt` null while it is.
+   */
+  awaitingApproval: boolean
   placedAt: string
   /** When the seats stop being held — the deadline to pay. */
   holdExpiresAt: string | null
@@ -88,6 +94,16 @@ export interface GuestOrder {
    * otherwise say.
    */
   onWaitlist: boolean
+  /**
+   * Waiting for the organizer to approve it (US-REG-02): nothing owed, no
+   * clock running, and no ticket until they do.
+   */
+  awaitingApproval: boolean
+  /**
+   * The state banner already says why there are no tickets — money owed, in
+   * line, awaiting approval, or not approved — so the page need not.
+   */
+  ticketsExplained: boolean
   /**
    * The instant the seats stop being held, ISO — `null` when none are.
    *

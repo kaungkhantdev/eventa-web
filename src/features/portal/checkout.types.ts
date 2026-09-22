@@ -55,7 +55,8 @@ export interface CheckoutViewWire {
   event: CheckoutEventWire
   tiers: CheckoutTierWire[]
   seatMap: { seats: CheckoutSeatWire[] } | null
-  notes: { seating: string | null; delivery: string | null }
+  /** `approval`: the event requires approval — said before anybody pays (US-REG-02). */
+  notes: { seating: string | null; delivery: string | null; approval: string | null }
   maxPerBooking: number
   paymentRequired: boolean
 }
@@ -119,6 +120,11 @@ export interface OrderPlacedWire {
   summary: OrderSummaryWire
   tickets: IssuedTicketWire[]
   paymentRequired: boolean
+  /**
+   * The registration now waits for the organizer to approve it (US-REG-02). A
+   * paid one starts waiting only once its payment lands, so reads false here.
+   */
+  awaitingApproval: boolean
 }
 
 /* ── what the page renders ────────────────────────────────────────────── */
@@ -210,6 +216,8 @@ export interface PlacedOrder {
   ticketCount: number
   total: string
   paymentRequired: boolean
+  /** Placed, but waiting for the organizer — not registered yet (US-REG-02). */
+  awaitingApproval: boolean
 }
 
 /** `POST /public/payments` — the payment the API started, verbatim. */

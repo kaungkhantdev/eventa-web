@@ -47,7 +47,7 @@ const VIEW: CheckoutViewWire = {
   },
   tiers: [TIER],
   seatMap: null,
-  notes: { seating: 'Seating is first-come, first-served.', delivery: null },
+  notes: { seating: 'Seating is first-come, first-served.', delivery: null, approval: null },
   maxPerBooking: 8,
   paymentRequired: true,
 }
@@ -193,9 +193,19 @@ describe('toCheckoutView', () => {
     })
   })
 
+  // US-REG-02: a buyer pays first on an approval event, so they are told
+  // before they pay that the organizer decides — and what a "no" means.
+  it('says an event requires approval, before anybody pays', () => {
+    const note =
+      "The organizer reviews each registration before confirming it. If yours isn't approved, any payment is refunded in full."
+    expect(
+      view({ notes: { seating: null, delivery: null, approval: note } }).notes,
+    ).toEqual([note])
+  })
+
   it('keeps only the notes the organizer actually wrote', () => {
     expect(view().notes).toEqual(['Seating is first-come, first-served.'])
-    expect(view({ notes: { seating: null, delivery: null } }).notes).toEqual([])
+    expect(view({ notes: { seating: null, delivery: null, approval: null } }).notes).toEqual([])
   })
 })
 
@@ -322,6 +332,7 @@ const PLACED: OrderPlacedWire = {
     { id: 't2', qrToken: 'b', holderName: null, ticketLabel: null, status: 'valid' },
   ],
   paymentRequired: true,
+  awaitingApproval: false,
 }
 
 describe('toPlacedOrder', () => {
@@ -338,7 +349,16 @@ describe('toPlacedOrder', () => {
       ticketCount: 2,
       total: '฿3,150',
       paymentRequired: true,
+      awaitingApproval: false,
     })
+  })
+
+  // US-REG-02: a free registration on an event that requires approval waits
+  // for the organizer — placed, but neither registered nor owing anything.
+  it('knows a registration is waiting for the organizer’s approval', () => {
+    expect(
+      placed({ paymentRequired: false, awaitingApproval: true, tickets: [] }).awaitingApproval,
+    ).toBe(true)
   })
 
   // A paid order is placed `pending` and its tickets are minted only once the

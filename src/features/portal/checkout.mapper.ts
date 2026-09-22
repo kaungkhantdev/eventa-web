@@ -55,7 +55,9 @@ export function toCheckoutView(wire: CheckoutViewWire): CheckoutView {
     mode: modeOf(wire.event),
     tiers: wire.tiers.map((tier) => toTierOption(tier, wire.maxPerBooking)),
     rows: toSeatRows(wire),
-    notes: [wire.notes.seating, wire.notes.delivery].filter((note): note is string => Boolean(note)),
+    notes: [wire.notes.seating, wire.notes.delivery, wire.notes.approval].filter(
+      (note): note is string => Boolean(note),
+    ),
     maxPerBooking: wire.maxPerBooking,
     paymentRequired: wire.paymentRequired,
   }
@@ -184,6 +186,7 @@ export function toPlacedOrder(order: OrderPlacedWire): PlacedOrder {
     ticketCount: order.summary.quantity,
     total: order.summary.labels.total,
     paymentRequired: order.paymentRequired,
+    awaitingApproval: order.awaitingApproval,
   }
 }
 

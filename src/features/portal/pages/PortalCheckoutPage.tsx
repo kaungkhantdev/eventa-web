@@ -796,12 +796,23 @@ interface OverlayHead {
   tone: string
 }
 
+/** Not done, not wrong — the money or the organizer is still to come. */
+const WAITING_TONE = 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+
 function headOf(order: PlacedOrder, payment: PaymentStep | null): OverlayHead {
   if (payment?.state === 'failed') {
     return {
       title: 'Payment could not be started',
       icon: 'hgi-alert-02',
       tone: 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300',
+    }
+  }
+  // Placed, but the organizer decides (US-REG-02) — not "registered" yet.
+  if (order.awaitingApproval) {
+    return {
+      title: 'Registration received — awaiting approval',
+      icon: 'hgi-time-quarter-pass',
+      tone: WAITING_TONE,
     }
   }
   if (!order.paymentRequired || payment === null) {
@@ -814,14 +825,17 @@ function headOf(order: PlacedOrder, payment: PaymentStep | null): OverlayHead {
   return {
     title: 'Almost there — your seats are held',
     icon: 'hgi-time-quarter-pass',
-    tone: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+    tone: WAITING_TONE,
   }
 }
 
 function SuccessOverlay({ order, payment }: { order: PlacedOrder; payment: PaymentStep | null }) {
   const head = headOf(order, payment)
-  /** Nothing is owed — so the tickets exist and the order is a registration. */
-  const settled = !order.paymentRequired || payment === null
+  /**
+   * Nothing is owed and nobody has to decide — so the tickets exist and the
+   * order is a registration.
+   */
+  const settled = !order.awaitingApproval && (!order.paymentRequired || payment === null)
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-black/50 p-4">
@@ -863,6 +877,14 @@ function SuccessOverlay({ order, payment }: { order: PlacedOrder; payment: Payme
 }
 
 function PaymentNext({ order, payment }: { order: PlacedOrder; payment: PaymentStep | null }) {
+  if (order.awaitingApproval) {
+    return (
+      <p className="mt-2 text-[13px] text-muted">
+        The organizer reviews each registration. Your ticket is emailed to you once it's
+        approved.
+      </p>
+    )
+  }
   if (!order.paymentRequired || payment === null) {
     return <p className="mt-2 text-[13px] text-brand">Free admission — there is nothing to pay.</p>
   }

@@ -56,6 +56,13 @@ export interface RegistrationEntry {
   waitlistPosition: number | null
   /** When a waitlist offer lapses and passes on; set once one is made. */
   offerExpiresAt: string | null
+  /**
+   * Waiting for the organizer's decision on an event that requires approval
+   * (US-REG-02) — paid for already if it cost anything.
+   */
+  awaitingApproval: boolean
+  /** Rejecting it refunds its payment: it was paid for while it waited. */
+  rejectRefunds: boolean
 }
 
 /** Live tab totals for the whole filtered queue, whichever tab is open. */
@@ -87,9 +94,14 @@ export interface Registration {
   approveBlockedReason: string | null
   canReject: boolean
   rejectBlockedReason: string | null
+  /** What Reject will do — `Reject and refund` when it gives money back. */
+  rejectLabel: string
   canOffer: boolean
   /** What the Offer button says it will do — including who it passes over. */
   offerHint: string
-  /** A line under the badge: place in line, or until when an offer holds. */
+  /**
+   * A line under the badge: place in line, until when an offer holds, that it
+   * awaits approval, or that a rejection's refund is still owed.
+   */
   statusNote: string | null
 }

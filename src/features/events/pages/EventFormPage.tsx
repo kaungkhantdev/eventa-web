@@ -240,6 +240,7 @@ export default function EventFormPage() {
   const [onlineNote, setOnlineNote] = useState(initial.onlineNote)
   const [capacity, setCapacity] = useState(initial.capacity)
   const [waitlist, setWaitlist] = useState(initial.waitlistEnabled)
+  const [approval, setApproval] = useState(initial.requiresApproval)
   const [highlights, setHighlights] = useState<Highlight[]>(() =>
     initial.highlights.map((h) => ({ icon: h.icon ?? 'hgi-sparkles', label: h.text })),
   )
@@ -284,6 +285,7 @@ export default function EventFormPage() {
     capacity,
     // Reserved seating has no waitlist, whatever the switch was left at.
     waitlistEnabled: waitlist && seating === 'ga',
+    requiresApproval: approval,
     seatRows: rows,
     seatsPerRow: cols,
     coverImage,
@@ -1042,10 +1044,25 @@ export default function EventFormPage() {
                   </p>
                 </div>
               </div>
-              {/* The kit's "Enable waitlist" row, verbatim; its "Require
-                  approval" sibling stays out until something honours it. */}
+              {/* The kit's "Require approval" and "Enable waitlist" rows,
+                  verbatim. A paid registration on an approval event pays
+                  first; rejecting it refunds it (US-REG-02). */}
               <div className="mt-4 space-y-3 border-t border-line pt-3">
                 <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-ink">Require approval</p>
+                    <p className="text-[11px] text-muted">
+                      Manually review each registration before it's confirmed.
+                    </p>
+                  </div>
+                  <Toggle
+                    on={approval}
+                    onChange={setApproval}
+                    label="Require approval"
+                    transition="transition-transform"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-ink">Enable waitlist</p>
                     <p className="text-[11px] text-muted">{WAITLIST_HINT[seating]}</p>

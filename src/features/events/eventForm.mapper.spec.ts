@@ -286,6 +286,25 @@ describe('what PATCH /events/:id may carry', () => {
       expect(toUpdateBody({ ...base, waitlistEnabled: false }).waitlistEnabled).toBe(false)
     })
   })
+
+  describe('require approval (US-REG-02)', () => {
+    it('reads the switch back, so reopening the wizard does not turn it off', () => {
+      expect(toEventFormValues(event({ requiresApproval: true }), [], []).requiresApproval).toBe(
+        true,
+      )
+    })
+
+    it('starts off — for a brand-new event, and for a response that leaves it out', () => {
+      expect(toEventFormValues(null, [], []).requiresApproval).toBe(false)
+      expect(toEventFormValues(event(), [], []).requiresApproval).toBe(false)
+    })
+
+    it('sends the switch either way — off is a decision, not an omission', () => {
+      const base = toEventFormValues(event(), [], [])
+      expect(toUpdateBody({ ...base, requiresApproval: true }).requiresApproval).toBe(true)
+      expect(toUpdateBody({ ...base, requiresApproval: false }).requiresApproval).toBe(false)
+    })
+  })
 })
 
 describe('whether the event may be published yet', () => {

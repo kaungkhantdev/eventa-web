@@ -411,11 +411,13 @@ function DecideButtons({
         name="intent"
         value="reject"
         disabled={!row.canReject || busy}
-        title={row.rejectBlockedReason ?? 'Reject'}
+        title={row.rejectBlockedReason ?? row.rejectLabel}
         className="btn-icon text-red-500 disabled:cursor-not-allowed disabled:opacity-40 dark:text-red-400"
       >
         <i className="hgi-stroke hgi-cancel-circle text-[16px]" />
-        <span className="sr-only">Reject {row.name}</span>
+        <span className="sr-only">
+          {row.rejectLabel} {row.name}
+        </span>
       </button>
     </fetcher.Form>
   )

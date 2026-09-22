@@ -83,12 +83,11 @@ export default function GuestOrderPage() {
             </div>
           </section>
         )}
-        {/* Only the genuinely odd case. An unpaid order is explained by the
-            panel above it, and saying "no tickets yet" underneath would be a
-            second, vaguer answer to a question already answered. */}
-        {order.tickets.length === 0 && !order.awaitingPayment && !order.onWaitlist && (
-          <NothingToShow />
-        )}
+        {/* Only the genuinely odd case. An unpaid, waiting or turned-down
+            order is explained by the banner and panel above it, and saying
+            "no tickets yet" underneath would be a second, vaguer answer to a
+            question already answered. */}
+        {order.tickets.length === 0 && !order.ticketsExplained && <NothingToShow />}
 
         <Receipt
           order={order}
