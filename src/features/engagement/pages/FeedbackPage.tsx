@@ -19,9 +19,9 @@ import type { FeedbackData, FeedbackEventCard } from '../surveys.routes'
  * **Two of the kit's four KPI tiles are here; two are not.** Responses and
  * average rating are real, and arrive the moment an attendee answers. NPS and
  * completion are gone: NPS needs a 0–10 recommendation question, which is not
- * a question type this product has, and completion needs a denominator — how
- * many were ASKED — which nothing records, because nothing distributes a
- * survey link yet.
+ * a question type this product has. Completion needs a denominator — how many
+ * were ASKED — and the post-event thank-you now records exactly that in the
+ * delivery log, so it is computable; it just has not been built.
  *
  * The average reads "—" when nobody has rated anything, never "0.0". Nought
  * out of five is a verdict about how attendees felt; this is the absence of
