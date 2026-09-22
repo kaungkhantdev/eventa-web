@@ -4,6 +4,7 @@ import type { ActionResult } from '@/app/loaders'
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useTheme } from '@/lib/useTheme'
+import { NPS_SCALE } from '../survey.mapper'
 import type {
   PortalSurveyData,
   SurveyQuestionView,
@@ -17,6 +18,12 @@ import type {
  * whatever the ORGANIZER wrote — the shell, the banner, the stars and the
  * thank-you card are the port; the questions come from the API.
  *
+ * A "how likely are you to recommend…" question is a 0–10 scale. The kit has
+ * no such control, so it borrows the kit's radio-option tile (the choice
+ * question's) laid out as eleven numbers. They are real radio buttons sharing
+ * one name, so Tab reaches the group and the arrow keys move and choose; the
+ * focus ring is drawn on the tile because the input itself is visually hidden.
+ *
  * Signed in, and once. The API only offers a survey to somebody with a
  * confirmed registration for that event and refuses a second answer from the
  * same account, because a rating anyone holding the link could move is not
@@ -29,6 +36,12 @@ const RATING_LABELS: Record<number, string> = {
   3: 'Good',
   4: 'Great',
   5: 'Excellent',
+}
+
+/** What the ends of the 0–10 scale mean, for whoever cannot see the anchors. */
+const NPS_ENDS: Record<number, string> = {
+  0: '0 — not at all likely',
+  10: '10 — extremely likely',
 }
 
 export default function SurveyPage() {
@@ -152,12 +165,22 @@ function Question({
   value: string
   onChange: (value: string) => void
 }) {
+  const promptId = `q-${question.id}-prompt`
   return (
     <div>
-      <label className="block text-[13.5px] font-semibold text-ink">
+      <label id={promptId} className="block text-[13.5px] font-semibold text-ink">
         {question.prompt}
         {question.type !== 'text' && <span className="text-red-500"> *</span>}
       </label>
+
+      {question.type === 'nps' && (
+        <NpsScale
+          name={`q-${question.id}`}
+          labelledBy={promptId}
+          value={value}
+          onChange={onChange}
+        />
+      )}
 
       {question.type === 'rating' && (
         <Stars value={Number(value) || 0} onChange={(n) => onChange(String(n))} />
@@ -194,6 +217,46 @@ function Question({
         </div>
       )}
     </div>
+  )
+}
+
+function NpsScale({
+  name,
+  labelledBy,
+  value,
+  onChange,
+}: {
+  name: string
+  labelledBy: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <fieldset aria-labelledby={labelledBy} className="mt-2.5">
+      {/* Six across on a phone: eleven in a row would leave targets ~23px wide. */}
+      <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-11">
+        {NPS_SCALE.map((point) => (
+          <label key={point} className="block cursor-pointer">
+            <input
+              type="radio"
+              name={name}
+              value={point}
+              checked={value === String(point)}
+              onChange={() => onChange(String(point))}
+              aria-label={NPS_ENDS[point]}
+              className="peer sr-only"
+            />
+            <span className="flex h-10 items-center justify-center rounded-lg border border-hair text-[13px] font-semibold text-ink tnum transition hover:bg-line/60 peer-checked:border-brand peer-checked:bg-brand-soft/50 peer-checked:text-brand peer-focus-visible:ring-4 peer-focus-visible:ring-brand/15">
+              {point}
+            </span>
+          </label>
+        ))}
+      </div>
+      <div className="mt-1.5 flex justify-between text-[11px] text-muted" aria-hidden="true">
+        <span>Not at all likely</span>
+        <span>Extremely likely</span>
+      </div>
+    </fieldset>
   )
 }
 

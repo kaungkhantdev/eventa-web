@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatNps,
   nextStatus,
   summarise,
   toFeedbackSummary,
+  toNpsView,
   toSurveyCard,
+  type NpsWire,
 } from './surveys.mapper'
 import type { SurveyWire } from './surveys.types'
 
@@ -79,6 +82,15 @@ describe('an event’s surveys, summarised', () => {
   })
 })
 
+/** Nobody has answered a recommendation question. */
+const NO_NPS: NpsWire = {
+  score: null,
+  answers: 0,
+  promoters: 0,
+  passives: 0,
+  detractors: 0,
+}
+
 describe('the rating breakdown (US-MSG-08)', () => {
   const wire = {
     responses: 4,
@@ -86,6 +98,7 @@ describe('the rating breakdown (US-MSG-08)', () => {
     distribution: { 5: 2, 4: 1, 3: 1 },
     asked: 20,
     completionRate: 20,
+    nps: NO_NPS,
   }
 
   it('runs five stars down to one', () => {
@@ -111,6 +124,7 @@ describe('the rating breakdown (US-MSG-08)', () => {
       distribution: {},
       asked: 0,
       completionRate: null,
+      nps: NO_NPS,
     })
     expect(summary.average).toBeNull()
     expect(summary.bars.every((bar) => bar.percent === 0)).toBe(true)
@@ -118,7 +132,7 @@ describe('the rating breakdown (US-MSG-08)', () => {
 })
 
 describe('the completion rate (US-MSG-08)', () => {
-  const wire = { responses: 9, average: 4.1, distribution: { 4: 9 } }
+  const wire = { responses: 9, average: 4.1, distribution: { 4: 9 }, nps: NO_NPS }
 
   it('reads the completion rate as a whole percentage', () => {
     // Already out of a hundred from the API — not a ratio to multiply.
@@ -136,5 +150,60 @@ describe('the completion rate (US-MSG-08)', () => {
     // Everybody asked, nobody answered: a real result, and worth seeing.
     const summary = toFeedbackSummary({ ...wire, asked: 10, completionRate: 0 })
     expect(summary.completion).toBe('0%')
+  })
+})
+
+describe('the NPS (US-MSG-08)', () => {
+  it('signs a positive score, as the kit does', () => {
+    expect(formatNps(25)).toBe('+25')
+  })
+
+  it('shows a balanced room as a plain 0', () => {
+    // Not "+0", and not the dash: nought is a real score.
+    expect(formatNps(0)).toBe('0')
+  })
+
+  it('shows a negative score with its minus', () => {
+    expect(formatNps(-40)).toBe('-40')
+  })
+
+  it('has no score when nobody answered', () => {
+    expect(formatNps(null)).toBeNull()
+  })
+
+  it('splits the answers into promoters, passives and detractors, in that order', () => {
+    const view = toNpsView({
+      score: 25,
+      answers: 4,
+      promoters: 2,
+      passives: 1,
+      detractors: 1,
+    })
+    expect(view.score).toBe('+25')
+    expect(view.answers).toBe(4)
+    expect(view.split).toEqual([
+      { key: 'promoters', label: 'Promoters', range: '9–10', count: 2, percent: 50 },
+      { key: 'passives', label: 'Passives', range: '7–8', count: 1, percent: 25 },
+      { key: 'detractors', label: 'Detractors', range: '0–6', count: 1, percent: 25 },
+    ])
+  })
+
+  it('draws empty bars, not broken ones, before anybody answers', () => {
+    const view = toNpsView(NO_NPS)
+    expect(view.score).toBeNull()
+    expect(view.split.map((group) => group.percent)).toEqual([0, 0, 0])
+  })
+
+  it('arrives with the rest of the feedback summary', () => {
+    const summary = toFeedbackSummary({
+      responses: 4,
+      average: 5,
+      distribution: { 5: 4 },
+      asked: 0,
+      completionRate: null,
+      nps: { score: -50, answers: 2, promoters: 0, passives: 1, detractors: 1 },
+    })
+    expect(summary.nps.score).toBe('-50')
+    expect(summary.nps.answers).toBe(2)
   })
 })

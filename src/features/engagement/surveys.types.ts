@@ -11,7 +11,8 @@
 /** `draft` collects nothing. `closed` can be reopened. */
 export type SurveyStatus = 'draft' | 'live' | 'closed'
 
-export type SurveyQuestionType = 'rating' | 'text' | 'choice'
+/** `nps` is a 0–10 "how likely are you to recommend…"; like a rating, no options. */
+export type SurveyQuestionType = 'rating' | 'text' | 'choice' | 'nps'
 
 export interface SurveyQuestionWire {
   id: string

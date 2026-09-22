@@ -90,6 +90,17 @@ export interface FeedbackSummary {
   bars: RatingBar[]
   /** "38%", or null when nobody was asked. Never "0%" for that. */
   completion: string | null
+  nps: NpsView
+}
+
+/** The API's NPS: promoters (9–10) less detractors (0–6), in whole points. */
+export interface NpsWire {
+  /** −100 to 100; null when nobody answered a recommendation question. */
+  score: number | null
+  answers: number
+  promoters: number
+  passives: number
+  detractors: number
 }
 
 export interface SummaryWire {
@@ -100,6 +111,35 @@ export interface SummaryWire {
   asked: number
   /** Whole percent of those asked who answered; null when nobody was asked. */
   completionRate: number | null
+  nps: NpsWire
+}
+
+type NpsGroupKey = 'promoters' | 'passives' | 'detractors'
+
+/**
+ * The three bands, best first. Labels only: which score falls in which band
+ * is the API's rule, and the page never recomputes it.
+ */
+const NPS_GROUPS: readonly { key: NpsGroupKey; label: string; range: string }[] = [
+  { key: 'promoters', label: 'Promoters', range: '9–10' },
+  { key: 'passives', label: 'Passives', range: '7–8' },
+  { key: 'detractors', label: 'Detractors', range: '0–6' },
+]
+
+export interface NpsSplit {
+  key: NpsGroupKey
+  label: string
+  range: string
+  count: number
+  /** Share of the recommendation answers, for the bar's width. */
+  percent: number
+}
+
+export interface NpsView {
+  /** "+25", "0" or "-40"; null when nobody answered. Never "0" for that. */
+  score: string | null
+  answers: number
+  split: NpsSplit[]
 }
 
 /**
@@ -121,10 +161,40 @@ export function toFeedbackSummary(wire: SummaryWire): FeedbackSummary {
     average: wire.average === null ? null : wire.average.toFixed(1),
     bars: counts.map((row) => ({
       ...row,
-      percent: rated === 0 ? 0 : Math.round((row.count / rated) * 100),
+      percent: shareOf(row.count, rated),
     })),
     completion: completionOf(wire.completionRate),
+    nps: toNpsView(wire.nps),
   }
+}
+
+/**
+ * Signed, as the kit shows it: "+25". Nought is a real score — as many
+ * promoters as detractors — so it reads "0", not "+0" and not the dash.
+ */
+export function formatNps(score: number | null): string | null {
+  if (score === null) return null
+  return score > 0 ? `+${score}` : String(score)
+}
+
+/** Percentages are of the recommendation answers, so the three bars add up. */
+export function toNpsView(wire: NpsWire): NpsView {
+  return {
+    score: formatNps(wire.score),
+    answers: wire.answers,
+    split: NPS_GROUPS.map((group) => ({
+      ...group,
+      count: wire[group.key],
+      percent: shareOf(wire[group.key], wire.answers),
+    })),
+  }
+}
+
+const PERCENT = 100
+
+/** A bar's width: 0 rather than NaN when there is nothing to share out. */
+function shareOf(count: number, total: number): number {
+  return total === 0 ? 0 : Math.round((count / total) * PERCENT)
 }
 
 /**

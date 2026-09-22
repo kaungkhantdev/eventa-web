@@ -20,7 +20,7 @@ import { cn } from '@/lib/cn'
 import { bangkokDate, MASKED } from '@/lib/format'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters } from '@/lib/useFilters'
-import { nextStatus, type SurveyCard } from '../surveys.mapper'
+import { nextStatus, type NpsSplit, type NpsView, type SurveyCard } from '../surveys.mapper'
 import type { SurveyQuestionType } from '../surveys.types'
 import type { FeedbackDetailData } from '../surveys.routes'
 
@@ -35,9 +35,14 @@ import type { FeedbackDetailData } from '../surveys.routes'
  * are what attendees actually sent from the portal. Clicking a bar filters the
  * list to that score (US-MSG-10).
  *
- * The average reads "—" rather than "0.0" before anybody rates anything.
- * Nought out of five is a verdict about how attendees felt; this is the
- * absence of one.
+ * Beside it, the likelihood to recommend: the event's NPS and how its 0–10
+ * answers split into promoters (9–10), passives (7–8) and detractors (0–6).
+ * Those bars do not filter — an NPS answer is not a star rating, and the
+ * responses list is filtered by stars.
+ *
+ * The average reads "—" rather than "0.0" before anybody rates anything, and
+ * the NPS reads "—" rather than "0" before anybody answers a recommendation
+ * question. Nought is a verdict in both; this is the absence of one.
  */
 export default function FeedbackDetailPage() {
   const data = useLoaderData() as FeedbackDetailData
@@ -173,6 +178,8 @@ export default function FeedbackDetailPage() {
         )}
       </Card>
 
+      <NpsCard nps={data.summary.nps} />
+
       <Card className="mt-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-[15px] font-bold tracking-tight">Responses</h2>
@@ -238,6 +245,59 @@ export default function FeedbackDetailPage() {
         survey={editing}
       />
     </>
+  )
+}
+
+/** Best to worst, in the product's own colours for good, middling and bad. */
+const NPS_TONE: Record<NpsSplit['key'], string> = {
+  promoters: 'bg-brand',
+  passives: 'bg-amber-400',
+  detractors: 'bg-red-500',
+}
+
+/** The bar markup is the rating breakdown's, minus the filter it drives. */
+function NpsCard({ nps }: { nps: NpsView }) {
+  return (
+    <Card className="mt-3 p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[15px] font-bold tracking-tight">Likelihood to recommend</h2>
+        <p className="text-[12px] text-muted">
+          <span className="text-[20px] font-extrabold tracking-tight text-ink tnum">
+            {nps.score ?? MASKED}
+          </span>{' '}
+          NPS from <span className="font-semibold text-ink tnum">{nps.answers}</span>{' '}
+          {nps.answers === 1 ? 'answer' : 'answers'}
+        </p>
+      </div>
+
+      {nps.answers === 0 ? (
+        <PanelEmptyPreview
+          preview="bars"
+          description="Add a “Likelihood to recommend” question to a survey. Its 0–10 answers split into promoters, passives and detractors here."
+        >
+          No recommendation scores yet.
+        </PanelEmptyPreview>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {nps.split.map((group) => (
+            <div key={group.key} className="flex items-center gap-3 px-2 py-1.5">
+              <span className="w-28 shrink-0 text-[12px] font-semibold text-muted">
+                {group.label} <span className="font-normal tnum">{group.range}</span>
+              </span>
+              <span className="h-2 flex-1 overflow-hidden rounded-full bg-line">
+                <span
+                  className={cn('block h-full rounded-full', NPS_TONE[group.key])}
+                  style={{ width: `${group.percent}%` }}
+                />
+              </span>
+              <span className="w-8 shrink-0 text-right text-[12px] text-muted tnum">
+                {group.count}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }
 
@@ -348,6 +408,7 @@ const TYPES: { value: SurveyQuestionType; label: string }[] = [
   { value: 'rating', label: 'Rating' },
   { value: 'text', label: 'Free text' },
   { value: 'choice', label: 'Multiple choice' },
+  { value: 'nps', label: 'Likelihood to recommend (0–10)' },
 ]
 
 /**

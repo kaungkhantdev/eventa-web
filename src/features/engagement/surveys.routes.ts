@@ -63,7 +63,6 @@ export interface FeedbackEventCard {
 
 export interface FeedbackData {
   events: FeedbackEventCard[]
-  totals: SurveySummary
   summary: FeedbackSummary
 }
 
@@ -89,7 +88,6 @@ async function loadFeedback(): Promise<FeedbackData> {
       surveys: summarise(surveys.filter((s) => s.eventId === event.id)),
       responses: responsesByEvent.get(event.id) ?? 0,
     })),
-    totals: summarise(surveys),
   }
 }
 
@@ -111,6 +109,19 @@ export interface FeedbackDetailData {
   rating: string | null
 }
 
+/**
+ * What a link with no event in it shows: nothing measured. Every figure is
+ * null rather than 0, so the page reads "—", not a verdict.
+ */
+const NO_SUMMARY: SummaryWire = {
+  responses: 0,
+  average: null,
+  distribution: {},
+  asked: 0,
+  completionRate: null,
+  nps: { score: null, answers: 0, promoters: 0, passives: 0, detractors: 0 },
+}
+
 async function loadFeedbackDetail({
   request,
 }: LoaderArgs): Promise<FeedbackDetailData> {
@@ -121,15 +132,7 @@ async function loadFeedbackDetail({
   const [surveys, events, summary, responses] = await Promise.all([
     eventId ? surveysApi.list(eventId) : Promise.resolve([]),
     eventOptions(),
-    eventId
-      ? surveysApi.summary(eventId)
-      : Promise.resolve({
-          responses: 0,
-          average: null,
-          distribution: {},
-          asked: 0,
-          completionRate: null,
-        }),
+    eventId ? surveysApi.summary(eventId) : Promise.resolve(NO_SUMMARY),
     eventId ? surveysApi.responses(eventId, rating ?? undefined) : Promise.resolve([]),
   ])
 

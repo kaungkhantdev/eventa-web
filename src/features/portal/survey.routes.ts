@@ -1,6 +1,7 @@
 import { attendeeAction, attendeeData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { api } from '@/lib/api'
 import type { SurveyQuestionType } from '@/features/engagement/surveys.types'
+import { toAnswerBody, type AnswerBody } from './survey.mapper'
 
 /**
  * The survey an attendee is asked after an event (US-MSG-08).
@@ -34,7 +35,7 @@ export interface PortalSurveyData {
 
 const surveyApi = {
   mine: (eventId: string) => api.get<MySurveyWire>(`/me/surveys/${eventId}`),
-  submit: (eventId: string, answers: unknown[]) =>
+  submit: (eventId: string, answers: AnswerBody[]) =>
     api.post(`/me/surveys/${eventId}`, { answers }),
 }
 
@@ -61,21 +62,19 @@ async function submitSurvey({ request }: LoaderArgs): Promise<null> {
   const form = await request.formData()
   const eventId = String(form.get('eventId') ?? '')
 
+  const types = form.getAll('questionType').map(String)
+  const values = form.getAll('answer').map(String)
   const answers = form
     .getAll('questionId')
     .map(String)
-    .map((questionId, index) => {
-      const type = String(form.getAll('questionType')[index] ?? '')
-      const value = String(form.getAll('answer')[index] ?? '').trim()
-      if (type === 'rating') {
-        return value ? { questionId, rating: Number(value) } : null
-      }
-      if (type === 'choice') return value ? { questionId, choice: value } : null
-      return value ? { questionId, answerText: value } : null
-    })
-    // An unanswered optional question is left out rather than sent empty:
-    // "they said nothing" and "they wrote an empty string" are different.
-    .filter((answer): answer is NonNullable<typeof answer> => answer !== null)
+    .map((questionId, index) =>
+      toAnswerBody(
+        questionId,
+        types[index] as SurveyQuestionType,
+        values[index] ?? '',
+      ),
+    )
+    .filter((answer): answer is AnswerBody => answer !== null)
 
   await surveyApi.submit(eventId, answers)
   return null

@@ -16,10 +16,15 @@ import type { FeedbackData, FeedbackEventCard } from '../surveys.routes'
  * Feedback across every event (US-MSG-08/09). Ported from
  * `eventa-ui-kit/admin/feedback.html`.
  *
- * **Three of the kit's four KPI tiles are here.** Responses and average rating
- * arrive the moment an attendee answers. NPS is still absent: it needs a 0–10
- * recommendation question, which is not a question type this product has, so
- * its slot holds the survey count instead.
+ * **All four of the kit's KPI tiles are here.** Responses and average rating
+ * arrive the moment an attendee answers.
+ *
+ * NPS is built from answers to a 0–10 "how likely are you to recommend…"
+ * question, pooled across every event — so each event weighs by how many
+ * answered it. It reads "+25", "0" or "-40", and "—" when nobody has answered
+ * one: 0 is a real score (as many promoters as detractors), and a survey that
+ * never asked is not that. It took the slot where a survey count stood in;
+ * each event card still says how many surveys it has.
  *
  * Completion is of the people the post-event thank-you reached — it carries
  * the survey link, so it is what ASKS — the share who answered. It reads "—"
@@ -74,7 +79,7 @@ export default function FeedbackPage() {
           label="Average rating"
           value={data.summary.average ?? MASKED}
         />
-        <Tile icon="hgi-note-01" label="Surveys" value={String(data.totals.total)} />
+        <Tile icon="hgi-analytics-up" label="NPS" value={data.summary.nps.score ?? MASKED} />
         <Tile
           icon="hgi-checkmark-badge-01"
           label="Completion rate"
