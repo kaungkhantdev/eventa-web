@@ -4,6 +4,7 @@ import {
   Navigate,
   type ActionFunction,
   type LoaderFunction,
+  type ShouldRevalidateFunction,
 } from 'react-router'
 import AdminShell from '@/layouts/AdminShell'
 import RootLayout, { RootFallback } from '@/layouts/RootLayout'
@@ -73,6 +74,11 @@ const ERROR_ELEMENT = <RouteError />
 interface RouteData {
   loader: LoaderFunction
   action?: ActionFunction
+  /**
+   * For the rare page whose loader must NOT re-run after its action — the
+   * reset link, which the action spends, so a re-check would report it used.
+   */
+  shouldRevalidate?: ShouldRevalidateFunction
 }
 
 /**
@@ -490,6 +496,18 @@ export const router = createBrowserRouter([
         ...livePage(
           () => import('@/features/auth/pages/VerifyEmailPage'),
           () => import('@/features/auth/verifyEmail.routes').then((m) => m.verifyEmailRoute),
+        ),
+      },
+      {
+        // Where every reset email's link lands — the API builds it as
+        // `${PUBLIC_WEB_URL}/reset-password?token=…`, so this path is fixed by
+        // that and is not under /auth. Serves both personas, and is not
+        // `guestOnly`: somebody still signed in on this device may be the one
+        // who forgot the password.
+        path: '/reset-password',
+        ...livePage(
+          () => import('@/features/auth/pages/ResetPasswordPage'),
+          () => import('@/features/auth/resetPassword.routes').then((m) => m.resetPasswordRoute),
         ),
       },
       {
