@@ -59,15 +59,17 @@ export const authApi = {
   },
 
   /**
-   * Start a password reset. Resolves the same way whether or not the address
-   * has an account — the API answers uniformly on purpose, so this endpoint
-   * cannot be used to discover who is registered. The page must show the same
-   * confirmation either way.
+   * Start a password reset. Resolves only when a link was sent. When none can
+   * be, the API says why and this throws its `ApiError`: no account in that
+   * audience (404, naming the other audience), an account that signs in with a
+   * social provider or cannot sign in yet (422), too many attempts (429). The
+   * API tells these apart on purpose (US-ACC-04), and its message is written
+   * for the person — show it as it is.
    */
   async forgotPassword(email: string, persona: Persona): Promise<void> {
     // Stated rather than defaulted: the API looks the address up in that
-    // persona's realm, so an attendee sent as an organizer is never found and
-    // the uniform "check your inbox" would be a lie.
+    // persona's realm, so an attendee sent as an organizer is told that no
+    // organizer account uses the address.
     await api.post('/auth/forgot-password', { email, persona }, { anonymous: true })
   },
 
