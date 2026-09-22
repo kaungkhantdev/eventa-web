@@ -26,6 +26,14 @@ describe('a Bangkok date → the instant the API stores', () => {
   it('is null when there is no date', () => {
     expect(bangkokInstant('')).toBeNull()
   })
+
+  // Null, not a thrown RangeError: the caller hands what it could not read
+  // straight to the API, which answers under the field.
+  it('is null when what was typed is not a date', () => {
+    expect(bangkokInstant('not-a-date')).toBeNull()
+    expect(bangkokInstant('2026-13-45')).toBeNull()
+    expect(bangkokInstant('2026-08-20', 'half past four')).toBeNull()
+  })
 })
 
 describe('a Bangkok date-and-time field ↔ the instant the API stores', () => {
@@ -42,6 +50,18 @@ describe('a Bangkok date-and-time field ↔ the instant the API stores', () => {
   // An empty field is not "now".
   it('is null when nothing was picked', () => {
     expect(bangkokInstantOfLocal('')).toBeNull()
+  })
+
+  /**
+   * A `datetime-local` the browser degraded to a text box, or a replayed
+   * submission, can carry anything. The action passes what it could not read
+   * to the API, which refuses it under `sendAt` — so this answers null rather
+   * than throwing past the action and losing the composed message.
+   */
+  it('is null when the field holds something that is not a time', () => {
+    expect(bangkokInstantOfLocal('not-a-date')).toBeNull()
+    expect(bangkokInstantOfLocal('2026-13-45T10:00')).toBeNull()
+    expect(bangkokInstantOfLocal('2026-08-05T10:00:30')).toBeNull()
   })
 
   it('fills the field with the Bangkok wall time of an instant', () => {

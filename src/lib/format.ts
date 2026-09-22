@@ -115,10 +115,16 @@ const BANGKOK_OFFSET = '+07:00'
  * which reads the pair in the *browser's* zone and would move every deadline by
  * the organizer's distance from Thailand. Empty in, null out: a date nobody
  * filled in is not midnight today.
+ *
+ * Unreadable in, null out too — a field the browser degraded to a text box, or
+ * a replayed submission, can carry anything. Callers hand what could not be
+ * read to the API, which refuses it under its field; throwing here would take
+ * the whole route down instead and lose what the organizer had typed.
  */
 export function bangkokInstant(date: string, time = '00:00'): string | null {
   if (!date) return null
-  return new Date(`${date}T${time || '00:00'}:00${BANGKOK_OFFSET}`).toISOString()
+  const at = new Date(`${date}T${time || '00:00'}:00${BANGKOK_OFFSET}`)
+  return Number.isNaN(at.getTime()) ? null : at.toISOString()
 }
 
 /**
