@@ -84,7 +84,10 @@ export interface RatingBar {
 }
 
 export interface FeedbackSummary {
+  /** People who answered, one per response — whether or not they gave stars. */
   responses: number
+  /** Star ratings given: what `average` and `bars` are taken over. */
+  ratings: number
   /** "4.3", or null when nobody has rated anything. Never "0.0". */
   average: string | null
   bars: RatingBar[]
@@ -104,6 +107,10 @@ export interface NpsWire {
 }
 
 export interface SummaryWire {
+  /**
+   * People who answered in scope. Not the ratings: a recommendation-only
+   * survey has none, and one with two star questions has two per person.
+   */
   responses: number
   average: number | null
   distribution: Record<string, number>
@@ -158,6 +165,7 @@ export function toFeedbackSummary(wire: SummaryWire): FeedbackSummary {
 
   return {
     responses: wire.responses,
+    ratings: rated,
     average: wire.average === null ? null : wire.average.toFixed(1),
     bars: counts.map((row) => ({
       ...row,

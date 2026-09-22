@@ -17,7 +17,9 @@ import type { FeedbackData, FeedbackEventCard } from '../surveys.routes'
  * `eventa-ui-kit/admin/feedback.html`.
  *
  * **All four of the kit's KPI tiles are here.** Responses and average rating
- * arrive the moment an attendee answers.
+ * arrive the moment an attendee answers. Responses counts PEOPLE, one each,
+ * whether or not their survey asked for stars, so a recommendation-only survey
+ * does not read 0 beside its own NPS.
  *
  * NPS is built from answers to a 0–10 "how likely are you to recommend…"
  * question, pooled across every event — so each event weighs by how many

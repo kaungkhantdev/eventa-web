@@ -130,18 +130,20 @@ export default function FeedbackDetailPage() {
             </span>{' '}
             from{' '}
             <span className="font-semibold text-ink tnum">
-              {data.summary.responses}
+              {data.summary.ratings}
             </span>{' '}
-            {data.summary.responses === 1 ? 'response' : 'responses'}
+            {data.summary.ratings === 1 ? 'rating' : 'ratings'}
           </p>
         </div>
 
-        {data.summary.responses === 0 ? (
+        {/* Gated on the stars, not on who answered: a survey asking only the
+            recommendation question has answers but nothing to break down. */}
+        {data.summary.ratings === 0 ? (
           <PanelEmptyPreview
             preview="bars"
-            description="Once attendees answer a live survey, their scores break down here."
+            description="Once attendees give a star rating on a live survey, the stars break down here."
           >
-            Nobody has answered yet.
+            No star ratings yet.
           </PanelEmptyPreview>
         ) : (
           <div className="mt-3 space-y-2">

@@ -116,6 +116,23 @@ describe('the rating breakdown (US-MSG-08)', () => {
     expect(toFeedbackSummary(wire).average).toBe('4.3')
   })
 
+  it('counts the star ratings the average is taken over', () => {
+    expect(toFeedbackSummary(wire).ratings).toBe(4)
+  })
+
+  it('keeps the people who answered apart from the stars they gave', () => {
+    // A survey asking only the recommendation question: ten people answered,
+    // nobody gave a star. "Nobody has answered" would be false.
+    const npsOnly = toFeedbackSummary({ ...wire, responses: 10, average: null, distribution: {} })
+    expect(npsOnly.responses).toBe(10)
+    expect(npsOnly.ratings).toBe(0)
+
+    // Two star questions: two people, four ratings.
+    const twoStars = toFeedbackSummary({ ...wire, responses: 2, average: 4, distribution: { 4: 4 } })
+    expect(twoStars.responses).toBe(2)
+    expect(twoStars.ratings).toBe(4)
+  })
+
   it('has no average, and no bars, before anybody rates anything', () => {
     // Not "0.0" — nought out of five is a verdict, and this is its absence.
     const summary = toFeedbackSummary({
