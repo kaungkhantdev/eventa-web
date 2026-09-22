@@ -59,6 +59,24 @@ describe('what became of it', () => {
   })
 })
 
+describe('how it went', () => {
+  it('says which channel it went by', () => {
+    // A confirmation email and its text are two rows with the same recipient,
+    // the same message type and the same minute. Without this column they are
+    // indistinguishable, and the log reads as a duplicate.
+    expect(toDeliveryRow(wire()).channel).toEqual({
+      label: 'Email',
+      icon: 'hgi-mail-01',
+      tone: 'blue',
+    })
+    expect(toDeliveryRow(wire({ channel: 'sms' })).channel).toEqual({
+      label: 'SMS',
+      icon: 'hgi-smart-phone-01',
+      tone: 'green',
+    })
+  })
+})
+
 describe('what it was', () => {
   it('reads a catalog slug as its own name', () => {
     expect(kindLabel('registration-confirmation')).toBe('Registration confirmation')

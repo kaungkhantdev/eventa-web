@@ -1,3 +1,5 @@
+import type { MessageChannel } from './templates.types'
+
 /**
  * What `/message-deliveries` returns (US-MSG-06).
  *
@@ -17,7 +19,8 @@ export interface DeliveryWire {
   id: string
   /** Catalog slug for an automated message, or `announcement`. */
   kind: string
-  channel: string
+  /** How it left. The API's own enum, so a new value breaks the build here. */
+  channel: MessageChannel
   recipientEmail: string
   recipientName: string | null
   eventId: string | null

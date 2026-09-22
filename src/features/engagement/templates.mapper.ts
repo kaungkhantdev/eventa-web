@@ -1,8 +1,5 @@
-import type {
-  MessageChannel,
-  MessageTemplateWire,
-  TemplateWording,
-} from './templates.types'
+import { CHANNEL_BADGE, type ChannelBadge } from './channel-badges'
+import type { MessageTemplateWire, TemplateWording } from './templates.types'
 
 /**
  * One automated message, as a card (US-MSG-01).
@@ -12,10 +9,7 @@ import type {
  * something. Everywhere else the card says what is actually happening instead.
  */
 
-export interface ChannelBadge {
-  label: string
-  icon: string
-}
+export type { ChannelBadge }
 
 export interface TemplateStanding {
   label: string
@@ -89,11 +83,6 @@ const LOOK: Record<string, { icon: string; iconClass: string }> = {
 const FALLBACK_LOOK = {
   icon: 'hgi-mail-01',
   iconClass: 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300',
-}
-
-const CHANNEL_BADGE: Record<MessageChannel, ChannelBadge> = {
-  email: { label: 'Email', icon: 'hgi-mail-01' },
-  sms: { label: 'SMS', icon: 'hgi-smart-phone-01' },
 }
 
 const STANDING: Record<string, TemplateStanding> = {

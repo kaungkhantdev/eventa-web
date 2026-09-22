@@ -67,7 +67,19 @@ describe('turning a message off', () => {
 describe('the card itself', () => {
   it('shows a badge per channel the message uses', () => {
     const card = toTemplateCard(wire({ channels: ['email'] }))
-    expect(card.channels).toEqual([{ label: 'Email', icon: 'hgi-mail-01' }])
+    expect(card.channels).toEqual([
+      { label: 'Email', icon: 'hgi-mail-01', tone: 'blue' },
+    ])
+  })
+
+  it('draws SMS as the kit does — green beside a blue Email', () => {
+    // The confirmation goes out on both (US-DISC-06). One tone for every
+    // channel would make the two badges read as one repeated thing.
+    const card = toTemplateCard(wire({ channels: ['email', 'sms'] }))
+    expect(card.channels).toEqual([
+      { label: 'Email', icon: 'hgi-mail-01', tone: 'blue' },
+      { label: 'SMS', icon: 'hgi-smart-phone-01', tone: 'green' },
+    ])
   })
 
   it('falls back to a known icon for a message this app has not met', () => {

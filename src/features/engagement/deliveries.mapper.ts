@@ -1,5 +1,6 @@
 import type { BadgeTone } from '@/components/ui'
 import { bangkokTime, initials } from '@/lib/format'
+import { CHANNEL_BADGE, type ChannelBadge } from './channel-badges'
 import type { DeliveryStatus, DeliveryWire } from './deliveries.types'
 
 /**
@@ -20,6 +21,12 @@ export interface DeliveryRow {
   email: string | null
   initials: string
   kind: string
+  /**
+   * How it left. A confirmation email and its text (US-DISC-06) are two rows
+   * with the same recipient, the same kind and the same minute — without this
+   * they read as one row printed twice.
+   */
+  channel: ChannelBadge
   /** Null when the message was not about an event. */
   event: string | null
   status: { label: string; tone: BadgeTone; icon: string }
@@ -73,6 +80,7 @@ export function toDeliveryRow(wire: DeliveryWire): DeliveryRow {
     email: wire.recipientName ? wire.recipientEmail : null,
     initials: initials(name),
     kind: kindLabel(wire.kind),
+    channel: CHANNEL_BADGE[wire.channel],
     event: wire.eventName,
     status: STATUS[wire.status],
     error: wire.error,

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import type { ActionResult } from '@/app/loaders'
 import {
+  Badge,
   Button,
   Card,
   HeaderUser,
@@ -47,7 +48,7 @@ export default function MessagingTemplatesPage() {
     <>
       <PageHeader
         title="Message templates"
-        subtitle="The emails Eventa sends your attendees automatically."
+        subtitle="The emails and texts Eventa sends your attendees automatically."
         actions={<HeaderUser />}
       />
 
@@ -103,10 +104,9 @@ function TemplateTile({ card }: { card: TemplateCard }) {
 
       <div className="flex flex-wrap items-center gap-1.5">
         {card.channels.map((channel) => (
-          <span key={channel.label} className="badge badge-blue">
-            <Icon name={channel.icon} size={12} />
+          <Badge key={channel.label} tone={channel.tone} icon={channel.icon}>
             {channel.label}
-          </span>
+          </Badge>
         ))}
       </div>
 

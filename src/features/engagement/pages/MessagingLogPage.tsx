@@ -26,8 +26,10 @@ import type { DeliveriesData, DeliveryTab } from '../deliveries.routes'
  * says "I never got my ticket" — inventing "Delivered" there would answer that
  * question wrongly, with confidence.
  *
- * **The SMS channel column is gone** for the same reason it went from the
- * templates page: nothing in the product sends one.
+ * **The Channel column is the kit's**, and it earns its place now that the
+ * registration confirmation is texted as well as emailed (US-DISC-06): the two
+ * arrive as separate rows with the same recipient, the same message type and
+ * the same minute, and without this column the log reads as a duplicate.
  *
  * **Read-only, with no re-send.** A failed message failed for a reason — a dead
  * address, a full mailbox — and firing the same message at the same address
@@ -54,7 +56,7 @@ export default function MessagingLogPage() {
     <>
       <PageHeader
         title="Delivery log"
-        subtitle="Every email sent to your attendees, and what became of it."
+        subtitle="Every email and text sent to your attendees, and what became of it."
         actions={
           <>
             <DownloadButton
@@ -119,6 +121,7 @@ export default function MessagingLogPage() {
               <tr>
                 <th>Recipient</th>
                 <th>Message</th>
+                <th>Channel</th>
                 <th>Event</th>
                 <th>Status</th>
                 <th className="text-right">Sent</th>
@@ -140,6 +143,11 @@ export default function MessagingLogPage() {
                       </div>
                     </td>
                     <td className="text-muted">{row.kind}</td>
+                    <td>
+                      <Badge tone={row.channel.tone} icon={row.channel.icon}>
+                        {row.channel.label}
+                      </Badge>
+                    </td>
                     <td className="text-muted">{row.event ?? '—'}</td>
                     <td>
                       <div className="flex flex-col items-start gap-1">
@@ -158,7 +166,7 @@ export default function MessagingLogPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <DeliveriesEmpty
                       tab={data.tab}
                       reason={emptyReason}
