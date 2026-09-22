@@ -130,7 +130,7 @@ describe('submitNewPassword', () => {
       reset,
     )
 
-    expect(result).toEqual({ ok: false, error: PASSWORDS_DIFFER })
+    expect(result).toEqual({ ok: false, error: PASSWORDS_DIFFER, recheck: false })
     expect(reset).not.toHaveBeenCalled()
   })
 
@@ -142,39 +142,53 @@ describe('submitNewPassword', () => {
       reset,
     )
 
-    expect(result).toEqual({ ok: false, error: INCOMPLETE_LINK })
+    expect(result).toEqual({ ok: false, error: INCOMPLETE_LINK, recheck: false })
     expect(reset).not.toHaveBeenCalled()
   })
 
   // Shown beside the form: the password rule, "choose a different password",
-  // or a link that expired while the form was open.
-  it('returns the API’s refusal verbatim', async () => {
+  // or a link that expired while the form was open. Any of those could be the
+  // link, so the page re-checks it.
+  it('returns the API’s refusal verbatim, and asks for the link to be re-checked', async () => {
     const reused = 'Please choose a password different from your current one.'
-    const reset = vi.fn(async () => {
-      throw new ApiError(422, { message: reused })
-    })
 
-    expect(
-      await submitNewPassword(
-        submitted({ newPassword: 'n3wPassword', confirmPassword: 'n3wPassword' }),
-        reset,
-      ),
-    ).toEqual({ ok: false, error: reused })
+    expect(await submitRefusedBy(new ApiError(422, { message: reused }))).toEqual({
+      ok: false,
+      error: reused,
+      recheck: true,
+    })
   })
 
-  it('reports an unreachable server beside the form rather than replacing it', async () => {
-    const reset = vi.fn(async () => {
-      throw new NetworkError(null)
+  // An outage says nothing about the link, and re-checking during the same
+  // outage would fail too — so no re-check is asked for.
+  it('reports an unreachable server beside the form, without a re-check', async () => {
+    expect(await submitRefusedBy(new NetworkError(null))).toEqual({
+      ok: false,
+      error: new NetworkError(null).message,
+      recheck: false,
     })
+  })
 
-    const result = await submitNewPassword(
-      submitted({ newPassword: 'n3wPassword', confirmPassword: 'n3wPassword' }),
-      reset,
-    )
+  it('reports a server failure beside the form, without a re-check', async () => {
+    const failure = new ApiError(500, { message: 'Something went wrong.' })
 
-    expect(result).toEqual({ ok: false, error: new NetworkError(null).message })
+    expect(await submitRefusedBy(failure)).toEqual({
+      ok: false,
+      error: 'Something went wrong.',
+      recheck: false,
+    })
   })
 })
+
+function submitRefusedBy(cause: Error) {
+  const reset = vi.fn(async () => {
+    throw cause
+  })
+  return submitNewPassword(
+    submitted({ newPassword: 'n3wPassword', confirmPassword: 'n3wPassword' }),
+    reset,
+  )
+}
 
 describe('shouldRecheckLink', () => {
   // The reset spends the link. Checking it again would report — correctly —
@@ -188,16 +202,39 @@ describe('shouldRecheckLink', () => {
     ).toBe(false)
   })
 
-  // After a refusal the link may have gone bad meanwhile (expired, or used in
-  // another tab); re-checking is what moves the page to its invalid state.
-  it('re-checks after a refusal, as the router would by default', () => {
-    expect(
-      shouldRecheckLink({
-        actionResult: { ok: false, error: INVALID_LINK },
-        defaultShouldRevalidate: true,
-      }),
-    ).toBe(true)
+  // After the API refuses the submission the link may have gone bad meanwhile
+  // (expired, or used in another tab); re-checking is what moves the page to
+  // its invalid state.
+  it('re-checks after the API refuses the submission', async () => {
+    const actionResult = await submitRefusedBy(new ApiError(422, { message: INVALID_LINK }))
+
+    expect(shouldRecheckLink({ actionResult, defaultShouldRevalidate: true })).toBe(true)
+  })
+
+  // The router re-runs the loader after every fetcher action. During an outage
+  // that re-check fails too, and its error screen would replace the form — and
+  // the passwords typed into it — with a retry that brings back an empty one.
+  it('does not re-check after an unreachable server or a server failure', async () => {
+    for (const cause of [new NetworkError(null), new ApiError(503, {})]) {
+      const actionResult = await submitRefusedBy(cause)
+
+      expect(shouldRecheckLink({ actionResult, defaultShouldRevalidate: true })).toBe(false)
+    }
+  })
+
+  // Nothing was sent, so nothing about the link can have changed.
+  it('does not re-check after a confirmation that does not match', async () => {
+    const actionResult = await submitNewPassword(
+      submitted({ newPassword: 'n3wPassword', confirmPassword: 'n3wPasswrod' }),
+      vi.fn(),
+    )
+
+    expect(shouldRecheckLink({ actionResult, defaultShouldRevalidate: true })).toBe(false)
+  })
+
+  it('leaves anything other than a submission to the router', () => {
     expect(shouldRecheckLink({ defaultShouldRevalidate: true })).toBe(true)
+    expect(shouldRecheckLink({ defaultShouldRevalidate: false })).toBe(false)
   })
 })
 
@@ -213,7 +250,7 @@ describe('screenOf', () => {
   })
 
   it('keeps the form up with the refusal beside it', () => {
-    expect(screenOf(ready, { ok: false, error: PASSWORDS_DIFFER })).toEqual({
+    expect(screenOf(ready, { ok: false, error: PASSWORDS_DIFFER, recheck: false })).toEqual({
       kind: 'ready',
       view: ready.view,
       error: PASSWORDS_DIFFER,
@@ -230,8 +267,8 @@ describe('screenOf', () => {
   })
 
   it('shows an unusable link as such, whatever was submitted', () => {
-    expect(screenOf({ state: 'invalid', error: INVALID_LINK }, { ok: false, error: 'x' })).toEqual(
-      { kind: 'invalid', error: INVALID_LINK },
-    )
+    expect(
+      screenOf({ state: 'invalid', error: INVALID_LINK }, { ok: false, error: 'x', recheck: true }),
+    ).toEqual({ kind: 'invalid', error: INVALID_LINK })
   })
 })

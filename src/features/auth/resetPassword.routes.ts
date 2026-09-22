@@ -20,7 +20,13 @@ export type ResetLinkData =
   | { state: 'ready'; view: ResetLinkView }
   | { state: 'invalid'; error: string }
 
-export type ResetResult = { ok: true; message: string } | { ok: false; error: string }
+/**
+ * `recheck` says whether the refusal could be about the link, and so whether
+ * the page should check the link again (see `shouldRecheckLink`).
+ */
+export type ResetResult =
+  | { ok: true; message: string }
+  | { ok: false; error: string; recheck: boolean }
 
 /** Which of the page's three screens to show. */
 export type ResetScreen =
@@ -73,34 +79,48 @@ export async function submitNewPassword(
   reset: ResetPassword,
 ): Promise<ResetResult> {
   const token = tokenOf(request)
-  if (!token) return { ok: false, error: INCOMPLETE_LINK }
+  if (!token) return { ok: false, error: INCOMPLETE_LINK, recheck: false }
   const form = await request.formData()
   const newPassword = String(form.get('newPassword') ?? '')
   if (newPassword !== String(form.get('confirmPassword') ?? '')) {
-    return { ok: false, error: PASSWORDS_DIFFER }
+    return { ok: false, error: PASSWORDS_DIFFER, recheck: false }
   }
   try {
     return { ok: true, message: (await reset(token, newPassword)).message }
   } catch (cause) {
     if (cause instanceof ApiError || cause instanceof NetworkError) {
-      return { ok: false, error: messageOf(cause) }
+      return { ok: false, error: messageOf(cause), recheck: mayBeAboutTheLink(cause) }
     }
     throw cause
   }
 }
 
 /**
- * Don't re-check a link the reset has just spent: the check would report,
+ * Only a validation refusal can mean the link has gone bad. An outage or a
+ * server failure says nothing about it — and the re-check would fail the same
+ * way, sending the page to its error screen and losing what was typed.
+ */
+function mayBeAboutTheLink(cause: ApiError | NetworkError): boolean {
+  return cause instanceof ApiError && cause.isValidation
+}
+
+/**
+ * The router re-runs the loader after every submission; this decides whether
+ * the link is checked again.
+ *
+ * Not after a reset that worked: the link is spent, the check would report,
  * correctly, that it has been used, and "done" would become "that link didn't
- * work". After a refusal the router's default stands — the link may have
- * expired meanwhile, and re-checking is what shows that.
+ * work". After a refusal, only when the refusal could be about the link (it
+ * may have expired meanwhile, and re-checking is what shows that) — never
+ * after an outage, whose re-check would fail too and replace the form with
+ * the error screen. Anything that is not a submission is the router's call.
  */
 export function shouldRecheckLink({
   actionResult,
   defaultShouldRevalidate,
 }: Pick<ShouldRevalidateFunctionArgs, 'actionResult' | 'defaultShouldRevalidate'>): boolean {
-  if (isDone(actionResult)) return false
-  return defaultShouldRevalidate
+  if (!isResetResult(actionResult)) return defaultShouldRevalidate
+  return !actionResult.ok && actionResult.recheck
 }
 
 /** The link as the loader found it, and what the last submission said. */
@@ -110,8 +130,8 @@ export function screenOf(link: ResetLinkData, result: ResetResult | undefined): 
   return { kind: 'ready', view: link.view, error: result?.error ?? null }
 }
 
-function isDone(result: unknown): boolean {
-  return typeof result === 'object' && result !== null && 'ok' in result && result.ok === true
+function isResetResult(result: unknown): result is ResetResult {
+  return typeof result === 'object' && result !== null && 'ok' in result
 }
 
 export const resetPasswordRoute = {
