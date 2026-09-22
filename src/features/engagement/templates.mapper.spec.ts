@@ -30,6 +30,19 @@ describe('what an organizer may change', () => {
     expect(card.switchable).toBe(false)
     expect(card.standing?.label).toBe('Not sent yet')
   })
+
+  it('shows a message that is off until switched on as off, with a switch and no warning', () => {
+    // The event reminder starts off in every workspace. Off is not "Not sent
+    // yet": the organizer must be able to find the switch that sends it, and
+    // turning it on needs no confirmation.
+    const card = toTemplateCard(
+      wire({ slug: 'event-reminder', expected: false, active: false }),
+    )
+    expect(card.switchable).toBe(true)
+    expect(card.active).toBe(false)
+    expect(card.standing).toBeNull()
+    expect(card.confirmOff).toBeNull()
+  })
 })
 
 describe('turning a message off', () => {
