@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useFetcher, useLoaderData, type FetcherWithComponents } from 'react-router'
 import { Icon } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
@@ -123,8 +123,18 @@ function BackToSignIn({ view }: { view: ResetLinkView }) {
  * Reset. The API's confirmation is shown as it is, and the one sign-in this
  * account uses is offered — the link knew whose it was, so there is nothing to
  * choose between.
+ *
+ * This screen replaces the form, taking the focused button with it, so focus
+ * is moved to the confirmation: a keyboard user keeps their place, and a
+ * screen reader reads it. Focus rather than a live region, because a region
+ * that arrives already holding its text is often not announced.
  */
 function Done({ view, message }: { view: ResetLinkView; message: string }) {
+  const confirmation = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    confirmation.current?.focus()
+  }, [])
+
   return (
     <AuthLayout
       title="Password reset"
@@ -135,7 +145,7 @@ function Done({ view, message }: { view: ResetLinkView; message: string }) {
         <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-brand-soft text-brand">
           <Icon name="hgi-checkmark-circle-02" size={30} />
         </span>
-        <p role="status" className="mt-4 text-[13px] text-muted">
+        <p ref={confirmation} tabIndex={-1} className="mt-4 text-[13px] text-muted">
           {message}
         </p>
         <Link to={view.signIn.to} className="btn btn-primary mt-5 w-full">
