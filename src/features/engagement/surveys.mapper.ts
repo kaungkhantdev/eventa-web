@@ -88,12 +88,18 @@ export interface FeedbackSummary {
   /** "4.3", or null when nobody has rated anything. Never "0.0". */
   average: string | null
   bars: RatingBar[]
+  /** "38%", or null when nobody was asked. Never "0%" for that. */
+  completion: string | null
 }
 
 export interface SummaryWire {
   responses: number
   average: number | null
   distribution: Record<string, number>
+  /** People the post-event thank-you reached, once per event. */
+  asked: number
+  /** Whole percent of those asked who answered; null when nobody was asked. */
+  completionRate: number | null
 }
 
 /**
@@ -117,5 +123,14 @@ export function toFeedbackSummary(wire: SummaryWire): FeedbackSummary {
       ...row,
       percent: rated === 0 ? 0 : Math.round((row.count / rated) * 100),
     })),
+    completion: completionOf(wire.completionRate),
   }
+}
+
+/**
+ * Not `pct()` from `@/lib/format`, which takes a ratio and multiplies: the API
+ * sends this already out of a hundred, and `pct(45)` would read "4500%".
+ */
+function completionOf(rate: number | null): string | null {
+  return rate === null ? null : `${rate}%`
 }

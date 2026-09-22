@@ -123,7 +123,13 @@ async function loadFeedbackDetail({
     eventOptions(),
     eventId
       ? surveysApi.summary(eventId)
-      : Promise.resolve({ responses: 0, average: null, distribution: {} }),
+      : Promise.resolve({
+          responses: 0,
+          average: null,
+          distribution: {},
+          asked: 0,
+          completionRate: null,
+        }),
     eventId ? surveysApi.responses(eventId, rating ?? undefined) : Promise.resolve([]),
   ])
 

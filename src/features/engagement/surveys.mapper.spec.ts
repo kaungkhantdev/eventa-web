@@ -80,7 +80,13 @@ describe('an event’s surveys, summarised', () => {
 })
 
 describe('the rating breakdown (US-MSG-08)', () => {
-  const wire = { responses: 4, average: 4.25, distribution: { 5: 2, 4: 1, 3: 1 } }
+  const wire = {
+    responses: 4,
+    average: 4.25,
+    distribution: { 5: 2, 4: 1, 3: 1 },
+    asked: 20,
+    completionRate: 20,
+  }
 
   it('runs five stars down to one', () => {
     expect(toFeedbackSummary(wire).bars.map((b) => b.stars)).toEqual([5, 4, 3, 2, 1])
@@ -99,8 +105,36 @@ describe('the rating breakdown (US-MSG-08)', () => {
 
   it('has no average, and no bars, before anybody rates anything', () => {
     // Not "0.0" — nought out of five is a verdict, and this is its absence.
-    const summary = toFeedbackSummary({ responses: 0, average: null, distribution: {} })
+    const summary = toFeedbackSummary({
+      responses: 0,
+      average: null,
+      distribution: {},
+      asked: 0,
+      completionRate: null,
+    })
     expect(summary.average).toBeNull()
     expect(summary.bars.every((bar) => bar.percent === 0)).toBe(true)
+  })
+})
+
+describe('the completion rate (US-MSG-08)', () => {
+  const wire = { responses: 9, average: 4.1, distribution: { 4: 9 } }
+
+  it('reads the completion rate as a whole percentage', () => {
+    // Already out of a hundred from the API — not a ratio to multiply.
+    const summary = toFeedbackSummary({ ...wire, asked: 20, completionRate: 45 })
+    expect(summary.completion).toBe('45%')
+  })
+
+  it('has no completion rate when nobody was asked — not 0%', () => {
+    // The thank-you was off, or never went. Nobody ignoring it is not the fact.
+    const summary = toFeedbackSummary({ ...wire, asked: 0, completionRate: null })
+    expect(summary.completion).toBeNull()
+  })
+
+  it('shows a measured zero as 0%', () => {
+    // Everybody asked, nobody answered: a real result, and worth seeing.
+    const summary = toFeedbackSummary({ ...wire, asked: 10, completionRate: 0 })
+    expect(summary.completion).toBe('0%')
   })
 })

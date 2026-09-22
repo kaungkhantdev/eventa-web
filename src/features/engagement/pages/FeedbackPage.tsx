@@ -16,12 +16,22 @@ import type { FeedbackData, FeedbackEventCard } from '../surveys.routes'
  * Feedback across every event (US-MSG-08/09). Ported from
  * `eventa-ui-kit/admin/feedback.html`.
  *
- * **Two of the kit's four KPI tiles are here; two are not.** Responses and
- * average rating are real, and arrive the moment an attendee answers. NPS and
- * completion are gone: NPS needs a 0–10 recommendation question, which is not
- * a question type this product has. Completion needs a denominator — how many
- * were ASKED — and the post-event thank-you now records exactly that in the
- * delivery log, so it is computable; it just has not been built.
+ * **Three of the kit's four KPI tiles are here.** Responses and average rating
+ * arrive the moment an attendee answers. NPS is still absent: it needs a 0–10
+ * recommendation question, which is not a question type this product has, so
+ * its slot holds the survey count instead.
+ *
+ * Completion is of the people the post-event thank-you reached — it carries
+ * the survey link, so it is what ASKS — the share who answered. It reads "—"
+ * when nobody has been asked (the thank-you switched off, no live survey, or
+ * every send failed), never "0%": nobody ignoring a question and nobody being
+ * asked one are different facts. Somebody who answered without being emailed
+ * counts under Responses but not in completion, which is why completion never
+ * passes 100%. It takes the kit's fourth slot, where a "Live" count stood in;
+ * each event card still says how many of its surveys are live.
+ *
+ * The kit's trend chips are not ported: there is no previous period to
+ * compare with, and an arrow with nothing behind it is invented.
  *
  * The average reads "—" when nobody has rated anything, never "0.0". Nought
  * out of five is a verdict about how attendees felt; this is the absence of
@@ -65,7 +75,11 @@ export default function FeedbackPage() {
           value={data.summary.average ?? MASKED}
         />
         <Tile icon="hgi-note-01" label="Surveys" value={String(data.totals.total)} />
-        <Tile icon="hgi-radio" label="Live" value={String(data.totals.live)} />
+        <Tile
+          icon="hgi-checkmark-badge-01"
+          label="Completion rate"
+          value={data.summary.completion ?? MASKED}
+        />
       </div>
 
       <Card className="mt-3 p-4">
