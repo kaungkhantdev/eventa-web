@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AWAITING_APPROVAL_FREE_STATE,
   AWAITING_APPROVAL_PAID_STATE,
+  receiptHeading,
   toGuestOrder,
 } from './guestOrder.mapper'
 import type { GuestOrderWire } from './guestOrder.types'
@@ -179,10 +180,20 @@ describe('toGuestOrder', () => {
       expect(state.detail).toMatch(/refunded in full/i)
     })
 
-    it('says a free one is awaiting approval, with the ticket to follow by email', () => {
+    it('says a free one is awaiting approval, with the ticket to follow on this page', () => {
       const { state } = order(FREE_AND_WAITING)
       expect(state).toEqual(AWAITING_APPROVAL_FREE_STATE)
-      expect(state.detail).toMatch(/emailed/i)
+      expect(state.detail).toMatch(/appear on this page/i)
+    })
+
+    // The organizer can switch the confirmation email off (US-MSG-01); the
+    // ticket always appears here. Promise only what always happens.
+    it('promises no email — only the order page, where the ticket always appears', () => {
+      for (const waiting of [PAID_AND_WAITING, FREE_AND_WAITING]) {
+        const { state } = order(waiting)
+        expect(state.detail).not.toMatch(/email/i)
+        expect(state.detail).toMatch(/appear on this page/i)
+      }
     })
 
     it('is neither expired nor registered, though it has no hold and no ticket', () => {
@@ -263,6 +274,65 @@ describe('toGuestOrder', () => {
 
     it('flags a settled order that somehow has no tickets', () => {
       expect(order({ tickets: [] }).ticketsExplained).toBe(false)
+    })
+  })
+
+  describe('paid — whether money ever changed hands', () => {
+    it('is true once the payment has arrived, and still true once it was refunded', () => {
+      expect(order().paid).toBe(true)
+      expect(order({ paymentStatus: 'refunded' }).paid).toBe(true)
+    })
+
+    it('is false while nothing has cleared', () => {
+      expect(order(UNPAID).paid).toBe(false)
+      expect(order({ ...UNPAID, paymentStatus: 'failed' }).paid).toBe(false)
+    })
+
+    it('is false for a paid ticket turned down before any money arrived', () => {
+      // Rejected off the waitlist, or before the payment landed: status
+      // `rejected`, payment still `pending`, a total above zero.
+      const rejected = order({
+        status: 'rejected',
+        paymentStatus: 'pending',
+        paymentRequired: false,
+        tickets: [],
+      })
+      expect(rejected.paid).toBe(false)
+    })
+  })
+
+  describe('receiptHeading — a heading that is actually true', () => {
+    it('asks for the money while it can still be paid', () => {
+      expect(receiptHeading({ canPay: true, paid: false })).toBe('What you owe')
+    })
+
+    it('says what was paid once money changed hands', () => {
+      expect(receiptHeading({ canPay: false, paid: true })).toBe('What you paid')
+    })
+
+    it('says only the order total when nothing was ever charged', () => {
+      expect(receiptHeading({ canPay: false, paid: false })).toBe('Order total')
+    })
+
+    it('never says “What you paid” above a registration rejected before it was charged', () => {
+      const rejected = order({
+        status: 'rejected',
+        paymentStatus: 'pending',
+        paymentRequired: false,
+        tickets: [],
+      })
+      expect(receiptHeading({ canPay: rejected.payable, paid: rejected.paid })).toBe(
+        'Order total',
+      )
+    })
+
+    it('says “Order total” for someone waiting in line or whose seats lapsed', () => {
+      for (const unpaid of [
+        order({ status: 'waitlisted', paymentStatus: 'pending', tickets: [] }),
+        order({ ...UNPAID, status: 'expired' }),
+      ]) {
+        expect(receiptHeading({ canPay: unpaid.payable, paid: unpaid.paid })).toBe('Order total')
+      }
     })
   })
 

@@ -3,7 +3,7 @@ import { EmptyState, Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useTheme } from '@/lib/useTheme'
 import { ExpiredNotice, PayNowPanel } from '../components/PayNowPanel'
-import { EXPIRED_STATE } from '../guestOrder.mapper'
+import { EXPIRED_STATE, receiptHeading } from '../guestOrder.mapper'
 import type { GuestOrder, GuestTicket, OrderState } from '../guestOrder.types'
 import { useCountdown } from '../lib/countdown'
 
@@ -29,15 +29,6 @@ const TONES: Record<OrderState['tone'], string> = {
 
 /** Where somebody whose order lapsed can start again. */
 const DISCOVER = '/portal/discover'
-
-/**
- * An expired order is owed nothing — it was never charged and never will be —
- * and a waitlist entry is owed nothing YET. Neither was paid.
- */
-function receiptHeading({ canPay, unpaid }: { canPay: boolean; unpaid: boolean }): string {
-  if (unpaid) return 'Order total'
-  return canPay ? 'What you owe' : 'What you paid'
-}
 
 export default function GuestOrderPage() {
   const { order } = useLoaderData() as { order: GuestOrder }
@@ -89,10 +80,7 @@ export default function GuestOrderPage() {
             question already answered. */}
         {order.tickets.length === 0 && !order.ticketsExplained && <NothingToShow />}
 
-        <Receipt
-          order={order}
-          heading={receiptHeading({ canPay, unpaid: lapsed || order.onWaitlist })}
-        />
+        <Receipt order={order} heading={receiptHeading({ canPay, paid: order.paid })} />
         <KeepThem order={order} />
 
         <p className="mt-8 text-center text-[11px] text-muted/70">

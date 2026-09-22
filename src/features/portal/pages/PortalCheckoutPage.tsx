@@ -877,11 +877,13 @@ function SuccessOverlay({ order, payment }: { order: PlacedOrder; payment: Payme
 }
 
 function PaymentNext({ order, payment }: { order: PlacedOrder; payment: PaymentStep | null }) {
+  // Points at the order page, not an inbox — the same rule as the note above:
+  // the organizer can switch the confirmation email off (US-MSG-01).
   if (order.awaitingApproval) {
     return (
       <p className="mt-2 text-[13px] text-muted">
-        The organizer reviews each registration. Your ticket is emailed to you once it's
-        approved.
+        The organizer reviews each registration. Your ticket will appear on your order page
+        once it's approved.
       </p>
     )
   }

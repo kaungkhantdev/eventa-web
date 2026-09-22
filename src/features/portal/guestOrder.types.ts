@@ -89,6 +89,12 @@ export interface GuestOrder {
   /** True while the money is still owed, so the page can say so plainly. */
   awaitingPayment: boolean
   /**
+   * Money actually changed hands — paid, or paid and since refunded. Not the
+   * same as "owes nothing": a registration turned down before it was charged
+   * owes nothing and paid nothing.
+   */
+  paid: boolean
+  /**
    * In line for a sold-out ticket (US-REG-04): nothing held, nothing owed yet,
    * no tickets — and not lapsed, which is what those three facts would
    * otherwise say.
