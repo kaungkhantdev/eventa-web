@@ -1,7 +1,7 @@
 import { Link, useLoaderData } from 'react-router'
 import {
   Badge,
-  DownloadButton,
+  ExportMenu,
   HeaderUser,
   PageFooter,
   PageHeader,
@@ -12,6 +12,7 @@ import { useFilters } from '@/lib/useFilters'
 import { ReportEmptyRow } from '../components/ReportEmptyRow'
 import { ReportFilters } from '../components/ReportFilters'
 import { StatTile } from '../components/StatTile'
+import { REPORT_DOWNLOADS } from '../insights.exports'
 import type { TransactionsReportData } from '../insights.routes'
 
 /**
@@ -36,11 +37,7 @@ export default function ReportsTransactionsPage() {
         subtitle="Every payment and refund across all events."
         actions={
           <>
-            <DownloadButton
-              path="/reports/transactions.csv"
-              query={data.exportQuery}
-              filename="eventa-transactions.csv"
-            />
+            <ExportMenu downloads={REPORT_DOWNLOADS.transactions} query={data.exportQuery} />
             <HeaderUser />
           </>
         }

@@ -2,7 +2,7 @@ import { Link, useLoaderData, useOutletContext } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import {
   Badge,
-  DownloadButton,
+  ExportMenu,
   NotificationBell,
   PageFooter,
   Paginator,
@@ -11,6 +11,7 @@ import {
 import { num } from '@/lib/format'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { ReportEmptyRow } from '../components/ReportEmptyRow'
+import { REPORT_DOWNLOADS } from '../insights.exports'
 import type { EventsReportData } from '../insights.routes'
 
 /**
@@ -53,11 +54,7 @@ export default function ReportsEventsPage() {
           </p>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
-          <DownloadButton
-            path="/reports/events.csv"
-            query={data.exportQuery}
-            filename="eventa-events.csv"
-          />
+          <ExportMenu downloads={REPORT_DOWNLOADS.events} query={data.exportQuery} />
           <NotificationBell />
           <SignedInChip />
         </div>

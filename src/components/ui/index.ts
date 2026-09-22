@@ -1,6 +1,7 @@
 export { Icon } from './Icon'
 export { Button, ButtonLink, IconButton } from './Button'
 export { DownloadButton } from './DownloadButton'
+export { ExportMenu } from './ExportMenu'
 export { Badge, type BadgeTone } from './Badge'
 export { RichText } from './RichText'
 export { Card } from './Card'

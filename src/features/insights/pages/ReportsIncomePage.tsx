@@ -1,6 +1,6 @@
 import { useLoaderData } from 'react-router'
 import {
-  DownloadButton,
+  ExportMenu,
   HeaderUser,
   PageFooter,
   PageHeader,
@@ -10,6 +10,7 @@ import { useFilters } from '@/lib/useFilters'
 import { ReportEmptyRow } from '../components/ReportEmptyRow'
 import { ReportFilters } from '../components/ReportFilters'
 import { StatTile } from '../components/StatTile'
+import { REPORT_DOWNLOADS } from '../insights.exports'
 import type { IncomeReportData } from '../insights.routes'
 
 /**
@@ -31,11 +32,7 @@ export default function ReportsIncomePage() {
         subtitle="Gross revenue, refunds & fees across all events."
         actions={
           <>
-            <DownloadButton
-              path="/reports/income.csv"
-              query={data.exportQuery}
-              filename="eventa-income.csv"
-            />
+            <ExportMenu downloads={REPORT_DOWNLOADS.income} query={data.exportQuery} />
             <HeaderUser />
           </>
         }

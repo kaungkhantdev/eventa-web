@@ -1,6 +1,6 @@
 import { useLoaderData } from 'react-router'
 import {
-  DownloadButton,
+  ExportMenu,
   HeaderUser,
   PageFooter,
   PageHeader,
@@ -10,6 +10,7 @@ import { useFilters } from '@/lib/useFilters'
 import { ReportEmptyRow } from '../components/ReportEmptyRow'
 import { ReportFilters } from '../components/ReportFilters'
 import { StatTile } from '../components/StatTile'
+import { REPORT_DOWNLOADS } from '../insights.exports'
 import type { AttendanceReportData } from '../insights.routes'
 
 /**
@@ -31,11 +32,7 @@ export default function ReportsAttendancePage() {
         subtitle="Check-in and show-up rates across all events."
         actions={
           <>
-            <DownloadButton
-              path="/reports/attendance.csv"
-              query={data.exportQuery}
-              filename="eventa-attendance.csv"
-            />
+            <ExportMenu downloads={REPORT_DOWNLOADS.attendance} query={data.exportQuery} />
             <HeaderUser />
           </>
         }

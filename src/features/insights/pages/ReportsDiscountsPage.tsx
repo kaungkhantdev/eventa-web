@@ -1,7 +1,7 @@
 import { useLoaderData } from 'react-router'
 import {
   Badge,
-  DownloadButton,
+  ExportMenu,
   HeaderUser,
   PageFooter,
   PageHeader,
@@ -11,6 +11,7 @@ import { useFilters } from '@/lib/useFilters'
 import { ReportEmptyRow } from '../components/ReportEmptyRow'
 import { ReportFilters } from '../components/ReportFilters'
 import { StatTile } from '../components/StatTile'
+import { REPORT_DOWNLOADS } from '../insights.exports'
 import type { DiscountsReportData } from '../insights.routes'
 
 /**
@@ -38,11 +39,7 @@ export default function ReportsDiscountsPage() {
         subtitle="Promotion usage and the revenue it influenced."
         actions={
           <>
-            <DownloadButton
-              path="/reports/discounts.csv"
-              query={data.exportQuery}
-              filename="eventa-discounts.csv"
-            />
+            <ExportMenu downloads={REPORT_DOWNLOADS.discounts} query={data.exportQuery} />
             <HeaderUser />
           </>
         }
