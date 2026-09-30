@@ -181,7 +181,23 @@ function RolePanel({
   editing: RoleCard | null
   groups: PermissionGroups
 }) {
-  const fetcher = useFetcher<ActionResult>()
+  // Counted per open, not per role, so the switches are re-read from the saved
+  // permissions every time the panel is opened. The panel's element stays
+  // mounted while closed, so keying on the role's id alone would hold on to an
+  // abandoned edit: turn permissions off, Cancel, reopen the same role, and the
+  // switches would still show what was given up on rather than what is stored.
+  const [wasOpen, setWasOpen] = useState(open)
+  const [session, setSession] = useState(0)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setSession((n) => n + 1)
+  }
+
+  // The fetcher is keyed by the same counter, for the same reason: it outlives
+  // the close too, and an unkeyed one would still be holding the last save —
+  // closing the next role's panel on its `ok` before a switch could be read,
+  // and showing its refusal under a role that was never refused.
+  const fetcher = useFetcher<ActionResult>({ key: `role-panel-${session}` })
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
 
   useEffect(() => {
@@ -212,9 +228,9 @@ function RolePanel({
         </>
       }
     >
-      {/* Keyed so switching roles rebuilds the switches from the new role's
+      {/* Keyed so every open rebuilds the switches from the role's stored
           permissions — they are state, and state does not reset on its own. */}
-      <RoleForm key={editing?.id ?? 'new'} Form={fetcher.Form} editing={editing} groups={groups}>
+      <RoleForm key={session} Form={fetcher.Form} editing={editing} groups={groups}>
         {fetcher.data?.ok === false && (
           <p
             role="alert"
