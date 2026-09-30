@@ -16,8 +16,16 @@ export interface TicketWire {
   sold: number
   /** The allocation. 0 means unlimited — not "none left". */
   total: number
+  /** How many seats one order may hold. */
+  maxPerOrder: number
   salesStartAt: string | null
   salesEndAt: string | null
+  /**
+   * Which read of this tier the row is. Sent back on an edit, where the API
+   * compares it against the stored one and refuses a write that answers a tier
+   * somebody else has since changed.
+   */
+  version: number
 }
 
 /** How many tiers sit in each status, across the whole workspace. */
@@ -53,4 +61,47 @@ export interface TicketCard {
   /** Null when unlimited: there is no share of "no limit" to draw. */
   percent: number | null
   iconTint: string
+  /** Everything the edit form needs, so a click can open it filled in. */
+  edit: TicketDraft
+}
+
+/**
+ * A tier as the edit form holds it, before it goes back over the wire.
+ *
+ * Separate from the card because the two answer different questions: the card
+ * says `฿2,900` for a reader, the draft says `2900` for a number box. Only the
+ * draft can be submitted unchanged and arrive as the figures it came from.
+ */
+export interface TicketDraft {
+  id: string
+  eventId: string
+  name: string
+  isFree: boolean
+  /** Baht. The API stores prices in whole baht, so this is a whole number. */
+  price: number
+  /** The allocation. 0 means unlimited, and is an answer, not a blank. */
+  total: number
+  /** How many seats one order may hold. */
+  maxPerOrder: number
+  /** `YYYY-MM-DD` on the Bangkok calendar, or '' — what a date box can show. */
+  salesStartDay: string
+  salesEndDay: string
+  /**
+   * The instants those days stand for, or '' when there is no window.
+   *
+   * Carried beside the days because a date box cannot hold a time: submitted
+   * back with them, an untouched save returns the window exactly as it was
+   * instead of dragging it to the midnight the box implies.
+   */
+  salesStartAt: string
+  salesEndAt: string
+  /**
+   * The row's optimistic-concurrency token, sent straight back on save.
+   *
+   * Without it the API cannot tell an edit of what this form loaded from an
+   * edit of what a colleague has since saved, and the later write silently
+   * wins. Carried through the draft rather than read from the card, so the
+   * token that goes back is provably the one this panel was opened with.
+   */
+  version: number
 }

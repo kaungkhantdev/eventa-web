@@ -1,6 +1,6 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { bangkokInstant } from '@/lib/format'
+import { bangkokDayKey, bangkokInstant } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { ticketsApi, type ListTicketsQuery, type TicketInput } from './tickets.api'
@@ -54,34 +54,84 @@ export function tabCountsOf(counts: TicketCountsWire): TabCounts {
 }
 
 /**
- * Baht typed into a form → the integer satang the wire carries.
+ * The edit panel's form → the fields the wire carries.
  *
- * Rounded because satang is the smallest unit there is: a price of 10.005 baht
- * is not payable, and a float would be refused by the DTO. A free tier is
- * priced at nothing whatever is left in the price box, since the two controls
- * can disagree and only one of them is the answer.
+ * A free tier is priced at nothing whatever is left in the price box, since the
+ * two controls can disagree and only one of them is the answer.
  */
 export function ticketInputOf(form: FormData): TicketInput {
   const isFree = String(form.get('type') ?? 'paid') === 'free'
-  const price = Number(form.get('price')) || 0
   const version = Number(form.get('version'))
   return {
     name: String(form.get('name') ?? '').trim(),
     isFree,
-    priceSatang: isFree ? 0 : Math.round(price * SATANG_PER_BAHT),
-    total: Number(form.get('total')) || 0,
+    priceSatang: isFree ? 0 : satangOrNothing(form.get('price')),
+    total: figureOrNothing(form.get('total')),
     maxPerOrder: Number(form.get('maxPerOrder')) || undefined,
-    salesStartAt: instantOrNothing(form.get('salesStartAt')),
-    salesEndAt: instantOrNothing(form.get('salesEndAt')),
+    salesStartAt: windowInstant(form.get('salesStartAt'), form.get('salesStartWas')),
+    salesEndAt: windowInstant(form.get('salesEndAt'), form.get('salesEndWas')),
     version: Number.isInteger(version) && version > 0 ? version : undefined,
   }
 }
 
 const SATANG_PER_BAHT = 100
 
-/** A blank date field is "no window", which the API expects as an absent key. */
-function instantOrNothing(value: FormDataEntryValue | null): string | undefined {
-  return bangkokInstant(String(value ?? '')) ?? undefined
+/**
+ * Baht typed into the price box → the integer satang the wire carries.
+ *
+ * Rounded because satang is the smallest unit there is: a price of 10.005 baht
+ * is not payable, and a float would be refused by the DTO.
+ */
+function satangOrNothing(value: FormDataEntryValue | null): number | undefined {
+  const baht = figureOrNothing(value)
+  return baht === undefined ? undefined : Math.round(baht * SATANG_PER_BAHT)
+}
+
+/**
+ * An emptied box is "leave it as it is", never 0.
+ *
+ * The panel opens with the tier's own price and allocation already in the
+ * boxes, so a box with nothing in it is one the organizer is still typing in.
+ * Read as 0 it would put a paid tier on sale for nothing, or throw its
+ * allocation open, on a save that was meant to change something else; sent as
+ * an absent key, the API keeps what it holds. 0 is still sayable by typing it.
+ *
+ * What cannot be read at all — a box the browser degraded to plain text, a
+ * replayed submission — is left out for the same reason, rather than becoming
+ * the one figure nobody typed.
+ */
+function figureOrNothing(value: FormDataEntryValue | null): number | undefined {
+  const typed = String(value ?? '').trim()
+  if (!typed) return undefined
+  const figure = Number(typed)
+  return Number.isFinite(figure) ? figure : undefined
+}
+
+/**
+ * A day picked in a date box → the instant the API stores.
+ *
+ * `was` is the instant the panel opened the box with. A date box holds a day
+ * and the stored instant holds a time of day as well, so rebuilding the window
+ * from the day alone would drag it back to Bangkok midnight: up to a day of
+ * selling lost on a save that changed nothing, and a window that opens and
+ * closes inside one Bangkok day collapsed onto itself, which the API refuses
+ * outright. So the instant goes back verbatim while the box still names its
+ * day, and only a day the organizer actually moved becomes a fresh midnight.
+ *
+ * A blank box is "no window", which the API expects as an absent key — and,
+ * for a window it was prefilled with, cannot happen: the panel marks those
+ * boxes required, because an absent key means "unchanged" here and clearing one
+ * would otherwise look like removing a window it silently kept.
+ */
+function windowInstant(
+  day: FormDataEntryValue | null,
+  was: FormDataEntryValue | null,
+): string | undefined {
+  const picked = String(day ?? '')
+  const stored = String(was ?? '')
+  if (!picked) return undefined
+  if (stored && bangkokDayKey(stored) === picked) return stored
+  return bangkokInstant(picked) ?? undefined
 }
 
 export interface TicketsData {

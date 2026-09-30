@@ -1,7 +1,7 @@
 import type { BadgeTone } from '@/components/ui'
-import { baht, num } from '@/lib/format'
+import { bangkokDayKey, baht, num } from '@/lib/format'
 import { hashIndex } from '@/lib/palette'
-import type { TicketCard, TicketWire } from './tickets.types'
+import type { TicketCard, TicketDraft, TicketWire } from './tickets.types'
 import type { TicketStatus } from './types'
 
 /** The rules behind the ticket inventory (US-TKT-03/04). */
@@ -47,7 +47,46 @@ export function toTicketCard(wire: TicketWire): TicketCard {
     soldLabel: soldLabel(wire.sold, wire.total),
     percent: sharePercent(wire.sold, wire.total),
     iconTint: ICON_TINTS[hashIndex(wire.id, ICON_TINTS.length)],
+    edit: toTicketDraft(wire),
   }
+}
+
+/**
+ * The same tier, as the edit form holds it.
+ *
+ * The price is the plain quotient: the API refuses a price with stray satang on
+ * both create and update, so what it stores is always whole baht and there is
+ * nothing here for the number box to round.
+ *
+ * The window is taken on the Bangkok calendar rather than from the first ten
+ * characters of the ISO string, which name the wrong day for any window opening
+ * after 17:00 UTC — the evening ones, which is most of them. The instants
+ * travel with those days: the day is all a date box can show, and it is not
+ * enough to rebuild the window from.
+ */
+function toTicketDraft(wire: TicketWire): TicketDraft {
+  return {
+    id: wire.id,
+    eventId: wire.eventId,
+    name: wire.name,
+    isFree: wire.isFree,
+    price: wire.priceSatang / SATANG_PER_BAHT,
+    total: wire.total,
+    maxPerOrder: wire.maxPerOrder,
+    version: wire.version,
+    salesStartDay: dayOrBlank(wire.salesStartAt),
+    salesEndDay: dayOrBlank(wire.salesEndAt),
+    salesStartAt: wire.salesStartAt ?? '',
+    salesEndAt: wire.salesEndAt ?? '',
+  }
+}
+
+/**
+ * No window is an empty field: a date input cannot show "never", and today
+ * would be a date the organizer never chose.
+ */
+function dayOrBlank(instant: string | null): string {
+  return instant ? bangkokDayKey(instant) : ''
 }
 
 /**

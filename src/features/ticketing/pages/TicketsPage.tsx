@@ -241,7 +241,7 @@ export default function TicketsPage() {
       <TicketPanel
         open={panel.open}
         onClose={panel.onClose}
-        editing={editing}
+        editing={editing?.edit ?? null}
         events={data.events}
       />
 

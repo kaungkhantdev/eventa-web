@@ -12,12 +12,18 @@ export interface ListTicketsQuery extends Query {
   search?: string
 }
 
-/** What a tier is created or edited with — only fields the API accepts. */
+/**
+ * What a tier is created or edited with — only fields the API accepts.
+ *
+ * Everything but the name is optional, and an absent key is how this app says
+ * "leave it as it is": the API merges a PATCH over the stored tier, so a figure
+ * the organizer did not fill in is kept rather than reset.
+ */
 export interface TicketInput {
   name: string
   isFree: boolean
-  priceSatang: number
-  total: number
+  priceSatang?: number
+  total?: number
   maxPerOrder?: number
   salesStartAt?: string
   salesEndAt?: string
