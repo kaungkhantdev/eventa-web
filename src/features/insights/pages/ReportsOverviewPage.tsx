@@ -1,44 +1,48 @@
-import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
-  HeaderUser,
-  PillTabs,
-  Button,
-  Badge,
-  Icon,
   AreaChart,
+  Badge,
   DonutChart,
-  type BadgeTone,
+  HeaderUser,
+  Icon,
+  PageFooter,
+  PageHeader,
+  PanelEmptyPreview,
+  PillTabs,
   type PillTabItem,
 } from '@/components/ui'
-import { cn } from '@/lib/cn'
-import { REPORTS_EVENTS, type ReportEventStatus } from '../data/reportsEvents'
-import {
-  RANGE_TABS,
-  REVENUE_DATASETS,
-  STAT_CARDS,
-  TICKET_TYPES,
-  REGISTRATIONS_BY_EVENT,
-  SALES_BY_CHANNEL,
-  type RtRange,
-} from '../data/reportsOverview'
+import { bahtCompact } from '@/lib/format'
+import { useFilters } from '@/lib/useFilters'
+import { StatTile } from '../components/StatTile'
+import type { OverviewData } from '../insights.routes'
+import type { OverviewRange } from '../insights.types'
 
-const STATUS_META: Record<ReportEventStatus, { tone: BadgeTone; icon: string }> = {
-  Upcoming: { tone: 'blue', icon: 'hgi-time-schedule' },
-  Completed: { tone: 'gray', icon: 'hgi-checkmark-badge-01' },
-  Live: { tone: 'green', icon: 'hgi-tick-02' },
-}
+/**
+ * Workspace health at a glance (US-RPT-01/03/04). Layout ported from the kit.
+ *
+ * The range switches the WHOLE screen, not just the chart: every figure here
+ * describes one window, resolved once by the API, so the revenue tile and the
+ * chart's headline cannot disagree about what "this year" meant.
+ *
+ * The kit's "Sales by channel" panel is deliberately absent. No source, channel
+ * or UTM column exists anywhere in the schema, so it could only ever have been
+ * invented — it needs capture at checkout before it can be reported on.
+ */
 
-const nf = (n: number) => n.toLocaleString('en-US')
+const NO_REVENUE = 'No revenue in this period.'
+const NOTHING_CLEARED = 'Paid registrations show up here as soon as the first one clears.'
 
-const RANGE_ITEMS: PillTabItem<RtRange>[] = RANGE_TABS
+const RANGE_TABS: PillTabItem<OverviewRange>[] = [
+  { value: '7d', label: '7 days' },
+  { value: '30d', label: '30 days' },
+  { value: '90d', label: '90 days' },
+  { value: 'year', label: 'Year' },
+]
 
 export default function ReportsOverviewPage() {
-  const [range, setRange] = useState<RtRange>('year')
-  const rt = REVENUE_DATASETS[range]
-  const topEvents = REPORTS_EVENTS.slice(0, 6)
+  const data = useLoaderData() as OverviewData
+  const { set } = useFilters()
+  const { tiles } = data
 
   return (
     <>
@@ -48,162 +52,177 @@ export default function ReportsOverviewPage() {
         actions={<HeaderUser />}
       />
 
-      {/* date range (left) + export actions (right) */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <PillTabs items={RANGE_ITEMS} value={range} onChange={setRange} />
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className="text-[11px] text-muted">Export:</span>
-          <Button variant="ghost">
-            <Icon name="hgi-file-01" size={16} />
-            CSV
-          </Button>
-          <Button variant="ghost">
-            <Icon name="hgi-file-01" size={16} />
-            Excel
-          </Button>
-          <Button variant="ghost">
-            <Icon name="hgi-file-01" size={16} />
-            PDF
-          </Button>
-        </div>
+      {/* The kit put export buttons beside these tabs. An export belongs to a
+          REPORT, not to a dashboard — each report page below has its own, and
+          three buttons that did nothing were worse than none. */}
+      <div className="mb-4">
+        <PillTabs
+          items={RANGE_TABS}
+          value={data.range}
+          onChange={(range) => set({ range })}
+        />
       </div>
 
-      {/* stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {STAT_CARDS.map((c) => (
-          <div key={c.label} className={cn('card p-3.5', c.wide && 'sm:col-span-2 xl:col-span-1')}>
-            <div className="flex items-center gap-1.5 text-[12px] text-muted">
-              <Icon name={c.icon} size={16} />
-              {c.label}
-            </div>
-            <div className="mt-2 flex items-end justify-between">
-              <p className="text-[22px] font-bold tracking-tight tnum">{c.value}</p>
-              <span
-                className={cn(
-                  'flex items-center gap-0.5 text-[12px] font-semibold',
-                  c.positive ? 'text-brand' : 'text-red-500',
-                )}
-              >
-                <Icon name={c.down ? 'hgi-arrow-down-right-01' : 'hgi-arrow-up-right-01'} size={13} />
-                {c.delta}
-              </span>
-            </div>
-          </div>
-        ))}
+        <StatTile icon="hgi-wallet-01" label="Revenue" {...tiles.revenue} />
+        <StatTile icon="hgi-user-add-01" label="Registrations" {...tiles.registrations} />
+        <StatTile
+          icon="hgi-checkmark-badge-01"
+          label="Attendance rate"
+          {...tiles.attendance}
+        />
+        <StatTile icon="hgi-ticket-01" label="Avg ticket" {...tiles.averageTicket} />
+        <StatTile
+          icon="hgi-delivery-return-01"
+          label="Refund rate"
+          wide
+          {...tiles.refundRate}
+        />
       </div>
 
-      {/* revenue trend + donut row */}
       <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-3">
         <section className="card p-4 xl:col-span-2">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-[15px] font-bold tracking-tight">Revenue trend</h2>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="text-[24px] font-extrabold tracking-tight tnum">{rt.value}</span>
-                <span
-                  className={cn(
-                    'flex items-center gap-0.5 text-[13px] font-semibold',
-                    rt.up ? 'text-brand' : 'text-red-500',
-                  )}
-                >
-                  <Icon
-                    name={rt.up ? 'hgi-arrow-up-right-01' : 'hgi-arrow-down-right-01'}
-                    size={13}
-                  />
-                  {rt.delta}
-                </span>
-                <span className="text-[12px] text-muted">vs previous period</span>
-              </div>
+              {data.revenue ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-[24px] font-extrabold tracking-tight tnum">
+                    {data.revenue.total}
+                  </span>
+                  <span
+                    className={
+                      data.revenue.delta.tone === 'good'
+                        ? 'flex items-center gap-0.5 text-[13px] font-semibold text-brand'
+                        : data.revenue.delta.tone === 'bad'
+                          ? 'flex items-center gap-0.5 text-[13px] font-semibold text-red-500'
+                          : 'flex items-center gap-0.5 text-[13px] font-semibold text-muted'
+                    }
+                  >
+                    {data.revenue.delta.direction && (
+                      <Icon
+                        name={
+                          data.revenue.delta.direction === 'up'
+                            ? 'hgi-arrow-up-right-01'
+                            : 'hgi-arrow-down-right-01'
+                        }
+                        size={13}
+                      />
+                    )}
+                    {data.revenue.delta.text}
+                  </span>
+                  <span className="text-[12px] text-muted">vs previous period</span>
+                </div>
+              ) : (
+                <p className="mt-1 text-[12px] text-muted">
+                  Revenue is only shown to members with finance access.
+                </p>
+              )}
             </div>
           </div>
-          <div className="mt-2">
-            <AreaChart
-              labels={rt.labels}
-              values={rt.values}
-              max={rt.max}
-              prefix="฿"
-              suffix="k"
-              ariaLabel="Revenue trend"
-            />
-          </div>
+          {data.revenue &&
+            (data.revenue.earned ? (
+              <div className="mt-2">
+                <AreaChart
+                  labels={data.revenue.labels}
+                  values={data.revenue.values}
+                  format={(value) => bahtCompact(value)}
+                  ariaLabel="Revenue trend"
+                />
+              </div>
+            ) : (
+              /* A period with no sales still comes back as a full series of
+                 zeroes, which draws a flat line along the axis and reads as a
+                 chart that failed rather than a period that earned nothing. */
+              <PanelEmptyPreview preview="chart" description={NOTHING_CLEARED}>
+                {NO_REVENUE}
+              </PanelEmptyPreview>
+            ))}
         </section>
 
         <section className="card p-4 xl:col-span-1">
-          <h2 className="text-[15px] font-bold tracking-tight">Registrations by Ticket Type</h2>
+          <h2 className="text-[15px] font-bold tracking-tight">
+            Registrations by Ticket Type
+          </h2>
           <p className="mt-0.5 text-[12px] text-muted">Share of total registrations</p>
-          <div className="mt-2 flex justify-center">
-            <DonutChart
-              data={TICKET_TYPES.map((t) => ({ value: t.pct, color: t.color }))}
-              centerLabel="1,340"
-              centerSub="total registrations"
-              ariaLabel="Registrations by ticket type"
-            />
-          </div>
-          <div className="mt-4 space-y-3">
-            {TICKET_TYPES.map((t) => (
-              <div key={t.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="h-3.5 w-3.5 rounded" style={{ background: t.color }} />
-                  <div className="leading-tight">
-                    <p className="text-[13px] font-semibold text-ink">{t.name}</p>
-                    <p className="text-[11px] text-muted tnum">{t.regs} registrations</p>
+          {data.mix.length ? (
+            <>
+              <div className="mt-2 flex justify-center">
+                <DonutChart
+                  data={data.mix.map((slice) => ({
+                    value: slice.percent,
+                    color: slice.color,
+                  }))}
+                  centerLabel={data.mixTotal}
+                  centerSub="total registrations"
+                  ariaLabel="Registrations by ticket type"
+                />
+              </div>
+              <div className="mt-4 space-y-3">
+                {data.mix.map((slice) => (
+                  <div key={slice.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className="h-3.5 w-3.5 rounded"
+                        style={{ background: slice.color }}
+                      />
+                      <div className="leading-tight">
+                        <p className="text-[13px] font-semibold text-ink">{slice.name}</p>
+                        <p className="text-[11px] text-muted tnum">
+                          {slice.seats} registrations
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[15px] font-bold tnum">{slice.percent}%</span>
                   </div>
-                </div>
-                <span className="text-[15px] font-bold tnum">{t.pct}%</span>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <PanelEmptyPreview
+              preview="ring"
+              description="Once tickets sell, this shows which types people chose."
+            >
+              Nothing sold yet.
+            </PanelEmptyPreview>
+          )}
         </section>
       </div>
 
-      {/* registrations by event + sales by channel row */}
-      <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
-        <section className="card p-4">
-          <h2 className="text-[15px] font-bold tracking-tight">Registrations by event</h2>
-          <p className="mt-0.5 text-[12px] text-muted">Top 6 events, share of total sign-ups</p>
+      <section className="card mt-3 p-4">
+        <h2 className="text-[15px] font-bold tracking-tight">Registrations by event</h2>
+        <p className="mt-0.5 text-[12px] text-muted">
+          Top {data.bars.length} events, share of total sign-ups
+        </p>
+        {data.bars.length ? (
           <div className="mt-4 space-y-3.5">
-            {REGISTRATIONS_BY_EVENT.map((e) => (
-              <div key={e.name} className="flex items-center gap-3">
+            {data.bars.map((bar) => (
+              <div key={bar.id} className="flex items-center gap-3">
                 <p className="w-36 shrink-0 truncate text-[13px] font-medium text-ink sm:w-44">
-                  {e.name}
+                  {bar.name}
                 </p>
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-line">
-                  <div className="h-full rounded-full bg-brand" style={{ width: `${e.width}%` }} />
+                  <div
+                    className="h-full rounded-full bg-brand"
+                    style={{ width: `${bar.width}%` }}
+                  />
                 </div>
                 <span className="w-10 shrink-0 text-right text-[13px] font-semibold tnum">
-                  {e.regs}
+                  {bar.count}
                 </span>
               </div>
             ))}
           </div>
-        </section>
+        ) : (
+          <PanelEmptyPreview
+            preview="bars"
+            description="Widen the range, or check back once registrations start coming in."
+          >
+            No sign-ups in this period.
+          </PanelEmptyPreview>
+        )}
+      </section>
 
-        <section className="card p-4">
-          <h2 className="text-[15px] font-bold tracking-tight">Sales by channel</h2>
-          <p className="mt-0.5 text-[12px] text-muted">Where registrations are coming from</p>
-          <div className="mt-4 space-y-3.5">
-            {SALES_BY_CHANNEL.map((c) => (
-              <div key={c.name} className="flex items-center gap-3">
-                <p className="w-36 shrink-0 truncate text-[13px] font-medium text-ink sm:w-44">
-                  {c.name}
-                </p>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-line">
-                  <div className="h-full rounded-full bg-brand" style={{ width: `${c.pct}%` }} />
-                </div>
-                <span className="w-10 shrink-0 text-right text-[13px] font-semibold tnum">
-                  {c.pct}%
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-4 border-t border-line pt-3 text-[11px] text-muted">
-            Website checkout remains the dominant channel; Partner referrals are the smallest but
-            carry the highest average order value.
-          </p>
-        </section>
-      </div>
-
-      {/* top events table (View all → full searchable/paginated list) */}
       <section className="card mt-3 p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -230,29 +249,45 @@ export default function ReportsOverviewPage() {
               </tr>
             </thead>
             <tbody className="text-[13px]">
-              {topEvents.map((e) => (
-                <tr key={e.name}>
-                  <td>
-                    <div>
-                      <Link
-                        to="/admin/event-detail"
-                        className="font-semibold text-ink hover:text-brand hover:underline"
-                      >
-                        {e.name}
-                      </Link>
-                      <p className="text-[11px] text-muted">{e.meta}</p>
-                    </div>
-                  </td>
-                  <td className="text-ink tnum">{nf(e.regs)}</td>
-                  <td className="font-semibold text-ink tnum">฿{nf(e.rev)}</td>
-                  <td className="text-muted tnum">{e.att ? `${e.att}%` : '—'}</td>
-                  <td>
-                    <Badge tone={STATUS_META[e.status].tone} icon={STATUS_META[e.status].icon}>
-                      {e.status}
-                    </Badge>
+              {data.topEvents.length ? (
+                data.topEvents.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <div>
+                        <Link
+                          to={row.href}
+                          className="font-semibold text-ink hover:text-brand hover:underline"
+                        >
+                          {row.name}
+                        </Link>
+                        <p className="text-[11px] text-muted">{row.meta}</p>
+                      </div>
+                    </td>
+                    <td className="text-ink tnum">{row.registrations}</td>
+                    <td className="font-semibold text-ink tnum">{row.revenue}</td>
+                    <td className="text-muted tnum">{row.attendanceRate}</td>
+                    <td>
+                      <Badge tone={row.status.tone}>{row.status.label}</Badge>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5}>
+                    <PanelEmptyPreview
+                      preview="table"
+                      description="A report describes what has already happened. Widen the range, or start from your events."
+                      action={{
+                        label: 'See your events',
+                        to: '/admin/events',
+                        icon: 'hgi-calendar-03',
+                      }}
+                    >
+                      No events in this period.
+                    </PanelEmptyPreview>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

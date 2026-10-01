@@ -1,138 +1,59 @@
-import { useMemo, useState } from 'react'
+import { useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
+  Badge,
+  ExportMenu,
   HeaderUser,
-  Button,
-  Icon,
-  EventPicker,
+  PageFooter,
+  PageHeader,
   Paginator,
-  usePagination,
 } from '@/components/ui'
-import { cn } from '@/lib/cn'
-import { baht, num } from '@/lib/format'
-import { DISCOUNT_CODES, DISCOUNT_STATUS_BADGE } from '../data/reportsDiscounts'
+import { useFilters } from '@/lib/useFilters'
+import { ReportEmptyRow } from '../components/ReportEmptyRow'
+import { ReportFilters } from '../components/ReportFilters'
+import { StatTile } from '../components/StatTile'
+import { REPORT_DOWNLOADS } from '../insights.exports'
+import type { DiscountsReportData } from '../insights.routes'
 
+/**
+ * Promotion and discount payback (US-RPT-10). Layout ported from the kit.
+ *
+ * "Revenue influenced" is the value of the confirmed orders a code was used on,
+ * after the discount — order value, not settled cash, and deliberately not the
+ * income report's net. A promotion's job is to cause orders; crediting it only
+ * once the money clears would make a code look worthless for as long as a bank
+ * transfer takes.
+ *
+ * The tiles carry no change chip. A code's payback is its lifetime payback, so
+ * there is no previous period to compare it against, and a chip that always
+ * read "—" would look like data that failed to load.
+ */
 export default function ReportsDiscountsPage() {
-  const [event, setEvent] = useState<string>('All events')
-  const [q, setQ] = useState('')
-
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase()
-    return DISCOUNT_CODES.filter((r) => {
-      if (!(event === 'All events' || r.event === event)) return false
-      if (!query) return true
-      return (
-        (r.code + ' ' + r.type + ' ' + r.event + ' ' + r.status).toLowerCase().indexOf(query) !== -1
-      )
-    })
-  }, [event, q])
-
-  const pager = usePagination(filtered)
-  const { setPage } = pager
-
-  const onSearch = (v: string) => {
-    setQ(v)
-    setPage(1)
-  }
-  const onEvent = (v: string) => {
-    setEvent(v)
-    setPage(1)
-  }
+  const data = useLoaderData() as DiscountsReportData
+  const { set, clear, emptyReason } = useFilters({ total: data.window.total })
+  const { tiles } = data
 
   return (
     <>
       <PageHeader
         title="Discounts"
-        subtitle="Promo usage and savings across all events."
+        subtitle="Promotion usage and the revenue it influenced."
         actions={
           <>
-            <Button variant="primary">
-              <Icon name="hgi-download-01" size={16} />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
+            <ExportMenu downloads={REPORT_DOWNLOADS.discounts} query={data.exportQuery} />
             <HeaderUser />
           </>
         }
       />
 
-      {/* filter bar: search + event */}
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:w-64">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => onSearch(e.target.value)}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search code, type or event…"
-          />
-        </div>
-        <div className="relative w-full sm:w-52">
-          <EventPicker
-            value={event}
-            onChange={onEvent}
-            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
-          />
-        </div>
-      </div>
+      <ReportFilters events={data.events} />
 
-      {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-discount-tag-01 text-[16px]" />
-            Active codes
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">14</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />2 new
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-ticket-01 text-[16px]" />
-            Redemptions
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">316</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              18.5%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-money-bag-02 text-[16px]" />
-            Discount given
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">฿148k</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-red-500">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              12.0%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-wallet-01 text-[16px]" />
-            Revenue influenced
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">฿1.2M</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              14.3%
-            </span>
-          </div>
-        </div>
+        <StatTile icon="hgi-discount-tag-01" label="Active codes" value={tiles.activeCodes} />
+        <StatTile icon="hgi-ticket-01" label="Redemptions" value={tiles.redemptions} />
+        <StatTile icon="hgi-money-bag-02" label="Discount given" value={tiles.discount} />
+        <StatTile icon="hgi-wallet-01" label="Revenue influenced" value={tiles.influenced} />
       </div>
 
-      {/* detailed table: discount codes */}
       <section className="card mt-3 p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -149,48 +70,45 @@ export default function ReportsDiscountsPage() {
                 <th className="text-right">Redemptions</th>
                 <th className="text-right">Discount ฿</th>
                 <th className="text-right">Revenue ฿</th>
+                <th className="text-right">Return</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody className="text-[13px]">
-              {pager.slice.length ? (
-                pager.slice.map((r) => (
-                  <tr key={r.code}>
+              {data.rows.length ? (
+                data.rows.map((row) => (
+                  <tr key={row.id}>
                     <td>
-                      <span className="font-mono font-semibold uppercase text-ink">{r.code}</span>
+                      <div>
+                        <p className="font-semibold text-ink">{row.code}</p>
+                        <p className="text-[11px] text-muted">{row.scope}</p>
+                      </div>
                     </td>
-                    <td className="text-muted">{r.type}</td>
-                    <td className="text-right text-ink tnum">{num(r.redemptions)}</td>
-                    <td className="text-right text-muted tnum">{baht(r.discount)}</td>
-                    <td className="text-right font-semibold text-ink tnum">{baht(r.revenue)}</td>
+                    <td className="text-muted">{row.terms}</td>
+                    <td className="text-right text-ink tnum">{row.redemptions}</td>
+                    <td className="text-right text-muted tnum">{row.discount}</td>
+                    <td className="text-right font-semibold text-ink tnum">{row.influenced}</td>
+                    <td className="text-right text-muted tnum">{row.returnRatio}</td>
                     <td>
-                      <span className={cn('badge', DISCOUNT_STATUS_BADGE[r.status])}>
-                        {r.status}
-                      </span>
+                      <Badge tone={row.status.tone}>{row.status.label}</Badge>
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-[13px] text-muted">
-                    No discount codes for this selection.
-                  </td>
-                </tr>
+                <ReportEmptyRow colSpan={7} noun="codes" reason={emptyReason} onClear={clear}>
+                  No discount code matches the current search and event filter. Try a different
+                  code, or widen the period.
+                </ReportEmptyRow>
               )}
             </tbody>
           </table>
         </div>
 
         <Paginator
-          from={pager.from}
-          to={pager.to}
-          total={pager.total}
-          page={pager.page}
-          pageCount={pager.pageCount}
-          size={pager.size}
-          onPage={pager.setPage}
-          onSize={pager.setSize}
+          {...data.window}
           noun="codes"
+          onPage={(page) => set({ page })}
+          onSize={(size) => set({ limit: size, page: null })}
         />
       </section>
 

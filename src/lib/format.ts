@@ -47,6 +47,17 @@ function zone(timeZone?: string): string {
 export function satang(amount: number | null): string {
   if (amount === null) return MASKED
   if (amount === 0) return FREE
+  return satangAmount(amount)
+}
+
+/**
+ * The same conversion with no special case for zero.
+ *
+ * A price of nothing is "Free"; a SUM of nothing is ฿0. A report column that
+ * has to add up, or a payout of no money, would read as nonsense with a word in
+ * it — and the reader cannot subtract "Free" from a total.
+ */
+export function satangAmount(amount: number): string {
   return baht(Math.round(amount / SATANG_PER_BAHT))
 }
 
@@ -104,10 +115,32 @@ const BANGKOK_OFFSET = '+07:00'
  * which reads the pair in the *browser's* zone and would move every deadline by
  * the organizer's distance from Thailand. Empty in, null out: a date nobody
  * filled in is not midnight today.
+ *
+ * Unreadable in, null out too — a field the browser degraded to a text box, or
+ * a replayed submission, can carry anything. Callers hand what could not be
+ * read to the API, which refuses it under its field; throwing here would take
+ * the whole route down instead and lose what the organizer had typed.
  */
 export function bangkokInstant(date: string, time = '00:00'): string | null {
   if (!date) return null
-  return new Date(`${date}T${time || '00:00'}:00${BANGKOK_OFFSET}`).toISOString()
+  const at = new Date(`${date}T${time || '00:00'}:00${BANGKOK_OFFSET}`)
+  return Number.isNaN(at.getTime()) ? null : at.toISOString()
+}
+
+/**
+ * A `datetime-local` value (`YYYY-MM-DDTHH:mm`), picked on the Bangkok clock →
+ * the UTC instant the API stores. The field carries no zone of its own; read
+ * as the browser's, it would move a scheduled send by the organizer's distance
+ * from Thailand. Empty in, null out: an empty field is not "now".
+ */
+export function bangkokInstantOfLocal(value: string): string | null {
+  const [date = '', time = ''] = value.split('T')
+  return bangkokInstant(date, time)
+}
+
+/** An instant → the `datetime-local` value showing it on the Bangkok clock. */
+export function bangkokLocalInput(instant: string): string {
+  return `${bangkokDayKey(instant)}T${bangkokTime(instant)}`
 }
 
 /**

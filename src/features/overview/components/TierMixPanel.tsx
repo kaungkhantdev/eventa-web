@@ -1,8 +1,7 @@
-import { DonutChart } from '@/components/ui'
+import { DonutChart, PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { num } from '@/lib/format'
 import type { TierRow } from '../overview.types'
-import { PanelEmptyPreview } from './PanelChrome'
 
 /**
  * How registrations split across ticket types (US-DASH-10).

@@ -1,48 +1,61 @@
-import { useState } from 'react'
+import { useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
-  HeaderUser,
   Button,
-  Icon,
   Card,
-  Panel,
-  Label,
-  Input,
-  Select,
-  Textarea,
-  Hint,
   EventPicker,
+  HeaderUser,
+  Icon,
+  PageFooter,
+  PageHeader,
+  PanelEmptyPreview,
+  PastEnd,
+  Paginator,
 } from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
-import { cn } from '@/lib/cn'
-import { num } from '@/lib/format'
-import {
-  ANNOUNCEMENTS,
-  ANNOUNCEMENT_AUDIENCES,
-  type Announcement,
-} from '../data/announcements'
+import { useFilters } from '@/lib/useFilters'
+import type { AnnouncementsData } from '../announcements.routes'
+import type { AnnouncementRow } from '../announcements.mapper'
+import { AnnouncementListItem } from '../components/AnnouncementListItem'
+import { CancelAnnouncementModal } from '../components/CancelAnnouncementModal'
+import { ComposePanel } from '../components/ComposePanel'
+import { RescheduleModal } from '../components/RescheduleModal'
+import { useRowDialog } from '../useRowDialog'
 
-const STATUS_BADGE: Record<Announcement['status'], { cls: string; icon: string; label: string }> = {
-  sent: { cls: 'badge-green', icon: 'hgi-tick-02', label: 'Sent' },
-  scheduled: { cls: 'badge-blue', icon: 'hgi-time-schedule', label: 'Scheduled' },
-}
-
-const ICON_WRAP: Record<Announcement['status'], string> = {
-  sent: 'bg-brand-soft text-brand',
-  scheduled: 'bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300',
-}
-
+/**
+ * Broadcasts sent to an event's attendees, and the ones still to go
+ * (US-MSG-04/05). Ported from `eventa-ui-kit/admin/messaging-announcements.html`.
+ *
+ * Two of the composer's controls are gone, because the send they configure
+ * does not exist:
+ *
+ * - **Audience.** The broadcast goes to an event's CONFIRMED attendees. There
+ *   is no waitlist domain and no checked-in-only send, so a picker offering
+ *   them would choose between one real option and two imaginary ones.
+ * - **Channel.** Email only — there is no SMS provider in the product.
+ * - **"All events".** The send takes one event; a broadcast to every attendee
+ *   in the workspace is a different feature with different consent questions.
+ *
+ * **Schedule** is back: an announcement can be given a Bangkok time, and
+ * cancelled or moved until it goes. The list carries the kit's status badge
+ * again, because the rows no longer all say the same thing. What it
+ * deliberately does NOT say is "Delivered" — this app knows the broadcast was
+ * queued, not that it arrived. That is US-MSG-06.
+ *
+ * Reschedule and Cancel have no markup in the kit, so they are assembled from
+ * its own primitives.
+ */
 export default function MessagingAnnouncementsPage() {
+  const data = useLoaderData() as AnnouncementsData
   const panel = useDisclosure()
-  const [sendMode, setSendMode] = useState<'now' | 'schedule'>('now')
-  const [announceEvent, setAnnounceEvent] = useState('All events')
+  const moving = useRowDialog<AnnouncementRow>()
+  const cancelling = useRowDialog<AnnouncementRow>()
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
 
   return (
     <>
       <PageHeader
         title="Announcements"
-        subtitle="Broadcasts sent to registrants, checked-in attendees or your waitlist."
+        subtitle="One-off emails to everyone registered for an event — now, or at a time you pick."
         actions={
           <>
             <Button variant="primary" className="shrink-0" onClick={panel.onOpen}>
@@ -55,154 +68,75 @@ export default function MessagingAnnouncementsPage() {
         }
       />
 
-      {/* ============ ANNOUNCEMENTS ============ */}
-      <Card className="p-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-[15px] font-bold tracking-tight">Sent announcements</h2>
-            <p className="mt-0.5 text-[12px] text-muted">
-              Broadcast messages sent to registrants, checked-in attendees or your waitlist.
-            </p>
-          </div>
-          <Button variant="primary" size="sm" className="shrink-0" onClick={panel.onOpen}>
-            <Icon name="hgi-megaphone-01" size={14} />
-            Send announcement
-          </Button>
-        </div>
-      </Card>
+      <div className="mb-3 w-full sm:w-52">
+        <EventPicker
+          value={params.get('eventId') ?? ''}
+          // '' rather than a label, so choosing "All events" drops `?eventId=`
+          // instead of sending a name the API cannot match.
+          allValue=""
+          options={data.events}
+          onChange={(eventId) => set({ eventId, page: null })}
+          className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
+        />
+      </div>
 
-      <Card className="mt-3 p-4">
-        {ANNOUNCEMENTS.map((a, i) => {
-          const badge = STATUS_BADGE[a.status]
-          return (
-            <div
-              key={a.title + a.date}
-              className={cn('flex items-center gap-3 py-3', i > 0 && 'border-t border-line')}
-            >
-              <span
-                className={cn(
-                  'grid h-10 w-10 shrink-0 place-items-center rounded-xl',
-                  ICON_WRAP[a.status],
-                )}
-              >
-                <i className="hgi-stroke hgi-megaphone-01 text-[18px]" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-semibold text-ink">{a.title}</p>
-                <p className="mt-0.5 truncate text-[11px] text-muted tnum">
-                  {a.event} · {num(a.recipients)} recipients · {a.date}
-                </p>
-              </div>
-              <div className="hidden items-center gap-1.5 sm:flex">
-                {a.channels.includes('email') && (
-                  <span className="badge badge-blue">
-                    <i className="hgi-stroke hgi-mail-01 text-[12px]" />
-                    Email
-                  </span>
-                )}
-                {a.channels.includes('sms') && (
-                  <span className="badge badge-green">
-                    <i className="hgi-stroke hgi-smart-phone-01 text-[12px]" />
-                    SMS
-                  </span>
-                )}
-              </div>
-              <span className={cn('badge shrink-0', badge.cls)}>
-                <i className={cn('hgi-stroke', badge.icon, 'text-[12px]')} />
-                {badge.label}
-              </span>
-            </div>
-          )
-        })}
+      <Card className="p-4">
+        <h2 className="text-[15px] font-bold tracking-tight">Sent &amp; scheduled</h2>
+        <p className="mt-0.5 text-[12px] text-muted">
+          What is still to go, then what has gone. A sent announcement cannot be unsent.
+        </p>
+
+        {data.rows.length ? (
+          <div className="mt-1">
+            {data.rows.map((row, i) => (
+              <AnnouncementListItem
+                key={row.id}
+                row={row}
+                first={i === 0}
+                onReschedule={moving.show}
+                onCancel={cancelling.show}
+              />
+            ))}
+          </div>
+        ) : emptyReason === 'past-end' ? (
+          /* The announcements exist, they are further back. A ghost of rows
+             here would claim they belong on this page. */
+          <PastEnd noun="announcements" onFirstPage={clear} />
+        ) : emptyReason === 'no-results' ? (
+          <PanelEmptyPreview
+            preview="announcements"
+            description="Nothing has been sent to this event’s attendees, and nothing is scheduled. Pick another event, or send the first one."
+            action={{ label: 'All events', icon: 'hgi-refresh', onClick: clear }}
+          >
+            No announcements for this event.
+          </PanelEmptyPreview>
+        ) : (
+          <PanelEmptyPreview
+            preview="announcements"
+            description="A one-off email to everyone registered for an event — a venue change, a schedule update, a thank-you. Send it now or schedule it."
+            action={{
+              label: 'Send announcement',
+              icon: 'hgi-megaphone-01',
+              onClick: panel.onOpen,
+            }}
+          >
+            Nothing sent yet.
+          </PanelEmptyPreview>
+        )}
+
+        <Paginator
+          {...data.window}
+          noun="announcements"
+          onPage={(page) => set({ page })}
+          onSize={(size) => set({ limit: size, page: null })}
+        />
       </Card>
 
       <PageFooter />
 
-      {/* Send announcement panel */}
-      <Panel
-        open={panel.open}
-        onClose={panel.onClose}
-        title="Send announcement"
-        footer={
-          <>
-            <Button variant="soft" className="flex-1" onClick={panel.onClose}>
-              Cancel
-            </Button>
-            <Button variant="primary" className="flex-1" onClick={panel.onClose}>
-              Send
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <Label>Event</Label>
-            <div className="relative">
-              <EventPicker value={announceEvent} onChange={setAnnounceEvent} />
-            </div>
-          </div>
-          <div>
-            <Label>Audience</Label>
-            <Select defaultValue={ANNOUNCEMENT_AUDIENCES[0]}>
-              {ANNOUNCEMENT_AUDIENCES.map((aud) => (
-                <option key={aud}>{aud}</option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label>Channel</Label>
-            <div className="flex gap-2">
-              <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-hair px-3 py-2 text-[13px] text-ink">
-                <input type="checkbox" className="checkbox" defaultChecked />
-                <i className="hgi-stroke hgi-mail-01 text-[15px] text-muted" />
-                Email
-              </label>
-              <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-lg border border-hair px-3 py-2 text-[13px] text-ink">
-                <input type="checkbox" className="checkbox" defaultChecked />
-                <i className="hgi-stroke hgi-smart-phone-01 text-[15px] text-muted" />
-                SMS
-              </label>
-            </div>
-          </div>
-          <div>
-            <Label>Subject</Label>
-            <Input type="text" placeholder="e.g. Venue change for Tech Summit 2026" />
-          </div>
-          <div>
-            <Label>Message</Label>
-            <Textarea placeholder="Write your announcement…" rows={5} />
-            <Hint>
-              Recipients receive this as an email and/or SMS depending on the channels selected
-              above.
-            </Hint>
-          </div>
-          <div>
-            <Label>Delivery</Label>
-            <div className="segmented w-full">
-              <button
-                type="button"
-                className={cn('flex-1', sendMode === 'now' && 'active')}
-                onClick={() => setSendMode('now')}
-              >
-                Send now
-              </button>
-              <button
-                type="button"
-                className={cn('flex-1', sendMode === 'schedule' && 'active')}
-                onClick={() => setSendMode('schedule')}
-              >
-                Schedule
-              </button>
-            </div>
-          </div>
-          {sendMode === 'schedule' && (
-            <div>
-              <Label>Send date &amp; time</Label>
-              <Input type="datetime-local" />
-            </div>
-          )}
-        </div>
-      </Panel>
+      <ComposePanel open={panel.open} onClose={panel.onClose} events={data.events} />
+      <RescheduleModal dialog={moving} />
+      <CancelAnnouncementModal dialog={cancelling} />
     </>
   )
 }

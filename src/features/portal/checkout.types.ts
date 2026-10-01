@@ -38,6 +38,8 @@ export interface CheckoutTierWire {
   maxPerOrder: number
   /** `null` means unlimited — emphatically not "none left". */
   remaining: number | null
+  /** Sold out, and a buyer may join its waitlist instead (US-REG-04). */
+  waitlist: boolean
 }
 
 export interface CheckoutSeatWire {
@@ -53,7 +55,8 @@ export interface CheckoutViewWire {
   event: CheckoutEventWire
   tiers: CheckoutTierWire[]
   seatMap: { seats: CheckoutSeatWire[] } | null
-  notes: { seating: string | null; delivery: string | null }
+  /** `approval`: the event requires approval — said before anybody pays (US-REG-02). */
+  notes: { seating: string | null; delivery: string | null; approval: string | null }
   maxPerBooking: number
   paymentRequired: boolean
 }
@@ -81,6 +84,17 @@ export interface OrderSummaryWire {
   paymentRequired: boolean
 }
 
+/** `POST /public/checkout/waitlist` — where the buyer now stands. */
+export interface WaitlistJoinedWire {
+  orderId: string
+  reference: string
+  eventName: string
+  ticketTypeName: string
+  quantity: number
+  /** 1 is next in line. */
+  position: number
+}
+
 export interface CheckoutHoldWire {
   holdIds: number[]
   expiresAt: string
@@ -106,6 +120,11 @@ export interface OrderPlacedWire {
   summary: OrderSummaryWire
   tickets: IssuedTicketWire[]
   paymentRequired: boolean
+  /**
+   * The registration now waits for the organizer to approve it (US-REG-02). A
+   * paid one starts waiting only once its payment lands, so reads false here.
+   */
+  awaitingApproval: boolean
 }
 
 /* ── what the page renders ────────────────────────────────────────────── */
@@ -120,6 +139,8 @@ export interface TierOption {
   isFree: boolean
   /** False when this tier cannot be bought — paused, sold out, not yet open. */
   selectable: boolean
+  /** Sold out with its waitlist open: chosen to JOIN the line, not to buy. */
+  waitlist: boolean
   /** Why not, in words, or `null` when it can be selected. */
   unavailableReason: string | null
   minPerOrder: number
@@ -172,6 +193,18 @@ export interface SummaryLines {
   paymentRequired: boolean
 }
 
+/** What the page says once the buyer has joined the waitlist. */
+export interface WaitlistPlace {
+  /** Their own page for this registration — the offer will link there too. */
+  orderId: string
+  reference: string
+  eventName: string
+  /** e.g. `2 × General admission`. */
+  ticketsLabel: string
+  /** e.g. `You're 3rd in line`. */
+  place: string
+}
+
 /** What the success step says once the order exists. */
 export interface PlacedOrder {
   /** Where the buyer's own copy of this order lives — no account needed. */
@@ -183,6 +216,8 @@ export interface PlacedOrder {
   ticketCount: number
   total: string
   paymentRequired: boolean
+  /** Placed, but waiting for the organizer — not registered yet (US-REG-02). */
+  awaitingApproval: boolean
 }
 
 /** `POST /public/payments` — the payment the API started, verbatim. */

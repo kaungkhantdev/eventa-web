@@ -1,4 +1,4 @@
-import { MASKED, bangkokDate, initials, satang } from '@/lib/format'
+import { MASKED, bangkokDate, bangkokTime, initials, satang } from '@/lib/format'
 import type {
   Registration,
   RegistrationEntry,
@@ -14,6 +14,11 @@ const STATUS_LABEL: Record<RegistrationWireStatus, RegistrationStatus> = {
   cancelled: 'Cancelled',
   rejected: 'Rejected',
 }
+
+const PAID = 'paid'
+const REJECT = 'Reject'
+/** Said before the click: this rejection gives the buyer's money back (US-REG-02). */
+const REJECT_AND_REFUND = 'Reject and refund'
 
 /**
  * One queue row, display-ready (US-REG-01).
@@ -43,5 +48,44 @@ export function toRegistrationRow(entry: RegistrationEntry): Registration {
     approveBlockedReason: entry.approveBlockedReason,
     canReject: entry.canReject,
     rejectBlockedReason: entry.rejectBlockedReason,
+    rejectLabel: entry.rejectRefunds ? REJECT_AND_REFUND : REJECT,
+    canOffer: entry.canOffer,
+    offerHint: offerHintOf(entry.waitlistPosition),
+    statusNote: statusNoteOf(entry),
   }
+}
+
+/**
+ * Where a waitlist entry stands, or until when an offer holds its seat
+ * (US-REG-04). The deadline is on Bangkok's clock, the one the attendee's
+ * email gives them. A registration awaiting approval says so (US-REG-02) —
+ * "Pending" alone reads as "not paid yet" — and a rejection still holding the
+ * buyer's money says the refund has not gone through.
+ */
+function statusNoteOf(entry: RegistrationEntry): string | null {
+  if (entry.status === 'waitlisted' && entry.waitlistPosition !== null) {
+    return entry.waitlistPosition <= 1 ? 'Next in line' : `#${entry.waitlistPosition} in line`
+  }
+  if (entry.status === 'pending' && entry.awaitingApproval) {
+    return entry.paymentStatus === PAID ? 'Paid · awaiting approval' : 'Awaiting approval'
+  }
+  if (entry.status === 'rejected' && entry.paymentStatus === PAID) {
+    return 'Payment not yet refunded'
+  }
+  if (entry.status === 'pending' && entry.offerExpiresAt) {
+    const until = entry.offerExpiresAt
+    return `Offer open until ${bangkokDate(until)} ${bangkokTime(until)}`
+  }
+  return null
+}
+
+/**
+ * Offering a seat to someone further back is allowed — the story says so —
+ * but it passes people over, and the API records that. Said before the click.
+ */
+function offerHintOf(position: number | null): string {
+  const ahead = (position ?? 1) - 1
+  if (ahead <= 0) return 'Offer a seat'
+  const people = ahead === 1 ? '1 person' : `${ahead} people`
+  return `Offer a seat — ${people} ahead of them will be passed over, and that is recorded`
 }

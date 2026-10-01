@@ -1,8 +1,8 @@
 import { Link } from 'react-router'
-import { Icon } from '@/components/ui'
+import { Icon, PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { AlertRow } from '../overview.types'
-import { PanelEmptyPreview, SectionHeader } from './PanelChrome'
+import { SectionHeader } from './PanelChrome'
 
 /**
  * What needs acting on (US-DASH-06).

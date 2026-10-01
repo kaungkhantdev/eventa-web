@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { Icon, type EmptyAction } from '@/components/ui'
+import { Icon, PanelEmptyPreview, type EmptyAction } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { TodayRegistrations } from '../overview.types'
-import { CountBadge, PanelEmptyPreview, SectionHeader } from './PanelChrome'
+import { CountBadge, SectionHeader } from './PanelChrome'
 
 /**
  * Today's sign-ups (US-DASH-02). Markup ported from admin/home.html.

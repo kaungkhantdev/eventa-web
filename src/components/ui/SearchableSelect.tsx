@@ -30,7 +30,7 @@ export interface SearchableSelectProps {
   noun?: string
   /** Shown on the trigger when nothing is selected. */
   placeholder?: string
-  /** Leading icon slug on the trigger. Positioned against the caller's `relative`. */
+  /** Leading icon slug on the trigger. Anchored to the trigger itself. */
   icon?: string
   disabled?: boolean
   className?: string
@@ -70,7 +70,11 @@ export function SearchableSelect({
         aria-expanded={open}
         aria-label={selected ? `${label}: ${selected.label}` : label}
         className={cn(
-          'select inline-flex items-center text-left disabled:opacity-60',
+          // `relative` so the leading icon below anchors to this button. It used
+          // to rely on the caller wrapping it in a positioned box, which the
+          // list filters happen to do and the panel form fields do not — there
+          // the icon escaped and floated over whatever sat above the field.
+          'select relative inline-flex items-center text-left disabled:opacity-60',
           icon && 'pl-9',
           className,
         )}

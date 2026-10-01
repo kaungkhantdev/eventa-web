@@ -1,12 +1,22 @@
 import { useState, type ReactNode } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
-import { Badge, Button, Card, FieldError, Hint, Icon, Input, Label, Select } from '@/components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  FieldError,
+  Hint,
+  Icon,
+  Input,
+  Label,
+  Select,
+  Toggle,
+} from '@/components/ui'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
 import { useFilters } from '@/lib/useFilters'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
-import { Toggle } from '../components/Toggle'
 import type { PaymentsData } from '../settings.routes'
 import type { PaymentMethodRow, PaymentSettingsCard } from '../settings.types'
 

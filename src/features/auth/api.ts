@@ -16,6 +16,19 @@ export interface VerifiedEmail {
   persona: Persona
 }
 
+/**
+ * Whose reset link this is, from `POST /auth/reset-password/check`.
+ *
+ * `workspaceName` is the organizer account's workspace — an organizer with
+ * accounts in several gets one link per account, so the page can say which it
+ * is resetting. Always `null` for an attendee: their realm is the platform
+ * organization, which is never named to them.
+ */
+export interface ResetLinkCheck {
+  persona: Persona
+  workspaceName: string | null
+}
+
 /** What the API actually returns — flattened into `LoginResult` below. */
 interface RawLogin {
   twoFactorRequired: boolean
@@ -59,21 +72,43 @@ export const authApi = {
   },
 
   /**
-   * Start a password reset. Resolves the same way whether or not the address
-   * has an account — the API answers uniformly on purpose, so this endpoint
-   * cannot be used to discover who is registered. The page must show the same
-   * confirmation either way.
+   * Start a password reset. Resolves only when a link was sent. When none can
+   * be, the API says why and this throws its `ApiError`: no account in that
+   * audience (404, naming the other audience), an account that signs in with a
+   * social provider or cannot sign in yet (422), too many attempts (429). The
+   * API tells these apart on purpose (US-ACC-04), and its message is written
+   * for the person — show it as it is.
    */
   async forgotPassword(email: string, persona: Persona): Promise<void> {
     // Stated rather than defaulted: the API looks the address up in that
-    // persona's realm, so an attendee sent as an organizer is never found and
-    // the uniform "check your inbox" would be a lie.
+    // persona's realm, so an attendee sent as an organizer is told that no
+    // organizer account uses the address.
     await api.post('/auth/forgot-password', { email, persona }, { anonymous: true })
   },
 
-  /** Finish a reset with the token from the emailed link. */
-  async resetPassword(token: string, password: string): Promise<void> {
-    await api.post('/auth/reset-password', { token, password }, { anonymous: true })
+  /**
+   * Whether an emailed reset link can still be used, and whose it is — asked
+   * when the link is opened, WITHOUT spending it (US-ACC-04).
+   *
+   * The token goes in the body, never a query string: a URL is what the API's
+   * access log records. An invalid, expired or already-used link is a 422 whose
+   * message is the reset endpoint's own, written for the person holding it.
+   */
+  checkResetLink(token: string): Promise<ResetLinkCheck> {
+    return api.post<ResetLinkCheck>('/auth/reset-password/check', { token }, { anonymous: true })
+  },
+
+  /**
+   * Finish a reset with the token from the emailed link. `newPassword` is the
+   * name `ResetPasswordDto` requires — the API's whitelist refuses any other.
+   * Resolves with the API's confirmation, worded for the person reading it.
+   */
+  resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    return api.post<{ message: string }>(
+      '/auth/reset-password',
+      { token, newPassword },
+      { anonymous: true },
+    )
   },
 
   /**

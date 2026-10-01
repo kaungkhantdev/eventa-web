@@ -1,8 +1,20 @@
 import { queryOf, type LoaderArgs } from '@/app/loaders'
 import { ApiError, NetworkError, messageOf } from '@/lib/api'
 import { checkoutApi, type Buyer, type Selection } from './checkout.api'
-import { toCheckoutView, toPaymentStep, toPlacedOrder, toSummaryLines } from './checkout.mapper'
-import type { CheckoutView, PaymentStep, PlacedOrder, SummaryLines } from './checkout.types'
+import {
+  toCheckoutView,
+  toPaymentStep,
+  toPlacedOrder,
+  toSummaryLines,
+  toWaitlistPlace,
+} from './checkout.mapper'
+import type {
+  CheckoutView,
+  PaymentStep,
+  PlacedOrder,
+  SummaryLines,
+  WaitlistPlace,
+} from './checkout.types'
 
 /**
  * Registering for an event (US-DISC-04/05/06).
@@ -21,6 +33,7 @@ export interface CheckoutData {
 export type CheckoutResult =
   | { ok: true; intent: 'quote'; summary: SummaryLines }
   | { ok: true; intent: 'book'; order: PlacedOrder; payment: PaymentStep | null }
+  | { ok: true; intent: 'waitlist'; place: WaitlistPlace }
   | { ok: false; error: string }
 
 const MISSING_EVENT = 'This registration link does not name an event.'
@@ -39,7 +52,7 @@ export const checkoutRoute = {
   action: async ({ request }: LoaderArgs): Promise<CheckoutResult> => {
     const form = await request.formData()
     try {
-      return form.get('intent') === 'book' ? await book(form) : await quote(form)
+      return await (INTENTS[String(form.get('intent'))] ?? quote)(form)
     } catch (cause) {
       // The API's refusal is written for the buyer — a seat taken while they
       // were deciding, a code that has run out. Shown verbatim, beside the
@@ -50,6 +63,21 @@ export const checkoutRoute = {
       throw cause
     }
   },
+}
+
+/**
+ * Join a sold-out ticket's waitlist (US-REG-04). No hold, no payment: the API
+ * puts them in line and says where; an offer comes later, by email.
+ */
+async function joinWaitlist(form: FormData): Promise<CheckoutResult> {
+  const joined = await checkoutApi.joinWaitlist({
+    eventId: text(form, 'eventId'),
+    ticketTypeId: text(form, 'ticketTypeId'),
+    quantity: Number(form.get('quantity') ?? 1),
+    buyer: buyerOf(form),
+    idempotencyKey: idempotencyKeyOf(form),
+  })
+  return { ok: true, intent: 'waitlist', place: toWaitlistPlace(joined) }
 }
 
 async function quote(form: FormData): Promise<CheckoutResult> {
@@ -99,6 +127,12 @@ async function confirmOrRelease(form: FormData, selection: Selection, holdIds: n
     await checkoutApi.release(selection.eventId, holdIds).catch(() => undefined)
     throw cause
   }
+}
+
+/** What each submit button asks for; anything else is a price check. */
+const INTENTS: Record<string, (form: FormData) => Promise<CheckoutResult>> = {
+  book,
+  waitlist: joinWaitlist,
 }
 
 function selectionOf(form: FormData): Selection {

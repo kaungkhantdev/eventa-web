@@ -119,8 +119,26 @@ function guardedData<T>(persona: Persona, load: (args: LoaderArgs) => Promise<T>
  * is not the API talking (a bug, a thrown redirect) still propagates.
  */
 export function pageAction(run: (args: LoaderArgs) => Promise<unknown>) {
+  return guardedAction('admin', run)
+}
+
+/**
+ * The same, for a mutation the attendee portal owns — answering a survey, say.
+ *
+ * Separate from `pageAction` only in which sign-in an expired session is sent
+ * to. An attendee bounced to the organizer's login would be asked for a
+ * workspace they have no business having.
+ */
+export function attendeeAction(run: (args: LoaderArgs) => Promise<unknown>) {
+  return guardedAction('attendee', run)
+}
+
+function guardedAction(
+  persona: Persona,
+  run: (args: LoaderArgs) => Promise<unknown>,
+) {
   return async (args: LoaderArgs): Promise<ActionResult | Response> => {
-    requirePersona('admin')
+    requirePersona(persona)
     try {
       const result = await run(args)
       // An action that answers with a Response is redirecting — creating a
@@ -129,7 +147,7 @@ export function pageAction(run: (args: LoaderArgs) => Promise<unknown>) {
       if (result instanceof Response) return result
       return { ok: true }
     } catch (cause) {
-      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn('admin')
+      if (cause instanceof ApiError && cause.isUnauthorized) throw signIn(persona)
       if (cause instanceof ApiError || cause instanceof NetworkError) {
         return {
           ok: false,

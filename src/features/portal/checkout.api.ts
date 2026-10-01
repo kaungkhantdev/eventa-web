@@ -5,6 +5,7 @@ import type {
   OrderPlacedWire,
   OrderSummaryWire,
   PaymentIntentWire,
+  WaitlistJoinedWire,
 } from './checkout.types'
 
 /**
@@ -48,6 +49,18 @@ export const checkoutApi = {
       idempotencyKey: string
     },
   ) => api.post<OrderPlacedWire>('/public/checkout/confirm', body),
+
+  /**
+   * Join a sold-out ticket's waitlist (US-REG-04). Nothing is held and nothing
+   * is charged; the API prices the entry and answers with a place in line.
+   */
+  joinWaitlist: (body: {
+    eventId: string
+    ticketTypeId: string
+    quantity: number
+    buyer: Buyer
+    idempotencyKey: string
+  }) => api.post<WaitlistJoinedWire>('/public/checkout/waitlist', body),
 
   /**
    * Take the money.

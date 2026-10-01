@@ -1,9 +1,8 @@
 import { useFetcher, useLoaderData } from 'react-router'
-import { Card, Icon, PageFooter } from '@/components/ui'
+import { Card, Icon, PageFooter, Toggle } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
-import { Toggle } from '../components/Toggle'
 import type { NotificationsData } from '../settings.routes'
 import type { NotificationRow } from '../settings.types'
 

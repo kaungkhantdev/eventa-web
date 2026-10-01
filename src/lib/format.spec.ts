@@ -5,6 +5,8 @@ import {
   bangkokDateRange,
   bangkokDayKey,
   bangkokInstant,
+  bangkokInstantOfLocal,
+  bangkokLocalInput,
   bangkokLongDate,
   bangkokMonthKey,
   bangkokTime,
@@ -23,6 +25,57 @@ describe('a Bangkok date → the instant the API stores', () => {
   // A deadline nobody filled in is not midnight today.
   it('is null when there is no date', () => {
     expect(bangkokInstant('')).toBeNull()
+  })
+
+  // Null, not a thrown RangeError: the caller hands what it could not read
+  // straight to the API, which answers under the field.
+  it('is null when what was typed is not a date', () => {
+    expect(bangkokInstant('not-a-date')).toBeNull()
+    expect(bangkokInstant('2026-13-45')).toBeNull()
+    expect(bangkokInstant('2026-08-20', 'half past four')).toBeNull()
+  })
+})
+
+describe('a Bangkok date-and-time field ↔ the instant the API stores', () => {
+  // A `datetime-local` value carries no zone. The organizer picks it on the
+  // Bangkok clock, wherever their laptop thinks it is.
+  it('reads the field on the Bangkok clock', () => {
+    expect(bangkokInstantOfLocal('2026-08-05T10:00')).toBe('2026-08-05T03:00:00.000Z')
+  })
+
+  it('crosses midnight the right way', () => {
+    expect(bangkokInstantOfLocal('2026-08-06T03:00')).toBe('2026-08-05T20:00:00.000Z')
+  })
+
+  // An empty field is not "now".
+  it('is null when nothing was picked', () => {
+    expect(bangkokInstantOfLocal('')).toBeNull()
+  })
+
+  /**
+   * A `datetime-local` the browser degraded to a text box, or a replayed
+   * submission, can carry anything. The action passes what it could not read
+   * to the API, which refuses it under `sendAt` — so this answers null rather
+   * than throwing past the action and losing the composed message.
+   */
+  it('is null when the field holds something that is not a time', () => {
+    expect(bangkokInstantOfLocal('not-a-date')).toBeNull()
+    expect(bangkokInstantOfLocal('2026-13-45T10:00')).toBeNull()
+    expect(bangkokInstantOfLocal('2026-08-05T10:00:30')).toBeNull()
+  })
+
+  it('fills the field with the Bangkok wall time of an instant', () => {
+    expect(bangkokLocalInput('2026-08-06T08:00:00.000Z')).toBe('2026-08-06T15:00')
+  })
+
+  it('fills it with the Bangkok day, not the UTC one', () => {
+    expect(bangkokLocalInput('2026-08-05T20:00:00.000Z')).toBe('2026-08-06T03:00')
+  })
+
+  it('round-trips', () => {
+    expect(bangkokInstantOfLocal(bangkokLocalInput('2026-12-31T17:30:00.000Z'))).toBe(
+      '2026-12-31T17:30:00.000Z',
+    )
   })
 })
 

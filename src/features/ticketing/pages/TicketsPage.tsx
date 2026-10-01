@@ -170,8 +170,6 @@ export default function TicketsPage() {
                   aria-label="Search ticket types"
                 />
               </div>
-              {/* The wrapper keeps its `relative`: the picker draws its own
-                  leading icon absolutely, against the caller's ancestor. */}
               <div className="relative w-full sm:w-56">
                 <EventPicker
                   value={params.get('eventId') ?? ''}
@@ -243,7 +241,7 @@ export default function TicketsPage() {
       <TicketPanel
         open={panel.open}
         onClose={panel.onClose}
-        editing={editing}
+        editing={editing?.edit ?? null}
         events={data.events}
       />
 

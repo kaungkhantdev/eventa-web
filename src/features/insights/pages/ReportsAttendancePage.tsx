@@ -1,59 +1,29 @@
-import { useMemo, useState } from 'react'
+import { useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
+  ExportMenu,
   HeaderUser,
-  Button,
-  Icon,
-  EventPicker,
+  PageFooter,
+  PageHeader,
   Paginator,
-  usePagination,
 } from '@/components/ui'
-import { num } from '@/lib/format'
-import { REPORTS_EVENTS } from '../data/reportsEvents'
+import { useFilters } from '@/lib/useFilters'
+import { ReportEmptyRow } from '../components/ReportEmptyRow'
+import { ReportFilters } from '../components/ReportFilters'
+import { StatTile } from '../components/StatTile'
+import { REPORT_DOWNLOADS } from '../insights.exports'
+import type { AttendanceReportData } from '../insights.routes'
 
-/* Attendance by event — derived from the shared REPORTS_EVENTS data, matching
-   the static kit's inline mapping (checked-in = regs × att%, no-shows =
-   registered − checked-in). */
-const ROWS = REPORTS_EVENTS.map((e) => {
-  const registered = e.regs
-  const att = e.att || 0
-  const checkedin = Math.round(e.regs * (att / 100))
-  const noshows = registered - checkedin
-  return {
-    name: e.name,
-    meta: e.meta,
-    registered,
-    checkedin,
-    noshows,
-    pct: e.att ? e.att + '%' : '—',
-  }
-})
-
+/**
+ * Attendance and no-shows (US-RPT-09). Layout ported from the kit.
+ *
+ * A dash in this table is not a missing number: an event that has not started
+ * has no attendance to report, which is a different fact from an event nobody
+ * came to. The API draws that line and the page keeps it.
+ */
 export default function ReportsAttendancePage() {
-  const [event, setEvent] = useState<string>('All events')
-  const [q, setQ] = useState('')
-
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase()
-    return ROWS.filter((r) => {
-      if (!(event === 'All events' || r.name === event)) return false
-      if (!query) return true
-      return (r.name + ' ' + r.meta).toLowerCase().indexOf(query) !== -1
-    })
-  }, [event, q])
-
-  const pager = usePagination(filtered)
-  const { setPage } = pager
-
-  const onSearch = (v: string) => {
-    setQ(v)
-    setPage(1)
-  }
-  const onEvent = (v: string) => {
-    setEvent(v)
-    setPage(1)
-  }
+  const data = useLoaderData() as AttendanceReportData
+  const { set, clear, emptyReason } = useFilters({ total: data.window.total })
+  const { tiles } = data
 
   return (
     <>
@@ -62,93 +32,25 @@ export default function ReportsAttendancePage() {
         subtitle="Check-in and show-up rates across all events."
         actions={
           <>
-            <Button variant="primary">
-              <Icon name="hgi-download-01" size={16} />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
+            <ExportMenu downloads={REPORT_DOWNLOADS.attendance} query={data.exportQuery} />
             <HeaderUser />
           </>
         }
       />
 
-      {/* filter bar: search + event */}
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:w-64">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => onSearch(e.target.value)}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search events…"
-          />
-        </div>
-        <div className="relative w-full sm:w-52">
-          <EventPicker
-            value={event}
-            onChange={onEvent}
-            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
-          />
-        </div>
-      </div>
+      <ReportFilters events={data.events} />
 
-      {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-user-check-01 text-[16px]" />
-            Checked in
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">1,058</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              5.5%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-checkmark-badge-01 text-[16px]" />
-            Attendance rate
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">79%</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-red-500">
-              <i className="hgi-stroke hgi-arrow-down-right-01 text-[13px]" />
-              1.4%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-user-remove-01 text-[16px]" />
-            No-shows
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">282</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-red-500">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              1.4%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-clock-01 text-[16px]" />
-            On-time
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">91%</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              2.0%
-            </span>
-          </div>
-        </div>
+        <StatTile icon="hgi-user-check-01" label="Checked in" {...tiles.checkedIn} />
+        <StatTile
+          icon="hgi-checkmark-badge-01"
+          label="Attendance rate"
+          {...tiles.attendanceRate}
+        />
+        <StatTile icon="hgi-user-remove-01" label="No-shows" {...tiles.noShows} />
+        <StatTile icon="hgi-clock-01" label="On-time" {...tiles.onTimeRate} />
       </div>
 
-      {/* detailed table: attendance by event */}
       <section className="card mt-3 p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -168,42 +70,42 @@ export default function ReportsAttendancePage() {
               </tr>
             </thead>
             <tbody className="text-[13px]">
-              {pager.slice.length ? (
-                pager.slice.map((r) => (
-                  <tr key={r.name}>
+              {data.rows.length ? (
+                data.rows.map((row) => (
+                  <tr key={row.id}>
                     <td>
                       <div>
-                        <p className="font-semibold text-ink">{r.name}</p>
-                        <p className="text-[11px] text-muted">{r.meta}</p>
+                        <p className="font-semibold text-ink">{row.name}</p>
+                        <p className="text-[11px] text-muted">{row.meta}</p>
                       </div>
                     </td>
-                    <td className="text-right text-ink tnum">{num(r.registered)}</td>
-                    <td className="text-right text-ink tnum">{num(r.checkedin)}</td>
-                    <td className="text-right text-muted tnum">{num(r.noshows)}</td>
-                    <td className="text-right font-semibold text-ink tnum">{r.pct}</td>
+                    <td className="text-right text-ink tnum">{row.registered}</td>
+                    <td className="text-right text-ink tnum">{row.checkedIn}</td>
+                    <td className="text-right text-muted tnum">{row.noShows}</td>
+                    <td className="text-right font-semibold text-ink tnum">
+                      {row.attendanceRate}
+                    </td>
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={5} className="py-10 text-center text-[13px] text-muted">
-                    No attendance for this selection.
-                  </td>
-                </tr>
+                <ReportEmptyRow
+                  colSpan={5}
+                  noun="events"
+                  reason={emptyReason}
+                  onClear={clear}
+                >
+                  No event with attendance matches the current search and event filter. Try widening the period.
+                </ReportEmptyRow>
               )}
             </tbody>
           </table>
         </div>
 
         <Paginator
-          from={pager.from}
-          to={pager.to}
-          total={pager.total}
-          page={pager.page}
-          pageCount={pager.pageCount}
-          size={pager.size}
-          onPage={pager.setPage}
-          onSize={pager.setSize}
+          {...data.window}
           noun="events"
+          onPage={(page) => set({ page })}
+          onSize={(size) => set({ limit: size, page: null })}
         />
       </section>
 

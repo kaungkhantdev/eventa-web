@@ -15,8 +15,10 @@ const wire = (over: Partial<TicketWire> = {}): TicketWire => ({
   status: 'onsale',
   sold: 210,
   total: 250,
+  maxPerOrder: 4,
   salesStartAt: null,
   salesEndAt: null,
+  version: 7,
   ...over,
 })
 
@@ -61,5 +63,59 @@ describe('toTicketCard', () => {
 
   it('gives a tier the same icon tint on every visit', () => {
     expect(toTicketCard(wire()).iconTint).toBe(toTicketCard(wire()).iconTint)
+  })
+})
+
+describe('toTicketCard — the edit draft', () => {
+  // The card's strings are for reading; the form needs figures it can put in a
+  // number box and send back. Keeping them apart is what stops the panel from
+  // parsing '฿2,900' back into a price.
+  it("hands the edit form the tier's own figures, not the strings the card shows", () => {
+    const card = toTicketCard(wire())
+
+    expect(card.edit.price).toBe(2_900)
+    expect(card.edit.total).toBe(250)
+    expect(card.price).toBe('฿2,900')
+  })
+
+  // 20:00 UTC is already the next day in Bangkok, so the first ten characters
+  // of the ISO string name the wrong day for every evening window.
+  it("dates the sales window on the Bangkok clock, not the reader's", () => {
+    const card = toTicketCard(wire({ salesStartAt: '2026-07-07T20:00:00Z' }))
+
+    expect(card.edit.salesStartDay).toBe('2026-07-08')
+  })
+
+  // A date box holds a day and nothing finer, so the day alone cannot say what
+  // time a window opens. The instant travels beside it, and is what goes back.
+  it('keeps the stored instant beside the day the box shows', () => {
+    const card = toTicketCard(wire({ salesEndAt: '2026-08-31T16:59:59.000Z' }))
+
+    expect(card.edit.salesEndDay).toBe('2026-08-31')
+    expect(card.edit.salesEndAt).toBe('2026-08-31T16:59:59.000Z')
+  })
+
+  it('leaves an unset window empty rather than inventing a date', () => {
+    const card = toTicketCard(wire({ salesStartAt: null, salesEndAt: null }))
+
+    expect(card.edit.salesStartDay).toBe('')
+    expect(card.edit.salesEndDay).toBe('')
+    expect(card.edit.salesStartAt).toBe('')
+    expect(card.edit.salesEndAt).toBe('')
+  })
+
+  // 0 is the allocation "unlimited", a real answer the form has to carry back.
+  it('carries an unlimited allocation as the 0 it is', () => {
+    expect(toTicketCard(wire({ total: 0 })).edit.total).toBe(0)
+  })
+
+  // The per-order cap is a figure the organizer set and the panel must reopen
+  // with; the version is the read this edit is answering. Both reach the draft
+  // only because the inventory response now carries them.
+  it("carries the tier's per-order cap and the version it was read at", () => {
+    const card = toTicketCard(wire({ maxPerOrder: 6, version: 12 }))
+
+    expect(card.edit.maxPerOrder).toBe(6)
+    expect(card.edit.version).toBe(12)
   })
 })

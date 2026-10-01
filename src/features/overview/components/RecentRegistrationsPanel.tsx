@@ -1,6 +1,7 @@
+import { PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { RecentRow } from '../overview.types'
-import { PanelEmptyPreview, SectionHeader } from './PanelChrome'
+import { SectionHeader } from './PanelChrome'
 
 /** The latest registrations (US-DASH-12). */
 

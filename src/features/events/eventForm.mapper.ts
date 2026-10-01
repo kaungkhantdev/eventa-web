@@ -51,6 +51,10 @@ export interface EventFormValues {
   onlineNote: string
   seatingMode: 'ga' | 'reserved'
   capacity: string
+  /** Let attendees queue for a sold-out general-admission ticket (US-REG-04). */
+  waitlistEnabled: boolean
+  /** Hold each registration for the organizer's decision (US-REG-02). */
+  requiresApproval: boolean
   seatMapName: string
   seatRows: string
   seatsPerRow: string
@@ -84,6 +88,8 @@ function emptyValues(): EventFormValues {
     onlineNote: '',
     seatingMode: 'ga',
     capacity: '',
+    waitlistEnabled: false,
+    requiresApproval: false,
     seatMapName: '',
     seatRows: '',
     seatsPerRow: '',
@@ -133,6 +139,8 @@ export function toEventFormValues(
     city: event.city ?? '',
     isOnline: event.isOnline,
     capacity: event.capacity === null ? '' : String(event.capacity),
+    waitlistEnabled: event.waitlistEnabled ?? false,
+    requiresApproval: event.requiresApproval ?? false,
     coverImage: event.coverImage ?? '',
     tickets: tickets.map((ticket) => ({
       id: ticket.id,
@@ -178,6 +186,8 @@ export function toUpdateBody(values: EventFormValues) {
     isOnline: values.isOnline,
     onlineNote: values.onlineNote.trim(),
     coverImage: values.coverImage.trim(),
+    waitlistEnabled: values.waitlistEnabled,
+    requiresApproval: values.requiresApproval,
     ...capacityOf(values.capacity),
     ...(values.version === null ? {} : { version: values.version }),
   }

@@ -230,7 +230,27 @@ function MeetingRow({ card, onEdit }: { card: MeetingCard; onEdit: () => void })
         <p className="mt-0.5 text-[12px] text-muted">
           {card.who} · {card.event}
         </p>
-        {card.place && <p className="mt-0.5 truncate text-[12px] text-muted">{card.place}</p>}
+        {/* The kit's "where" line: an icon for how the meeting happens, and for
+            a video call the Meet link itself, clickable. It was plain grey text
+            here, so the one thing on the row somebody needs at the top of the
+            hour could not be opened without first opening the meeting. */}
+        {(card.place || card.link) && (
+          <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted">
+            <Icon name={card.modeIcon} size={13} className="shrink-0" />
+            {card.link ? (
+              <a
+                href={card.link}
+                target="_blank"
+                rel="noopener"
+                className="truncate font-medium text-brand hover:underline"
+              >
+                {card.place || card.link}
+              </a>
+            ) : (
+              <span className="truncate">{card.place}</span>
+            )}
+          </p>
+        )}
         {card.cancellationReason && (
           <p role="alert" className="mt-1 text-[12px] text-red-500">
             Cancelled — {card.cancellationReason}

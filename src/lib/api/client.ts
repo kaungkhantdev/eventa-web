@@ -54,7 +54,7 @@ export const api = {
     request<T>('DELETE', path, options),
 
   /**
-   * A file endpoint — the CSV exports and the SVG invoices.
+   * A file endpoint — the CSV, Excel and PDF exports, and the SVG invoices.
    *
    * Fetched rather than linked to with an `<a href>`, because these routes are
    * behind the same bearer token as everything else and a plain link sends no

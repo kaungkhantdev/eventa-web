@@ -4,6 +4,7 @@ import {
   Navigate,
   type ActionFunction,
   type LoaderFunction,
+  type ShouldRevalidateFunction,
 } from 'react-router'
 import AdminShell from '@/layouts/AdminShell'
 import RootLayout, { RootFallback } from '@/layouts/RootLayout'
@@ -73,6 +74,11 @@ const ERROR_ELEMENT = <RouteError />
 interface RouteData {
   loader: LoaderFunction
   action?: ActionFunction
+  /**
+   * For the rare page whose loader must NOT re-run after its action — the
+   * reset link, which the action spends, so a re-check would report it used.
+   */
+  shouldRevalidate?: ShouldRevalidateFunction
 }
 
 /**
@@ -283,17 +289,27 @@ const adminChildren = [
   },
   {
     path: 'reports',
-    ...page(() => import('@/features/insights/pages/ReportsOverviewPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsOverviewPage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.overviewReportRoute),
+    ),
     handle: { page: 'reports' },
   },
   {
     path: 'reports-income',
-    ...page(() => import('@/features/insights/pages/ReportsIncomePage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsIncomePage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.incomeReportRoute),
+    ),
     handle: { page: 'reports-income' },
   },
   {
     path: 'reports-transactions',
-    ...page(() => import('@/features/insights/pages/ReportsTransactionsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsTransactionsPage'),
+      () =>
+        import('@/features/insights/insights.routes').then((m) => m.transactionsReportRoute),
+    ),
     handle: { page: 'reports-transactions' },
   },
   {
@@ -303,52 +319,85 @@ const adminChildren = [
   },
   {
     path: 'reports-registrations',
-    ...page(() => import('@/features/insights/pages/ReportsRegistrationsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsRegistrationsPage'),
+      () =>
+        import('@/features/insights/insights.routes').then((m) => m.registrationsReportRoute),
+    ),
     handle: { page: 'reports-registrations' },
   },
   {
     path: 'reports-attendance',
-    ...page(() => import('@/features/insights/pages/ReportsAttendancePage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsAttendancePage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.attendanceReportRoute),
+    ),
     handle: { page: 'reports-attendance' },
   },
   {
     path: 'reports-discounts',
-    ...page(() => import('@/features/insights/pages/ReportsDiscountsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsDiscountsPage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.discountsReportRoute),
+    ),
     handle: { page: 'reports-discounts' },
   },
   {
     path: 'reports-events',
-    ...page(() => import('@/features/insights/pages/ReportsEventsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsEventsPage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.eventsReportRoute),
+    ),
     handle: { page: 'reports-events' },
   },
   {
     path: 'notifications',
-    ...page(() => import('@/features/engagement/pages/NotificationsPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/NotificationsPage'),
+      () => import('@/features/engagement/notifications.routes').then((m) => m.notificationsRoute),
+    ),
     handle: { page: 'notifications' },
   },
   {
     path: 'messaging-templates',
-    ...page(() => import('@/features/engagement/pages/MessagingTemplatesPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/MessagingTemplatesPage'),
+      async () => (await import('@/features/engagement/templates.routes')).messageTemplatesRoute,
+    ),
     handle: { page: 'messaging-templates' },
   },
   {
     path: 'messaging-announcements',
-    ...page(() => import('@/features/engagement/pages/MessagingAnnouncementsPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/MessagingAnnouncementsPage'),
+      async () =>
+        (await import('@/features/engagement/announcements.routes')).announcementsRoute,
+    ),
     handle: { page: 'messaging-announcements' },
   },
   {
     path: 'messaging-log',
-    ...page(() => import('@/features/engagement/pages/MessagingLogPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/MessagingLogPage'),
+      async () => (await import('@/features/engagement/deliveries.routes')).deliveriesRoute,
+    ),
     handle: { page: 'messaging-log' },
   },
   {
     path: 'feedback',
-    ...page(() => import('@/features/engagement/pages/FeedbackPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/FeedbackPage'),
+      async () => (await import('@/features/engagement/surveys.routes')).feedbackRoute,
+    ),
     handle: { page: 'feedback' },
   },
   {
     path: 'feedback-detail',
-    ...page(() => import('@/features/engagement/pages/FeedbackDetailPage')),
+    ...livePage(
+      () => import('@/features/engagement/pages/FeedbackDetailPage'),
+      async () =>
+        (await import('@/features/engagement/surveys.routes')).feedbackDetailRoute,
+    ),
     handle: { page: 'feedback' },
   },
   {
@@ -450,6 +499,18 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // Where every reset email's link lands — the API builds it as
+        // `${PUBLIC_WEB_URL}/reset-password?token=…`, so this path is fixed by
+        // that and is not under /auth. Serves both personas, and is not
+        // `guestOnly`: somebody still signed in on this device may be the one
+        // who forgot the password.
+        path: '/reset-password',
+        ...livePage(
+          () => import('@/features/auth/pages/ResetPasswordPage'),
+          () => import('@/features/auth/resetPassword.routes').then((m) => m.resetPasswordRoute),
+        ),
+      },
+      {
         path: '/portal/login',
         ...page(() => import('@/features/portal/pages/PortalLoginPage'), guestOnly('attendee')),
       },
@@ -514,7 +575,10 @@ export const router = createBrowserRouter([
       },
       {
         path: '/portal/survey',
-        ...page(() => import('@/features/portal/pages/SurveyPage')),
+        ...livePage(
+          () => import('@/features/portal/pages/SurveyPage'),
+          async () => (await import('@/features/portal/survey.routes')).portalSurveyRoute,
+        ),
       },
       {
         // A published event at its own public URL — the canonical shape the

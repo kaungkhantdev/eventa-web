@@ -51,6 +51,8 @@ export default function PaymentsPage() {
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
   const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
+  // Already loaded for the event filter, so this costs no extra request.
+  const hasEvents = data.events.length > 0
 
   const header = (
     <PageHeader
@@ -82,20 +84,34 @@ export default function PaymentsPage() {
         {header}
 
         <Card>
+          {/* What is missing depends on what the workspace already has. Offering
+              "Create your first event" to somebody whose events are published
+              and selling sends them to a blank form, which is not the reason
+              this page is empty — nobody has paid yet is. The same distinction
+              the dashboard's own first-run rule draws, and the one Registrations
+              and Tickets already make. */}
           <EmptyState
             icon="hgi-credit-card"
             title="No payments yet"
-            actions={[
-              {
-                label: 'Create your first event',
-                to: '/admin/event-form',
-                icon: 'hgi-calendar-add-01',
-              },
-              { label: 'Set up payments', to: '/admin/settings-payments' },
-            ]}
+            actions={
+              hasEvents
+                ? [
+                    { label: 'See your events', to: '/admin/events' },
+                    { label: 'Set up payments', to: '/admin/settings-payments' },
+                  ]
+                : [
+                    {
+                      label: 'Create your first event',
+                      to: '/admin/event-form',
+                      icon: 'hgi-calendar-add-01',
+                    },
+                    { label: 'Set up payments', to: '/admin/settings-payments' },
+                  ]
+            }
           >
-            Every charge, refund and failed attempt lands here the moment a buyer pays. Publish an
-            event with a paid ticket and your first transaction will appear.
+            {hasEvents
+              ? 'Every charge, refund and failed attempt lands here the moment a buyer pays. Nothing has sold yet — share your event and the first transaction will appear.'
+              : 'Every charge, refund and failed attempt lands here the moment a buyer pays. Publish an event with a paid ticket and your first transaction will appear.'}
           </EmptyState>
         </Card>
 
