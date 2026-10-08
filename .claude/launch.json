@@ -4,8 +4,10 @@
     {
       "name": "eventa-react",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev", "--port", "5180"],
-      "port": 5180
+      "runtimeArgs": ["dev", "--port", "5173"],
+      "port": 5173,
+      "comment": "5173 is Vite's default and the port this project is developed on. eventa-api's CORS_ORIGINS allows 5173, 5174 and 5180, so any of the three works from the browser — but /admin needs the API running at VITE_API_URL either way.",
+      "autoPort": false
     }
   ]
 }

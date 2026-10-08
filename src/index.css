@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import './styles/tokens.css';
-@import './styles/components.css';
+/* Into @layer components so Tailwind utilities (their own, higher-ranked layer)
+   win over these classes — the markup relies on `.select sm:w-52`, `.input pl-9`,
+   paginator `.select w-auto py-0`, etc. overriding the component defaults. */
+@import './styles/components.css' layer(components);
 
 /* The static kit toggles `class="dark"` on <html>; Tailwind v4 defaults to
    prefers-color-scheme, so opt back into the class strategy. */
@@ -37,5 +40,14 @@
   ::backdrop,
   ::file-selector-button {
     border-color: rgb(var(--hair));
+  }
+
+  /* The React mount node sits between <body class="h-full"> and the AdminShell.
+     Without an explicit height it collapses to auto, so the shell's `h-full`
+     can't resolve and `main`'s internal scroll never engages — which pushed the
+     rail's bottom items (Settings / theme / logo) below the fold on tall pages.
+     Restoring 100% here re-creates the static kit's body→shell height chain. */
+  #root {
+    height: 100%;
   }
 }

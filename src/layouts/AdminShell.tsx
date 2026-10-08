@@ -1,8 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, Outlet, useLocation, useMatches } from 'react-router'
-import { MODULES, moduleOfPage, type NavGroup, type NavModule } from '@/app/navigation'
+import {
+  MODULES,
+  moduleOfPage,
+  routeStateOfPath,
+  type NavGroup,
+  type NavModule,
+} from '@/app/navigation'
+import { AdminPageSkeleton } from '@/app/pageSkeletons'
 import { useTheme } from '@/lib/useTheme'
+import { usePendingPath } from '@/lib/usePendingPath'
 import { cn } from '@/lib/cn'
+import { ROUTE_FRAME, routeFrameKey } from '@/lib/routeTransition'
 
 /* Double sidebar: an icon rail of modules plus a labeled panel of grouped
    sub-nav. Faithful port of the markup shell.js injected in the static kit.
@@ -18,9 +27,19 @@ const RAIL_OFF =
   'grid h-9 w-9 place-items-center rounded-lg text-white/55 transition hover:bg-white/10 hover:text-brand'
 
 const LEAF_ON =
-  'block rounded-lg py-1.5 pl-9 pr-2.5 text-[13px] font-semibold bg-brand-soft text-brand'
+  'relative block rounded-lg py-1.5 pl-9 pr-2.5 text-[13px] font-semibold bg-brand-soft text-brand'
 const LEAF_OFF =
-  'block rounded-lg py-1.5 pl-9 pr-2.5 text-[13px] font-medium text-muted transition hover:bg-brand-soft/60 hover:text-brand'
+  'relative block rounded-lg py-1.5 pl-9 pr-2.5 text-[13px] font-medium text-muted transition hover:bg-brand-soft/60 hover:text-brand'
+
+/* The marker on the active leaf, on top of the soft-green fill. Absolutely
+   positioned rather than a border or an inline element: either would widen the
+   active leaf and push its label sideways, so every leaf in the panel would
+   shift as you moved between pages. Both states keep identical padding. */
+function LeafMarker() {
+  return (
+    <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-brand" />
+  )
+}
 
 function RailButton({ mod, active }: { mod: NavModule; active: boolean }) {
   return (
@@ -53,13 +72,17 @@ function PanelGroup({ group, page }: { group: NavGroup; page: string }) {
       </button>
       {open && (
         <ul className="mt-0.5 space-y-0.5">
-          {group.items.map((it) => (
-            <li key={it.page}>
-              <Link to={it.to} className={it.page === page ? LEAF_ON : LEAF_OFF}>
-                {it.label}
-              </Link>
-            </li>
-          ))}
+          {group.items.map((it) => {
+            const on = it.page === page
+            return (
+              <li key={it.page}>
+                <Link to={it.to} className={on ? LEAF_ON : LEAF_OFF}>
+                  {on && <LeafMarker />}
+                  {it.label}
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
@@ -67,27 +90,46 @@ function PanelGroup({ group, page }: { group: NavGroup; page: string }) {
 }
 
 /** Read the active page id from the deepest route that declares one. */
-function usePageId(): string {
+/** Read the active page id and the `focused` flag from the deepest route that
+ *  declares them. `focused` routes (the create-event wizard) keep the icon rail
+ *  but hide the module sub-nav panel, matching the static kit. */
+function useRouteHandle(): { page: string; focused: boolean } {
   const matches = useMatches()
+  let page = 'dashboard'
+  let focused = false
   for (let i = matches.length - 1; i >= 0; i--) {
-    const handle = matches[i]!.handle as { page?: string } | undefined
-    if (handle?.page) return handle.page
+    const handle = matches[i]!.handle as { page?: string; focused?: boolean } | undefined
+    if (handle?.page && page === 'dashboard') page = handle.page
+    if (handle?.focused) focused = true
   }
-  return 'dashboard'
+  return { page, focused }
 }
 
 export default function AdminShell() {
   const { dark, toggle } = useTheme()
   const location = useLocation()
-  const page = usePageId()
+  const settled = useRouteHandle()
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  /* While the next admin page is loading, show its skeleton in place of the
+     outlet — and move the rail, sub-nav and panel visibility to the
+     destination now, so the chrome doesn't shift once the page lands. */
+  const pending = usePendingPath()
+  const pendingAdmin = pending && pending.startsWith('/admin') ? pending : null
+  const { page, focused } = (pendingAdmin && routeStateOfPath(pendingAdmin)) || settled
 
   const selected = useMemo(() => moduleOfPage(page), [page])
   const mod = useMemo(() => MODULES.find((m) => m.id === selected), [selected])
-  const hasPanel = Boolean(mod?.groups?.length)
+  const hasPanel = Boolean(mod?.groups?.length) && !focused
 
-  // Close the mobile drawer whenever the route changes.
-  useEffect(() => setDrawerOpen(false), [location.pathname])
+  // Close the mobile drawer whenever the route changes. Adjusted during render
+  // rather than in an effect, so the drawer is already gone on the paint that
+  // shows the new page instead of flashing over it for one frame.
+  const [drawerPath, setDrawerPath] = useState(location.pathname)
+  if (location.pathname !== drawerPath) {
+    setDrawerPath(location.pathname)
+    setDrawerOpen(false)
+  }
 
   return (
     <div className="flex h-full min-h-screen">
@@ -103,7 +145,7 @@ export default function AdminShell() {
         )}
       >
         {/* icon rail — modules */}
-        <aside className="relative z-30 flex w-16 shrink-0 flex-col items-center bg-[#0e0f12] py-4 dark:bg-[#101613]">
+        <aside className="relative z-30 flex w-16 shrink-0 flex-col items-center bg-[#0e0f12] py-4 dark:bg-[#101613]"> 
           <div className="group relative flex justify-center">
             <Link
               to="/admin/dashboard"
@@ -166,8 +208,18 @@ export default function AdminShell() {
       </div>
 
       <main className="min-w-0 flex-1 overflow-y-auto px-5 py-4 lg:px-7">
-        <div className="mx-auto w-full max-w-[1600px]">
-          <Outlet context={{ openDrawer: () => setDrawerOpen(true) }} />
+        {/* Keyed so the fade replays on both halves of a navigation — the
+            skeleton arriving, then the page replacing it. A filter or a page
+            number leaves the key alone, so the table below does not flash. */}
+        <div
+          key={routeFrameKey(pendingAdmin, location.pathname)}
+          className={cn(ROUTE_FRAME, 'mx-auto w-full max-w-[1600px]')}
+        >
+          {pendingAdmin ? (
+            <AdminPageSkeleton path={pendingAdmin} />
+          ) : (
+            <Outlet context={{ openDrawer: () => setDrawerOpen(true) }} />
+          )}
         </div>
       </main>
     </div>

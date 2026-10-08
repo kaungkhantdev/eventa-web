@@ -1,448 +1,398 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useFetcher, useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
-  HeaderUser,
   Button,
-  Icon,
   Card,
-  Panel,
-  PillTabs,
-  Paginator,
-  usePagination,
-  Label,
-  Input,
-  Select,
-  Textarea,
+  EmptyState,
+  EventPicker,
+  HeaderUser,
   Hint,
+  Icon,
+  Input,
+  Label,
+  NoResults,
+  PageFooter,
+  PageHeader,
+  Paginator,
+  Panel,
+  PastEnd,
+  PillTabs,
+  Textarea,
   type PillTabItem,
 } from '@/components/ui'
-import { useDisclosure } from '@/lib/useDisclosure'
 import { cn } from '@/lib/cn'
-import {
-  ATTENDEES,
-  TAG_BADGE,
-  ATT_TAGS,
-  ATT_EVENTS,
-  type Attendee,
-  type AttendeeTab,
-  type AttendeeSort,
-} from '../data/attendees'
+import { toast } from '@/lib/toast'
+import { useDisclosure } from '@/lib/useDisclosure'
+import { useFilters, useSearchBox } from '@/lib/useFilters'
+import { useIsFiltering } from '@/lib/usePendingPath'
+import type { ActionResult } from '@/app/loaders'
+import { TAGS, type DirectoryData } from '../directory.routes'
+import type { AttendeeRow, AttendeeSegment, AttendeeSort } from '../directory.types'
+
+/**
+ * The attendee directory (US-CHK-06/07). Layout ported from attendees.html.
+ *
+ * Every filter and the sort are URL parameters the API applies across the whole
+ * directory — 390 people do not fit on a page, and sorting the ten that arrived
+ * would put the wrong name at the top.
+ */
+
+const ALL_TAGS = 'All tags'
+const MAX_SEARCH_LENGTH = 120
+
+/** What the loader sorts by when the URL says nothing — see `SORTS`. */
+const DEFAULT_SORT: AttendeeSort = 'recent'
 
 const SORT_LABEL: Record<AttendeeSort, string> = {
-  activity: 'Sort: Last activity',
+  recent: 'Sort: Last activity',
   name: 'Sort: Name (A–Z)',
   events: 'Sort: Most events',
   tickets: 'Sort: Most tickets',
 }
 
-function sortList(list: Attendee[], sort: AttendeeSort): Attendee[] {
-  const l = list.slice()
-  if (sort === 'name') l.sort((a, b) => a.name.localeCompare(b.name))
-  else if (sort === 'events') l.sort((a, b) => b.events - a.events || b.ts - a.ts)
-  else if (sort === 'tickets') l.sort((a, b) => b.tickets - a.tickets || b.ts - a.ts)
-  else l.sort((a, b) => b.ts - a.ts)
-  return l
-}
-
 export default function AttendeesPage() {
-  const profile = useDisclosure()
+  const data = useLoaderData() as DirectoryData
+  // No defaults are declared: the sort select writes its value even when it is
+  // the default one, but sorting reorders rather than hides, so `useFilters`
+  // does not count it as narrowing in the first place.
+  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
+  const filtering = useIsFiltering()
   const invite = useDisclosure()
+  const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
-  const [q, setQ] = useState('')
-  const [tab, setTab] = useState<AttendeeTab>('all')
-  const [tag, setTag] = useState('') // '' = All tags
-  const [sort, setSort] = useState<AttendeeSort>('activity')
+  // Nothing has been registered yet: there is nothing to search, tab through or
+  // page, so the controls go with the table and the page explains itself.
+  const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
 
-  const counts = useMemo(() => {
-    let nw = 0
-    let ci = 0
-    let vip = 0
-    for (const a of ATTENDEES) {
-      if (a.isNew) nw++
-      if (a.checkedIn) ci++
-      if (a.tag === 'VIP') vip++
-    }
-    return { all: ATTENDEES.length, new: nw, checkedin: ci, vip }
-  }, [])
+  // The loader fetches these for the invite panel, so the page already knows
+  // whether anything has been published — and an organizer who is simply
+  // waiting for the first signup must not be told to create their first event.
+  //
+  // Read in one direction only: a non-empty list proves events exist, so it can
+  // withdraw an offer, but an empty one is not proof of the opposite anywhere it
+  // could have been masked (Registrations loads the same list through
+  // `withoutForbidden`, and gets `[]` for Staff who may not list events).
+  const hasEvents = data.events.length > 0
 
-  const tabs: PillTabItem<AttendeeTab>[] = [
-    { value: 'all', label: 'All', count: counts.all },
-    { value: 'new', label: 'New', count: counts.new },
-    { value: 'checkedin', label: 'Checked-in', count: counts.checkedin },
-    { value: 'vip', label: 'VIPs', count: counts.vip },
-  ]
+  if (firstRun) {
+    return (
+      <>
+        <DirectoryHeader onInvite={invite.onOpen} canInvite={hasEvents} />
 
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase()
-    const byTab = (a: Attendee) => {
-      if (tab === 'new') return a.isNew
-      if (tab === 'checkedin') return a.checkedIn
-      if (tab === 'vip') return a.tag === 'VIP'
-      return true
-    }
-    const list = ATTENDEES.filter(byTab)
-      .filter((a) => !tag || a.tag === tag)
-      .filter(
-        (a) =>
-          !query ||
-          a.name.toLowerCase().indexOf(query) >= 0 ||
-          a.email.toLowerCase().indexOf(query) >= 0,
-      )
-    return sortList(list, sort)
-  }, [q, tab, tag, sort])
+        <Card>
+          {/* Two different organizers land here, and the next step is not the
+              same one: nothing published yet, or a live event nobody has
+              registered for. With events on the calendar the remaining links
+              in the chain are a ticket type on sale and the invitations this
+              page can send itself — "Create an event" would be a step they
+              have already taken, and "See registrations" would be this same
+              empty card one page over. */}
+          <EmptyState
+            icon="hgi-user-multiple"
+            title="No attendees yet"
+            actions={
+              hasEvents
+                ? [
+                    { label: 'Set up ticket types', to: '/admin/tickets', icon: 'hgi-ticket-01' },
+                    { label: 'Invite attendees', onClick: invite.onOpen },
+                  ]
+                : [
+                    {
+                      label: 'Create an event',
+                      to: '/admin/event-form',
+                      icon: 'hgi-calendar-add-01',
+                    },
+                  ]
+            }
+          >
+            {hasEvents
+              ? 'Everyone who completes a registration gets a profile here, with their tickets, tags and history. Put a ticket type on sale, or invite people to one of your events, and the first profiles will follow.'
+              : 'Everyone who completes a registration gets a profile here, with their tickets, tags and history. Publish an event with tickets on sale and the first attendees will follow.'}
+          </EmptyState>
+        </Card>
 
-  const pager = usePagination(filtered)
-  const { setPage } = pager
-  useEffect(() => setPage(1), [q, tab, tag, sort, setPage])
+        <PageFooter />
+
+        <InvitePanel open={invite.open} onClose={invite.onClose} events={data.events} />
+      </>
+    )
+  }
 
   return (
     <>
-      <PageHeader
-        title="Attendees"
-        subtitle="Everyone who has registered for your events."
-        actions={
-          <>
-            <Button variant="ghost">
-              <Icon name="hgi-download-01" />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
-            <Button variant="primary" onClick={invite.onOpen}>
-              <Icon name="hgi-mail-send-01" />
-              <span className="hidden sm:inline">Invite</span>
-              <span className="sm:hidden">Invite</span>
-            </Button>
-            <HeaderUser />
-          </>
-        }
+      <DirectoryHeader onInvite={invite.onOpen} canInvite={hasEvents} />
+
+      <PillTabs<AttendeeSegment>
+        items={pills(data)}
+        value={(params.get('segment') as AttendeeSegment) ?? 'all'}
+        onChange={(segment) => set({ segment: segment === 'all' ? null : segment })}
       />
 
-      {/* pill tabs (out of table) */}
-      <PillTabs items={tabs} value={tab} onChange={setTab} />
-
-      {/* search + filters (out of table) */}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full flex-1">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search by name or email…"
-          />
-        </div>
-        <div className="flex gap-2">
-          <div className="relative flex-1 sm:flex-none">
-            <i className="hgi-stroke hgi-tag-01 text-[15px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-            <select
-              value={tag || 'All tags'}
-              onChange={(e) => setTag(e.target.value === 'All tags' ? '' : e.target.value)}
-              className="select h-10 w-full border-0 bg-surface pl-9 font-medium sm:w-44"
-            >
-              {ATT_TAGS.map((t) => (
-                <option key={t}>{t}</option>
-              ))}
-            </select>
+      <div className={cn('mt-3', filtering && 'opacity-60 transition-opacity')}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full flex-1">
+            <Icon
+              name="hgi-search-01"
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+            />
+            <input
+              type="text"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+              placeholder="Search by name or email…"
+              maxLength={MAX_SEARCH_LENGTH}
+              aria-label="Search attendees"
+            />
           </div>
-          <div className="relative flex-1 sm:flex-none">
-            <i className="hgi-stroke hgi-arrow-up-down text-[15px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as AttendeeSort)}
-              className="select h-10 w-full border-0 bg-surface pl-9 font-medium sm:w-52"
-            >
-              <option value="activity">{SORT_LABEL.activity}</option>
-              <option value="name">{SORT_LABEL.name}</option>
-              <option value="events">{SORT_LABEL.events}</option>
-              <option value="tickets">{SORT_LABEL.tickets}</option>
-            </select>
+          <div className="flex gap-2">
+            <div className="relative flex-1 sm:flex-none">
+              <Icon
+                name="hgi-tag-01"
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              />
+              <select
+                value={params.get('tag') ?? ''}
+                onChange={(e) => set({ tag: e.target.value || null })}
+                className="select h-10 w-full border-0 bg-surface pl-9 font-medium sm:w-44"
+                aria-label="Filter by tag"
+              >
+                <option value="">{ALL_TAGS}</option>
+                {TAGS.map((tag) => (
+                  <option key={tag} value={tag}>
+                    {tag}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="relative flex-1 sm:flex-none">
+              <Icon
+                name="hgi-arrow-up-down"
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+              />
+              <select
+                value={params.get('sort') ?? DEFAULT_SORT}
+                onChange={(e) => set({ sort: e.target.value })}
+                className="select h-10 w-full border-0 bg-surface pl-9 font-medium sm:w-52"
+                aria-label="Sort attendees"
+              >
+                {Object.entries(SORT_LABEL).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* table */}
-      <Card className="mt-3 p-4">
-        <div className="overflow-x-auto">
-          <table className="data-table min-w-[860px]">
-            <thead>
-              <tr>
-                <th>Attendee</th>
-                <th>Phone</th>
-                <th>Events</th>
-                <th>Tickets</th>
-                <th>Tags</th>
-                <th>Last activity</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-[13px]">
-              {pager.slice.length ? (
-                pager.slice.map((a, i) => {
-                  const badge = a.tag ? TAG_BADGE[a.tag] : null
-                  return (
-                    <tr key={a.email + i}>
-                      <td>
-                        <div className="flex items-center gap-2">
-                          <span className="avatar h-8 w-8 text-[11px]">{a.initials}</span>
-                          <div className="min-w-0 leading-tight">
-                            <p className="truncate font-medium text-ink">{a.name}</p>
-                            <p className="truncate text-[11px] text-muted">{a.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="text-muted tnum">{a.phone}</td>
-                      <td className="text-muted tnum">
-                        {a.events} event{a.events === 1 ? '' : 's'}
-                      </td>
-                      <td className="font-semibold text-ink tnum">{a.tickets}</td>
-                      {badge ? (
-                        <td>
-                          <span className={cn('badge', badge.cls)}>
-                            <i className={cn('hgi-stroke', badge.icon, 'text-[12px]')} />
-                            {badge.label}
-                          </span>
-                        </td>
-                      ) : (
-                        <td className="text-muted">—</td>
-                      )}
-                      <td className="text-muted tnum">{a.date}</td>
-                      <td className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            className="btn-icon"
-                            title="View profile"
-                            onClick={profile.onOpen}
-                          >
-                            <i className="hgi-stroke hgi-eye text-[16px]" />
-                          </button>
-                          <button className="btn-icon" title="More">
-                            <i className="hgi-stroke hgi-more-vertical text-[16px]" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              ) : (
+        <Card className="mt-3 p-4">
+          <div className="overflow-x-auto">
+            <table className="data-table min-w-[860px]">
+              <thead>
                 <tr>
-                  <td colSpan={7}>
-                    <div className="py-10 text-center text-[13px] text-muted">No matches.</div>
-                  </td>
+                  <th>Attendee</th>
+                  <th>Phone</th>
+                  <th>Events</th>
+                  <th>Tickets</th>
+                  <th>Tags</th>
+                  <th>Last activity</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="text-[13px]">
+                {data.rows.map((row) => (
+                  <AttendeeTableRow key={row.id} row={row} />
+                ))}
+                {data.rows.length === 0 && (
+                  <tr>
+                    <td colSpan={6}>
+                      {emptyReason === 'past-end' ? (
+                        /* A bookmarked `?page=4` that no longer has anybody on
+                           it. Back to the first page keeping the search: it is
+                           what the button says, and "Clear filters" would
+                           throw away a search that may well have matches. */
+                        <PastEnd noun="attendees" onFirstPage={() => set({ page: null })} />
+                      ) : (
+                        <NoResults noun="attendees" onClear={clear}>
+                          Nothing matches the current search, tab and tag filter. Try a shorter
+                          search term, or widen the filters.
+                        </NoResults>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        <Paginator
-          from={pager.from}
-          to={pager.to}
-          total={pager.total}
-          page={pager.page}
-          pageCount={pager.pageCount}
-          size={pager.size}
-          onPage={pager.setPage}
-          onSize={pager.setSize}
-          noun="attendees"
-        />
-      </Card>
+          <Paginator
+            {...data.window}
+            noun="attendees"
+            onPage={(page) => set({ page })}
+            onSize={(size) => set({ limit: size, page: null })}
+          />
+        </Card>
+      </div>
 
       <PageFooter />
 
-      {/* Attendee profile panel */}
-      <Panel
-        open={profile.open}
-        onClose={profile.onClose}
-        title="Attendee profile"
-        footer={
-          <>
-            <Button variant="soft" className="flex-1" onClick={profile.onClose}>
-              <Icon name="hgi-mail-01" />
-              Send email
-            </Button>
-            <Button variant="primary" className="flex-1" onClick={profile.onClose}>
-              <Icon name="hgi-edit-02" />
-              Edit
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-5">
-          <div className="flex items-center gap-3">
-            <span className="avatar h-14 w-14 text-[18px]">AP</span>
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-bold text-ink">Anong Praditsarn</p>
-              <p className="truncate text-[12px] text-muted">anong.p@gmail.com</p>
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                <span className="badge badge-purple">
-                  <i className="hgi-stroke hgi-star text-[12px]" />
-                  VIP
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card space-y-2 p-3">
-            <div className="flex items-center gap-2 text-[13px]">
-              <i className="hgi-stroke hgi-mail-01 text-[15px] text-muted" />
-              <span className="text-ink">anong.p@gmail.com</span>
-            </div>
-            <div className="flex items-center gap-2 text-[13px]">
-              <i className="hgi-stroke hgi-call text-[15px] text-muted" />
-              <span className="text-ink tnum">+66 81 234 5678</span>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Registered events
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-lg border border-hair p-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-ink">Tech Summit 2026</p>
-                  <p className="text-[11px] text-muted">Jul 18, 2026 · BITEC</p>
-                </div>
-                <span className="badge badge-green">
-                  <i className="hgi-stroke hgi-checkmark-badge-01 text-[12px]" />
-                  Checked-in
-                </span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-hair p-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-ink">Bangkok Jazz Night</p>
-                  <p className="text-[11px] text-muted">Jul 12, 2026 · Sala Daeng</p>
-                </div>
-                <span className="badge badge-blue">
-                  <i className="hgi-stroke hgi-ticket-01 text-[12px]" />
-                  Registered
-                </span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-hair p-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-ink">
-                    Thai Street Food Festival
-                  </p>
-                  <p className="text-[11px] text-muted">Jun 21, 2026 · Lumphini Park</p>
-                </div>
-                <span className="badge badge-green">
-                  <i className="hgi-stroke hgi-checkmark-badge-01 text-[12px]" />
-                  Checked-in
-                </span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-hair p-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-semibold text-ink">UX Bangkok Meetup</p>
-                  <p className="text-[11px] text-muted">May 14, 2026 · IconSiam</p>
-                </div>
-                <span className="badge badge-gray">Past</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Tickets
-            </h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between rounded-lg border border-hair p-2.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <i className="hgi-stroke hgi-ticket-star text-[15px] text-muted" />
-                  <p className="truncate text-[13px] text-ink">VIP Pass · Tech Summit 2026</p>
-                </div>
-                <span className="text-[13px] font-semibold text-ink tnum">฿1,250</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-hair p-2.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <i className="hgi-stroke hgi-ticket-01 text-[15px] text-muted" />
-                  <p className="truncate text-[13px] text-ink">
-                    General Admission · Bangkok Jazz Night
-                  </p>
-                </div>
-                <span className="text-[13px] font-semibold text-ink tnum">฿480</span>
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-hair p-2.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <i className="hgi-stroke hgi-ticket-01 text-[15px] text-muted" />
-                  <p className="truncate text-[13px] text-ink">Early Bird · UX Bangkok Meetup</p>
-                </div>
-                <span className="badge badge-green">Free</span>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Activity
-            </h4>
-            <div className="space-y-4 border-l border-line pl-4">
-              <div className="relative">
-                <span className="absolute -left-[21px] top-0.5 h-2.5 w-2.5 rounded-full bg-brand ring-4 ring-brand-soft" />
-                <p className="text-[13px] font-medium text-ink">Checked in at Tech Summit 2026</p>
-                <p className="text-[11px] text-muted tnum">Jul 15, 2026 · 10:24</p>
-              </div>
-              <div className="relative">
-                <span className="absolute -left-[21px] top-0.5 h-2.5 w-2.5 rounded-full bg-line" />
-                <p className="text-[13px] font-medium text-ink">Registered for Bangkok Jazz Night</p>
-                <p className="text-[11px] text-muted tnum">Jul 9, 2026 · 14:52</p>
-              </div>
-              <div className="relative">
-                <span className="absolute -left-[21px] top-0.5 h-2.5 w-2.5 rounded-full bg-line" />
-                <p className="text-[13px] font-medium text-ink">Updated contact details</p>
-                <p className="text-[11px] text-muted tnum">Jun 28, 2026</p>
-              </div>
-              <div className="relative">
-                <span className="absolute -left-[21px] top-0.5 h-2.5 w-2.5 rounded-full bg-line" />
-                <p className="text-[13px] font-medium text-ink">Joined Eventa</p>
-                <p className="text-[11px] text-muted tnum">Mar 3, 2026</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Panel>
-
-      {/* Invite panel */}
-      <Panel
-        open={invite.open}
-        onClose={invite.onClose}
-        title="Invite attendee"
-        footer={
-          <>
-            <Button variant="soft" className="flex-1" onClick={invite.onClose}>
-              Cancel
-            </Button>
-            <Button variant="primary" className="flex-1" onClick={invite.onClose}>
-              <Icon name="hgi-mail-send-01" />
-              Send invite
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <Label>Full name</Label>
-            <Input type="text" placeholder="e.g. Somchai Tanakit" />
-          </div>
-          <div>
-            <Label>Email address</Label>
-            <Input type="email" placeholder="name@example.com" />
-          </div>
-          <div>
-            <Label>Event</Label>
-            <Select defaultValue={ATT_EVENTS[0]}>
-              {ATT_EVENTS.map((ev) => (
-                <option key={ev}>{ev}</option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label>Personal message</Label>
-            <Textarea placeholder="Add a short note to the invite email..." />
-            <Hint>Optional — shown at the top of the invite email.</Hint>
-          </div>
-        </div>
-      </Panel>
+      <InvitePanel open={invite.open} onClose={invite.onClose} events={data.events} />
     </>
+  )
+}
+
+/** The same header above both states — an invitation is still possible on a
+ *  first run, as long as there is an event to invite people to. */
+function DirectoryHeader({ onInvite, canInvite }: { onInvite: () => void; canInvite: boolean }) {
+  return (
+    <PageHeader
+      title="Attendees"
+      subtitle="Everyone who has registered for your events."
+      actions={
+        <>
+          <Button variant="primary" onClick={onInvite} disabled={!canInvite}>
+            <Icon name="hgi-mail-send-01" />
+            <span>Invite</span>
+          </Button>
+          <HeaderUser />
+        </>
+      }
+    />
+  )
+}
+
+function pills(data: DirectoryData): PillTabItem<AttendeeSegment>[] {
+  return [
+    { value: 'all', label: 'All', count: data.counts.all },
+    { value: 'new', label: 'New', count: data.counts.new },
+    { value: 'checked_in', label: 'Checked in', count: data.counts.checkedIn },
+    { value: 'vip', label: 'VIP', count: data.counts.vip },
+  ]
+}
+
+function AttendeeTableRow({ row }: { row: AttendeeRow }) {
+  return (
+    <tr>
+      <td>
+        <div className="flex items-center gap-2">
+          <span className="avatar h-8 w-8 text-[11px]">{row.initials}</span>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate font-medium text-ink">{row.name}</p>
+            <p className="truncate text-[11px] text-muted">{row.email}</p>
+          </div>
+        </div>
+      </td>
+      <td className="tnum text-muted">{row.phone}</td>
+      <td className="tnum text-muted">{row.events}</td>
+      <td className="tnum font-semibold text-ink">{row.tickets}</td>
+      <td className={cn(!row.tag && 'text-muted')}>
+        {row.tag ? (
+          <span className={cn('badge', row.tagClass)}>
+            <Icon name={row.tagIcon} size={12} />
+            {row.tag}
+          </span>
+        ) : (
+          '—'
+        )}
+      </td>
+      <td className="tnum text-muted">{row.lastActivity}</td>
+    </tr>
+  )
+}
+
+/**
+ * Inviting people to an event (US-CHK-07).
+ *
+ * The event is required: an invitation is to something, and the API has no
+ * notion of a workspace-wide one.
+ */
+function InvitePanel({
+  open,
+  onClose,
+  events,
+}: {
+  open: boolean
+  onClose: () => void
+  events: { id: string; name: string }[]
+}) {
+  const fetcher = useFetcher<ActionResult>()
+  // An invite must name an event, so the picker starts on one rather than on a
+  // blank the browser can no longer enforce (`required` means nothing to the
+  // hidden input a custom picker submits through).
+  const [inviteEvent, setInviteEvent] = useState(events[0]?.id ?? '')
+  const sending = fetcher.state !== 'idle'
+  const error = fetcher.data?.ok === false ? fetcher.data.error : null
+  const sent = fetcher.state === 'idle' && fetcher.data?.ok === true
+
+  useEffect(() => {
+    if (!sent || !open) return
+    toast.success('Invitations sent.')
+    onClose()
+  }, [sent, open, onClose])
+
+  return (
+    <Panel
+      open={open}
+      onClose={onClose}
+      title="Invite attendees"
+      footer={
+        <>
+          <Button variant="soft" className="flex-1" onClick={onClose} disabled={sending}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            className="flex-1"
+            type="submit"
+            form="invite-form"
+            disabled={sending}
+          >
+            {sending ? 'Sending…' : 'Send invitations'}
+          </Button>
+        </>
+      }
+    >
+      <fetcher.Form id="invite-form" method="post" className="space-y-4">
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg bg-red-50 p-3 text-[13px] text-red-600 dark:bg-red-500/15 dark:text-red-300"
+          >
+            {error}
+          </p>
+        )}
+
+        <div>
+          <Label htmlFor="invite-event">Event</Label>
+          <EventPicker
+            id="invite-event"
+            name="eventId"
+            value={inviteEvent}
+            onChange={setInviteEvent}
+            options={events}
+            allLabel={false}
+            placeholder="Choose an event"
+          />
+        </div>
+        <div>
+          <Label htmlFor="invite-emails">Email addresses</Label>
+          <Textarea
+            id="invite-emails"
+            name="emails"
+            rows={4}
+            required
+            placeholder="anong@example.com, somchai@example.com"
+          />
+          <Hint>One per line or separated by commas. Duplicates are only sent once.</Hint>
+        </div>
+        <div>
+          <Label htmlFor="invite-message">Message</Label>
+          <Input id="invite-message" name="message" type="text" placeholder="Optional note" />
+        </div>
+      </fetcher.Form>
+    </Panel>
   )
 }

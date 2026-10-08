@@ -143,16 +143,23 @@ export function AreaChart({
           </g>
         ))}
 
-        {fill && <path d={area} fill={`url(#${gid})`} />}
-        <path
-          d={line}
-          fill="none"
-          stroke={chartColors.brand}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
+        {/* An empty series still draws its axis — a period that earned nothing
+            is a real answer — but not a line through no points: `smoothPath`
+            has nothing to start with, and the browser rejects the path. */}
+        {n > 0 && (
+          <>
+            {fill && <path d={area} fill={`url(#${gid})`} />}
+            <path
+              d={line}
+              fill="none"
+              stroke={chartColors.brand}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          </>
+        )}
 
         {labels.map((lb, i) => (
           <text

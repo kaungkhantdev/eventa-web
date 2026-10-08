@@ -1,75 +1,86 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useFetcher, useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
-  HeaderUser,
-  Button,
   Badge,
+  Button,
+  Card,
+  EmptyState,
+  EventPicker,
+  HeaderUser,
   Icon,
-  Panel,
+  NoResults,
+  PageFooter,
+  PageHeader,
+  Paginator,
   PillTabs,
-  Label,
-  Hint,
-  Input,
-  Select,
-  Textarea,
   type PillTabItem,
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
-import { baht, num } from '@/lib/format'
+import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
-import { TICKETS, TICKET_STATUS_META, type Ticket } from '../data/tickets'
-import { EVENT_NAMES, EVENT_PICKER_OPTIONS } from '../data/events'
-import type { TicketStatus } from '../types'
-import { ToggleSwitch } from '../components/ToggleSwitch'
-import { TicketQrModal } from '../components/TicketQrModal'
+import { useFilters, useSearchBox } from '@/lib/useFilters'
+import { useIsFiltering } from '@/lib/usePendingPath'
+import type { ActionResult } from '@/app/loaders'
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal'
+import { TicketPanel } from '../components/TicketPanel'
+import { TicketQrModal } from '../components/TicketQrModal'
+import type { TabCounts, TicketTab, TicketsData } from '../tickets.routes'
+import type { TicketCard, TicketShareWire } from '../tickets.types'
 
-type TicketTab = 'all' | TicketStatus
+/**
+ * The cross-event ticket inventory (US-TKT-04). Layout ported from tickets.html.
+ *
+ * Every filter is a URL parameter and every count comes from the API, so the
+ * pills, the cards and the paginator describe one answer rather than three
+ * views of a list this page re-sliced.
+ */
+
+const ALL_EVENTS = 'All events'
+const MAX_SEARCH_LENGTH = 120
 
 export default function TicketsPage() {
-  const [tab, setTab] = useState<TicketTab>('all')
-  const [query, setQuery] = useState('')
-  const [eventFilter, setEventFilter] = useState('')
+  const data = useLoaderData() as TicketsData
+  // No page writes a default into this URL — an absent `tab` is "all" — so
+  // every parameter present is one the organizer chose.
+  const { params, set, clear, filtered } = useFilters()
+  const filtering = useIsFiltering()
+  const panel = useDisclosure()
+  const del = useDisclosure()
+  const qr = useDisclosure()
 
-  // Panel / modal disclosure state (replaces shell.js data-open wiring).
-  const ticketPanel = useDisclosure()
-  const delModal = useDisclosure()
-  const qrModal = useDisclosure()
-  const [qrTicket, setQrTicket] = useState<Ticket | null>(null)
+  const [editing, setEditing] = useState<TicketCard | null>(null)
+  const [sharing, setSharing] = useState<TicketCard | null>(null)
+  const [deleting, setDeleting] = useState<TicketCard | null>(null)
+  const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
-  // New-ticket panel: Paid/Free segmented + Transferable toggle.
-  const [ticketType, setTicketType] = useState<'paid' | 'free'>('paid')
-  const [transferable, setTransferable] = useState(true)
+  const share = useFetcher<TicketShareWire>()
+  const mutate = useFetcher<ActionResult>()
 
-  const counts = useMemo(() => {
-    const c: Record<TicketStatus, number> = { onsale: 0, scheduled: 0, paused: 0, soldout: 0 }
-    for (const t of TICKETS) c[t.status]++
-    return c
-  }, [])
-
-  const tabs: PillTabItem<TicketTab>[] = [
-    { value: 'all', label: 'All', count: TICKETS.length },
-    { value: 'onsale', label: 'On sale', count: counts.onsale },
-    { value: 'scheduled', label: 'Scheduled', count: counts.scheduled },
-    { value: 'paused', label: 'Paused', count: counts.paused },
-    { value: 'soldout', label: 'Sold out', count: counts.soldout },
-  ]
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return TICKETS.filter(
-      (t) =>
-        (tab === 'all' || t.status === tab) &&
-        (!eventFilter || t.event === eventFilter) &&
-        (!q || t.name.toLowerCase().includes(q) || t.event.toLowerCase().includes(q)),
-    )
-  }, [tab, query, eventFilter])
-
-  const openQr = (t: Ticket) => {
-    setQrTicket(t)
-    qrModal.onOpen()
+  const openShare = (card: TicketCard) => {
+    setSharing(card)
+    qr.onOpen()
+    share.load(`/admin/tickets/share?eventId=${card.eventId}&ticketId=${card.id}`)
   }
+
+  const openNew = () => {
+    setEditing(null)
+    panel.onOpen()
+  }
+
+  // Nothing to filter yet: the tabs, the search and the paginator are all noise
+  // until a first tier exists, so first run replaces the whole working area.
+  // Not `emptyReason`: the loader redirects a page past the end back to the
+  // last real one whenever any row matches, so the only way to land here with
+  // `page=2` is a list that is empty for these filters anyway — and "they are
+  // still there" would be the one explanation that is false.
+  const firstRun = data.cards.length === 0 && !filtered
+
+  // A tier is created *inside* an event: TicketPanel's Event select is
+  // `required` and holds nothing but the events below, so with none of them the
+  // form can never be submitted. Offering the panel is gated on `> 0`, which is
+  // the direction that proves something — `=== 0` only ever hides a control,
+  // never asserts the workspace is empty.
+  const hasEvents = data.events.length > 0
 
   return (
     <>
@@ -78,226 +89,312 @@ export default function TicketsPage() {
         subtitle="Manage ticket types across your events."
         actions={
           <>
-            <Button variant="primary" className="shrink-0" onClick={ticketPanel.onOpen}>
-              <Icon name="hgi-add-01" size={16} />
-              <span className="hidden sm:inline">New ticket type</span>
-              <span className="sm:hidden">New</span>
-            </Button>
+            {hasEvents && (
+              <Button variant="primary" className="shrink-0" onClick={openNew}>
+                <Icon name="hgi-add-01" size={16} />
+                <span className="hidden sm:inline">New ticket type</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+            )}
             <HeaderUser />
           </>
         }
       />
 
-      {/* pill tabs */}
-      <PillTabs items={tabs} value={tab} onChange={setTab} />
-
-      {/* search + filter */}
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full flex-1">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search ticket types…"
-          />
-        </div>
-        <div className="relative w-full sm:w-56">
-          <i className="hgi-stroke hgi-calendar-03 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-brand" />
-          <select
-            value={eventFilter || 'All events'}
-            onChange={(e) => setEventFilter(e.target.value === 'All events' ? '' : e.target.value)}
-            className="select h-10 w-full border-0 bg-surface pl-9 text-[14px] font-semibold"
+      {firstRun ? (
+        <Card>
+          {/* The kit page has one version of this because it has no data: it
+              assumes nothing exists yet and sends the reader to the event
+              wizard. Here the loader knows. An organizer with a published event
+              and no tiers is the likeliest occupant of this screen, and for
+              them the step that unblocks the page is the panel, not a second
+              event. Only the closing instruction changes; the first sentence is
+              the kit's. */}
+          <EmptyState
+            icon="hgi-ticket-01"
+            title="No ticket types yet"
+            actions={
+              hasEvents
+                ? [
+                    { label: 'New ticket type', onClick: openNew, icon: 'hgi-add-01' },
+                    { label: 'See all events', to: '/admin/events' },
+                  ]
+                : [
+                    {
+                      label: 'Create an event first',
+                      to: '/admin/event-form',
+                      icon: 'hgi-calendar-add-01',
+                    },
+                    { label: 'See all events', to: '/admin/events' },
+                  ]
+            }
           >
-            {EVENT_PICKER_OPTIONS.map((e) => (
-              <option key={e}>{e}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+            {hasEvents ? (
+              <>
+                Every ticket type belongs to an event — its price in ฿, how many are available and
+                when they go on sale. Add the first tier to one of your events and people can start
+                buying it.
+              </>
+            ) : (
+              <>
+                Every ticket type belongs to an event — its price in ฿, how many are available and
+                when they go on sale. Create an event first, then add the tickets people can buy for
+                it.
+              </>
+            )}
+          </EmptyState>
+        </Card>
+      ) : (
+        <>
+          <PillTabs<TicketTab>
+            items={tabItems(data.tabs)}
+            value={(params.get('tab') as TicketTab) ?? 'all'}
+            onChange={(tab) => set({ tab: tab === 'all' ? null : tab })}
+          />
 
-      {/* ticket type cards */}
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((t) => {
-          const meta = TICKET_STATUS_META[t.status]
-          const pct = t.total ? Math.round((t.sold / t.total) * 100) : 0
-          return (
-            <div key={t.id} className="card flex flex-col gap-3 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', t.iconClass)}
-                  >
-                    <Icon name="hgi-ticket-01" size={18} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-[14px] font-semibold text-ink">{t.name}</p>
-                    <p className="truncate text-[11px] text-muted">{t.event}</p>
-                  </div>
-                </div>
-                <button type="button" className="btn-icon shrink-0" title="More">
-                  <Icon name="hgi-more-vertical" size={16} />
-                </button>
+          <div className={cn('mt-3', filtering && 'opacity-60 transition-opacity')}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative w-full flex-1">
+                <Icon
+                  name="hgi-search-01"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                />
+                <input
+                  type="text"
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
+                  placeholder="Search ticket types…"
+                  maxLength={MAX_SEARCH_LENGTH}
+                  aria-label="Search ticket types"
+                />
               </div>
-              <div className="flex items-end justify-between">
-                {t.free ? (
-                  <Badge tone="green">
-                    <Icon name="hgi-tick-02" size={12} />
-                    Free
-                  </Badge>
-                ) : (
-                  <p className="text-[22px] font-bold tracking-tight tnum">{baht(t.price)}</p>
-                )}
-                <Badge tone={meta.tone}>
-                  <Icon name={meta.icon} size={12} />
-                  {meta.label}
-                </Badge>
-              </div>
-              <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
-                  <span className="tnum">
-                    {num(t.sold)} / {num(t.total)} sold
-                  </span>
-                  <span className="tnum">{pct}%</span>
-                </div>
-                <div className="h-1.5 w-full rounded-full bg-line">
-                  <div className="h-1.5 rounded-full bg-brand" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-              <div className="mt-1 flex items-center gap-2 border-t border-hair pt-3">
-                <button
-                  type="button"
-                  className="btn btn-soft btn-sm flex-1"
-                  onClick={ticketPanel.onOpen}
-                >
-                  <Icon name="hgi-edit-02" size={14} />
-                  Edit
-                </button>
-                <button type="button" className="btn-icon" title="QR code" onClick={() => openQr(t)}>
-                  <Icon name="hgi-qr-code-01" size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="btn-icon"
-                  title="Delete"
-                  onClick={delModal.onOpen}
-                >
-                  <Icon name="hgi-delete-02" size={16} />
-                </button>
+              <div className="relative w-full sm:w-56">
+                <EventPicker
+                  value={params.get('eventId') ?? ''}
+                  onChange={(eventId) => set({ eventId: eventId || null })}
+                  options={data.events}
+                  allLabel={ALL_EVENTS}
+                  allValue=""
+                  placeholder={ALL_EVENTS}
+                  className="h-10 w-full border-0 bg-surface font-medium"
+                />
               </div>
             </div>
-          )
-        })}
-        {filtered.length === 0 && (
-          <div className="col-span-full py-10 text-center text-[13px] text-muted">No matches.</div>
-        )}
-      </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {data.cards.map((card) => (
+                <TicketTile
+                  key={card.id}
+                  card={card}
+                  onEdit={() => {
+                    setEditing(card)
+                    panel.onOpen()
+                  }}
+                  onShare={() => openShare(card)}
+                  onDelete={() => {
+                    setDeleting(card)
+                    del.onOpen()
+                  }}
+                  onToggle={() =>
+                    mutate.submit(
+                      {
+                        intent: card.status === 'paused' ? 'resume' : 'pause',
+                        eventId: card.eventId,
+                        ticketId: card.id,
+                      },
+                      { method: 'post' },
+                    )
+                  }
+                />
+              ))}
+              {/* The filters stay on screen — they are what has to change. */}
+              {data.cards.length === 0 && (
+                <div className="col-span-full">
+                  <NoResults noun="ticket types" onClear={clear}>
+                    Nothing matches the current search, status tab and event filter. Try widening
+                    them to see more ticket types.
+                  </NoResults>
+                </div>
+              )}
+            </div>
+
+            <Paginator
+              {...data.window}
+              noun="ticket types"
+              onPage={(page) => set({ page })}
+              onSize={(size) => set({ limit: size, page: null })}
+            />
+          </div>
+        </>
+      )}
+
+      {mutate.data?.ok === false && (
+        <p role="alert" className="mt-3 text-[13px] text-red-500">
+          {mutate.data.error}
+        </p>
+      )}
 
       <PageFooter />
 
-      {/* New / edit ticket type panel */}
-      <Panel
-        open={ticketPanel.open}
-        onClose={ticketPanel.onClose}
-        title="New ticket type"
-        footer={
-          <>
-            <Button variant="soft" className="flex-1" onClick={ticketPanel.onClose}>
-              Cancel
-            </Button>
-            <Button variant="primary" className="flex-1" onClick={ticketPanel.onClose}>
-              Save ticket type
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <Label>Ticket name</Label>
-            <Input type="text" placeholder="e.g. VIP Access" />
-          </div>
-          <div>
-            <Label>Event</Label>
-            <Select defaultValue="Tech Summit 2026">
-              {EVENT_NAMES.map((e) => (
-                <option key={e}>{e}</option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label>Type</Label>
-            <div className="segmented w-full">
-              <button
-                type="button"
-                className={cn('flex-1', ticketType === 'paid' && 'active')}
-                onClick={() => setTicketType('paid')}
-              >
-                Paid
-              </button>
-              <button
-                type="button"
-                className={cn('flex-1', ticketType === 'free' && 'active')}
-                onClick={() => setTicketType('free')}
-              >
-                Free
-              </button>
-            </div>
-          </div>
-          {ticketType === 'paid' && (
-            <div>
-              <Label>Price (฿)</Label>
-              <Input type="number" min={0} step={1} placeholder="1250" />
-            </div>
-          )}
-          <div>
-            <Label>Quantity available</Label>
-            <Input type="number" min={0} step={1} placeholder="250" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Sales start</Label>
-              <Input type="date" />
-            </div>
-            <div>
-              <Label>Sales end</Label>
-              <Input type="date" />
-            </div>
-          </div>
-          <div>
-            <Label>Per-order limit</Label>
-            <Input type="number" min={1} step={1} placeholder="4" />
-            <Hint>Maximum tickets a single order can include.</Hint>
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea placeholder="What's included with this ticket…" />
-          </div>
-          <div className="flex items-center justify-between border-t border-hair pt-4">
-            <div>
-              <p className="text-[13px] font-medium text-ink">Transferable</p>
-              <Hint className="mt-0.5">Allow this ticket to be transferred to another attendee</Hint>
-            </div>
-            <ToggleSwitch checked={transferable} onChange={setTransferable} />
+      <TicketPanel
+        open={panel.open}
+        onClose={panel.onClose}
+        editing={editing?.edit ?? null}
+        events={data.events}
+      />
+
+      <TicketQrModal
+        open={qr.open}
+        onClose={qr.onClose}
+        ticketName={sharing?.name ?? 'Ticket'}
+        eventName={sharing?.event ?? ''}
+        // Only this tier's answer counts. The fetcher still holds the last
+        // one, and showing tier A's QR under tier B's name is a link that
+        // sells the wrong ticket.
+        share={share.data && share.data.ticketId === sharing?.id ? share.data : null}
+        error={share.state === 'idle' && !share.data ? SHARE_FAILED : null}
+      />
+
+      <DeleteTicketModal open={del.open} onClose={del.onClose} target={deleting} />
+    </>
+  )
+}
+
+const SHARE_FAILED = "That link couldn't be prepared. Close this and try again."
+
+function tabItems(counts: TabCounts): PillTabItem<TicketTab>[] {
+  return [
+    { value: 'all', label: 'All', count: counts.all },
+    { value: 'onsale', label: 'On sale', count: counts.onsale },
+    { value: 'scheduled', label: 'Scheduled', count: counts.scheduled },
+    { value: 'paused', label: 'Paused', count: counts.paused },
+    { value: 'soldout', label: 'Sold out', count: counts.soldout },
+  ]
+}
+
+interface TicketTileProps {
+  card: TicketCard
+  onEdit: () => void
+  onShare: () => void
+  onDelete: () => void
+  onToggle: () => void
+}
+
+function TicketTile({ card, onEdit, onShare, onDelete, onToggle }: TicketTileProps) {
+  const paused = card.status === 'paused'
+
+  return (
+    <div className="card flex flex-col gap-3 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', card.iconTint)}>
+            <Icon name="hgi-ticket-01" size={18} />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[14px] font-semibold text-ink">{card.name}</p>
+            <p className="truncate text-[11px] text-muted">{card.event}</p>
           </div>
         </div>
-      </Panel>
+        <button
+          type="button"
+          className="btn-icon shrink-0"
+          title={paused ? 'Resume sales' : 'Pause sales'}
+          onClick={onToggle}
+        >
+          <Icon name={paused ? 'hgi-play' : 'hgi-pause'} size={16} />
+        </button>
+      </div>
 
-      {/* Share ticket type (registration QR) modal */}
-      <TicketQrModal
-        open={qrModal.open}
-        onClose={qrModal.onClose}
-        ticketName={qrTicket?.name ?? 'Ticket'}
-        eventName={qrTicket?.event ?? ''}
-      />
+      <div className="flex items-end justify-between">
+        {card.isFree ? (
+          <Badge tone="green">
+            <Icon name="hgi-tick-02" size={12} />
+            Free
+          </Badge>
+        ) : (
+          <p className="tnum text-[22px] font-bold tracking-tight">{card.price}</p>
+        )}
+        <Badge tone={card.statusTone} icon={card.statusIcon}>
+          {card.statusLabel}
+        </Badge>
+      </div>
 
-      {/* Delete confirm modal */}
-      <ConfirmDeleteModal
-        open={delModal.open}
-        onClose={delModal.onClose}
-        title="Delete ticket type?"
-        message="This will permanently remove the ticket type. Attendees who already hold this ticket won't be affected."
-      />
-    </>
+      <div>
+        <div className="mb-1 flex items-center justify-between text-[11px] text-muted">
+          <span className="tnum">{card.soldLabel}</span>
+          {card.percent !== null && <span className="tnum">{card.percent}%</span>}
+        </div>
+        {card.percent === null ? (
+          <p className="text-[11px] text-muted">Unlimited</p>
+        ) : (
+          <div className="h-1.5 w-full rounded-full bg-line">
+            <div className="h-1.5 rounded-full bg-brand" style={{ width: `${card.percent}%` }} />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-1 flex items-center gap-2 border-t border-hair pt-3">
+        <button type="button" className="btn btn-soft btn-sm flex-1" onClick={onEdit}>
+          <Icon name="hgi-edit-02" size={14} />
+          Edit
+        </button>
+        <button type="button" className="btn-icon" title="Share link & QR" onClick={onShare}>
+          <Icon name="hgi-qr-code-01" size={16} />
+        </button>
+        <button type="button" className="btn-icon" title="Delete" onClick={onDelete}>
+          <Icon name="hgi-delete-02" size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Deleting a tier.
+ *
+ * The API refuses once a tier has sold — it answers 409 with the reason, which
+ * the modal shows verbatim rather than paraphrasing, because "retire it
+ * instead" is an instruction written for the person reading it.
+ */
+function DeleteTicketModal({
+  open,
+  onClose,
+  target,
+}: {
+  open: boolean
+  onClose: () => void
+  target: TicketCard | null
+}) {
+  const fetcher = useFetcher<ActionResult>()
+  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
+  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
+
+  useEffect(() => {
+    if (!done || !open) return
+    toast.success('Ticket type deleted.')
+    onClose()
+  }, [done, open, onClose])
+
+  return (
+    <ConfirmDeleteModal
+      open={open}
+      onClose={onClose}
+      title="Delete ticket type?"
+      message={
+        refused ??
+        'This permanently removes the ticket type. Attendees who already hold one are not affected.'
+      }
+      tone={refused ? 'error' : 'default'}
+      confirmLabel={fetcher.state === 'idle' ? 'Delete' : 'Deleting…'}
+      onConfirm={() =>
+        target &&
+        fetcher.submit(
+          { intent: 'delete', eventId: target.eventId, ticketId: target.id },
+          { method: 'post' },
+        )
+      }
+    />
   )
 }

@@ -1,0 +1,250 @@
+import { useEffect, useState } from 'react'
+import { useFetcher } from 'react-router'
+import {
+  Button,
+  EventPicker,
+  Hint,
+  Icon,
+  Input,
+  Label,
+  Panel,
+  Select,
+  Textarea,
+} from '@/components/ui'
+import { toast } from '@/lib/toast'
+import type { ActionResult } from '@/app/loaders'
+import { MEETING_MODES, MEETING_TYPES } from '../meetings.routes'
+import { meetingSaveLabel } from '../meetings.presentation'
+import type { MeetingDraft } from '../meetings.types'
+
+/** Schedule or reschedule a meeting (US-MTG-01/02). */
+
+interface MeetingPanelProps {
+  open: boolean
+  onClose: () => void
+  /** The meeting being changed, or null for a new one. */
+  editing: MeetingDraft | null
+  events: { id: string; name: string }[]
+  onCancelMeeting?: () => void
+}
+
+const FORM_ID = 'meeting-form'
+const ALL_EVENTS = 'All events'
+
+export function MeetingPanel({
+  open,
+  onClose,
+  editing,
+  events,
+  onCancelMeeting,
+}: MeetingPanelProps) {
+  const fetcher = useFetcher<ActionResult>()
+  const saving = fetcher.state !== 'idle'
+  const error = fetcher.data?.ok === false ? fetcher.data.error : null
+  const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
+
+  // Re-seeded from the meeting being edited each time the panel opens, so a
+  // reschedule does not inherit the previous one's event. Adjusted during
+  // render rather than in an effect, so the picker is right on the first paint.
+  const [eventId, setEventId] = useState(editing?.eventId ?? '')
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setEventId(editing?.eventId ?? '')
+  }
+
+  // A boolean rather than `editing` itself in the dependencies: the draft is an
+  // object, and depending on it would re-run this on any identity change.
+  const isNew = editing === null
+
+  useEffect(() => {
+    if (!saved || !open) return
+    // Matches the button that was pressed: scheduling sent the invites out,
+    // rescheduling only moved a meeting that already existed.
+    toast.success(isNew ? 'Meeting scheduled.' : 'Meeting saved.')
+    onClose()
+  }, [saved, open, onClose, isNew])
+
+  return (
+    <Panel
+      open={open}
+      onClose={onClose}
+      title={editing ? 'Reschedule meeting' : 'Schedule meeting'}
+      footer={
+        <>
+          {editing && onCancelMeeting ? (
+            <Button variant="danger" className="flex-1" onClick={onCancelMeeting} disabled={saving}>
+              Cancel meeting
+            </Button>
+          ) : (
+            <Button variant="soft" className="flex-1" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+          )}
+          <Button variant="primary" className="flex-1" type="submit" form={FORM_ID} disabled={saving}>
+            {!saving && !editing && <Icon name="hgi-calendar-add-01" size={16} />}
+            {meetingSaveLabel(Boolean(editing), saving)}
+          </Button>
+        </>
+      }
+    >
+      <fetcher.Form id={FORM_ID} key={editing?.id ?? 'new'} method="post" className="space-y-4">
+        <input type="hidden" name="intent" value={editing ? 'reschedule' : 'schedule'} />
+        {editing && (
+          <>
+            <input type="hidden" name="meetingId" value={editing.id} />
+            <input type="hidden" name="version" value={editing.version} />
+          </>
+        )}
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-lg bg-red-50 p-3 text-[13px] text-red-600 dark:bg-red-500/15 dark:text-red-300"
+          >
+            {error}
+          </p>
+        )}
+
+        <div>
+          <Label htmlFor="meeting-title">Title</Label>
+          <Input
+            id="meeting-title"
+            name="title"
+            type="text"
+            required
+            defaultValue={editing?.title ?? ''}
+            placeholder="e.g. Seating plan approval"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="meeting-date">Date</Label>
+          <Input
+            id="meeting-date"
+            name="date"
+            type="date"
+            required
+            defaultValue={editing?.date ?? ''}
+          />
+          <Hint>Bangkok calendar day.</Hint>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="meeting-start">Starts</Label>
+            <Input
+              id="meeting-start"
+              name="startTime"
+              type="time"
+              required
+              defaultValue={editing?.startTime ?? '10:00'}
+            />
+          </div>
+          <div>
+            <Label htmlFor="meeting-end">Ends</Label>
+            <Input
+              id="meeting-end"
+              name="endTime"
+              type="time"
+              required
+              defaultValue={editing?.endTime ?? '10:30'}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="meeting-type">Type</Label>
+            <Select id="meeting-type" name="type" defaultValue={editing?.type ?? 'Internal'}>
+              {MEETING_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="meeting-mode">Mode</Label>
+            <Select id="meeting-mode" name="mode" defaultValue={editing?.mode ?? 'Video'}>
+              {MEETING_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode}
+                </option>
+              ))}
+            </Select>
+            <Hint>A Meet link is generated automatically.</Hint>
+          </div>
+        </div>
+
+        <div>
+          <Label htmlFor="meeting-person">Who you are meeting</Label>
+          <Input
+            id="meeting-person"
+            name="person"
+            type="text"
+            required
+            defaultValue={editing?.person ?? ''}
+            placeholder="Sophia Reynolds"
+          />
+        </div>
+        <div>
+          <Label htmlFor="meeting-role">Their role</Label>
+          <Input
+            id="meeting-role"
+            name="role"
+            type="text"
+            defaultValue={editing?.role ?? ''}
+            placeholder="Venue Coordinator"
+          />
+        </div>
+        <div>
+          <Label htmlFor="meeting-email">Guest email</Label>
+          <Input
+            id="meeting-email"
+            name="guestEmail"
+            type="email"
+            required
+            defaultValue={editing?.guestEmail ?? ''}
+            placeholder="name@company.com"
+          />
+          <Hint>Where the calendar invite is sent.</Hint>
+        </div>
+
+        <div>
+          <Label htmlFor="meeting-event">Event</Label>
+          <EventPicker
+            id="meeting-event"
+            name="eventId"
+            value={eventId}
+            onChange={setEventId}
+            options={events}
+            allLabel={ALL_EVENTS}
+            allValue=""
+            placeholder={ALL_EVENTS}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="meeting-notes">Notes</Label>
+          <Textarea id="meeting-notes" name="notes" rows={3} defaultValue={editing?.notes ?? ''} />
+        </div>
+
+        {/* What scheduling actually does, from the kit — the guests are emailed
+            without the organizer sending anything, which is worth saying before
+            the button rather than after. Only on a new meeting: rescheduling
+            does not re-invite anybody. */}
+        {!editing && (
+          <div className="flex items-start gap-2 rounded-lg border border-hair bg-canvas p-3">
+            <Icon name="hgi-calendar-check-in-01" size={16} className="mt-0.5 text-muted" />
+            <p className="text-[12px] text-muted">
+              A <span className="font-medium text-ink">Google Meet</span> link and{' '}
+              <span className="font-medium text-ink">Google Calendar</span> invite are emailed to
+              each guest, with a reminder 15 minutes before.
+            </p>
+          </div>
+        )}
+      </fetcher.Form>
+    </Panel>
+  )
+}

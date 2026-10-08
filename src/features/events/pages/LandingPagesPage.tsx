@@ -1,12 +1,18 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
-import { PageHeader, PageFooter, HeaderUser, ButtonLink, Icon } from '@/components/ui'
-import { cn } from '@/lib/cn'
+import { Link, useFetcher, useLoaderData } from 'react-router'
 import {
-  SAMPLE_EVENTS,
-  LANDING_TEMPLATES,
-  type TemplateId,
-} from '../data/landingTemplates'
+  ButtonLink,
+  EmptyState,
+  EventPicker,
+  HeaderUser,
+  Icon,
+  PageFooter,
+  PageHeader,
+} from '@/components/ui'
+import type { ActionResult } from '@/app/loaders'
+import { cn } from '@/lib/cn'
+import type { LandingPagesData } from '../events.routes'
+import { LANDING_TEMPLATES, type PreviewEvent, type TemplateId } from '../landingTemplates'
 
 /** The three-dot browser chrome plus the template-specific preview body. */
 function TemplatePreview({ id }: { id: TemplateId }) {
@@ -72,11 +78,75 @@ function TemplatePreview({ id }: { id: TemplateId }) {
   )
 }
 
+/**
+ * Give the chosen event this design.
+ *
+ * The template used to be settable only while publishing, so changing it meant
+ * unpublishing a live event. It is now a PATCH, and this is where it is made —
+ * beside the design being chosen, against the event the switcher already names.
+ */
+function ApplyTemplate({
+  template,
+  event,
+  inUse,
+}: {
+  template: TemplateId
+  event: PreviewEvent | undefined
+  inUse: boolean
+}) {
+  const fetcher = useFetcher<ActionResult>()
+  const busy = fetcher.state !== 'idle'
+  const refusal = fetcher.data?.ok === false ? fetcher.data.error : null
+
+  if (!event) {
+    return (
+      <Link
+        to="/admin/event-form"
+        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[12.5px] font-semibold text-white transition hover:bg-brand-dark"
+      >
+        Use template
+      </Link>
+    )
+  }
+
+  return (
+    <fetcher.Form method="post" className="flex-1">
+      <input type="hidden" name="id" value={event.id} />
+      <input type="hidden" name="template" value={template} />
+      <button
+        type="submit"
+        disabled={busy || inUse}
+        title={inUse ? `${event.name} already uses this` : `Use this for ${event.name}`}
+        className={cn(
+          'inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-semibold transition',
+          inUse
+            ? 'cursor-default bg-brand-soft text-brand'
+            : 'bg-brand text-white hover:bg-brand-dark disabled:opacity-60',
+        )}
+      >
+        {inUse && <Icon name="hgi-checkmark-circle-02" size={14} />}
+        {inUse ? 'In use' : busy ? 'Applying…' : 'Use template'}
+      </button>
+      {/* The API's own words — a stale version or a refused id is its answer. */}
+      {refusal && (
+        <p role="alert" className="mt-1.5 text-[11.5px] leading-snug text-red-500">
+          {refusal}
+        </p>
+      )}
+    </fetcher.Form>
+  )
+}
+
 export default function LandingPagesPage() {
-  const [sampleEvent, setSampleEvent] = useState('tech-summit-2026')
+  const { events } = useLoaderData() as LandingPagesData
+  // The switcher previews against the workspace's own events now, so there is
+  // nothing to choose from until it has one.
+  const [previewSlug, setPreviewSlug] = useState(events[0]?.slug ?? '')
+  const selected = events.find((event) => event.slug === previewSlug)
 
   function preview(id: TemplateId) {
-    window.open(`/landing/${id}?event=${sampleEvent}`, '_blank', 'noopener')
+    if (!previewSlug) return
+    window.open(`/landing/${id}?event=${previewSlug}`, '_blank', 'noopener')
   }
 
   return (
@@ -96,6 +166,33 @@ export default function LandingPagesPage() {
         }
       />
 
+      {/* First run: the four designs exist before any event does, so they stay
+          on screen — what is missing is an event to build a page from, and that
+          is all this block says. Nothing real is hidden behind it.
+
+          Looking is all the copy offers, because looking is all there is to do:
+          with no event to attach a design to, Preview is disabled and every
+          "Use template" is a link to the event form. There is nowhere to keep a
+          choice made now, so the copy does not pretend one can be made. */}
+      {events.length === 0 && (
+        <EmptyState
+          className="card mb-4"
+          icon="hgi-browser"
+          title="No event pages yet"
+          actions={[
+            {
+              label: 'Create your first event',
+              to: '/admin/event-form',
+              icon: 'hgi-calendar-add-01',
+            },
+          ]}
+        >
+          Every event you create gets its own page, built from one of the four templates below —
+          title, date, venue, agenda and tickets all fill in from the event itself. Browse the
+          designs, then create an event to preview one with real details.
+        </EmptyState>
+      )}
+
       {/* how it works + sample switcher */}
       <div className="rounded-2xl bg-surface p-4 lg:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -111,29 +208,34 @@ export default function LandingPagesPage() {
               </p>
             </div>
           </div>
-          <div className="shrink-0">
-            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
-              Preview with
-            </p>
-            <div className="inline-flex rounded-lg bg-canvas p-0.5 text-[12px] font-semibold">
-              {SAMPLE_EVENTS.map((ev) => {
-                const on = ev.id === sampleEvent
-                return (
-                  <button
-                    key={ev.id}
-                    type="button"
-                    onClick={() => setSampleEvent(ev.id)}
-                    className={cn(
-                      'rounded-md px-3 py-1.5 transition',
-                      on ? 'bg-surface text-ink shadow-sm' : 'text-muted',
-                    )}
-                  >
-                    {ev.label}
-                  </button>
-                )
-              })}
+          {/* Nothing to preview against until an event exists; the block above
+              already says so, so the switcher goes rather than repeating it. */}
+          {events.length > 0 && (
+            <div className="shrink-0">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                Preview with
+              </p>
+              {/* A row of pills wrapped into several lines once a workspace had
+                  more than a handful of events, and had no way to find one.
+                  Keyed by slug rather than id: the preview URL takes the slug,
+                  and the picker reports back whatever `id` it was given. */}
+              <div className="relative w-full sm:w-56">
+                <EventPicker
+                  value={previewSlug}
+                  onChange={setPreviewSlug}
+                  options={events.map((event) => ({
+                    id: event.slug,
+                    name: event.name,
+                    date: event.date,
+                    status: event.status,
+                  }))}
+                  allLabel={false}
+                  placeholder="Choose event"
+                  className="h-10 w-full border-0 bg-surface font-medium"
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -149,22 +251,23 @@ export default function LandingPagesPage() {
                   {tpl.badge}
                 </span>
               </div>
-              <p className="mt-1 flex-1 text-[12.5px] leading-snug text-muted">{tpl.desc}</p>
+              <p className="mt-1 flex-1 text-[12.5px] leading-snug text-muted">{tpl.description}</p>
               <div className="mt-3 flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => preview(tpl.id)}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-3 py-2 text-[12.5px] font-semibold text-brand transition hover:brightness-95"
+                  disabled={!previewSlug}
+                  title={previewSlug ? undefined : 'Create an event first'}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-3 py-2 text-[12.5px] font-semibold text-brand transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Icon name="hgi-play" size={14} />
                   Preview
                 </button>
-                <Link
-                  to="/admin/event-form"
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[12.5px] font-semibold text-white transition hover:bg-brand-dark"
-                >
-                  Use template
-                </Link>
+                <ApplyTemplate
+                  template={tpl.id}
+                  event={selected}
+                  inUse={selected?.landingTemplateId === tpl.id}
+                />
               </div>
             </div>
           </div>
