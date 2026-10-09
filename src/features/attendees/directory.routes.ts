@@ -1,8 +1,11 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
+import { mapPanel, panel, type Panel } from '@/app/panels'
 import { api, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
+import { toTimeline } from './activity.mapper'
+import type { AuditEntryWire, TimelineEntry } from './activity.types'
 import { contactPatchOfForm, hasContactChanges } from './contact.changes'
 import { toAttendeeRow } from './directory.mapper'
 import type {
@@ -39,8 +42,46 @@ interface DirectoryQuery extends Query {
   sort?: AttendeeSort
 }
 
+/** The URL parameter naming whose profile panel is open. */
+export const PROFILE_PARAM = 'profile'
+
+/** How far back the panel's timeline reaches before deferring to the audit log. */
+const TIMELINE_LIMIT = 20
+
+/** The one kind of record `GET /audit` can be asked the trail of today. */
+const ATTENDEE_SUBJECT = 'attendee'
+
+interface ActivityQuery extends Query {
+  subjectType: typeof ATTENDEE_SUBJECT
+  subjectId: number
+  limit: number
+}
+
+/**
+ * "What happened to this attendee", as `GET /audit` takes it.
+ *
+ * The subject is two parameters and the DTO refuses half of it — "Send
+ * subjectType and subjectId together — half a subject matches nothing in
+ * particular" — so the pair is built here, once, and cannot be sent apart. The
+ * query is also behind a `forbidNonWhitelisted` pipe, which is why nothing else
+ * is added to it speculatively: an unknown parameter is a 400, not an ignored
+ * one.
+ */
+export function activityQueryOf(attendeeId: number): ActivityQuery {
+  return { subjectType: ATTENDEE_SUBJECT, subjectId: attendeeId, limit: TIMELINE_LIMIT }
+}
+
 const attendeesApi = {
   list: (query: DirectoryQuery) => api.list<AttendeeWire>('/attendees', { query }),
+  /**
+   * One attendee's recorded history (US-REG-08 AC5).
+   *
+   * The audit trail is the only record of a contact correction — the same
+   * entries the settings screen's security log lists, narrowed to one subject.
+   * There is deliberately no second activity table to read instead.
+   */
+  activity: (attendeeId: number) =>
+    api.list<AuditEntryWire>('/audit', { query: activityQueryOf(attendeeId) }),
   /** Invite people to an event by email (US-CHK-07). */
   invite: (eventId: string, emails: string[], message: string | undefined) =>
     api.post<void>(`/events/${eventId}/attendees/email`, { emails, message }),
@@ -74,19 +115,57 @@ export function listQueryOf(params: URLSearchParams): DirectoryQuery {
   }
 }
 
+/**
+ * Which attendee's profile the URL is asking for, if any.
+ *
+ * Which panel is open is URL state like every filter on this page: the back
+ * button closes it, the link can be shared, and — the reason it has to be in
+ * the URL rather than in the page — the loader is what reads the timeline, and
+ * a loader sees nothing but the request.
+ *
+ * Anything the API would refuse is read as "nobody". `subjectId` is validated
+ * `@IsInt() @Min(1)` behind a `forbidNonWhitelisted` pipe, so a hand-typed
+ * `?profile=0` would come back 400 — and a 400 under the panel would be
+ * reported as a failed history when nothing is wrong with the attendee's.
+ */
+export function profileIdOf(params: URLSearchParams): number | null {
+  const id = intParam(params, PROFILE_PARAM, 0)
+  return id > 0 ? id : null
+}
+
+/** The history behind one profile panel, and what to say if it never arrived. */
+export interface AttendeeActivity {
+  /** Whose — so the page can tell a loaded timeline from the previous one. */
+  attendeeId: number
+  timeline: Panel<TimelineEntry[]>
+}
+
 export interface DirectoryData {
   rows: AttendeeRow[]
   window: PageWindow
   counts: SegmentCountsWire
   /** The events an invitation can be sent for. */
   events: EventOption[]
+  /** Null when no profile is open — the common case. */
+  activity: AttendeeActivity | null
 }
 
 const NO_COUNTS: SegmentCountsWire = { all: 0, new: 0, checkedIn: 0, vip: 0 }
 
 async function loadDirectory({ request }: LoaderArgs): Promise<DirectoryData> {
-  const query = listQueryOf(queryOf(request))
-  const [page, events] = await Promise.all([attendeesApi.list(query), eventOptions()])
+  const params = queryOf(request)
+  const query = listQueryOf(params)
+  const profileId = profileIdOf(params)
+  const [page, events, activity] = await Promise.all([
+    attendeesApi.list(query),
+    eventOptions(),
+    // Wrapped rather than awaited bare: the profile's subject is the contact
+    // details, which the directory row already carries, and the history is
+    // context beside them. A failed read says so in its own section instead of
+    // replacing a panel that can still do its job. `panel()` keeps letting an
+    // expired session and a programming error through to their own handlers.
+    loadActivity(profileId),
+  ])
 
   if (page.meta.total > 0 && query.page! > page.meta.totalPages) {
     throw redirect(withPage(request.url, page.meta.totalPages))
@@ -97,7 +176,14 @@ async function loadDirectory({ request }: LoaderArgs): Promise<DirectoryData> {
     window: pageWindow(page.meta),
     counts: (page.meta.counts as SegmentCountsWire | undefined) ?? NO_COUNTS,
     events,
+    activity,
   }
+}
+
+async function loadActivity(attendeeId: number | null): Promise<AttendeeActivity | null> {
+  if (attendeeId === null) return null
+  const read = await panel(attendeesApi.activity(attendeeId))
+  return { attendeeId, timeline: mapPanel(read, (page) => toTimeline(page.items)) }
 }
 
 function withPage(current: string, page: number): string {

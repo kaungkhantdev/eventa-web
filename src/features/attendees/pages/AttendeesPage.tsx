@@ -29,9 +29,11 @@ import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
+import { AttendeeProfilePanel } from '../components/AttendeeProfilePanel'
 import { EditContactPanel } from '../components/EditContactPanel'
-import { TAGS, type DirectoryData } from '../directory.routes'
+import { PROFILE_PARAM, TAGS, type DirectoryData } from '../directory.routes'
 import type { AttendeeRow, AttendeeSegment, AttendeeSort } from '../directory.types'
+import { useOpenProfileId } from '../useOpenProfileId'
 
 /**
  * The attendee directory (US-CHK-06/07). Layout ported from attendees.html.
@@ -59,7 +61,14 @@ export default function AttendeesPage() {
   // No defaults are declared: the sort select writes its value even when it is
   // the default one, but sorting reorders rather than hides, so `useFilters`
   // does not count it as narrowing in the first place.
-  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
+  //
+  // Which profile is open is page state, not a filter: it hides nothing, so an
+  // empty table with a panel over it is still a first run and not a search that
+  // matched nothing — and "Clear filters" must not close the panel either.
+  const { params, set, clear, emptyReason } = useFilters({
+    total: data.window.total,
+    ignore: [PROFILE_PARAM],
+  })
   const filtering = useIsFiltering()
   const invite = useDisclosure()
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
@@ -78,8 +87,45 @@ export default function AttendeesPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const editing = data.rows.find((row) => row.id === editingId) ?? null
 
-  const onEdit = (row: AttendeeRow) => {
-    setEditingId(row.id)
+  const openId = useOpenProfileId()
+  // Whose details the panel is drawing. While it slides shut the URL has
+  // already stopped naming anybody, so it falls back to the profile the loader
+  // last read — which keeps the closing panel readable instead of emptying
+  // under the animation, and is still router state rather than a copy of it.
+  const shownId = openId ?? data.activity?.attendeeId ?? null
+  // A `?profile=` naming somebody who is not on this page opens nothing: the
+  // panel's subject is the row's own contact details, and no second read exists
+  // to recover them.
+  const viewing = data.rows.find((row) => row.id === shownId) ?? null
+  // The history, once the loader has read *this* attendee's. Null while that is
+  // in flight — including on the click that opened the panel, which shows
+  // before its timeline could possibly have arrived.
+  const timeline = data.activity?.attendeeId === shownId ? data.activity.timeline : null
+
+  // The page number rides along in every patch. `nextParams` drops it for any
+  // other change, because page 4 of a new filter is not page 4 of the old one —
+  // but opening a panel narrows nothing, and losing page 4 would take the row
+  // the panel was opened from off the screen behind it.
+  const setProfile = (id: number | null) =>
+    set({ [PROFILE_PARAM]: id, page: params.get('page') })
+
+  /**
+   * The kit's Edit lives in the profile footer, and its buttons close the panel
+   * behind them — one route into the form rather than two.
+   *
+   * The profile is hidden by the condition on its `open` prop rather than by
+   * clearing `?profile=`. Clearing it NAVIGATES, and the navigation discarded
+   * the state set on the two lines above it, so Edit closed the profile and
+   * opened nothing — found by clicking it, which is the only way: it type-
+   * checks, and no unit test covers two panels and a loader between them.
+   *
+   * Keeping the parameter is better than a fix anyway: the form is a step
+   * inside the profile, so closing it returns to the person it was opened from
+   * instead of to a bare directory.
+   */
+  const onEditProfile = () => {
+    if (!viewing) return
+    setEditingId(viewing.id)
     edit.onOpen()
   }
 
@@ -223,22 +269,20 @@ export default function AttendeesPage() {
                   <th>Tickets</th>
                   <th>Tags</th>
                   <th>Last activity</th>
-                  {/* The kit's own Actions column. It is dropped rather than
-                      left empty for somebody who may only read the directory. */}
-                  {canManage && <th className="text-right">Actions</th>}
+                  {/* The kit's own Actions column. Opening a profile is reading,
+                      so it is offered to everyone who may read the directory —
+                      the Edit button inside the panel is what needs the extra
+                      permission. */}
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-[13px]">
                 {data.rows.map((row) => (
-                  <AttendeeTableRow
-                    key={row.id}
-                    row={row}
-                    onEdit={canManage ? () => onEdit(row) : null}
-                  />
+                  <AttendeeTableRow key={row.id} row={row} onView={() => setProfile(row.id)} />
                 ))}
                 {data.rows.length === 0 && (
                   <tr>
-                    <td colSpan={canManage ? 7 : 6}>
+                    <td colSpan={7}>
                       {emptyReason === 'past-end' ? (
                         /* A bookmarked `?page=4` that no longer has anybody on
                            it. Back to the first page keeping the search: it is
@@ -270,6 +314,14 @@ export default function AttendeesPage() {
       <PageFooter />
 
       <InvitePanel open={invite.open} onClose={invite.onClose} events={data.events} />
+
+      <AttendeeProfilePanel
+        row={viewing}
+        timeline={timeline}
+        open={openId !== null && viewing !== null && !edit.open}
+        onClose={() => setProfile(null)}
+        onEdit={canManage ? onEditProfile : null}
+      />
 
       {/* Rendered for anyone who may edit, not only once a row is chosen: the
           element stays mounted so the kit's slide-in transition has something
@@ -310,14 +362,7 @@ function pills(data: DirectoryData): PillTabItem<AttendeeSegment>[] {
   ]
 }
 
-function AttendeeTableRow({
-  row,
-  /** Null for a caller who may not edit — the cell goes with the column. */
-  onEdit,
-}: {
-  row: AttendeeRow
-  onEdit: (() => void) | null
-}) {
+function AttendeeTableRow({ row, onView }: { row: AttendeeRow; onView: () => void }) {
   return (
     <tr>
       <td>
@@ -343,19 +388,18 @@ function AttendeeTableRow({
         )}
       </td>
       <td className="tnum text-muted">{row.lastActivity}</td>
-      {onEdit && (
-        <td className="text-right">
-          {/* The kit's actions cell, with the glyph its profile panel puts on
-              the Edit button. Its other two buttons (View profile, More) are
-              left out rather than wired to nothing. */}
-          <div className="flex items-center justify-end gap-1">
-            <IconButton onClick={onEdit} title="Edit contact details">
-              <Icon name="hgi-edit-02" size={16} />
-              <span className="sr-only">Edit {row.name}’s contact details</span>
-            </IconButton>
-          </div>
-        </td>
-      )}
+      <td className="text-right">
+        {/* The kit's actions cell. Its "More" button is still left out rather
+            than wired to nothing; "View profile" now opens the panel it names,
+            and the Edit that used to sit here moved into that panel's footer,
+            where the kit puts it. */}
+        <div className="flex items-center justify-end gap-1">
+          <IconButton onClick={onView} title="View profile">
+            <Icon name="hgi-eye" size={16} />
+            <span className="sr-only">View {row.name}’s profile</span>
+          </IconButton>
+        </div>
+      </td>
     </tr>
   )
 }
