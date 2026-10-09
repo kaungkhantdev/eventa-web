@@ -8,6 +8,7 @@ import {
 import type { VenueParts } from '@/lib/mapLink'
 import type { SessionWire, SpeakerWire } from '@/features/program/program.api'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
+import type { TicketStatus } from '@/features/ticketing/types'
 import type {
   EventAttendeeWire,
   EventOverviewWire,
@@ -352,6 +353,29 @@ export interface TicketRow {
 }
 
 /**
+ * Ticket status → the word this panel prints.
+ *
+ * The same four words the ticketing page badges a tier with (`STATUS_META` in
+ * `features/ticketing/tickets.mapper.ts`), which is the house wording: the kit
+ * wrote "On sale" and "Sold out" on every screen that says it. Restated rather
+ * than imported because that map also carries a badge tone and an icon this
+ * panel has no use for, and a feature does not reach into another feature's
+ * mapper for a value. The union is ticketing's, so a fifth `ticket_status`
+ * cannot be added there without a `tsc` error here.
+ *
+ * Derived mechanically before — title-case of the stored value — which printed
+ * "Onsale" and "Soldout": the same tier, two spellings, on two screens of the
+ * same console. Two of the four happen to survive that treatment, which is why
+ * it looked sound.
+ */
+const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
+  onsale: 'On sale',
+  scheduled: 'Scheduled',
+  paused: 'Paused',
+  soldout: 'Sold out',
+}
+
+/**
  * One ticket tier.
  *
  * Deliberately carries no revenue figure: the API reports none per tier, and
@@ -367,6 +391,16 @@ export function toTicketRow(ticket: TicketWire): TicketRow {
     // allocation of nothing that has somehow sold twelve.
     allocation: ticket.total > 0 ? `${ticket.sold}/${ticket.total}` : String(ticket.sold),
     soldPercent: ticket.total > 0 ? Math.round((ticket.sold / ticket.total) * 100) : 0,
-    status: titleCase(ticket.status.replace(/_/g, ' ')),
+    // `status` is a plain string on the wire, so the narrowing happens here. A
+    // value this build has never been taught still has to read as something,
+    // and the API's own word is the honest guess — spaced out first, because
+    // the database spells its other ticket enums with underscores
+    // (`issued_ticket_status` has `checked_in`), and a fifth `ticket_status`
+    // would most likely arrive the same way. "Sales_ended" is not a word to
+    // print at anybody, which is why the derivation this replaced did the
+    // same substitution before title-casing.
+    status:
+      TICKET_STATUS_LABEL[ticket.status as TicketStatus] ??
+      titleCase(ticket.status.replace(/_/g, ' ')),
   }
 }

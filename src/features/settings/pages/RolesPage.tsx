@@ -20,7 +20,7 @@ import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import type { ActionResult } from '@/app/loaders'
-import { toPermissionRows } from '../settings.mapper'
+import { grantedSeed, toPermissionRows } from '../settings.mapper'
 import type { RolesData } from '../settings.routes'
 import type { PermissionOption, PermissionRow, RoleCard } from '../settings.types'
 
@@ -271,26 +271,24 @@ function RoleForm({
   groups: PermissionGroups
   children: ReactNode
 }) {
-  // Seeded from the role's own grants rather than from the rows below, so a key
-  // the catalog no longer lists stays granted instead of being dropped by a
-  // save nobody meant to make — the same reversal the withdrawn backfill caused.
-  const [granted, setGranted] = useState<Set<string>>(
-    () => new Set(editing?.permissions ?? []),
-  )
+  const [granted, setGranted] = useState<Set<string>>(() => grantedSeed(editing))
 
   /**
-   * The rows, with each key's recorded state resolved by the mapper. Rebuilt
-   * per open along with the rest of the form, so an abandoned edit cannot leave
-   * a marker behind.
+   * The rows, with each key's state resolved by the mapper against both what is
+   * stored and what the switches say right now. Rebuilt per open along with the
+   * rest of the form, so an abandoned edit cannot leave a marker behind.
    */
   const rows = useMemo(
     () =>
       groups.map((group) => ({
         name: group.name,
-        permissions: toPermissionRows(group.permissions, editing),
+        permissions: toPermissionRows(group.permissions, editing, granted),
       })),
-    [groups, editing],
+    [groups, editing, granted],
   )
+
+  /** Whether anything on screen still carries the mark the legend explains. */
+  const marked = rows.some((group) => group.permissions.some((row) => row.neverOffered))
 
   const set = (key: string, on: boolean) =>
     setGranted((was) => {
@@ -353,6 +351,8 @@ function RoleForm({
         </Hint>
       )}
 
+      {marked && <Hint>{NEW_PERMISSION_LEGEND}</Hint>}
+
       {rows.map((group) => (
         <PermissionGroupCard
           key={group.name}
@@ -366,26 +366,83 @@ function RoleForm({
 }
 
 /**
- * What the marker on a never-offered row says.
+ * What the mark on an undecided row means, said once instead of on every row
+ * that carries it.
  *
- * Deliberately a word on the row and not a banner: most roles have no gaps at
- * all, and a role with one or two should not be announced as a problem. The
- * tooltip carries the part that matters — turning it on is an ordinary grant,
- * saved by the same `PUT` as every other switch on this form.
+ * The mark stays on the row because naming WHICH keys are open is the only part
+ * an organizer can act on, one switch at a time — not because gaps are rare.
+ * They are the common case: 21 of 32 roles have no row for at least one catalog
+ * key, and a Staff role is missing 12 of the 15. What makes a count in a banner
+ * the wrong shape is that the state is transitional and self-clearing — not one
+ * role carries a recorded refusal, and the first save from this panel answers
+ * every switch, after which the marks are gone for good. A form with unanswered
+ * questions in it is not a fault to announce above itself.
+ *
+ * Those three numbers are a SNAPSHOT of one database, taken 2026-10-09, and not
+ * a property of the product — re-run them before relying on them:
+ *
+ *     docker exec eventa-postgres-1 psql -U eventa -d eventa -At -c "
+ *       SELECT (SELECT count(*) FROM roles),
+ *              (SELECT count(*) FROM permissions),
+ *              (SELECT count(*) FROM role_permissions WHERE granted = false),
+ *              (SELECT count(*) FROM roles r WHERE EXISTS (
+ *                 SELECT 1 FROM permissions p WHERE NOT EXISTS (
+ *                   SELECT 1 FROM role_permissions rp
+ *                    WHERE rp.role_id = r.id AND rp.permission_key = p.key)))"
+ *
+ * It is a legend rather than a tooltip because a tooltip reaches neither a
+ * keyboard nor a screen reader, and this is the only place the difference
+ * between an open question and a refusal is written down.
+ *
+ * The wording stops short of "never offered" — which is what the API's own
+ * field is called — because no database can support that claim. Migration
+ * `0067_backfill_system_role_grants.sql` in eventa-api records that a revoke
+ * used to DELETE the row rather than write a `granted = false` tombstone, so in
+ * a workspace older than that convention an absent row is either a question
+ * nobody was asked or a refusal a past release erased. Being unable to tell
+ * those two apart is the whole reason the automatic backfill was withdrawn, and
+ * a legend promising the first reading would hand an organizer exactly the
+ * false certainty that backfill acted on.
  */
-const NEW_PERMISSION_TITLE =
-  'Nobody has decided about this permission for this role yet. Turn it on to grant it.'
+const NEW_PERMISSION_LEGEND =
+  'Permissions marked New have no answer on record for this role — either nobody here has been ' +
+  'asked about them yet, or an earlier release deleted the no when somebody turned one off. ' +
+  'Saving answers every switch on this form, so one left off is recorded as a no.'
 
 /**
  * The name the switch answers to.
  *
- * "Off because somebody turned it off" and "off because nobody was ever asked"
- * are different facts, and the badge is the only place the second one is
- * written — so a screen reader has to hear it from the switch itself.
+ * "Off because somebody turned it off" and "off because nothing is recorded"
+ * are different facts, and the pill beside the label is where the second one is
+ * drawn. A switch reached by keyboard announces its own name and nothing else
+ * on its row, so the fact is repeated in that name; the legend above the groups
+ * is what says why it matters. The name says what the absent row shows — not
+ * that the key is new to the role, which is the reading the data cannot prove.
  */
 function switchName(row: PermissionRow): string {
   if (!row.neverOffered) return row.label
-  return `${row.label} — new to this role`
+  return `${row.label} — marked New, no answer on record`
+}
+
+/**
+ * The row's label, with the pill where there is one to draw.
+ *
+ * A row with nothing marked keeps the plain paragraph the kit has always used.
+ * Sitting a pill beside the text needs a flex line, and that line truncates
+ * where the paragraph wrapped — so making every row one would clip the long
+ * labels of a role that has no gaps at all, which this is meant to leave
+ * looking exactly as it did.
+ */
+function PermissionLabel({ row }: { row: PermissionRow }) {
+  if (!row.neverOffered) return <p className="text-[13px] text-ink">{row.label}</p>
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 pr-2">
+      <span className="truncate text-[13px] text-ink">{row.label}</span>
+      <Badge tone="blue" className="shrink-0">
+        New
+      </Badge>
+    </span>
+  )
 }
 
 function PermissionGroupCard({
@@ -405,15 +462,8 @@ function PermissionGroupCard({
       </h4>
       <div className="divide-y divide-line rounded-lg border border-hair px-3">
         {group.permissions.map((row) => (
-          <div key={row.key} className="flex items-center justify-between gap-2 py-2.5">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-[13px] text-ink">{row.label}</span>
-              {row.neverOffered && (
-                <Badge tone="blue" className="shrink-0" title={NEW_PERMISSION_TITLE}>
-                  New
-                </Badge>
-              )}
-            </span>
+          <div key={row.key} className="flex items-center justify-between py-2.5">
+            <PermissionLabel row={row} />
             <Toggle
               on={granted.has(row.key)}
               onChange={(next) => onToggle(row.key, next)}

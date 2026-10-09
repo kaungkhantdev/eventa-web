@@ -15,6 +15,9 @@ import type { EventOverviewWire, EventRegistrationWire } from './eventDetail.api
 import type { EventWire } from './types'
 import type { SessionWire, SpeakerWire } from '@/features/program/program.api'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
+import { toTicketCard } from '@/features/ticketing/tickets.mapper'
+import type { TicketWire as InventoryTicketWire } from '@/features/ticketing/tickets.types'
+import type { TicketStatus } from '@/features/ticketing/types'
 
 const event = (over: Partial<EventWire> = {}): EventWire => ({
   id: 'evt-1',
@@ -336,9 +339,35 @@ const ticket = (over: Partial<TicketWire> = {}): TicketWire => ({
   isFree: false,
   priceSatang: 125_000,
   currency: 'THB',
-  status: 'on_sale',
+  // `onsale`, not `on_sale`: the stored value has no underscore. The old
+  // fixture's did, which made a mechanical derivation of the label look right
+  // here while production printed "Onsale".
+  status: 'onsale',
   sold: 180,
   total: 200,
+  salesStartAt: null,
+  salesEndAt: null,
+  version: 1,
+  ...over,
+})
+
+/**
+ * The same tier as the ticket inventory reads it. `/events/:id/tickets` and the
+ * inventory's own endpoint publish one `TicketResponseDto`, but each feature
+ * types the half it uses, so the agreement test needs both shapes.
+ */
+const inventoryTicket = (over: Partial<InventoryTicketWire> = {}): InventoryTicketWire => ({
+  id: 'tkt-1',
+  eventId: 'evt-1',
+  eventName: 'Tech Summit 2026',
+  name: 'Early Bird',
+  isFree: false,
+  priceSatang: 125_000,
+  vatRate: 7,
+  status: 'onsale',
+  sold: 180,
+  total: 200,
+  maxPerOrder: 10,
   salesStartAt: null,
   salesEndAt: null,
   version: 1,
@@ -371,6 +400,55 @@ describe('a row of the tickets tab', () => {
   it('reports no revenue figure — the API does not send one per tier', () => {
     // sold × price would ignore discounts and refunds, so it is not revenue.
     expect(toTicketRow(ticket())).not.toHaveProperty('revenue')
+  })
+
+  /**
+   * Every value the `ticket_status` pgEnum (`eventa-api/src/db/schema/enums.ts`)
+   * can store, and so every value a tier can arrive with.
+   *
+   * Literals rather than a list derived from `TicketStatus`, because that union
+   * is the thing that drifts from the API — derived from it, this list would
+   * only ever test itself. `satisfies` ties the two together, so a value the
+   * API adds cannot be listed here without the union being widened too.
+   */
+  const API_TICKET_STATUSES = [
+    'onsale',
+    'scheduled',
+    'paused',
+    'soldout',
+  ] as const satisfies readonly TicketStatus[]
+
+  /** The words the ticketing page prints, which are the house wording. */
+  const HOUSE_LABEL: Record<TicketStatus, string> = {
+    onsale: 'On sale',
+    scheduled: 'Scheduled',
+    paused: 'Paused',
+    soldout: 'Sold out',
+  }
+
+  it.each(API_TICKET_STATUSES)('calls a %s tier what the house calls it', (status) => {
+    expect(toTicketRow(ticket({ status })).status).toBe(HOUSE_LABEL[status])
+  })
+
+  // The two screens are the real assertion. This panel and the ticketing page
+  // show the same tier, so a tier badged "On sale" over there cannot be badged
+  // "Onsale" here — and pinning the words twice would let somebody reword the
+  // ticketing page and leave this one behind without a red test.
+  it.each(API_TICKET_STATUSES)('agrees with the ticketing page about %s', (status) => {
+    expect(toTicketRow(ticket({ status })).status).toBe(
+      toTicketCard(inventoryTicket({ status })).statusLabel,
+    )
+  })
+
+  // A value this build has never been taught still has to read as something,
+  // and the API's own word is the honest guess. Spelled with an underscore
+  // because that is how the database spells its other ticket enums
+  // (`issued_ticket_status` has `checked_in`), so it is how a fifth
+  // `ticket_status` would most likely arrive — and because a hyphen passes
+  // whether or not the fallback spaces the value out at all, which is what the
+  // assertion here is for. "Sales_ended" is not a word to print at anybody.
+  it('spaces out an unknown status rather than printing its underscores', () => {
+    expect(toTicketRow(ticket({ status: 'sales_ended' })).status).toBe('Sales ended')
   })
 })
 

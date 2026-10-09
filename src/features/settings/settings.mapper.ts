@@ -89,6 +89,19 @@ function humanise(key: string): string {
 }
 
 /**
+ * The switches a freshly opened editor starts with, and the set a save submits.
+ *
+ * The role's own grants, and deliberately nothing derived from the catalog rows
+ * drawn beside them: a key the catalog no longer lists stays in the set and is
+ * submitted again, so reopening a role and pressing save cannot quietly
+ * withdraw a grant nobody touched — the same reversal the backfill was removed
+ * for. A never-offered key is absent because nothing here has answered it yet.
+ */
+export function grantedSeed(role: RoleCard | null): Set<string> {
+  return new Set(role?.permissions ?? [])
+}
+
+/**
  * The editor's permission rows, with each key's state resolved.
  *
  * `role_permissions` carries three states and only two of them are grants: a
@@ -104,6 +117,8 @@ function humanise(key: string): string {
 export function toPermissionRows(
   options: readonly PermissionOption[],
   role: RoleCard | null,
+  /** The keys the form has switched on right now — `grantedSeed` plus edits. */
+  pending: ReadonlySet<string>,
 ): PermissionRow[] {
   // A role being created has no decisions recorded at all, so every key in the
   // catalog would qualify — a wall of markers saying nothing, in front of
@@ -114,10 +129,18 @@ export function toPermissionRows(
   return options.map((option) => ({
     key: option.key,
     label: option.label,
-    // A grant is a decision, so it wins. The API reports the two lists
-    // disjoint; if a payload ever contradicted itself, a switch must not read
-    // "on" and "never decided" at the same time.
-    neverOffered: gaps.has(option.key) && !granted.has(option.key),
+    // Two different answers close the question, and either one is enough.
+    //
+    // A recorded grant settles it on the server's side: the API reports the two
+    // lists disjoint, but a payload that contradicted itself must not leave a
+    // switch reading "on" and "never decided" at once — and switching that key
+    // off is then an answer too, not a reopened question.
+    //
+    // The pending set settles it on this screen's side: the organizer has
+    // answered the row, and a marker still saying nobody has would contradict
+    // the switch beside it until the page was reloaded.
+    neverOffered:
+      gaps.has(option.key) && !granted.has(option.key) && !pending.has(option.key),
   }))
 }
 

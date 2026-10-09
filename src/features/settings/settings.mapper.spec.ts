@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  grantedSeed,
   toMemberRow,
   toNotificationRow,
   toPermissionOption,
@@ -84,6 +85,29 @@ describe('toRoleCard', () => {
 
 const option = (key: string, label = key): PermissionOption => ({ key, label, group: 'Events' })
 
+describe('grantedSeed', () => {
+  // The switches have to start from what the role holds, not from the catalog
+  // rows drawn beside them: a key the catalog has dropped stays in the set and
+  // is submitted again, so reopening a role and saving cannot withdraw a grant
+  // nobody touched — the reversal the withdrawn backfill used to cause.
+  it('starts from the grants the role holds', () => {
+    const card = toRoleCard(role({ permissions: ['evCreate', 'regView'] }))
+
+    expect([...grantedSeed(card)]).toEqual(['evCreate', 'regView'])
+  })
+
+  // A never-offered key is an unanswered question, so the switch opens off.
+  it('leaves a key nobody has answered switched off', () => {
+    const card = toRoleCard(role({ permissions: [], neverOfferedPermissions: ['finManage'] }))
+
+    expect(grantedSeed(card).has('finManage')).toBe(false)
+  })
+
+  it('starts a role being created with nothing switched on', () => {
+    expect(grantedSeed(null).size).toBe(0)
+  })
+})
+
 describe('toPermissionRows', () => {
   /*
    * The rule this whole change exists for. On disk, a key an organizer turned
@@ -100,6 +124,7 @@ describe('toPermissionRows', () => {
     const rows = toPermissionRows(
       [option('evCreate'), option('finManage'), option('setUsers')],
       card,
+      grantedSeed(card),
     )
 
     expect(rows.map((row) => [row.key, row.neverOffered])).toEqual([
@@ -111,7 +136,9 @@ describe('toPermissionRows', () => {
   })
 
   it('carries the label the editor already humanised', () => {
-    const rows = toPermissionRows([option('evCreate', 'Create events')], toRoleCard(role()))
+    const card = toRoleCard(role())
+
+    const rows = toPermissionRows([option('evCreate', 'Create events')], card, grantedSeed(card))
 
     expect(rows).toEqual([{ key: 'evCreate', label: 'Create events', neverOffered: false }])
   })
@@ -120,7 +147,7 @@ describe('toPermissionRows', () => {
   // catalog would qualify as a gap — a wall of markers that tells the person
   // nothing, since they are deciding all of them right now.
   it('marks nothing while a role is being created', () => {
-    const rows = toPermissionRows([option('evCreate'), option('finManage')], null)
+    const rows = toPermissionRows([option('evCreate'), option('finManage')], null, grantedSeed(null))
 
     expect(rows.every((row) => !row.neverOffered)).toBe(true)
   })
@@ -133,7 +160,7 @@ describe('toPermissionRows', () => {
       role({ permissions: [], neverOfferedPermissions: ['finManage', 'evCreate'] }),
     )
 
-    const rows = toPermissionRows([option('evCreate'), option('regView')], card)
+    const rows = toPermissionRows([option('evCreate'), option('regView')], card, grantedSeed(card))
 
     expect(rows.map((row) => row.key)).toEqual(['evCreate', 'regView'])
   })
@@ -146,7 +173,56 @@ describe('toPermissionRows', () => {
       role({ permissions: ['evCreate'], neverOfferedPermissions: ['evCreate'] }),
     )
 
-    expect(toPermissionRows([option('evCreate')], card)[0].neverOffered).toBe(false)
+    expect(toPermissionRows([option('evCreate')], card, grantedSeed(card))[0].neverOffered).toBe(
+      false,
+    )
+  })
+
+  // The marker describes the key's state, not the payload it arrived in: once
+  // the organizer switches it on there is an answer on screen waiting to be
+  // saved, and a row still reading "never decided" would contradict the switch
+  // beside it until the page was reloaded.
+  it('clears the marker once the switch is turned on in this session', () => {
+    const card = toRoleCard(role({ permissions: [], neverOfferedPermissions: ['finManage'] }))
+
+    const rows = toPermissionRows([option('finManage')], card, new Set(['finManage']))
+
+    expect(rows[0].neverOffered).toBe(false)
+  })
+
+  // Turning it back off restores the question, because it is one again: the
+  // save has not happened, so nothing is recorded either way yet.
+  //
+  // Driven through the ON position first, because the round trip is the claim.
+  // An "off" set on its own is `grantedSeed` again — the state the first case
+  // in this block already pins — so asserting only that would pass whatever
+  // this derivation did with `pending`, and say nothing about a toggle.
+  it('marks it again when the switch is turned back off', () => {
+    const card = toRoleCard(role({ permissions: [], neverOfferedPermissions: ['finManage'] }))
+    const switchedOn = new Set([...grantedSeed(card), 'finManage'])
+    const switchedBackOff = new Set([...switchedOn].filter((key) => key !== 'finManage'))
+
+    const whileOn = toPermissionRows([option('finManage')], card, switchedOn)
+    const afterOff = toPermissionRows([option('finManage')], card, switchedBackOff)
+
+    expect(whileOn[0].neverOffered).toBe(false)
+    expect(afterOff[0].neverOffered).toBe(true)
+  })
+
+  // Switching off a key the role holds is an answer, not a gap, so the stored
+  // grant has to be consulted and not just the switches: a derivation that
+  // asked `pending` alone would mark this row, because the switch is off. Only
+  // a payload that contradicted itself could reach this state, and when one
+  // does, "decided" is the reading that cannot leave a switch saying "on" and
+  // "never decided" at the same time.
+  it('answers from the stored grant, not from the switch alone', () => {
+    const card = toRoleCard(
+      role({ permissions: ['evCreate'], neverOfferedPermissions: ['evCreate'] }),
+    )
+
+    const rows = toPermissionRows([option('evCreate')], card, new Set<string>())
+
+    expect(rows[0].neverOffered).toBe(false)
   })
 })
 

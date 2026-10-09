@@ -211,9 +211,24 @@ async function loadRoles(): Promise<RolesData> {
   }
 }
 
+/**
+ * The permission keys a save asks for.
+ *
+ * `getAll`, not `get`: the editor's switches are React state and reach the
+ * action as one hidden field per key that is on, so reading a single value
+ * would send the first switch and drop every other permission the role holds.
+ *
+ * A key the role has never been offered arrives in that same field, which is
+ * what makes answering one an ordinary grant — the marker on its row is a
+ * label, and the `PUT` that replaces the whole set never sees it.
+ */
+export function permissionsOf(form: FormData): string[] {
+  return form.getAll('permissions').map(String)
+}
+
 async function runRolesAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
-  const permissions = form.getAll('permissions').map(String)
+  const permissions = permissionsOf(form)
 
   if (String(form.get('intent')) === 'create') {
     await settingsApi.createRole({
