@@ -19,11 +19,40 @@ import { eventOptions as allEventOptions, type EventOption } from '@/features/ev
  *
  * The tab, the event, the search and the page all live in the URL: the API
  * filters and pages server-side, so the query string is what both the request
- * and the screen read. Nothing is re-filtered here — the count on each pill and
- * the rows beneath it come from one response and cannot disagree.
+ * and the screen read. Nothing is re-filtered here, and nothing is re-counted:
+ * the count on each pill and the rows beneath it come from one response, and
+ * All is the total that response counted rather than one assembled here, which
+ * is what stops them disagreeing. Arriving in the same payload was never
+ * enough on its own — see `tabCountsOf`.
  */
 
-/** The kit's four pills. `all` sends no status, so every bucket is counted. */
+/**
+ * The kit's four pills. `all` sends no status, so every bucket is counted.
+ *
+ * Three statuses deliberately have none: `confirmed`, `rejected` and
+ * `expired`. The API could serve a tab for any of them today —
+ * `ListRegistrationsDto.status` accepts every `order_status` member — so this
+ * is a choice, not a limitation, and it is worth saying why `expired` did not
+ * get one along with its count.
+ *
+ * It cannot be justified on its own merits. `expired` is neither rarer nor
+ * more actionable than `rejected`: both are terminal, and `canApprove`,
+ * `canReject` and `canOffer` are all false on either, so a pill would open a
+ * page of rows with every control disabled. (That alone is not the argument —
+ * `cancelled` has a pill and is just as finished.) The point is that the three
+ * without one are not distinguishable from each other, so the only
+ * non-arbitrary choices are a pill for none of them or for all three, and all
+ * three means a six-pill status browser in place of a four-pill work queue.
+ * That is a change to the kit's design, which is the visual contract this app
+ * ports rather than something to redecide while closing a count gap.
+ *
+ * What that costs is real and worth stating rather than glossing: expired
+ * rows are findable only by looking under All, narrowed by event or search.
+ * `tabOf` falls back to `all` for a tab it does not know, so not even a
+ * hand-typed `?tab=expired` reaches them. If reconciliation turns out to need
+ * them separately, the count is already published and a pill is one line
+ * here, one in `TAB_STATUS` and one in `TAB_LABEL`.
+ */
 export const REG_TABS = ['all', 'pending', 'waitlist', 'cancelled'] as const
 export type RegTab = (typeof REG_TABS)[number]
 
@@ -81,13 +110,19 @@ export interface TabCounts {
 
 /**
  * The API reports every status for the whole filtered queue, whichever tab is
- * open. All is their sum — confirmed and rejected have no pill of their own but
- * are still rows under it, and leaving them out would print a total smaller
- * than the table below it.
+ * open, plus `all`: its own count of the rows that request is about to return.
+ *
+ * All is read straight off that total rather than added up here. Confirmed,
+ * rejected and expired have no pill of their own but are still rows under All,
+ * and a sum of the buckets this file happens to name prints a number smaller
+ * than the table the moment `order_status` gains a member — which it had, and
+ * every expired order was listed by the queue while being in nobody's count.
+ * The server counts what it lists; this function only relabels the breakdown,
+ * so the two can no longer drift apart.
  */
 export function tabCountsOf(counts: RegistrationCounts): TabCounts {
   return {
-    all: counts.pending + counts.confirmed + counts.waitlisted + counts.cancelled + counts.rejected,
+    all: counts.all,
     pending: counts.pending,
     waitlist: counts.waitlisted,
     cancelled: counts.cancelled,
@@ -115,11 +150,13 @@ export interface RegistrationsData {
 
 /** The counts the API hangs on `meta`, or zeros if the endpoint omitted them. */
 const NO_COUNTS: RegistrationCounts = {
+  all: 0,
   pending: 0,
   confirmed: 0,
   waitlisted: 0,
   cancelled: 0,
   rejected: 0,
+  expired: 0,
 }
 
 /**

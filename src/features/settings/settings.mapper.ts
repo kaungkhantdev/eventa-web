@@ -92,10 +92,14 @@ function humanise(key: string): string {
  * The switches a freshly opened editor starts with, and the set a save submits.
  *
  * The role's own grants, and deliberately nothing derived from the catalog rows
- * drawn beside them: a key the catalog no longer lists stays in the set and is
- * submitted again, so reopening a role and pressing save cannot quietly
- * withdraw a grant nobody touched — the same reversal the backfill was removed
- * for. A never-offered key is absent because nothing here has answered it yet.
+ * drawn beside them, so a key the catalog no longer lists stays in the set.
+ * That key has no switch on screen and so cannot be turned off; keeping it
+ * here is what stops `RolesPage`, which submits this set verbatim as the `PUT`
+ * payload, from withdrawing a grant nobody touched — the same reversal the
+ * backfill was removed for. The guarantee needs both halves: narrowing this
+ * seed, or submitting anything other than this set, reintroduces it.
+ *
+ * A never-offered key is absent because nothing here has answered it yet.
  */
 export function grantedSeed(role: RoleCard | null): Set<string> {
   return new Set(role?.permissions ?? [])
@@ -111,8 +115,10 @@ export function grantedSeed(role: RoleCard | null): Set<string> {
  * answer it was withdrawn — every version of it silently reversed an
  * organizer's "no". So this marks the gaps, and leaves a refusal unmarked.
  *
- * The catalog decides membership and order, mirroring the server: a key the
- * catalog has dropped must not surface as a question nobody can answer.
+ * `options` decides membership and order — a key the catalog has dropped must
+ * not surface as a question nobody can answer. Whether that order matches the
+ * server's is settled upstream, where the catalog is fetched; this function
+ * preserves whatever it is handed rather than sorting it again.
  */
 export function toPermissionRows(
   options: readonly PermissionOption[],

@@ -189,17 +189,13 @@ export interface ProfileCard {
   bio: string
 }
 
-/** `GET /organization` — the workspace itself. */
-/** The capability the API hands the browser to PUT one file, once. */
-export interface LogoUploadWire {
-  key: string
-  uploadUrl: string
-  /** Sent verbatim — they are covered by the signature. */
-  headers: Record<string, string>
-  expiresInSeconds: number
-  maxBytes: number
-}
-
+/**
+ * `GET /organization` — the workspace itself.
+ *
+ * The logo upload the API issues is not declared here: it is `IssuedUpload` in
+ * `@/lib/signedUpload`, one shape for every image this app uploads, with the
+ * note on what its signed headers bind and why they go verbatim.
+ */
 export interface OrganizationWire {
   id: number
   name: string

@@ -6,11 +6,15 @@ import type { RegistrationCounts } from './registrations.types'
 const url = (query: string) => new URLSearchParams(query)
 
 const counts = (o: Partial<RegistrationCounts> = {}): RegistrationCounts => ({
+  // 52 rows in all, of which 3 are expired — the bucket that has no pill and
+  // that the old sum-the-pills total left out.
+  all: 52,
   pending: 12,
   confirmed: 30,
   waitlisted: 4,
   cancelled: 2,
   rejected: 1,
+  expired: 3,
   ...o,
 })
 
@@ -93,14 +97,31 @@ describe('what each pill tab counts', () => {
     expect(tabs.cancelled).toBe(2)
   })
 
-  it('adds every status up for All, including the ones with no tab', () => {
-    // Confirmed and rejected have no pill of their own but are still rows under
-    // All; leaving them out would print a total smaller than the table below it.
-    expect(tabCountsOf(counts()).all).toBe(49)
+  it("takes All from the API's own total rather than adding up the pills", () => {
+    // Confirmed, rejected and expired have no pill of their own but are still
+    // rows under All. The API counts every row it is about to list, so All is
+    // read straight off that total — a sum of named buckets would print a
+    // number smaller than the table the moment a seventh `order_status`
+    // appeared, which is exactly how `expired` went missing.
+    expect(tabCountsOf(counts()).all).toBe(52)
+  })
+
+  it('counts a status this build has no name for, because the API already did', () => {
+    // `all` is the API's `count(*)` over the rows it lists, so it is right even
+    // when the breakdown beside it does not account for every one of them.
+    expect(tabCountsOf(counts({ all: 60 })).all).toBe(60)
   })
 
   it('counts nothing as zero rather than leaving the pill blank', () => {
-    const empty = counts({ pending: 0, confirmed: 0, waitlisted: 0, cancelled: 0, rejected: 0 })
+    const empty = counts({
+      all: 0,
+      pending: 0,
+      confirmed: 0,
+      waitlisted: 0,
+      cancelled: 0,
+      rejected: 0,
+      expired: 0,
+    })
     expect(tabCountsOf(empty)).toEqual({ all: 0, pending: 0, waitlist: 0, cancelled: 0 })
   })
 })

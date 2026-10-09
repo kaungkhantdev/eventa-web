@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   placeInLine,
+  prefillsFromProfile,
+  toBuyerDefaults,
   toCheckoutView,
   toPaymentStep,
   toPlacedOrder,
@@ -15,6 +17,7 @@ import type {
   OrderSummaryWire,
   PaymentIntentWire,
 } from './checkout.types'
+import type { ProfileWire } from './profile.types'
 
 /**
  * Every value the `ticket_status` pgEnum (`eventa-api/src/db/schema/enums.ts`)
@@ -475,5 +478,88 @@ describe('toPaymentStep', () => {
       state: 'failed',
       declineReason: 'Card was declined.',
     })
+  })
+})
+
+/* ── pre-filling the buyer boxes (US-DISC-11, criterion 5) ───────────────── */
+
+const SAVED: ProfileWire = {
+  id: 'user-7',
+  name: 'Anan Suksawat',
+  email: 'anan@example.com',
+  pendingEmail: null,
+  emailVerified: true,
+  phone: '+66 81 234 5678',
+  timezone: 'Asia/Bangkok',
+  locale: 'th',
+  avatarUrl: null,
+  city: 'Bangkok',
+  dateOfBirth: '1995-04-12',
+  bio: null,
+  displayCurrency: null,
+}
+
+const EMPTY = { name: '', email: '', phone: '' }
+
+describe('toBuyerDefaults (US-DISC-11, criterion 5)', () => {
+  it('fills the buyer boxes from the saved profile', () => {
+    expect(toBuyerDefaults('attendee', SAVED)).toEqual({
+      name: 'Anan Suksawat',
+      email: 'anan@example.com',
+      phone: '+66 81 234 5678',
+    })
+  })
+
+  // Checkout is open to guests (US-ACC-03) and a guest has no saved profile to
+  // read. Empty strings are what leaves their page exactly as it is today.
+  it('leaves a guest the empty boxes they have today', () => {
+    expect(toBuyerDefaults(null, null)).toEqual(EMPTY)
+  })
+
+  // The loader fetches a profile for nobody else, so this pairing should not
+  // arise — but the rule refuses it rather than trusting that, because the
+  // failure mode is one person's name and email in another person's checkout.
+  it('ignores a profile that arrived without an attendee session', () => {
+    expect(toBuyerDefaults(null, SAVED)).toEqual(EMPTY)
+    expect(toBuyerDefaults('admin', SAVED)).toEqual(EMPTY)
+  })
+
+  // `null` is not the string "null". A phone nobody gave is a box nobody
+  // filled, which the placeholder goes on describing as usual.
+  it('renders a phone nobody gave as an empty box', () => {
+    expect(toBuyerDefaults('attendee', { ...SAVED, phone: null }).phone).toBe('')
+  })
+
+  // Checkout is the money path: a pre-fill that could not be read costs three
+  // fields of typing, never the sale.
+  it('leaves the boxes empty when the profile could not be read', () => {
+    expect(toBuyerDefaults('attendee', null)).toEqual(EMPTY)
+  })
+
+  // The ticket has to reach an inbox that works. A change of address is not
+  // done until it is confirmed (criterion 2), so the address that signs in is
+  // the one pre-filled — `pendingEmail` is one nobody has answered yet.
+  it('uses the address that signs in, not one awaiting confirmation', () => {
+    const moving = { ...SAVED, pendingEmail: 'anan@newmail.com', emailVerified: false }
+    expect(toBuyerDefaults('attendee', moving).email).toBe('anan@example.com')
+  })
+})
+
+describe('prefillsFromProfile (US-DISC-11, criterion 5)', () => {
+  it('reads the saved profile of a signed-in attendee', () => {
+    expect(prefillsFromProfile('attendee')).toBe(true)
+  })
+
+  // The decisive case. `/me/profile` needs a token, and the checkout loader is
+  // public: asked for it unconditionally, every guest's registration page would
+  // reject with a 401 and render React Router's error element instead.
+  it('asks for nothing when nobody is signed in', () => {
+    expect(prefillsFromProfile(null)).toBe(false)
+  })
+
+  // Two personas, never a shared login. An organizer token proves who runs a
+  // workspace, not who is buying this ticket, so it pre-fills nothing.
+  it('does not read an organizer session', () => {
+    expect(prefillsFromProfile('admin')).toBe(false)
   })
 })

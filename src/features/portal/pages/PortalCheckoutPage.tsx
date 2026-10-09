@@ -7,6 +7,7 @@ import { PaymentHandoff } from '../components/PaymentHandoff'
 import { WaitlistBar, WaitlistNote, WaitlistOverlay } from '../components/WaitlistPanel'
 import type { CheckoutData, CheckoutResult } from '../checkout.routes'
 import type {
+  BuyerDefaults,
   CheckoutView,
   PaymentStep,
   PlacedOrder,
@@ -44,7 +45,7 @@ const SEAT_CSS = `
 `
 
 export default function PortalCheckoutPage() {
-  const { checkout } = useLoaderData() as CheckoutData
+  const { checkout, buyer } = useLoaderData() as CheckoutData
   const [tierId, setTierId] = useState(() => firstSellable(checkout.tiers))
   const [quantity, setQuantity] = useState(1)
   const [seatIds, setSeatIds] = useState<number[]>([])
@@ -140,7 +141,7 @@ export default function PortalCheckoutPage() {
 
         <section className="mt-6">
           <StepHeading>3 · Your details</StepHeading>
-          <BuyerFields />
+          <BuyerFields defaults={buyer} />
         </section>
 
         {checkout.paymentRequired && !onWaitlist && (
@@ -497,8 +498,18 @@ function SeatPicker({
  * creates no account — this is a guest checkout. The fields are uncontrolled
  * and read straight off the submitted form, so nothing typed is held in this
  * app's state for longer than the request.
+ *
+ * `defaults` pre-fills them from the saved profile of a signed-in attendee
+ * (US-DISC-11, criterion 5), and is three empty strings for a guest, whose
+ * page is therefore unchanged. They stay `defaultValue` rather than `value`
+ * for two reasons that are the criterion's whole shape: these are DEFAULTS,
+ * so somebody buying for a colleague types over them and the browser submits
+ * what they typed; and an uncontrolled input keeps its typed value when the
+ * loader revalidates, where a controlled one would snap back to the profile
+ * mid-booking. The placeholders are the kit's, left verbatim — they describe
+ * an empty box, and a pre-filled one has no placeholder to show.
  */
-function BuyerFields() {
+function BuyerFields({ defaults }: { defaults: BuyerDefaults }) {
   const id = useId()
 
   return (
@@ -509,6 +520,7 @@ function BuyerFields() {
           id={`${id}-name`}
           form="booking"
           name="name"
+          defaultValue={defaults.name}
           type="text"
           required
           autoComplete="name"
@@ -521,6 +533,7 @@ function BuyerFields() {
           id={`${id}-email`}
           form="booking"
           name="email"
+          defaultValue={defaults.email}
           type="email"
           required
           autoComplete="email"
@@ -533,6 +546,7 @@ function BuyerFields() {
           id={`${id}-phone`}
           form="booking"
           name="phone"
+          defaultValue={defaults.phone}
           type="tel"
           autoComplete="tel"
           placeholder="+66 81 234 5678"

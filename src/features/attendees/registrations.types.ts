@@ -1,3 +1,5 @@
+import type { PaymentStatusWire } from '@/lib/wireEnums'
+
 /**
  * The registrations queue (US-REG-01), as `GET /registrations` describes it.
  *
@@ -40,7 +42,12 @@ export interface RegistrationEntry {
   buyerName: string
   buyerEmail: string
   status: RegistrationWireStatus
-  paymentStatus: string
+  /**
+   * What the money did. Narrowed from the DTO's `string` so the `paid`
+   * comparison in `statusNoteOf` is checked: that branch is the only thing
+   * telling an organizer a rejection has not been refunded yet.
+   */
+  paymentStatus: PaymentStatusWire
   seats: number
   /**
    * The tier bought, or every tier comma-joined on a mixed order. Null once the
@@ -75,13 +82,22 @@ export interface RegistrationEntry {
   rejectRefunds: boolean
 }
 
-/** Live tab totals for the whole filtered queue, whichever tab is open. */
-export interface RegistrationCounts {
-  pending: number
-  confirmed: number
-  waitlisted: number
-  cancelled: number
-  rejected: number
+/**
+ * Live tab totals for the whole filtered queue, whichever tab is open.
+ *
+ * One field per wire status, derived from `RegistrationWireStatus` rather than
+ * typed out again — the same single-source argument written over
+ * `STATUS_LABEL`, and for the same reason: a list of statuses kept by hand is
+ * what left `expired` out. Widening the union now fails every object that has
+ * to supply one of these until it does.
+ *
+ * `all` is the API's own count of the rows it is about to return, NOT the sum
+ * of the fields beside it. The distinction is the whole fix: a status with no
+ * pill is still a row in the table, so a total added up from named buckets
+ * reads smaller than the list beneath it, while a counted one cannot.
+ */
+export interface RegistrationCounts extends Record<RegistrationWireStatus, number> {
+  all: number
 }
 
 /** A row as the table renders it — every field already display-ready. */

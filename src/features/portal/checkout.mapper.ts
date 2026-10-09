@@ -1,6 +1,9 @@
 import { MASKED, bangkokDateRange } from '@/lib/format'
+import type { Persona } from '@/lib/persona'
+import type { ProfileWire } from './profile.types'
 import type {
   BookingMode,
+  BuyerDefaults,
   CheckoutEventWire,
   CheckoutHeader,
   CheckoutTierWire,
@@ -235,3 +238,74 @@ function stateOf(intent: PaymentIntentWire): PaymentStep['state'] {
   if (intent.status === FAILED) return FAILED
   return intent.method === PROMPT_PAY ? 'scan' : 'provider'
 }
+
+/* ── who is booking (US-DISC-11, criterion 5) ───────────────────────────── */
+
+/**
+ * The one persona whose saved profile fills the buyer boxes.
+ *
+ * Named once and read by both rules below, because "whose details pre-fill"
+ * and "whose profile is worth fetching" have to be the same answer: a loader
+ * that fetched for somebody the mapper then ignores would spend a round trip
+ * to achieve nothing, and one that fetched for fewer would leave a signed-in
+ * attendee retyping details the product already holds.
+ */
+const PREFILLING_PERSONA: Persona = 'attendee'
+
+/**
+ * Whether this visitor's saved profile should be read at all.
+ *
+ * The decisive rule of this criterion, because the checkout loader is PUBLIC —
+ * registering never requires an account (US-ACC-03), and eventa-api's checkout
+ * controller is `@Public` throughout. `/me/profile` needs a token, so fetching
+ * it unconditionally would reject with a 401 for every guest, and a loader that
+ * rejects replaces the registration page with an error element. The guest path
+ * must not change at all, so for a guest there is no request to fail.
+ *
+ * An organizer session is refused too. The two personas never share a login
+ * (`@/lib/persona`), and an admin token establishes who runs a workspace, not
+ * who is buying this ticket — the portal's own test for "signed in" is this
+ * same one, as `discover.routes.ts` uses for the shortlist.
+ */
+export function prefillsFromProfile(persona: Persona | null): boolean {
+  return persona === PREFILLING_PERSONA
+}
+
+/**
+ * The saved profile → what the buyer boxes start with.
+ *
+ * `profile` is `null` for two different reasons and the answer is the same
+ * empty form for both: nobody is signed in, or the profile of somebody who is
+ * could not be read. The second is deliberate — see `savedProfile` in
+ * `checkout.routes.ts`. Checkout is the money path, and three fields of typing
+ * is a far better outcome than an error page where a sale was.
+ *
+ * The persona is re-checked here even though the loader only fetches for an
+ * attendee: it makes the rule total, and the failure it forecloses is a
+ * profile left over from one visitor pre-filling another visitor's PII.
+ *
+ * Mapped from the wire rather than through `toAttendeeProfileCard`, because
+ * that is the Profile tab's view model — initials, a badge tone, a bio — and
+ * routing one page's data through another page's shape couples two screens
+ * that have no reason to move together.
+ */
+export function toBuyerDefaults(
+  persona: Persona | null,
+  profile: ProfileWire | null,
+): BuyerDefaults {
+  if (!prefillsFromProfile(persona) || !profile) return NO_BUYER_DEFAULTS
+  return {
+    name: profile.name,
+    // The address that signs in, never `pendingEmail`. An address change is
+    // not done until it is confirmed (criterion 2), so a pending one is an
+    // inbox nobody has proved they can open — and this is where the ticket
+    // and the receipt are sent.
+    email: profile.email,
+    // `null` is not the string "null", and it is not "0" either: a phone the
+    // API holds nothing for is a box nobody filled.
+    phone: profile.phone ?? '',
+  }
+}
+
+/** A guest's boxes, and the fallback when a profile could not be read. */
+const NO_BUYER_DEFAULTS: BuyerDefaults = { name: '', email: '', phone: '' }

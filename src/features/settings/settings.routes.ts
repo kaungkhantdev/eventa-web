@@ -1,6 +1,7 @@
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { api, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
+import type { IssuedUpload } from '@/lib/signedUpload'
 import { intParam } from '@/lib/urlFilters'
 import {
   toOrganizationForm,
@@ -29,7 +30,6 @@ import type {
   RoleCard,
   RoleWire,
   OrganizationForm,
-  LogoUploadWire,
   OrganizationSummaryWire,
   OrganizationWire,
   PaymentSettingsCard,
@@ -487,7 +487,7 @@ export const accountApi = {
    * or the API — only the browser and the bucket ever hold it.
    */
   logoUploadUrl: (contentType: string, byteSize: number) =>
-    api.post<LogoUploadWire>('/organization/logo/upload-url', {
+    api.post<IssuedUpload>('/organization/logo/upload-url', {
       contentType,
       byteSize,
     }),

@@ -44,7 +44,9 @@ import type { Registration } from '../registrations.types'
 
    The tab, event, search and page live in the URL: the API filters and pages
    server-side, so nothing is re-filtered here. The count on each pill and the
-   rows below it come from one response and cannot disagree.
+   rows below it come from one response, and All is the total that response
+   counted rather than a sum taken here — the reasoning is in `tabCountsOf`,
+   which is where they used to be able to disagree despite the one response.
 
    Two controls from the static kit are gone rather than faked: the ticket-type
    filter, which `GET /registrations` does not offer (narrowing one page of a

@@ -86,10 +86,9 @@ describe('toRoleCard', () => {
 const option = (key: string, label = key): PermissionOption => ({ key, label, group: 'Events' })
 
 describe('grantedSeed', () => {
-  // The switches have to start from what the role holds, not from the catalog
-  // rows drawn beside them: a key the catalog has dropped stays in the set and
-  // is submitted again, so reopening a role and saving cannot withdraw a grant
-  // nobody touched — the reversal the withdrawn backfill used to cause.
+  // The switches start from what the role holds, in that order. This case
+  // passes no catalog, so it says nothing about a key the catalog dropped —
+  // that is the last case in this block, which exercises both together.
   it('starts from the grants the role holds', () => {
     const card = toRoleCard(role({ permissions: ['evCreate', 'regView'] }))
 
@@ -105,6 +104,25 @@ describe('grantedSeed', () => {
 
   it('starts a role being created with nothing switched on', () => {
     expect(grantedSeed(null).size).toBe(0)
+  })
+
+  /*
+   * The reversal the withdrawn backfill used to cause, asserted rather than
+   * described. A key the catalog has dropped has no switch on screen, so
+   * nothing can turn it off — but it is still a grant this workspace made, and
+   * the `PUT` replaces the whole set. Were the seed narrowed to the catalog,
+   * opening a role and pressing save with no edit at all would withdraw it.
+   */
+  it('keeps a grant the catalog no longer lists, so saving cannot withdraw it', () => {
+    const card = toRoleCard(role({ permissions: ['evCreate', 'legacyExport'] }))
+    const catalog = [option('evCreate', 'Create events')]
+
+    const seed = grantedSeed(card)
+    const rows = toPermissionRows(catalog, card, seed)
+
+    expect(seed.has('legacyExport')).toBe(true)
+    // And it is not drawn as a row: a question nobody can answer.
+    expect(rows.map((r) => r.key)).toEqual(['evCreate'])
   })
 })
 
