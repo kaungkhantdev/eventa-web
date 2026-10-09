@@ -141,6 +141,18 @@ export function toOverview(overview: EventOverviewWire): OverviewTiles {
   }
 }
 
+/**
+ * Every value the `payment_status` pgEnum (`eventa-api/src/db/schema/enums.ts`)
+ * can store, which is every value this tab can be asked to show.
+ *
+ * `RegistrationRowDto.paymentStatus` republishes that enum through
+ * `@ApiProperty({ enum: paymentStatusEnum.enumValues })` but is typed as a
+ * plain `string`, so nothing on the wire narrows it for us. Naming the four
+ * here is what lets the pill lookup be a total map of them
+ * (`eventDetail.presentation.ts`) instead of a table with a hole in it.
+ */
+export type PaymentStatusWire = 'paid' | 'pending' | 'refunded' | 'failed'
+
 export interface RegistrationRow {
   reference: string
   name: string
@@ -148,6 +160,7 @@ export interface RegistrationRow {
   tone: AvatarTone
   tickets: number
   amount: string
+  /** The stored status as a word — `Paid`, `Pending`, `Refunded`, `Failed`. */
   status: string
   date: string
   time: string

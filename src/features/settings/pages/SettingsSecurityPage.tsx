@@ -17,6 +17,7 @@ import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
+import { auditLook } from '../settings.presentation'
 import type { SecurityData } from '../settings.routes'
 import type { AuditRow, SessionRow } from '../settings.types'
 
@@ -396,40 +397,6 @@ function CodeField({ id, label }: { id: string; label: string }) {
   )
 }
 
-/**
- * How each kind of audit entry looks. Presentation only, so it stays a lookup
- * table — a new entry type the API starts emitting needs a row here, and falls
- * back to something neutral rather than crashing if nobody adds one.
- */
-const AUDIT_LOOKS: Record<string, { icon: string; tint: string }> = {
-  signin: { icon: 'hgi-login-03', tint: 'bg-brand-soft text-brand' },
-  newdev: {
-    icon: 'hgi-smart-phone-01',
-    tint: 'bg-amber-50 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300',
-  },
-  pwd: {
-    icon: 'hgi-shield-key',
-    tint: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
-  },
-  twofa: { icon: 'hgi-security-lock', tint: 'bg-brand-soft text-brand' },
-  perm: {
-    icon: 'hgi-user-settings-01',
-    tint: 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
-  },
-  xport: {
-    icon: 'hgi-download-01',
-    tint: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
-  },
-  fail: {
-    icon: 'hgi-alert-02',
-    tint: 'bg-red-50 text-red-500 dark:bg-red-500/15 dark:text-red-300',
-  },
-  apikey: { icon: 'hgi-source-code', tint: 'bg-line text-muted' },
-  revoke: { icon: 'hgi-logout-03', tint: 'bg-line text-muted' },
-}
-
-const AUDIT_FALLBACK = { icon: 'hgi-login-03', tint: 'bg-line text-muted' }
-
 function AuditLogPanel({
   open,
   onClose,
@@ -465,7 +432,7 @@ function AuditLogPanel({
 }
 
 function AuditEntry({ row }: { row: AuditRow }) {
-  const look = AUDIT_LOOKS[row.type] ?? AUDIT_FALLBACK
+  const look = auditLook(row.type)
 
   return (
     <div className="flex items-start gap-3 py-3 first:pt-0">

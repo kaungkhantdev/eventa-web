@@ -6,13 +6,22 @@
  * is what the page renders.
  */
 
-/** Order status, as the API's `order_status` enum spells it. */
+/**
+ * Order status, as the API's `order_status` enum spells it — all six members of
+ * the `orderStatusEnum` pgEnum, which `RegistrationEntryDto` republishes as
+ * `@ApiProperty({ enum: orderStatusEnum.enumValues })`.
+ *
+ * This union must stay the same length as that enum. It is not a choice about
+ * what the queue wants to show: the service hands the column through unmapped,
+ * so a member missing here is a value that arrives anyway and finds no label.
+ */
 export type RegistrationWireStatus =
   | 'confirmed'
   | 'pending'
   | 'waitlisted'
   | 'cancelled'
   | 'rejected'
+  | 'expired'
 
 /** The same, Title-Cased for display — the kit's own wording. */
 export type RegistrationStatus =
@@ -21,6 +30,7 @@ export type RegistrationStatus =
   | 'Waitlisted'
   | 'Cancelled'
   | 'Rejected'
+  | 'Expired'
 
 export interface RegistrationEntry {
   id: string

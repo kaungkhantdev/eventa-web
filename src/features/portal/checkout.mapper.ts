@@ -27,13 +27,30 @@ import type {
  * the charged one is the one that counts.
  */
 
-/** Why a tier cannot be chosen, in words the buyer can act on. */
-const UNAVAILABLE: Record<string, string> = {
+/**
+ * Every value the `ticket_status` pgEnum (`eventa-api/src/db/schema/enums.ts`)
+ * can store, which is every value a tier can arrive with.
+ *
+ * `CheckoutTierDto.status` republishes that enum through
+ * `@ApiProperty({ enum: ticketStatusEnum.enumValues })` but is typed as a
+ * plain `string`, so nothing on the wire narrows it for us. Naming the four
+ * here is what makes `UNAVAILABLE` below a total map of the three a buyer can
+ * be refused for, rather than a list anybody can add invented values to.
+ */
+export type TicketStatusWire = 'onsale' | 'scheduled' | 'paused' | 'soldout'
+
+/**
+ * Why a tier cannot be chosen, in words the buyer can act on.
+ *
+ * `onsale` is absent because the API decides selectability with
+ * `status === 'onsale'` exactly (`checkout-view.service.ts`): an on-sale tier
+ * is answered before this table is consulted, and the other three are the only
+ * refusals the API can report.
+ */
+const UNAVAILABLE: Record<Exclude<TicketStatusWire, 'onsale'>, string> = {
   soldout: 'Sold out',
   paused: 'Paused',
   scheduled: 'Not on sale yet',
-  ended: 'Sales have closed',
-  retired: 'No longer offered',
 }
 
 const UNAVAILABLE_FALLBACK = 'Unavailable'
@@ -108,7 +125,10 @@ function toTierOption(tier: CheckoutTierWire, maxPerBooking: number): TierOption
 function unavailableReasonOf(tier: CheckoutTierWire): string | null {
   if (tier.canSelect) return null
   if (tier.waitlist) return WAITLIST_OPEN
-  return UNAVAILABLE[tier.status] ?? UNAVAILABLE_FALLBACK
+  // `status` is a plain string on the wire, so the narrowing happens here: a
+  // value outside the enum misses every key and is refused in general terms
+  // rather than with copy somebody guessed at.
+  return UNAVAILABLE[tier.status as Exclude<TicketStatusWire, 'onsale'>] ?? UNAVAILABLE_FALLBACK
 }
 
 /** 1 → "next"; the rest ordinally, as a person would say it. */

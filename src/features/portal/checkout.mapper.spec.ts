@@ -6,6 +6,7 @@ import {
   toPlacedOrder,
   toSummaryLines,
   toWaitlistPlace,
+  type TicketStatusWire,
 } from './checkout.mapper'
 import type {
   CheckoutTierWire,
@@ -14,6 +15,23 @@ import type {
   OrderSummaryWire,
   PaymentIntentWire,
 } from './checkout.types'
+
+/**
+ * Every value the `ticket_status` pgEnum (`eventa-api/src/db/schema/enums.ts`)
+ * can put on the wire, copied verbatim from it and republished by
+ * `CheckoutTierDto` as `@ApiProperty({ enum: ticketStatusEnum.enumValues })`.
+ *
+ * Literals rather than a list derived from this repo's own union, because the
+ * union is the thing that drifts — derived from it, this test would only ever
+ * test itself. `satisfies` ties the two together, so a value the API adds
+ * cannot be listed here without being added to the union as well.
+ */
+const API_TICKET_STATUSES = [
+  'onsale',
+  'scheduled',
+  'paused',
+  'soldout',
+] as const satisfies readonly TicketStatusWire[]
 
 const TIER: CheckoutTierWire = {
   id: 'tier-ga',
@@ -112,12 +130,39 @@ describe('toCheckoutView', () => {
       })
     })
 
+    // What the buyer is told about each of the four, and nothing else: the API
+    // decides selectability with `status === 'onsale'` exactly
+    // (`checkout-view.service.ts`), so the other three always arrive with
+    // `canSelect: false` and must each find their own words.
+    const REASON: Record<TicketStatusWire, string | null> = {
+      onsale: null,
+      scheduled: 'Not on sale yet',
+      paused: 'Paused',
+      soldout: 'Sold out',
+    }
+
+    it.each(API_TICKET_STATUSES)('tells a buyer what %s means', (status) => {
+      expect(tier({ status, canSelect: status === 'onsale' }).unavailableReason).toBe(
+        REASON[status],
+      )
+    })
+
     // A status nobody has taught this page about must not read as available.
     it('falls back to a plain refusal for an unknown status', () => {
       expect(tier({ canSelect: false, status: 'something-new' })).toMatchObject({
         selectable: false,
         unavailableReason: 'Unavailable',
       })
+    })
+
+    // `ended` and `retired` were invented here and have never existed in the
+    // `ticket_status` enum: the API derives a closed sales window back to
+    // `onsale` (`ticketing.policy.ts` `resolveStatus`) and a retired tier is
+    // soft-deleted out of the catalog altogether. Copy for a value the API
+    // cannot send is copy nobody proof-reads, so they must read as the unknown
+    // statuses they are.
+    it.each(['ended', 'retired'])('treats %s as a status it does not know', (status) => {
+      expect(tier({ canSelect: false, status }).unavailableReason).toBe('Unavailable')
     })
 
     it('gives no reason when the tier can simply be bought', () => {
