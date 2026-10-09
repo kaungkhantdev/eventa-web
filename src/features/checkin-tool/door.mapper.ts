@@ -60,13 +60,18 @@ interface Outcome {
  * A lookup rather than a chain, so a sixth outcome the API grows is one row
  * here — and, until it is added, falls to something honest rather than to
  * "checked in".
+ *
+ * The keys are the API's `scan_outcome` values spelled exactly as they arrive,
+ * never a local alias: a key this repo renames for readability stops matching
+ * the wire, and the refusal it was meant to explain lands on the fallback
+ * instead, which tells the door to admit the person anyway.
  */
 const OUTCOMES: Record<ScanResultWire['outcome'], Outcome> = {
   admitted: { tone: 'ok', title: 'Checked in', detail: 'Welcome — let them through.' },
-  already_in: { tone: 'dupe', title: 'Already checked in', detail: '' },
+  already_checked_in: { tone: 'dupe', title: 'Already checked in', detail: '' },
   invalid: { tone: 'invalid', title: 'Not a valid ticket', detail: 'This code is not one of ours.' },
   wrong_event: { tone: 'wrong', title: 'Wrong event', detail: 'This ticket is for another event.' },
-  denied: { tone: 'void', title: 'Entry denied', detail: 'This ticket has been refunded or voided.' },
+  cancelled: { tone: 'void', title: 'Entry denied', detail: 'This ticket has been refunded or voided.' },
 }
 
 const UNRECOGNISED: Outcome = {
@@ -81,9 +86,9 @@ export function toScanFeedback(result: ScanResultWire): ScanFeedback {
     tone: outcome.tone,
     title: outcome.title,
     name: result.holderName ?? UNKNOWN,
-    // "Already in" is only useful with the time they actually arrived.
+    // "Already checked in" is only useful with the time they actually arrived.
     detail:
-      result.outcome === 'already_in' && result.checkedInAt
+      result.outcome === 'already_checked_in' && result.checkedInAt
         ? `Arrived at ${bangkokTime(result.checkedInAt)}`
         : outcome.detail,
   }

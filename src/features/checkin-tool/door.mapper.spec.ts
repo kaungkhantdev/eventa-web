@@ -104,16 +104,48 @@ const SCAN: ScanResultWire = {
 
 const feedback = (patch: Partial<ScanResultWire> = {}) => toScanFeedback({ ...SCAN, ...patch })
 
+/**
+ * Every value the API can put on the wire, copied verbatim from the
+ * `scan_outcome` pgEnum (`eventa-api/src/db/schema/enums.ts`) that
+ * `ScanResultDto` publishes through `openapi.json` and the check-in service
+ * returns unmapped.
+ *
+ * They are written out as literals rather than derived from this repo's own
+ * union because the union is the thing that drifted: a list taken from it
+ * would only ever test itself, which is why two refusals reached the door as
+ * "could not read that" while both repos type-checked clean. `satisfies` ties
+ * the two together, so a future API value has to be added to the union before
+ * this file compiles.
+ */
+const API_SCAN_OUTCOMES = [
+  'admitted',
+  'already_checked_in',
+  'invalid',
+  'wrong_event',
+  'cancelled',
+] as const satisfies readonly ScanResultWire['outcome'][]
+
+/** The mapper's last-resort copy, which no API outcome may ever reach. */
+const UNRECOGNISED_TITLE = 'Could not read that'
+
 describe('toScanFeedback', () => {
   it('welcomes somebody in', () => {
     expect(feedback()).toMatchObject({ tone: 'ok', title: 'Checked in' })
     expect(feedback().name).toBe('Anan Suksawat')
   })
 
+  // The fallback tells the door to "admit them by name" — the opposite of what
+  // a used or refunded ticket calls for. So every outcome the API can actually
+  // send has to find its own row, and the fallback is left for the genuinely
+  // unknown.
+  it.each(API_SCAN_OUTCOMES)('has an answer of its own for %s', (outcome) => {
+    expect(feedback({ outcome }).title).not.toBe(UNRECOGNISED_TITLE)
+  })
+
   // The five outcomes are five different things to do about it, so the door
   // must never collapse them into "no".
   it('says they are already inside, and when they arrived', () => {
-    expect(feedback({ outcome: 'already_in' })).toMatchObject({
+    expect(feedback({ outcome: 'already_checked_in' })).toMatchObject({
       tone: 'dupe',
       title: 'Already checked in',
       detail: 'Arrived at 14:32',
@@ -135,7 +167,7 @@ describe('toScanFeedback', () => {
   })
 
   it('says entry is denied for a refunded or void ticket', () => {
-    expect(feedback({ outcome: 'denied' })).toMatchObject({
+    expect(feedback({ outcome: 'cancelled' })).toMatchObject({
       tone: 'void',
       title: 'Entry denied',
     })
@@ -143,5 +175,16 @@ describe('toScanFeedback', () => {
 
   it('names an unknown code rather than leaving the panel blank', () => {
     expect(feedback({ outcome: 'invalid', holderName: null }).name).toBe('Unknown ticket')
+  })
+
+  // A sixth outcome the API grows is a value this union cannot describe yet,
+  // which is the whole point of the fallback — and the only way to write that
+  // down in a typed test is to assert past the type.
+  it('still degrades safely for an outcome it has never heard of', () => {
+    const unheardOf = 'beamed_aboard' as unknown as ScanResultWire['outcome']
+    expect(feedback({ outcome: unheardOf })).toMatchObject({
+      tone: 'invalid',
+      title: UNRECOGNISED_TITLE,
+    })
   })
 })
