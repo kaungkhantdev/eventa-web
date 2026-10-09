@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
+  Badge,
   Button,
   Card,
   EmptyState,
@@ -19,8 +20,9 @@ import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import type { ActionResult } from '@/app/loaders'
+import { toPermissionRows } from '../settings.mapper'
 import type { RolesData } from '../settings.routes'
-import type { PermissionOption, RoleCard } from '../settings.types'
+import type { PermissionOption, PermissionRow, RoleCard } from '../settings.types'
 
 /**
  * What each role may do (US-ACC-09/10). Ported from roles.html.
@@ -269,8 +271,25 @@ function RoleForm({
   groups: PermissionGroups
   children: ReactNode
 }) {
+  // Seeded from the role's own grants rather than from the rows below, so a key
+  // the catalog no longer lists stays granted instead of being dropped by a
+  // save nobody meant to make — the same reversal the withdrawn backfill caused.
   const [granted, setGranted] = useState<Set<string>>(
     () => new Set(editing?.permissions ?? []),
+  )
+
+  /**
+   * The rows, with each key's recorded state resolved by the mapper. Rebuilt
+   * per open along with the rest of the form, so an abandoned edit cannot leave
+   * a marker behind.
+   */
+  const rows = useMemo(
+    () =>
+      groups.map((group) => ({
+        name: group.name,
+        permissions: toPermissionRows(group.permissions, editing),
+      })),
+    [groups, editing],
   )
 
   const set = (key: string, on: boolean) =>
@@ -334,7 +353,7 @@ function RoleForm({
         </Hint>
       )}
 
-      {groups.map((group) => (
+      {rows.map((group) => (
         <PermissionGroupCard
           key={group.name}
           group={group}
@@ -346,12 +365,35 @@ function RoleForm({
   )
 }
 
+/**
+ * What the marker on a never-offered row says.
+ *
+ * Deliberately a word on the row and not a banner: most roles have no gaps at
+ * all, and a role with one or two should not be announced as a problem. The
+ * tooltip carries the part that matters — turning it on is an ordinary grant,
+ * saved by the same `PUT` as every other switch on this form.
+ */
+const NEW_PERMISSION_TITLE =
+  'Nobody has decided about this permission for this role yet. Turn it on to grant it.'
+
+/**
+ * The name the switch answers to.
+ *
+ * "Off because somebody turned it off" and "off because nobody was ever asked"
+ * are different facts, and the badge is the only place the second one is
+ * written — so a screen reader has to hear it from the switch itself.
+ */
+function switchName(row: PermissionRow): string {
+  if (!row.neverOffered) return row.label
+  return `${row.label} — new to this role`
+}
+
 function PermissionGroupCard({
   group,
   granted,
   onToggle,
 }: {
-  group: PermissionGroups[number]
+  group: { name: string; permissions: PermissionRow[] }
   granted: Set<string>
   onToggle: (key: string, on: boolean) => void
 }) {
@@ -362,13 +404,20 @@ function PermissionGroupCard({
         {group.name}
       </h4>
       <div className="divide-y divide-line rounded-lg border border-hair px-3">
-        {group.permissions.map((permission) => (
-          <div key={permission.key} className="flex items-center justify-between py-2.5">
-            <p className="text-[13px] text-ink">{permission.label}</p>
+        {group.permissions.map((row) => (
+          <div key={row.key} className="flex items-center justify-between gap-2 py-2.5">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-[13px] text-ink">{row.label}</span>
+              {row.neverOffered && (
+                <Badge tone="blue" className="shrink-0" title={NEW_PERMISSION_TITLE}>
+                  New
+                </Badge>
+              )}
+            </span>
             <Toggle
-              on={granted.has(permission.key)}
-              onChange={(next) => onToggle(permission.key, next)}
-              label={permission.label}
+              on={granted.has(row.key)}
+              onChange={(next) => onToggle(row.key, next)}
+              label={switchName(row)}
               transition="transition-transform"
             />
           </div>

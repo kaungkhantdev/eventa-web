@@ -11,6 +11,7 @@ import type {
   NotificationPrefWire,
   NotificationRow,
   PermissionOption,
+  PermissionRow,
   PermissionWire,
   RoleCard,
   RoleWire,
@@ -55,6 +56,7 @@ export function toRoleCard(wire: RoleWire): RoleCard {
     name: wire.name,
     description: wire.description,
     permissions: wire.permissions,
+    neverOffered: wire.neverOfferedPermissions,
     members: memberCount(wire.memberCount),
     isSystem: wire.isSystem,
   }
@@ -84,6 +86,39 @@ export function toPermissionOption(wire: PermissionWire): PermissionOption {
 function humanise(key: string): string {
   const spaced = key.replace(/([A-Z])/g, ' $1').toLowerCase().trim()
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+/**
+ * The editor's permission rows, with each key's state resolved.
+ *
+ * `role_permissions` carries three states and only two of them are grants: a
+ * row saying yes, a row saying no, and no row at all. The first two are
+ * decisions this workspace made; the third is a question nobody here has been
+ * asked, and it reaches the editor because the automatic backfill that used to
+ * answer it was withdrawn — every version of it silently reversed an
+ * organizer's "no". So this marks the gaps, and leaves a refusal unmarked.
+ *
+ * The catalog decides membership and order, mirroring the server: a key the
+ * catalog has dropped must not surface as a question nobody can answer.
+ */
+export function toPermissionRows(
+  options: readonly PermissionOption[],
+  role: RoleCard | null,
+): PermissionRow[] {
+  // A role being created has no decisions recorded at all, so every key in the
+  // catalog would qualify — a wall of markers saying nothing, in front of
+  // somebody who is deciding all of them right now.
+  const gaps = new Set(role?.neverOffered ?? [])
+  const granted = new Set(role?.permissions ?? [])
+
+  return options.map((option) => ({
+    key: option.key,
+    label: option.label,
+    // A grant is a decision, so it wins. The API reports the two lists
+    // disjoint; if a payload ever contradicted itself, a switch must not read
+    // "on" and "never decided" at the same time.
+    neverOffered: gaps.has(option.key) && !granted.has(option.key),
+  }))
 }
 
 /**

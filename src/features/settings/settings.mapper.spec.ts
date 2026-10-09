@@ -3,6 +3,7 @@ import {
   toMemberRow,
   toNotificationRow,
   toPermissionOption,
+  toPermissionRows,
   toRoleCard,
   describeDevice,
   toAuditRow,
@@ -12,6 +13,7 @@ import type {
   AuditEntryWire,
   LoginSessionWire,
   MemberWire,
+  PermissionOption,
   RoleWire,
 } from './settings.types'
 
@@ -52,6 +54,7 @@ const role = (over: Partial<RoleWire> = {}): RoleWire => ({
   name: 'Organizer',
   description: 'Runs events day to day',
   permissions: ['evCreate', 'regView'],
+  neverOfferedPermissions: [],
   memberCount: 3,
   isSystem: false,
   ...over,
@@ -67,6 +70,83 @@ describe('toRoleCard', () => {
   // and worth saying plainly.
   it('says so plainly when nobody holds it', () => {
     expect(toRoleCard(role({ memberCount: 0 })).members).toBe('No members yet')
+  })
+
+  // The card carries the gap through so the editor can ask about it. Dropping
+  // it here would leave the page unable to tell the third state from a refusal
+  // however carefully it rendered.
+  it('carries the keys nobody here has decided about', () => {
+    expect(toRoleCard(role({ neverOfferedPermissions: ['finManage'] })).neverOffered).toEqual([
+      'finManage',
+    ])
+  })
+})
+
+const option = (key: string, label = key): PermissionOption => ({ key, label, group: 'Events' })
+
+describe('toPermissionRows', () => {
+  /*
+   * The rule this whole change exists for. On disk, a key an organizer turned
+   * off and a key nobody here was ever asked about are both "not granted" — and
+   * reversing the first was why the automatic backfill was withdrawn. The
+   * editor has to draw them differently, so the derivation is the thing to pin
+   * down.
+   */
+  it('tells a key nobody was offered apart from one that was turned off', () => {
+    const card = toRoleCard(
+      role({ permissions: ['evCreate'], neverOfferedPermissions: ['finManage'] }),
+    )
+
+    const rows = toPermissionRows(
+      [option('evCreate'), option('finManage'), option('setUsers')],
+      card,
+    )
+
+    expect(rows.map((row) => [row.key, row.neverOffered])).toEqual([
+      ['evCreate', false],
+      ['finManage', true],
+      // In neither list: a refusal somebody recorded, and not an open question.
+      ['setUsers', false],
+    ])
+  })
+
+  it('carries the label the editor already humanised', () => {
+    const rows = toPermissionRows([option('evCreate', 'Create events')], toRoleCard(role()))
+
+    expect(rows).toEqual([{ key: 'evCreate', label: 'Create events', neverOffered: false }])
+  })
+
+  // A role being created has no recorded decisions at all, so every key in the
+  // catalog would qualify as a gap — a wall of markers that tells the person
+  // nothing, since they are deciding all of them right now.
+  it('marks nothing while a role is being created', () => {
+    const rows = toPermissionRows([option('evCreate'), option('finManage')], null)
+
+    expect(rows.every((row) => !row.neverOffered)).toBe(true)
+  })
+
+  // The catalog decides membership and order, exactly as it does on the server:
+  // a key the catalog has dropped must not surface as a question nobody can
+  // answer, and the groups have to read the same way on every open.
+  it('shows the catalog, not the role’s lists', () => {
+    const card = toRoleCard(
+      role({ permissions: [], neverOfferedPermissions: ['finManage', 'evCreate'] }),
+    )
+
+    const rows = toPermissionRows([option('evCreate'), option('regView')], card)
+
+    expect(rows.map((row) => row.key)).toEqual(['evCreate', 'regView'])
+  })
+
+  // The API reports the two lists disjoint. If a payload ever contradicted
+  // itself, a switch must not read "on" and "never decided" at the same time —
+  // a grant is a decision, so it wins.
+  it('treats a key reported as both granted and never-offered as granted', () => {
+    const card = toRoleCard(
+      role({ permissions: ['evCreate'], neverOfferedPermissions: ['evCreate'] }),
+    )
+
+    expect(toPermissionRows([option('evCreate')], card)[0].neverOffered).toBe(false)
   })
 })
 

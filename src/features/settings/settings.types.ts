@@ -53,6 +53,14 @@ export interface RoleWire {
   name: string
   description: string
   permissions: string[]
+  /**
+   * Keys with no decision recorded for this role — never granted, and never
+   * turned off either. A key in neither list was turned off deliberately, and
+   * that difference is the whole contract: an automatic backfill was withdrawn
+   * because nothing on disk could tell "never offered" from "an organizer said
+   * no", so the gap is reported here and a person closes it.
+   */
+  neverOfferedPermissions: string[]
   /** Live members holding this role. */
   memberCount: number
   /** Built-in roles every workspace starts with. */
@@ -64,6 +72,8 @@ export interface RoleCard {
   name: string
   description: string
   permissions: string[]
+  /** Keys this role has no recorded decision for — see `RoleWire`. */
+  neverOffered: string[]
   /** `3 members`, or `No members yet`. */
   members: string
   isSystem: boolean
@@ -75,6 +85,18 @@ export interface PermissionOption {
   /** The API's label, or the key itself when it has none recorded. */
   label: string
   group: PermissionGroup
+}
+
+/** One permission as the roles editor draws it, with its state resolved. */
+export interface PermissionRow {
+  key: string
+  label: string
+  /**
+   * True only for the third state — this role has no decision recorded for the
+   * key. The switch is off either way; this is what lets the editor say *why*,
+   * instead of drawing a gap and a refusal identically.
+   */
+  neverOffered: boolean
 }
 
 /* ── security ─────────────────────────────────────────────────────────── */

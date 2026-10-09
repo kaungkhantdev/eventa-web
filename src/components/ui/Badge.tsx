@@ -18,17 +18,24 @@ export type BadgeTone = 'green' | 'amber' | 'red' | 'gray' | 'blue' | 'purple'
 export function Badge({
   tone = 'gray',
   icon,
+  title,
   className,
   children,
 }: {
   tone?: BadgeTone
   /** Hugeicons slug — keep it exact, a wrong one renders tofu. */
   icon?: string
+  /**
+   * The long form, for a pill whose one word needs it. A hover tooltip is an
+   * extra, never the only place a meaning is written — it reaches neither a
+   * keyboard nor a touch screen, so the caller still names the thing properly.
+   */
+  title?: string
   className?: string
   children: ReactNode
 }) {
   return (
-    <span className={cn('badge', `badge-${tone}`, className)}>
+    <span className={cn('badge', `badge-${tone}`, className)} title={title}>
       {icon && <Icon name={icon} size={12} />}
       {children}
     </span>
