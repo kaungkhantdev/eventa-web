@@ -189,8 +189,17 @@ function PastCard({ ev }: { ev: MyEventRow }) {
 }
 
 export default function MyEventsPage() {
-  const { me, profile, settings, upcoming, past, transactions, window: range, totals } =
-    useLoaderData() as MyEventsData
+  const {
+    me,
+    profile,
+    settings,
+    security,
+    upcoming,
+    past,
+    transactions,
+    window: range,
+    totals,
+  } = useLoaderData() as MyEventsData
   const navigate = useNavigate()
   const { set } = useFilters()
   const { dark, toggle } = useTheme()
@@ -517,7 +526,8 @@ export default function MyEventsPage() {
           {tab === 'settings' && (
             <SettingsTab
               settings={settings}
-              twoFactorEnabled={me.twoFactorEnabled}
+              security={security}
+              email={me.email}
               dark={dark}
               onToggleTheme={toggle}
             />

@@ -25,8 +25,15 @@ const surveysApi = {
     api.get<SurveyWire[]>('/surveys', { query: eventId ? { eventId } : {} }),
   create: (body: { eventId: string; title: string; questions: QuestionInput[] }) =>
     api.post<SurveyWire>('/surveys', body),
-  update: (id: string, body: { title: string; questions: QuestionInput[] }) =>
-    api.patch<SurveyWire>(`/surveys/${id}`, body),
+  /**
+   * `version` is required, not optional — the API refuses a save without it,
+   * and an optional lock is one a caller can forget to pass, which is the
+   * silent overwrite this exists to stop.
+   */
+  update: (
+    id: string,
+    body: { title: string; questions: QuestionInput[]; version: number },
+  ) => api.patch<SurveyWire>(`/surveys/${id}`, body),
   setStatus: (id: string, status: SurveyStatus) =>
     api.patch<SurveyWire>(`/surveys/${id}/status`, { status }),
   duplicate: (id: string) => api.post<SurveyWire>(`/surveys/${id}/duplicate`),
@@ -176,7 +183,10 @@ async function runSurveysAction({ request }: LoaderArgs): Promise<null> {
     await surveysApi.create({ eventId: String(form.get('eventId')), ...body })
     return null
   }
-  await surveysApi.update(id, body)
+  // The version the editor loaded. Sent as its own field rather than folded
+  // into `body` above, because `create` shares that object and a survey being
+  // created has no prior version to compare against.
+  await surveysApi.update(id, { ...body, version: Number(form.get('version')) })
   return null
 }
 

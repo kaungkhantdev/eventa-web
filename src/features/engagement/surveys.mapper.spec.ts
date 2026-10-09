@@ -15,6 +15,7 @@ const wire = (over: Partial<SurveyWire> = {}): SurveyWire => ({
   eventId: 'e-1',
   title: 'Post-event feedback',
   status: 'draft',
+  version: 1,
   questions: [
     { id: 'q1', type: 'rating', prompt: 'How was it?', options: [] },
     { id: 'q2', type: 'choice', prompt: 'Best bit?', options: ['A', 'B'] },
@@ -222,5 +223,17 @@ describe('the NPS (US-MSG-08)', () => {
     })
     expect(summary.nps.score).toBe('-50')
     expect(summary.nps.answers).toBe(2)
+  })
+})
+
+/*
+ * The lock has to survive the trip to the view model, or the editor has nothing
+ * to send back and the API cannot refuse a stale save. Authoring replaces the
+ * whole question set, so what a lost update costs here is another editor's
+ * question, not a title — which is why this is pinned rather than assumed.
+ */
+describe('the optimistic lock on a survey card', () => {
+  it('carries the version it was read at', () => {
+    expect(toSurveyCard(wire({ version: 7 })).version).toBe(7)
   })
 })

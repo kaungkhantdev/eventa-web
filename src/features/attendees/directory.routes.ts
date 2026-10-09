@@ -3,6 +3,7 @@ import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { api, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
+import { contactPatchOfForm, hasContactChanges } from './contact.changes'
 import { toAttendeeRow } from './directory.mapper'
 import type {
   AttendeeRow,
@@ -10,6 +11,7 @@ import type {
   AttendeeSort,
   AttendeeTag,
   AttendeeWire,
+  ContactPatch,
   SegmentCountsWire,
 } from './directory.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
@@ -42,6 +44,16 @@ const attendeesApi = {
   /** Invite people to an event by email (US-CHK-07). */
   invite: (eventId: string, emails: string[], message: string | undefined) =>
     api.post<void>(`/events/${eventId}/attendees/email`, { emails, message }),
+  /**
+   * Correct a name, email or phone (US-REG-08) — `regManage`, not `regView`.
+   *
+   * Answers with the whole directory entry, which is deliberately discarded:
+   * the fetcher revalidates this route's loader, and that re-reads the segment
+   * counts beside the row as well. Splicing the one row back in would leave a
+   * second copy of server state here to go stale against it.
+   */
+  updateContact: (attendeeId: number, patch: ContactPatch) =>
+    api.patch<AttendeeWire>(`/attendees/${attendeeId}`, patch),
 }
 
 export function segmentOf(params: URLSearchParams): AttendeeSegment {
@@ -109,14 +121,36 @@ export function emailsOf(raw: string): string[] {
   return [...seen]
 }
 
+/** What the edit panel asks for; anything else on this route is an invitation. */
+export const CONTACT_INTENT = 'contact'
+
 async function runDirectoryAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
+  if (String(form.get('intent') ?? '') === CONTACT_INTENT) return saveContact(form)
+  return invite(form)
+}
+
+async function invite(form: FormData): Promise<void> {
   const emails = emailsOf(String(form.get('emails') ?? ''))
   await attendeesApi.invite(
     String(form.get('eventId') ?? ''),
     emails,
     String(form.get('message') ?? '').trim() || undefined,
   )
+}
+
+/**
+ * Correct an attendee's contact details (US-REG-08).
+ *
+ * The panel submits what was typed alongside what the row said when it opened,
+ * because only the difference is sent — see `contactPatchOf`. A refusal comes
+ * back through `pageAction` as the API's own sentence and is shown beside the
+ * control that was used, so the panel stays open with the typing still in it.
+ */
+async function saveContact(form: FormData): Promise<void> {
+  const patch = contactPatchOfForm(form)
+  if (!hasContactChanges(patch)) return
+  await attendeesApi.updateContact(Number(form.get('attendeeId')), patch)
 }
 
 export const directoryRoute = {

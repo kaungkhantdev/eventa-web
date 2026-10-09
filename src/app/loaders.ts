@@ -133,6 +133,44 @@ export function attendeeAction(run: (args: LoaderArgs) => Promise<unknown>) {
   return guardedAction('attendee', run)
 }
 
+/**
+ * What an action reports when the work succeeded.
+ *
+ * Normally just `ok`: this app's rule is that the API is the source of truth
+ * and a mutation is followed by revalidation, so an action that returned server
+ * data would be inviting a second copy of it.
+ *
+ * The exception is an answer no later read can reproduce.
+ * `POST /me/two-factor/start` replies with a one-time secret and its otpauth
+ * URI, and `/confirm` replies with the recovery codes — and no GET exposes
+ * either again, by design. There is nothing to revalidate; the answer existed
+ * once, in that response.
+ *
+ * It used to be dropped. `guardedAction` returned a bare `{ ok: true }`, so the
+ * console's enrolment screen read `act.data.secret` as `undefined` on every
+ * render, no QR was ever drawn, and the recovery codes were thrown away — which
+ * left US-ACC-07's two-factor setup non-functional in shipped code while every
+ * test stayed green.
+ *
+ * Only a plain object of named fields is carried, and it cannot claim the
+ * action failed: an API answering with a field called `ok` must not invert the
+ * outcome every caller branches on.
+ */
+export function actionSuccess(payload: unknown): ActionResult {
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    Array.isArray(payload)
+  ) {
+    return { ok: true }
+  }
+  // `ok` last so a payload cannot claim the action failed, and `error`
+  // dropped so a success cannot arrive carrying a refusal sentence.
+  const named = { ...(payload as Record<string, unknown>) }
+  delete named.error
+  return { ...named, ok: true }
+}
+
 function guardedAction(
   persona: Persona,
   run: (args: LoaderArgs) => Promise<unknown>,
@@ -145,7 +183,7 @@ function guardedAction(
       // draft moves the wizard to `?id=`. Swallowing it would leave the person
       // on a URL that no longer describes what they are editing.
       if (result instanceof Response) return result
-      return { ok: true }
+      return actionSuccess(result)
     } catch (cause) {
       if (cause instanceof ApiError && cause.isUnauthorized) throw signIn(persona)
       if (cause instanceof ApiError || cause instanceof NetworkError) {
@@ -175,6 +213,11 @@ export interface ActionResult {
    * belong at the foot of the form, not under an input.
    */
   fieldErrors?: Record<string, string>
+  /**
+   * An answer no later read can reproduce — a one-time secret, recovery codes.
+   * See {@link actionSuccess} for why an action may carry data at all.
+   */
+  [field: string]: unknown
 }
 
 export interface LoaderArgs {

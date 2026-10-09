@@ -17,6 +17,44 @@ interface RequestOptions {
 }
 
 /**
+ * A read, plus the one thing only a read may ask for.
+ *
+ * `bestEffort` says the caller has already decided it can live without the
+ * answer. That is a different request from one whose page depends on it, and
+ * the difference is not cosmetic: a 401 here has a destructive consequence.
+ * `send` below ends the stored session when the refresh cannot save it, and a
+ * caller that is *going to absorb* the failure has no business signing anybody
+ * out on its way past.
+ *
+ * The public checkout page is why this exists. Its profile pre-fill is a
+ * convenience on a page a guest can buy from without an account, so
+ * `portal/checkout.routes.ts` absorbs an `ApiError` rather than failing the
+ * money path, and says at length why. Absorbing the error did not undo what
+ * produced it: the session had already been ended by the time the catch ran, so
+ * merely opening a public page cleared a stale attendee's tokens. Nothing
+ * subscribed, so nobody saw it — which makes it an undocumented state change on
+ * the money path rather than a harmless one.
+ *
+ * **It opts out of the sign-out and of nothing else.** The refresh is still
+ * attempted and the request still replayed, because a session that *can* be
+ * saved should be — and then the pre-fill works. The `ApiError` is still
+ * thrown, because what an absent answer means is the caller's decision, and
+ * resolving with nothing would take that decision away from it.
+ *
+ * **Why a flag on the request rather than a second `api` object.** The stance
+ * belongs to one request and has to travel beside `query` and `signal` through
+ * the same `send`, so a parallel `api.optional.get/list` would be that table
+ * written out twice to carry one boolean, with both copies to keep in step.
+ * What the separate shape would buy — that no mutation can claim to be
+ * best-effort — is bought here by the type instead: only `get` and `list` take
+ * `ReadOptions`, so `api.post(path, body, { bestEffort: true })` does not
+ * compile. A mutation is never optional; it either happened or it did not.
+ */
+export interface ReadOptions extends RequestOptions {
+  bestEffort?: boolean
+}
+
+/**
  * The one place the app talks to eventa-api.
  *
  * Three things happen here so that no page has to think about them:
@@ -30,13 +68,15 @@ interface RequestOptions {
  *    a single refresh — shared between every request that raced into the same
  *    401, see `refreshing` — and the original request is replayed. If the
  *    refresh itself fails the session ends, and the router's guard takes over.
+ *    A read that passes `bestEffort` keeps the refresh and the replay but not
+ *    that last step; `ReadOptions` says when and why.
  */
 export const api = {
-  get: <T>(path: string, options: RequestOptions = {}) =>
+  get: <T>(path: string, options: ReadOptions = {}) =>
     request<T>('GET', path, options),
 
   /** A list endpoint: returns the rows and the `meta` beside them. */
-  async list<T>(path: string, options: RequestOptions = {}): Promise<Page<T>> {
+  async list<T>(path: string, options: ReadOptions = {}): Promise<Page<T>> {
     const envelope = await send<T[]>('GET', path, options)
     return { items: envelope.data ?? [], meta: envelope.meta ?? EMPTY_META }
   },
@@ -78,7 +118,7 @@ export const api = {
 async function request<T>(
   method: string,
   path: string,
-  options: RequestOptions,
+  options: ReadOptions,
 ): Promise<T> {
   return (await send<T>(method, path, options)).data
 }
@@ -86,7 +126,7 @@ async function request<T>(
 async function send<T>(
   method: string,
   path: string,
-  options: RequestOptions,
+  options: ReadOptions,
 ): Promise<SuccessEnvelope<T>> {
   const response = await dispatch(method, path, options)
   if (response.ok) return parse<T>(response)
@@ -99,7 +139,14 @@ async function send<T>(
       if (replay.ok) return parse<T>(replay)
       throw await toError(replay)
     }
-    session.end()
+    // The refresh failed, so this session cannot be saved. Ending it is right
+    // for the caller whose page depends on the answer: its loader guard turns
+    // the 401 into a redirect to sign-in, and a token nothing can renew would
+    // otherwise sit in storage and loop against the next 401. A best-effort
+    // read has claimed no such page, so it leaves storage as it found it — at
+    // the cost of one more doomed refresh on the next request, which the first
+    // caller that does depend on an answer will end for good.
+    if (!options.bestEffort) session.end()
   }
   throw await toError(response)
 }

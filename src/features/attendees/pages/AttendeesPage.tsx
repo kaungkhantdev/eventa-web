@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useFetcher, useLoaderData } from 'react-router'
+import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Button,
   Card,
@@ -8,6 +8,7 @@ import {
   HeaderUser,
   Hint,
   Icon,
+  IconButton,
   Input,
   Label,
   NoResults,
@@ -20,12 +21,15 @@ import {
   Textarea,
   type PillTabItem,
 } from '@/components/ui'
+import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
+import { can } from '@/features/auth/permissions'
+import type { Me } from '@/features/auth/types'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
-import type { ActionResult } from '@/app/loaders'
+import { EditContactPanel } from '../components/EditContactPanel'
 import { TAGS, type DirectoryData } from '../directory.routes'
 import type { AttendeeRow, AttendeeSegment, AttendeeSort } from '../directory.types'
 
@@ -59,6 +63,25 @@ export default function AttendeesPage() {
   const filtering = useIsFiltering()
   const invite = useDisclosure()
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
+  // Correcting contact details is `regManage`; the directory itself is only
+  // `regView`, which Staff hold so the door can look people up. This hides a
+  // control they cannot use — the API is what enforces it, and the panel still
+  // shows the 403 if it ever gets that far.
+  const canManage = can(me, 'regManage')
+  const edit = useDisclosure()
+  // The id rather than the row: a save revalidates this loader, and holding the
+  // row would leave the panel editing a copy of what the directory used to say.
+  // Looked up afresh on every render, so the details it submits as "what the
+  // row said" are the ones the table is showing now.
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const editing = data.rows.find((row) => row.id === editingId) ?? null
+
+  const onEdit = (row: AttendeeRow) => {
+    setEditingId(row.id)
+    edit.onOpen()
+  }
 
   // Nothing has been registered yet: there is nothing to search, tab through or
   // page, so the controls go with the table and the page explains itself.
@@ -200,15 +223,22 @@ export default function AttendeesPage() {
                   <th>Tickets</th>
                   <th>Tags</th>
                   <th>Last activity</th>
+                  {/* The kit's own Actions column. It is dropped rather than
+                      left empty for somebody who may only read the directory. */}
+                  {canManage && <th className="text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="text-[13px]">
                 {data.rows.map((row) => (
-                  <AttendeeTableRow key={row.id} row={row} />
+                  <AttendeeTableRow
+                    key={row.id}
+                    row={row}
+                    onEdit={canManage ? () => onEdit(row) : null}
+                  />
                 ))}
                 {data.rows.length === 0 && (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={canManage ? 7 : 6}>
                       {emptyReason === 'past-end' ? (
                         /* A bookmarked `?page=4` that no longer has anybody on
                            it. Back to the first page keeping the search: it is
@@ -240,6 +270,13 @@ export default function AttendeesPage() {
       <PageFooter />
 
       <InvitePanel open={invite.open} onClose={invite.onClose} events={data.events} />
+
+      {/* Rendered for anyone who may edit, not only once a row is chosen: the
+          element stays mounted so the kit's slide-in transition has something
+          to run on. Without a row it is never opened. */}
+      {canManage && (
+        <EditContactPanel row={editing} open={edit.open} onClose={edit.onClose} />
+      )}
     </>
   )
 }
@@ -273,7 +310,14 @@ function pills(data: DirectoryData): PillTabItem<AttendeeSegment>[] {
   ]
 }
 
-function AttendeeTableRow({ row }: { row: AttendeeRow }) {
+function AttendeeTableRow({
+  row,
+  /** Null for a caller who may not edit — the cell goes with the column. */
+  onEdit,
+}: {
+  row: AttendeeRow
+  onEdit: (() => void) | null
+}) {
   return (
     <tr>
       <td>
@@ -299,6 +343,19 @@ function AttendeeTableRow({ row }: { row: AttendeeRow }) {
         )}
       </td>
       <td className="tnum text-muted">{row.lastActivity}</td>
+      {onEdit && (
+        <td className="text-right">
+          {/* The kit's actions cell, with the glyph its profile panel puts on
+              the Edit button. Its other two buttons (View profile, More) are
+              left out rather than wired to nothing. */}
+          <div className="flex items-center justify-end gap-1">
+            <IconButton onClick={onEdit} title="Edit contact details">
+              <Icon name="hgi-edit-02" size={16} />
+              <span className="sr-only">Edit {row.name}’s contact details</span>
+            </IconButton>
+          </div>
+        </td>
+      )}
     </tr>
   )
 }

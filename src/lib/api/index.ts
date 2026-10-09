@@ -5,7 +5,7 @@
  *     query: { page, status },
  *   })
  */
-export { api, type Query } from './client'
+export { api, type Query, type ReadOptions } from './client'
 export { ApiError, NetworkError } from './ApiError'
 export { messageOf } from './messageOf'
 export { session, type Tokens } from './session'

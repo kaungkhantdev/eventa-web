@@ -30,6 +30,36 @@ export interface SegmentCountsWire {
   vip: number
 }
 
+/** The three details an organizer may correct, as the row stores them. */
+export const CONTACT_FIELDS = ['name', 'email', 'phone'] as const
+
+export type ContactField = (typeof CONTACT_FIELDS)[number]
+
+/** What the row holds right now — the values a save is measured against. */
+export interface StoredContact {
+  name: string
+  email: string
+  /** Absent when nobody ever left a number. */
+  phone: string | null
+}
+
+/** What the edit panel's three inputs hold, as a form submits them. */
+export interface ContactDraft {
+  name: string
+  email: string
+  phone: string
+}
+
+/**
+ * The body of `PATCH /attendees/:attendeeId` — only the fields that moved. An
+ * absent key is left alone; `phone: ''` clears the number.
+ */
+export interface ContactPatch {
+  name?: string
+  email?: string
+  phone?: string
+}
+
 export interface AttendeeRow {
   id: number
   name: string
@@ -37,6 +67,14 @@ export interface AttendeeRow {
   initials: string
   /** `—` when they never left one; a blank cell reads as a rendering bug. */
   phone: string
+  /**
+   * The same details unformatted, for the panel that corrects them.
+   *
+   * Kept apart from the cells above because `phone` is already a dash by the
+   * time the table reads it, and an edit seeded from that would PATCH "—" as
+   * somebody's phone number.
+   */
+  contact: StoredContact
   /** `3 events`. */
   events: string
   tickets: number

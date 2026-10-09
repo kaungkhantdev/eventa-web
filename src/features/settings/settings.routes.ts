@@ -69,7 +69,12 @@ const settingsApi = {
   revokeSession: (id: string) => api.delete<void>(`/me/sessions/${id}`),
   revokeOthers: () => api.post<void>('/me/sessions/revoke-others'),
   twoFactor: () => api.get<TwoFactorWire>('/me/two-factor'),
-  startTwoFactor: () => api.post<{ secret: string; otpauthUrl: string }>('/me/two-factor/start'),
+  // `otpauthUri`, matching `TwoFactorStartDto`. It was declared `otpauthUrl`
+  // here, so the field read `undefined` and the QR had nothing to encode even
+  // once the action stopped discarding the payload — the same re-typed-wire
+  // drift `@/lib/wireEnums` exists to stop.
+  startTwoFactor: () =>
+    api.post<{ secret: string; otpauthUri: string }>('/me/two-factor/start'),
   confirmTwoFactor: (code: string) => api.post<unknown>('/me/two-factor/confirm', { code }),
   disableTwoFactor: (code: string) => api.post<void>('/me/two-factor/disable', { code }),
   changePassword: (currentPassword: string, newPassword: string) =>

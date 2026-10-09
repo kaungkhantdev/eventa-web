@@ -18,6 +18,9 @@ import type { MyEventRow, PaymentTotals, TransactionRow } from './myEvents.types
 import { profileApi } from './profile.api'
 import { toAttendeeProfileCard, toProfilePatch } from './profile.mapper'
 import type { AttendeeProfileCard } from './profile.types'
+import { securityApi } from './security.api'
+import { countOtherDevices, toDeletionWarning, toTwoFactorCard } from './security.mapper'
+import type { AttendeeSecurity } from './security.types'
 
 /**
  * The attendee's own account page (US-DISC-07/09/10).
@@ -33,6 +36,17 @@ export interface MyEventsData {
   profile: AttendeeProfileCard
   /** The Settings tab's switches and selects (US-DISC-12). */
   settings: AttendeeAccountSettings
+  /**
+   * The Settings tab's Security card and danger zone (US-DISC-12 criteria 4–5,
+   * US-DISC-14).
+   *
+   * Two-factor standing comes from `GET /me/two-factor` rather than from
+   * `me.twoFactorEnabled`, which the tab used to be handed: both answer the
+   * same question, and the one that also knows about pending enrolments and
+   * recovery codes is the one to keep. Two sources for a security fact is how
+   * they come to disagree.
+   */
+  security: AttendeeSecurity
   upcoming: MyEventRow[]
   past: MyEventRow[]
   transactions: TransactionRow[]
@@ -66,6 +80,26 @@ export const NOTIFICATION_INTENT = 'notification'
 export const DISPLAY_PREFERENCE_INTENT = 'preference'
 
 /**
+ * The Security card's three submissions (criteria 4–5).
+ *
+ * Only three of the five security calls are here, and the division is not
+ * arbitrary: `guardedAction` reports `{ ok: true }` and discards whatever the
+ * call answered, which is exactly right for these — none of them has anything
+ * to say beyond "it worked", and each changes something the loader re-reads.
+ *
+ * Starting and confirming an enrolment are the opposite: their whole value IS
+ * the answer — a seed, and the recovery codes the API will never show again —
+ * and there is no loader read that could fetch either of them back. Those two
+ * go straight to `securityApi` from the panel that shows them, as the profile
+ * photo's three steps already do, and are gone when it closes. Deleting the
+ * account is likewise not a submission the page can revalidate after: there is
+ * no page left.
+ */
+export const PASSWORD_CHANGE_INTENT = 'change-password'
+export const REVOKE_OTHER_SESSIONS_INTENT = 'revoke-other-sessions'
+export const TWO_FACTOR_DISABLE_INTENT = 'disable-two-factor'
+
+/**
  * What this page can submit, and what each one does.
  *
  * A table rather than a chain of `if`s, because the account page keeps gaining
@@ -94,6 +128,22 @@ const SUBMISSIONS: Record<string, (form: FormData) => Promise<unknown>> = {
     // record and report back a save that never happened.
     return Object.keys(patch).length === 0 ? Promise.resolve(null) : profileApi.saveProfile(patch)
   },
+
+  /**
+   * Criterion 4. The confirm box never leaves the browser — the API has no
+   * business being told the same new secret twice to compare it.
+   */
+  [PASSWORD_CHANGE_INTENT]: (form) =>
+    securityApi.changePassword(
+      String(form.get('currentPassword') ?? ''),
+      String(form.get('newPassword') ?? ''),
+    ),
+
+  [REVOKE_OTHER_SESSIONS_INTENT]: () => securityApi.revokeOtherSessions(),
+
+  /** Criterion 5 in reverse, and the API still asks for a current code. */
+  [TWO_FACTOR_DISABLE_INTENT]: (form) =>
+    securityApi.disableTwoFactor(String(form.get('code') ?? '').trim()),
 }
 
 /** The details form is the one submission with no intent of its own. */
@@ -103,13 +153,29 @@ export const myEventsRoute = {
   loader: attendeeData(async ({ request }: LoaderArgs): Promise<MyEventsData> => {
     // Independent reads; the page shows every tab at once, so a half-loaded
     // account is not worth rendering.
-    const [me, profile, registrations, payments, summary, preferences] = await Promise.all([
+    const [
+      me,
+      profile,
+      registrations,
+      payments,
+      summary,
+      preferences,
+      twoFactor,
+      sessions,
+      deletion,
+    ] = await Promise.all([
       authApi.me(),
       profileApi.profile(),
       myEventsApi.registrations(),
       myEventsApi.payments(historyQueryOf(queryOf(request))),
       myEventsApi.paymentSummary(),
       panel(accountSettingsApi.notifications()),
+      // The Security card and the danger zone. Supplementary, so each is its
+      // own panel: the page's subject is somebody's tickets, and none of these
+      // three is worth taking them away for.
+      panel(securityApi.twoFactor()),
+      panel(securityApi.sessions()),
+      panel(securityApi.deletionWarning()),
     ])
 
     return {
@@ -120,6 +186,11 @@ export const myEventsRoute = {
       settings: {
         notifications: mapPanel(preferences, toAccountNotifications),
         preferences: toDisplayPreferences(profile),
+      },
+      security: {
+        twoFactor: mapPanel(twoFactor, toTwoFactorCard),
+        otherDevices: mapPanel(sessions, countOtherDevices),
+        deletion: mapPanel(deletion, toDeletionWarning),
       },
       upcoming: registrations.upcoming.map(toMyEventRow),
       past: registrations.past.map(toMyEventRow),

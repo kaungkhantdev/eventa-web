@@ -11,6 +11,10 @@ import type {
   NotificationSwitch,
 } from '../accountSettings.types'
 import { DISPLAY_PREFERENCE_INTENT, NOTIFICATION_INTENT } from '../myEvents.routes'
+import type { AttendeeSecurity } from '../security.types'
+import { DangerZoneCard } from './DangerZoneCard'
+import { SecurityCard } from './SecurityCard'
+import { Switch, SwitchStyles } from './Switch'
 
 /**
  * "My Account" → Settings (US-DISC-12), lifted out of `MyEventsPage` whole.
@@ -22,74 +26,32 @@ import { DISPLAY_PREFERENCE_INTENT, NOTIFICATION_INTENT } from '../myEvents.rout
  * "SMS alerts" on, navigated away, and the choice had never left the browser.
  * The theme switch was the one control that worked, and still does.
  *
- * Criteria 1 and 3 are wired here. Criteria 4 and 5 — the password change and
- * two-factor — are NOT: both exist on the API and both are already built in the
- * organizer console as a slide-over apiece, and bringing them to this tab means
- * markup the kit does not draw. The Security card is therefore still the kit's,
- * unwired, rather than half-wired.
+ * All five criteria are wired now. Criteria 1 and 3 are here; 4 and 5 moved to
+ * `SecurityCard` with the two slide-overs they need, and US-DISC-14 to
+ * `DangerZoneCard` with its confirmation — three files rather than one, because
+ * this tab is four independent cards and each of those two is a flow.
  */
-
-/* The kit's own switch, moved here with its CSS because this tab is the only
-   thing that uses either. Imperative `.switch` styling from the static kit;
-   `checked`/`onChange` make it a controlled React input. */
-const SWITCH_CSS = `
-.switch{position:relative;display:inline-flex;height:1.25rem;width:2.25rem;flex:none;cursor:pointer;align-items:center}
-.switch input{position:absolute;inset:0;opacity:0;cursor:pointer}
-.switch .track{height:1.25rem;width:2.25rem;border-radius:9999px;background:rgb(var(--line));transition:background .18s}
-.switch .dot{position:absolute;left:.125rem;height:1rem;width:1rem;border-radius:9999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .18s}
-.switch input:checked + .track{background:#1ba770}
-.switch input:checked ~ .dot{transform:translateX(1rem)}
-`
-
-function Switch({
-  id,
-  checked,
-  defaultChecked,
-  disabled,
-  onChange,
-}: {
-  id?: string
-  checked?: boolean
-  defaultChecked?: boolean
-  /**
-   * Held while the save is in flight. The kit has no disabled styling and none
-   * is invented — what this prevents is a second click racing the first, where
-   * whichever reply landed last would decide the position of the switch.
-   */
-  disabled?: boolean
-  onChange?: (checked: boolean) => void
-}) {
-  return (
-    <span className="switch">
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        defaultChecked={defaultChecked}
-        disabled={disabled}
-        onChange={onChange ? (e) => onChange(e.target.checked) : undefined}
-      />
-      <span className="track" />
-      <span className="dot" />
-    </span>
-  )
-}
 
 export function SettingsTab({
   settings,
-  twoFactorEnabled,
+  security,
+  email,
   dark,
   onToggleTheme,
 }: {
   settings: AttendeeAccountSettings
   /**
-   * Read, not guessed. The Security card's own controls are out of scope until
-   * the portal has the markup for a password change and a two-factor
-   * enrolment, but the SWITCH is a statement about this account either way, and
-   * `authApi.me()` already answers it — so rendering a bare `<Switch />` told
-   * somebody with two-factor ON that it was off.
+   * Read, not guessed (criteria 4–5, US-DISC-14).
+   *
+   * Three supplementary reads, each its own panel: two-factor standing, how
+   * many other devices hold a session, and what deleting the account would
+   * forfeit. A bare `<Switch />` renders off, so an account with two-factor
+   * enabled used to be told its second factor was not on — the one wrong
+   * answer a security card must not give.
    */
-  twoFactorEnabled: boolean
+  security: AttendeeSecurity
+  /** Named on the recovery-code file, so it is usable a year later. */
+  email: string
   /**
    * The theme comes from the page rather than from `useTheme()` here: two
    * instances of that hook keep two copies of `dark`, and the header's toggle
@@ -102,7 +64,7 @@ export function SettingsTab({
     <>
       {/* Outside the grid, so its four children are the four cards the kit
           draws and nothing else. */}
-      <style>{SWITCH_CSS}</style>
+      <SwitchStyles />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <NotificationsCard notifications={settings.notifications} />
         <PreferencesCard
@@ -110,8 +72,12 @@ export function SettingsTab({
           dark={dark}
           onToggleTheme={onToggleTheme}
         />
-        <SecurityCard twoFactorEnabled={twoFactorEnabled} />
-        <DangerZoneCard />
+        <SecurityCard
+          twoFactor={security.twoFactor}
+          otherDevices={security.otherDevices}
+          email={email}
+        />
+        <DangerZoneCard deletion={security.deletion} />
       </div>
     </>
   )
@@ -440,91 +406,6 @@ function PreferencesCard({
           <Switch checked={dark} onChange={onToggleTheme} />
         </label>
       </div>
-    </div>
-  )
-}
-
-/* ------------------------------- security -------------------------------- */
-
-/**
- * Criteria 4 and 5, and neither is wired — the kit's markup, untouched.
- *
- * Both endpoints exist (`POST /auth/change-password`, `/me/two-factor/*`) and
- * the organizer console already drives them from `SettingsSecurityPage`. What
- * is missing is the markup: a password change is three boxes and a
- * sign-out-everywhere choice, and enabling two-factor is a QR code, a verify
- * step and a list of recovery codes. The kit draws none of that for the portal,
- * and inventing it here is a change of its own rather than the tail of this
- * one.
- *
- * Two things are NOT left as the kit drew them, because both would have stated
- * something untrue about this person's account rather than merely being
- * unfinished:
- *
- * - "Last changed 3 months ago" is gone. This app holds no
- *   password-changed-at — the API exposes none — so it was invention of the
- *   same kind as the Profile tab's old "12 events attended", and a date is
- *   exactly the sort of detail a reader has no reason to doubt.
- * - The two-factor switch now shows the REAL state from `authApi.me()`, which
- *   the loader already had. A bare `<Switch />` renders off, so an account with
- *   two-factor enabled was told its second factor was not on — the one wrong
- *   answer a security card must not give.
- *
- * Both controls are inert until the flows exist, so both are `disabled`: a
- * control that moves and changes nothing is a worse lie than one that plainly
- * does not move yet.
- */
-function SecurityCard({ twoFactorEnabled }: { twoFactorEnabled: boolean }) {
-  return (
-    <div className="card p-5">
-      <h3 className="flex items-center gap-2 text-[14px] font-bold tracking-tight">
-        <Icon name="hgi-shield-01" size={16} className="text-muted" />
-        Security
-      </h3>
-      <div className="mt-4 space-y-3">
-        <div className="flex items-center justify-between rounded-lg border border-hair bg-canvas px-3.5 py-3">
-          <span>
-            <span className="block text-[13px] font-medium text-ink">Password</span>
-            <span className="block text-[11px] text-muted">
-              The password you sign in with
-            </span>
-          </span>
-          <button type="button" className="btn btn-soft btn-sm" disabled>
-            Change
-          </button>
-        </div>
-        <label className="flex items-center justify-between rounded-lg border border-hair bg-canvas px-3.5 py-3">
-          <span>
-            <span className="block text-[13px] font-medium text-ink">
-              Two-factor authentication
-            </span>
-            <span className="block text-[11px] text-muted">Extra security at sign-in</span>
-          </span>
-          <Switch checked={twoFactorEnabled} disabled />
-        </label>
-      </div>
-    </div>
-  )
-}
-
-/** US-DISC-14, which is its own story. The kit's markup, unwired. */
-function DangerZoneCard() {
-  return (
-    <div className="card border-red-200 p-5 dark:border-red-500/30">
-      <h3 className="flex items-center gap-2 text-[14px] font-bold tracking-tight text-red-600 dark:text-red-400">
-        <Icon name="hgi-alert-02" size={16} />
-        Danger zone
-      </h3>
-      <p className="mt-2 text-[12px] text-muted">
-        Permanently remove your account and all registration data. This cannot be undone.
-      </p>
-      <button
-        type="button"
-        className="btn btn-sm mt-4 border border-red-300 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-400"
-      >
-        <Icon name="hgi-delete-02" size={15} />
-        Delete account
-      </button>
     </div>
   )
 }

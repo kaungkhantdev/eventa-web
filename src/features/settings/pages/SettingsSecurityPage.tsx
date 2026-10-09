@@ -289,7 +289,7 @@ function TwoFactorPanel({
   onClose: () => void
   twoFactor: SecurityData['twoFactor']
 }) {
-  const act = useFetcher<ActionResult & { secret?: string; otpauthUrl?: string }>()
+  const act = useFetcher<ActionResult & { secret?: string; otpauthUri?: string }>()
   const error = act.data?.ok === false ? act.data.error : null
   const secret = act.data && 'secret' in act.data ? act.data.secret : undefined
   const enrolling = Boolean(secret) || twoFactor.pending

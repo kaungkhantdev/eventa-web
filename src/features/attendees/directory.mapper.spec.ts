@@ -47,6 +47,28 @@ describe('toAttendeeRow', () => {
     expect(toAttendeeRow(wire()).lastActivity).toBe('Jul 9, 2026')
   })
 
+  /**
+   * The dash belongs to the cell, not to the form behind it (US-REG-08).
+   *
+   * `phone` is already formatted for the table, so an edit panel seeded from it
+   * would put "—" in the box and PATCH that string as somebody's phone number.
+   * `contact` is what the row actually stores, untouched.
+   */
+  it('keeps the stored details apart from the formatted cells', () => {
+    expect(toAttendeeRow(wire()).contact).toEqual({
+      name: 'Anong Pattana',
+      email: 'anong.p@example.com',
+      phone: '02 555 0107',
+    })
+  })
+
+  it('leaves an unrecorded phone absent for the form, where the cell shows a dash', () => {
+    const row = toAttendeeRow(wire({ phone: null }))
+
+    expect(row.phone).toBe('—')
+    expect(row.contact.phone).toBeNull()
+  })
+
   it('tints a tagged attendee, and leaves an untagged one plain', () => {
     expect(toAttendeeRow(wire({ tag: 'Speaker' })).tagClass).toBeTruthy()
     expect(toAttendeeRow(wire({ tag: null })).tag).toBeNull()

@@ -467,6 +467,8 @@ function SurveyEditor({
     const form = new FormData()
     form.set('intent', survey ? 'update' : 'create')
     if (survey) form.set('surveyId', survey.id)
+    // Update only: the lock is a claim about a row that already exists.
+    if (survey) form.set('version', String(survey.version))
     else form.set('eventId', eventId)
     form.set('title', title)
     for (const question of questions) {
