@@ -15,10 +15,25 @@ const wire = (over: Partial<AttendeeWire> = {}): AttendeeWire => ({
   eventCount: 3,
   ticketCount: 5,
   checkedInCount: 2,
+  version: 4,
   ...over,
 })
 
 describe('toAttendeeRow', () => {
+  /**
+   * The panel seeds its hidden twins from `contact`, so a version dropped here
+   * is a save with nothing to guard it — the organizer would overwrite a row
+   * somebody else had already corrected, and be told nothing.
+   */
+  it('carries the version into the details the panel edits', () => {
+    expect(toAttendeeRow(wire({ version: 9 })).contact).toEqual({
+      name: 'Anong Pattana',
+      email: 'anong.p@example.com',
+      phone: '02 555 0107',
+      version: 9,
+    })
+  })
+
   it('reads as a person, with their initials for the avatar', () => {
     const row = toAttendeeRow(wire())
 
@@ -59,6 +74,7 @@ describe('toAttendeeRow', () => {
       name: 'Anong Pattana',
       email: 'anong.p@example.com',
       phone: '02 555 0107',
+      version: 4,
     })
   })
 

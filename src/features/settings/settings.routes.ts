@@ -1,5 +1,5 @@
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { api, type Query } from '@/lib/api'
+import { api, meProfileApi, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import type { IssuedUpload } from '@/lib/signedUpload'
 import { intParam } from '@/lib/urlFilters'
@@ -38,7 +38,6 @@ import type {
   PaymentSettingsWire,
   StoredKeysWire,
   ProfileCard,
-  ProfileWire,
   SessionRow,
   TwoFactorWire,
 } from './settings.types'
@@ -474,10 +473,13 @@ function nullable(form: FormData, name: string): string | null {
  * account reference the provider issued; the card details never reach this app.
  */
 export const accountApi = {
-  profile: () => api.get<ProfileWire>('/me/profile'),
-  saveProfile: (body: Record<string, unknown>) => api.patch<ProfileWire>('/me/profile', body),
+  // Shared with the attendee portal's Profile tab — same row, same three
+  // routes. `saveProfile` was typed `Record<string, unknown>` here, so a
+  // misspelled or stale field name reached the API with nothing to catch it.
+  profile: meProfileApi.profile,
+  saveProfile: meProfileApi.saveProfile,
   /** Confirms at the new address before it replaces the old one. */
-  changeEmail: (email: string) => api.post<unknown>('/me/profile/email', { email }),
+  changeEmail: meProfileApi.changeEmail,
 
   organization: () => api.get<OrganizationWire>('/organization'),
   /** Events hosted and team members. Its own call: `/organization` is the form. */

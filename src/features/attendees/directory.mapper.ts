@@ -21,7 +21,15 @@ export function toAttendeeRow(wire: AttendeeWire): AttendeeRow {
     // An unrecorded phone number is a dash, not an empty cell — a blank reads
     // as a column that failed to render.
     phone: wire.phone ?? MASKED,
-    contact: { name: wire.name, email: wire.email, phone: wire.phone },
+    contact: {
+      name: wire.name,
+      email: wire.email,
+      phone: wire.phone,
+      // `?? null` although the type says otherwise: an API deployed before the
+      // field existed simply omits it, and that must cost the organizer the
+      // guard, not the save.
+      version: wire.version ?? null,
+    },
     events: `${wire.eventCount} ${wire.eventCount === 1 ? 'event' : 'events'}`,
     tickets: wire.ticketCount,
     tag: wire.tag,

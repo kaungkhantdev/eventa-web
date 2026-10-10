@@ -1,6 +1,6 @@
-import { api } from '@/lib/api'
+import { api, meProfileApi } from '@/lib/api'
 import { putToSignedUrl, type IssuedUpload } from '@/lib/signedUpload'
-import type { PhotoWire, ProfileWire, ProfilePatch } from './profile.types'
+import type { PhotoWire } from './profile.types'
 
 /**
  * Every call the portal's Profile tab makes, and nothing else (US-DISC-11).
@@ -14,22 +14,12 @@ import type { PhotoWire, ProfileWire, ProfilePatch } from './profile.types'
 const STORAGE_PUT_FAILED = 'The photo could not be sent to storage.'
 
 export const profileApi = {
-  /** The whole record the tab renders. */
-  profile: () => api.get<ProfileWire>('/me/profile'),
-
-  /**
-   * Save the details form. A partial patch: an omitted key is left as it is
-   * and `null` clears a field, so an emptied box means "clear it" rather than
-   * "send the empty string".
-   */
-  saveProfile: (body: ProfilePatch) => api.patch<ProfileWire>('/me/profile', body),
-
-  /**
-   * Ask to move the account to a new address. The API emails a confirmation to
-   * the NEW address and the old one goes on working until that link is opened,
-   * so this returns with the change merely requested, never applied.
-   */
-  changeEmail: (email: string) => api.post<ProfileWire>('/me/profile/email', { email }),
+  // The three `/me/profile` calls are shared with the organizer console's
+  // account screens, so they live in `@/lib/api` and this facade just names
+  // them for the tab. The photo calls below really are the portal's.
+  profile: meProfileApi.profile,
+  saveProfile: meProfileApi.saveProfile,
+  changeEmail: meProfileApi.changeEmail,
 
   /**
    * The photo, in the API's two steps: ask where to PUT, send the bytes

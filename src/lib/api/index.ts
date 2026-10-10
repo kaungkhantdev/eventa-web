@@ -8,6 +8,11 @@
 export { api, type Query, type ReadOptions } from './client'
 export { ApiError, NetworkError } from './ApiError'
 export { messageOf } from './messageOf'
+export {
+  meProfileApi,
+  type ProfilePatch,
+  type ProfileWire,
+} from './meProfile'
 export { session, type Tokens } from './session'
 export {
   EMPTY_META,

@@ -16,44 +16,13 @@ import type { BadgeTone } from '@/components/ui'
  * Wire shapes; nothing outside the mapper reads them.
  */
 
-export interface ProfileWire {
-  id: string
-  name: string
-  /** The address you sign in with. */
-  email: string
-  /** A requested address awaiting confirmation; the old one still works. */
-  pendingEmail: string | null
-  /** False while an email change is unconfirmed. */
-  emailVerified: boolean
-  phone: string | null
-  timezone: string | null
-  locale: 'en' | 'th' | null
-  avatarUrl: string | null
-  city: string | null
-  /** A plain calendar date, `YYYY-MM-DD` — not an instant. */
-  dateOfBirth: string | null
-  bio: string | null
-  /** Display only — every charge still settles in THB. */
-  displayCurrency: string | null
-}
-
 /**
- * The fields a member may change on their own profile — `UpdateProfileDto`.
- *
- * Every one is optional and most are nullable: omitting a key leaves it as it
- * is, and `null` clears it. `avatarUrl` is deliberately absent, as it is on the
- * API — a photo is only ever set by confirming an upload the server issued.
+ * `ProfileWire` and `ProfilePatch` live in `@/lib/api`: the organizer console
+ * edits the same `/me/profile` row from `settings`, and one endpoint described
+ * in two features is one that drifts. Re-exported so this feature's modules
+ * keep importing their wire shapes from one place.
  */
-export interface ProfilePatch {
-  name?: string
-  phone?: string | null
-  timezone?: string | null
-  locale?: 'en' | 'th' | null
-  city?: string | null
-  dateOfBirth?: string | null
-  bio?: string | null
-  displayCurrency?: string | null
-}
+export type { ProfilePatch, ProfileWire } from '@/lib/api'
 
 /** The profile photo after a confirmed upload. */
 export interface PhotoWire {

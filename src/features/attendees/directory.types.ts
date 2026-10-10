@@ -20,6 +20,8 @@ export interface AttendeeWire {
   ticketCount: number
   /** Tickets actually used at a door. */
   checkedInCount: number
+  /** Sent back on PATCH so a row someone else changed is refused, not overwritten. */
+  version: number
 }
 
 /** The counts behind the four pills, for the whole directory. */
@@ -41,6 +43,21 @@ export interface StoredContact {
   email: string
   /** Absent when nobody ever left a number. */
   phone: string | null
+  /**
+   * Which version of the row those values came from, or `null` when the row
+   * did not say.
+   *
+   * Part of "what the row holds" rather than a separate argument, because it
+   * is read, carried and sent back exactly like the three values beside it —
+   * and anything that seeds a draft from a row has to carry it or the save
+   * silently reverts to last-write-wins.
+   *
+   * Nullable because an API that does not send one must not break the save.
+   * Measured: `version: 0` is answered 400 "version must not be less than 1",
+   * so encoding "no version" as a number would turn every save into a
+   * refusal naming a box the organizer cannot see.
+   */
+  version: number | null
 }
 
 /** What the edit panel's three inputs hold, as a form submits them. */
@@ -58,6 +75,11 @@ export interface ContactPatch {
   name?: string
   email?: string
   phone?: string
+  /**
+   * The version the panel was opened on. Not a field being changed — the API
+   * refuses the whole save with 409 when the row has moved past it.
+   */
+  version?: number
 }
 
 export interface AttendeeRow {

@@ -3,7 +3,7 @@ import { useFetcher } from 'react-router'
 import { Button, FieldError, Hint, Input, Label, Panel } from '@/components/ui'
 import type { ActionResult } from '@/app/loaders'
 import { toast } from '@/lib/toast'
-import { storedInput } from '../contact.changes'
+import { VERSION_INPUT, storedInput } from '../contact.changes'
 import { contactRefusalOf, type ContactRefusal } from '../contact.refusal'
 import { CONTACT_INTENT } from '../directory.routes'
 import type { AttendeeRow } from '../directory.types'
@@ -129,6 +129,10 @@ function ContactForm({
         <input type="hidden" name={storedInput('name')} value={stored?.name ?? ''} />
         <input type="hidden" name={storedInput('email')} value={stored?.email ?? ''} />
         <input type="hidden" name={storedInput('phone')} value={stored?.phone ?? ''} />
+        {/* And which version it said it at. The diff above covers a field
+            nobody touched; this covers the one two organizers both edit, where
+            the API answers 409 rather than letting the later save win. */}
+        <input type="hidden" name={VERSION_INPUT} value={stored?.version ?? ''} />
       </div>
 
       {/* A refusal with no box to belong to — the merge prompt (AC3), a row

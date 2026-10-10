@@ -156,23 +156,12 @@ export interface NotificationRow {
 
 /* ── profile, organization and payments ───────────────────────────────── */
 
-/** `GET /me/profile` — the signed-in person's own record. */
-export interface ProfileWire {
-  id: string
-  name: string
-  email: string
-  /** An address awaiting confirmation; the old one is still in use. */
-  pendingEmail: string | null
-  emailVerified: boolean
-  phone: string | null
-  timezone: string | null
-  locale: 'en' | 'th' | null
-  avatarUrl: string | null
-  city: string | null
-  dateOfBirth: string | null
-  bio: string | null
-  displayCurrency: string | null
-}
+/**
+ * `ProfileWire` comes from `@/lib/api`: the attendee portal's Profile tab
+ * edits the same `/me/profile` row, and this file used to carry a second,
+ * independently hand-written copy of the shape.
+ */
+export type { ProfilePatch, ProfileWire } from '@/lib/api'
 
 export interface ProfileCard {
   name: string
