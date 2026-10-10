@@ -71,6 +71,40 @@ export interface FilterMeta {
  * The input stays responsive while the request is debounced, and the URL wins
  * whenever it changes underneath — the back button, or a cleared filter, must
  * be reflected in the box rather than being overwritten by what was typed.
+ *
+ * WHY THE TERM IS IN THE URL AT ALL, given "no PII in a URL or query string".
+ * Fourteen pages use this, and on the attendee, registration and check-in
+ * lists the term is somebody's name or email. The two rules in AGENTS.md
+ * genuinely pull against each other here, so the reasoning is written down
+ * rather than re-argued, and the answer is NOT to move the term into
+ * component state.
+ *
+ * It cannot live in component state. The API pages server-side and the route
+ * loader reads the query string; a term the loader cannot see means fetching
+ * from the component, which breaks server-side paging, the skeleton model and
+ * the back button at once. The URL is load-bearing, not a convenience.
+ *
+ * So the rule is honoured by closing what it actually protects against —
+ * the term reaching somewhere nobody chose to send it. Each path, and what
+ * closes it:
+ *
+ * - **The API's access log.** It logged `req.url` and `req.query` on every
+ *   request. Now masked unless the parameter is on an allowlist, and the
+ *   Referer's query is masked with it (eventa-api `logger.config.ts`).
+ * - **Third parties.** Two font hosts and the icon CDN are loaded from
+ *   `index.html`. The referrer policy is pinned there to
+ *   `strict-origin-when-cross-origin`, so they are sent the origin and
+ *   nothing else — pinned rather than left to a browser default.
+ * - **Analytics and error reporters.** There are none. Should one ever be
+ *   added, it captures `location.href` by default and this comment is the
+ *   reason to configure it not to.
+ * - **History.** `set({ q }, { replace: true })` at every call site, so a
+ *   search replaces rather than stacking one entry per keystroke.
+ *
+ * What is deliberately NOT treated as a leak: the organizer's own address bar
+ * and their own history. They typed the term, and it names a record they are
+ * authorised to read and are looking at on screen. The rule is about
+ * propagation, not about showing somebody their own query.
  */
 export function useSearchBox(value: string, commit: (next: string) => void) {
   const [term, setTerm] = useState(value)

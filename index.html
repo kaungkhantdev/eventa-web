@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- A list page keeps its search term in the URL, because the API pages
+         server-side and the route loader reads the query (see useSearchBox).
+         On the attendee, registration and check-in lists that term is a
+         person's name or email, so the full URL must not travel to anyone.
+
+         This is today's browser default, pinned rather than assumed: three
+         third-party origins are loaded below (two font hosts and the icon
+         CDN), and a boundary that holds only because of a default is not a
+         boundary. Cross-origin requests now carry the origin and nothing
+         else, whatever a browser's default becomes or already was. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+
     <title>Eventa · Event registration system</title>
 
     <!-- Theme bootstrap: runs before paint so a dark reload never flashes light -->
