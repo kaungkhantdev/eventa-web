@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { toAttendeeRow } from './directory.mapper'
-import { emailsOf } from './directory.routes'
 import type { AttendeeWire } from './directory.types'
 
 const wire = (over: Partial<AttendeeWire> = {}): AttendeeWire => ({
@@ -88,26 +87,5 @@ describe('toAttendeeRow', () => {
   it('tints a tagged attendee, and leaves an untagged one plain', () => {
     expect(toAttendeeRow(wire({ tag: 'Speaker' })).tagClass).toBeTruthy()
     expect(toAttendeeRow(wire({ tag: null })).tag).toBeNull()
-  })
-})
-
-describe('emailsOf', () => {
-  it('takes addresses however they were pasted in', () => {
-    expect(emailsOf('a@x.co, b@x.co\nc@x.co; d@x.co')).toEqual([
-      'a@x.co',
-      'b@x.co',
-      'c@x.co',
-      'd@x.co',
-    ])
-  })
-
-  // Two invitations to the same event is how a workspace's mail gets marked
-  // as spam — and case is not a difference between two people.
-  it('sends each person one invitation', () => {
-    expect(emailsOf('a@x.co\nA@X.CO')).toEqual(['a@x.co'])
-  })
-
-  it('ignores anything that is not an address', () => {
-    expect(emailsOf('please invite: a@x.co and friends')).toEqual(['a@x.co'])
   })
 })

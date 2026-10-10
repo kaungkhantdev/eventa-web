@@ -18,7 +18,6 @@ import {
   Panel,
   PastEnd,
   PillTabs,
-  Textarea,
   type PillTabItem,
 } from '@/components/ui'
 import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
@@ -405,11 +404,23 @@ function AttendeeTableRow({ row, onView }: { row: AttendeeRow; onView: () => voi
 }
 
 /**
- * Inviting people to an event (US-CHK-07).
+ * Inviting somebody to an event (US-REG-06).
+ *
+ * ONE NAMED PERSON, which is what the story asks for: "Given I enter a
+ * recipient name, email and exactly one event". This was a textarea of
+ * addresses with no name field — a bulk invite that appears in no story and
+ * that no endpoint accepts. Two of the story's five criteria (the recipient
+ * name, and the inline error when it is missing) could not be met by a form
+ * with nowhere to type one, and the route it posted to was the event-wide
+ * broadcast, which refused every request.
  *
  * The event is required: an invitation is to something, and the API has no
  * notion of a workspace-wide one.
  */
+/** `SendInviteDto`: `@MaxLength(120)` on the name, 250 on the note. */
+const MAX_RECIPIENT_NAME = 120
+const MAX_INVITE_MESSAGE = 250
+
 function InvitePanel({
   open,
   onClose,
@@ -430,7 +441,7 @@ function InvitePanel({
 
   useEffect(() => {
     if (!sent || !open) return
-    toast.success('Invitations sent.')
+    toast.success('Invitation sent.')
     onClose()
   }, [sent, open, onClose])
 
@@ -438,7 +449,7 @@ function InvitePanel({
     <Panel
       open={open}
       onClose={onClose}
-      title="Invite attendees"
+      title="Invite someone to an event"
       footer={
         <>
           <Button variant="soft" className="flex-1" onClick={onClose} disabled={sending}>
@@ -451,7 +462,7 @@ function InvitePanel({
             form="invite-form"
             disabled={sending}
           >
-            {sending ? 'Sending…' : 'Send invitations'}
+            {sending ? 'Sending…' : 'Send invitation'}
           </Button>
         </>
       }
@@ -479,19 +490,38 @@ function InvitePanel({
           />
         </div>
         <div>
-          <Label htmlFor="invite-emails">Email addresses</Label>
-          <Textarea
-            id="invite-emails"
-            name="emails"
-            rows={4}
+          <Label htmlFor="invite-name">Recipient name</Label>
+          <Input
+            id="invite-name"
+            name="recipientName"
             required
-            placeholder="anong@example.com, somchai@example.com"
+            maxLength={MAX_RECIPIENT_NAME}
+            placeholder="Anong Pattana"
           />
-          <Hint>One per line or separated by commas. Duplicates are only sent once.</Hint>
+        </div>
+        <div>
+          <Label htmlFor="invite-email">Email address</Label>
+          <Input
+            id="invite-email"
+            name="recipientEmail"
+            type="email"
+            required
+            placeholder="anong@example.com"
+          />
         </div>
         <div>
           <Label htmlFor="invite-message">Message</Label>
-          <Input id="invite-message" name="message" type="text" placeholder="Optional note" />
+          <Input
+            id="invite-message"
+            name="message"
+            type="text"
+            maxLength={MAX_INVITE_MESSAGE}
+            placeholder="Optional note"
+          />
+          <Hint>
+            Appears at the top of the invitation. Sending the same person the
+            same invitation twice in a day does not send a second email.
+          </Hint>
         </div>
       </fetcher.Form>
     </Panel>

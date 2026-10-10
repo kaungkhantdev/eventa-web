@@ -9,8 +9,6 @@ import {
   HeaderUser,
   Hint,
   Icon,
-  Input,
-  Label,
   PageFooter,
   PageHeader,
 } from '@/components/ui'
@@ -203,11 +201,18 @@ function FileModal({
             </p>
           )}
 
-          <div className="mt-4">
-            <Label htmlFor="remitted">Amount remitted (฿)</Label>
-            <Input id="remitted" name="remitted" type="number" min={0} step={1} />
-            <Hint>Leave blank to record the VAT figure above.</Hint>
-          </div>
+          {/*
+           * No "amount remitted" box. US-FIN-12 is explicit that the remitted
+           * figure IS the period's VAT — "its remitted amount shows ฿210,896"
+           * for a period whose VAT is ฿210,896 — so it is derived, not typed,
+           * and `FileTaxPeriodDto` declares no such field. Sending it was
+           * refused outright and every filing answered 400, which reached the
+           * admin as a bare "Validation failed." The VAT being recorded is
+           * restated above instead, which is the whole of the decision.
+           */}
+          <Hint className="mt-3">
+            This records the VAT above as remitted and marks the period Filed.
+          </Hint>
 
           <div className="mt-4 flex gap-2">
             <Button variant="soft" className="flex-1" onClick={onClose}>

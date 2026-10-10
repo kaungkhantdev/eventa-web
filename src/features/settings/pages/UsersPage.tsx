@@ -222,7 +222,17 @@ function MemberTableRow({
               className="btn-icon"
               title="Send the invitation again"
               disabled={busy}
-              onClick={() => submit({ intent: 'resend', email: row.email })}
+              onClick={() =>
+                submit({
+                  intent: 'resend',
+                  // The same three fields the first invite sent: the API
+                  // recognises the address as already invited and re-sends
+                  // rather than creating a second member (US-SET-11).
+                  name: row.name,
+                  email: row.email,
+                  roleId: String(row.roleId),
+                })
+              }
             >
               <Icon name="hgi-mail-send-01" size={16} />
             </button>

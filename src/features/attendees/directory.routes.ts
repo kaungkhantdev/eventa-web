@@ -82,9 +82,23 @@ const attendeesApi = {
    */
   activity: (attendeeId: number) =>
     api.list<AuditEntryWire>('/audit', { query: activityQueryOf(attendeeId) }),
-  /** Invite people to an event by email (US-CHK-07). */
-  invite: (eventId: string, emails: string[], message: string | undefined) =>
-    api.post<void>(`/events/${eventId}/attendees/email`, { emails, message }),
+  /**
+   * Invite one named person to one event (US-REG-06).
+   *
+   * `POST /invitations` is the route built for this story — it writes the
+   * tracked `event_invitations` row the criteria describe and suppresses a
+   * repeat inside 24 hours. It used to post a LIST of addresses to
+   * `POST /events/:id/attendees/email`, which is the event-wide broadcast for
+   * US-EVT-14: that DTO declares no recipients at all and resolves its
+   * audience by COUNTING attendees, so every invitation sent from this
+   * directory was answered 400 and the panel never once worked.
+   */
+  invite: (body: {
+    eventId: string
+    recipientName: string
+    recipientEmail: string
+    message?: string
+  }) => api.post<void>('/invitations', body),
   /**
    * Correct a name, email or phone (US-REG-08) — `regManage`, not `regView`.
    *
@@ -192,20 +206,6 @@ function withPage(current: string, page: number): string {
   return url.pathname + url.search
 }
 
-/**
- * Addresses typed into the invite box, one per line or comma-separated.
- *
- * De-duplicated because sending the same person two invitations to the same
- * event is the kind of thing that gets a workspace's mail marked as spam.
- */
-export function emailsOf(raw: string): string[] {
-  const seen = new Set<string>()
-  for (const part of raw.split(/[\s,;]+/)) {
-    const email = part.trim().toLowerCase()
-    if (email.includes('@')) seen.add(email)
-  }
-  return [...seen]
-}
 
 /** What the edit panel asks for; anything else on this route is an invitation. */
 export const CONTACT_INTENT = 'contact'
@@ -217,12 +217,15 @@ async function runDirectoryAction({ request }: LoaderArgs): Promise<void> {
 }
 
 async function invite(form: FormData): Promise<void> {
-  const emails = emailsOf(String(form.get('emails') ?? ''))
-  await attendeesApi.invite(
-    String(form.get('eventId') ?? ''),
-    emails,
-    String(form.get('message') ?? '').trim() || undefined,
-  )
+  const message = String(form.get('message') ?? '').trim()
+  await attendeesApi.invite({
+    eventId: String(form.get('eventId') ?? ''),
+    recipientName: String(form.get('recipientName') ?? '').trim(),
+    recipientEmail: String(form.get('recipientEmail') ?? '').trim(),
+    // Absent rather than empty: `message?` is optional on the DTO and an
+    // empty note is not a note.
+    ...(message ? { message } : {}),
+  })
 }
 
 /**

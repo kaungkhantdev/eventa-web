@@ -58,8 +58,22 @@ const settingsApi = {
   removeMember: (id: number) => api.delete<void>(`/members/${id}`),
   suspend: (id: number) => api.post<void>(`/members/${id}/suspend`),
   reactivate: (id: number) => api.post<void>(`/members/${id}/reactivate`),
-  /** Send the invitation email again for somebody who has not accepted. */
-  resend: (email: string) => api.post<unknown>('/invitations', { email }),
+  /**
+   * Send the invitation again to somebody who has not accepted.
+   *
+   * The same route as the first invite, deliberately: US-SET-11 says a second
+   * invite to an already-invited address "is simply re-sent rather than
+   * duplicated", so the API decides which it is from the member's status —
+   * there is no separate resend endpoint and there does not need to be.
+   *
+   * It used to post `{email}` to `POST /invitations`, which is the EVENT
+   * invitation route for US-REG-06. That DTO wants an `eventId`, a
+   * `recipientName` and a `recipientEmail`, so the call failed on three
+   * missing required fields and one that should not exist: the button could
+   * never work.
+   */
+  resend: (body: { name: string; email: string; roleId: number }) =>
+    api.post<unknown>('/members', body),
 
   roles: () => api.get<RoleWire[]>('/roles'),
   permissions: () => api.get<PermissionWire[]>('/permissions'),
@@ -183,7 +197,11 @@ async function runUsersAction({ request }: LoaderArgs): Promise<void> {
     return
   }
   if (intent === 'resend') {
-    await settingsApi.resend(String(form.get('email') ?? ''))
+    await settingsApi.resend({
+      name: String(form.get('name') ?? ''),
+      email: String(form.get('email') ?? ''),
+      roleId: Number(form.get('roleId')),
+    })
     return
   }
   await settingsApi.removeMember(id)

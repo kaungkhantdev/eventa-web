@@ -177,8 +177,13 @@ export const invoicesRoute = {
 
 const taxesApi = {
   ledger: (year: number) => api.get<VatLedgerWire>('/tax-periods', { query: { year } }),
-  file: (year: number, month: number, remittedSatang: number | null) =>
-    api.post<void>(`/tax-periods/${year}/${month}/file`, { remittedSatang }),
+  /**
+   * Record the PP30 filing. No body: the remitted figure is the period's own
+   * VAT (US-FIN-12), and `FileTaxPeriodDto` declares only an optional
+   * `whtSatang` — which nothing in this app writes yet.
+   */
+  file: (year: number, month: number) =>
+    api.post<void>(`/tax-periods/${year}/${month}/file`, {}),
 }
 
 export interface TaxesData {
@@ -243,12 +248,7 @@ function bangkokYear(): number {
 
 async function runTaxesAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
-  const remitted = Number(form.get('remitted'))
-  await taxesApi.file(
-    Number(form.get('year')),
-    Number(form.get('month')),
-    Number.isFinite(remitted) && remitted > 0 ? Math.round(remitted * SATANG_PER_BAHT) : null,
-  )
+  await taxesApi.file(Number(form.get('year')), Number(form.get('month')))
 }
 
 export const taxesRoute = {
