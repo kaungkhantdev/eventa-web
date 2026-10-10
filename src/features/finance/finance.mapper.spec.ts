@@ -1,3 +1,4 @@
+import { withholdingSatangOf } from './finance.routes'
 import { describe, expect, it } from 'vitest'
 import { toBalances, toInvoiceRow, toPayoutRow, toTaxRow } from './finance.mapper'
 import type { InvoiceWire, PayoutWire, TaxPeriodWire } from './finance.types'
@@ -169,5 +170,43 @@ describe('toTaxRow', () => {
   it('marks a late filing', () => {
     expect(toTaxRow(period({ status: 'filed', late: true })).lateNote).toContain('late')
     expect(toTaxRow(period({ status: 'filed', late: false })).lateNote).toBeNull()
+  })
+})
+
+/**
+ * The one figure a PP30 filing carries.
+ *
+ * `FileTaxPeriodDto` declares `whtSatang` and nothing else — the remitted
+ * amount is the period's own VAT (US-FIN-12), derived rather than typed. The
+ * ledger has shown a Withholding headline since it was built (US-FIN-11:
+ * "the withholding headline sums those figures and is tracked separately
+ * from VAT payable"), but nothing ever wrote one, so it could only read zero.
+ */
+describe('withholdingSatangOf', () => {
+  it('converts baht to integer satang', () => {
+    expect(withholdingSatangOf('1250')).toBe(125_000)
+  })
+
+  it('rounds rather than truncating a fractional baht', () => {
+    expect(withholdingSatangOf('10.555')).toBe(1056)
+  })
+
+  /**
+   * Blank is "none withheld", which is an ABSENCE. Sending 0 would record a
+   * filing that explicitly withheld nothing, and a headline summing those
+   * cannot tell that from never having been told.
+   */
+  it('reads an empty box as nothing to send', () => {
+    expect(withholdingSatangOf('')).toBeNull()
+    expect(withholdingSatangOf('   ')).toBeNull()
+  })
+
+  it('refuses a zero or a negative rather than sending it', () => {
+    expect(withholdingSatangOf('0')).toBeNull()
+    expect(withholdingSatangOf('-5')).toBeNull()
+  })
+
+  it('refuses anything that is not a number', () => {
+    expect(withholdingSatangOf('about ฿500')).toBeNull()
   })
 })
