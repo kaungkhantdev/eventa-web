@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { useFetcher, useLoaderData } from 'react-router'
+import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Badge,
   Button,
@@ -10,12 +10,14 @@ import {
   Label,
   Panel,
   PageFooter,
+  RecoveryCodes,
   Toggle,
 } from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
-import type { ActionResult } from '@/app/loaders'
+import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
+import type { Me } from '@/features/auth/types'
 import { SettingsHeader } from '../components/SettingsHeader'
 import { auditLook } from '../settings.presentation'
 import type { SecurityData } from '../settings.routes'
@@ -37,6 +39,9 @@ import type { AuditRow, SessionRow } from '../settings.types'
  */
 export default function SettingsSecurityPage() {
   const data = useLoaderData() as SecurityData
+  // Only to label the recovery-codes file: ten unlabelled strings in a
+  // downloads folder are unusable a year later.
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me
 
   return (
     <>
@@ -46,7 +51,11 @@ export default function SettingsSecurityPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <SecurityActionsCard twoFactor={data.twoFactor} audit={data.audit} />
+        <SecurityActionsCard
+          twoFactor={data.twoFactor}
+          audit={data.audit}
+          email={me?.email ?? ''}
+        />
         <SessionsCard sessions={data.sessions} />
       </div>
 
@@ -58,9 +67,12 @@ export default function SettingsSecurityPage() {
 function SecurityActionsCard({
   twoFactor,
   audit,
+  email,
 }: {
   twoFactor: SecurityData['twoFactor']
   audit: AuditRow[]
+  /** Passed through to the codes file; the card itself never shows it. */
+  email: string
 }) {
   const password = useDisclosure()
   const setup = useDisclosure()
@@ -110,7 +122,12 @@ function SecurityActionsCard({
       </Card>
 
       <ChangePasswordPanel open={password.open} onClose={password.onClose} />
-      <TwoFactorPanel open={setup.open} onClose={setup.onClose} twoFactor={twoFactor} />
+      <TwoFactorPanel
+        open={setup.open}
+        onClose={setup.onClose}
+        twoFactor={twoFactor}
+        email={email}
+      />
       <AuditLogPanel open={log.open} onClose={log.onClose} rows={audit} />
     </>
   )
@@ -284,18 +301,33 @@ function TwoFactorPanel({
   open,
   onClose,
   twoFactor,
+  email,
 }: {
   open: boolean
   onClose: () => void
   twoFactor: SecurityData['twoFactor']
+  /** Named in the codes file, which is unusable as ten bare strings. */
+  email: string
 }) {
-  const act = useFetcher<ActionResult & { secret?: string; otpauthUri?: string }>()
+  const act = useFetcher<
+    ActionResult & {
+      secret?: string
+      otpauthUri?: string
+      recoveryCodes?: string[]
+    }
+  >()
   const error = act.data?.ok === false ? act.data.error : null
   const secret = act.data && 'secret' in act.data ? act.data.secret : undefined
+  const codes =
+    act.data && 'recoveryCodes' in act.data ? act.data.recoveryCodes : undefined
   const enrolling = Boolean(secret) || twoFactor.pending
   useFailureToast(act.state === 'idle' ? error : null)
+  // Neither toast nor close while the codes are up. They are shown exactly
+  // once — the API keeps only their hashes — so closing the panel on success
+  // would destroy the only copy, and a toast would land on top of the one
+  // sentence that has to be read. The codes ARE the confirmation.
   useSavedToast(
-    act.state === 'idle' && act.data?.ok === true,
+    act.state === 'idle' && act.data?.ok === true && !codes,
     twoFactor.enabled ? 'Two-factor turned off.' : 'Two-factor is on.',
     onClose,
   )
@@ -310,7 +342,14 @@ function TwoFactorPanel({
           : 'Set up two-factor authentication'
       }
     >
-      {twoFactor.enabled ? (
+      {/* The codes come first, ahead of BOTH branches below. Confirming
+          enrolment flips `twoFactor.enabled` as soon as the loader
+          revalidates, so anything rendered inside the not-yet-enabled branch
+          is unmounted at the exact moment it has something to say — which is
+          how this panel managed to mint ten codes and show none of them. */}
+      {codes ? (
+        <RecoveryCodes codes={codes} email={email} />
+      ) : twoFactor.enabled ? (
         <act.Form method="post" className="space-y-4">
           <input type="hidden" name="intent" value="disable-2fa" />
           <p className="text-[12.5px] leading-relaxed text-muted">

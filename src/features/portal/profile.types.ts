@@ -50,7 +50,12 @@ export interface AttendeeProfileCard {
   pendingEmail: string | null
   /** How the tab labels the state of the address. */
   emailStatus: { tone: BadgeTone; label: string }
+  /** The CONFIRMED number — the one Eventa texts — or `''`. */
   phone: string
+  /** A number waiting for its code; the confirmed one still works. */
+  pendingPhone: string | null
+  /** False until a texted code has been typed back (US-DISC-11 AC3). */
+  phoneVerified: boolean
   city: string
   /** `YYYY-MM-DD` for `<input type="date">`, or `''` when not given. */
   dateOfBirth: string

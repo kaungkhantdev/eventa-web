@@ -1,5 +1,5 @@
 import type { BadgeTone } from '@/components/ui'
-import { bangkokDate, bangkokTime, initials } from '@/lib/format'
+import { MASKED, bangkokDate, bangkokTime, initials } from '@/lib/format'
 import type {
   AuditEntryWire,
   AuditRow,
@@ -198,7 +198,9 @@ export function toSessionRow(wire: LoginSessionWire): SessionRow {
   return {
     id: wire.id,
     device: describeDevice(wire.device),
-    ipAddress: wire.ipAddress,
+    // `—`, not an empty cell: the API records no address for some sessions
+    // (`inet()` is nullable), and a blank reads as a column that failed.
+    ipAddress: wire.ipAddress ?? MASKED,
     // Somebody checking whether a sign-in was theirs is reading their own
     // clock, which in this product is Bangkok's.
     signedIn: `${bangkokDate(wire.signedInAt)} · ${bangkokTime(wire.signedInAt)}`,

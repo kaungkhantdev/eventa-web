@@ -21,6 +21,13 @@ export const profileApi = {
   saveProfile: meProfileApi.saveProfile,
   changeEmail: meProfileApi.changeEmail,
 
+  // The number is confirmed by a texted code (US-DISC-11 AC3), which is why
+  // it is three calls and not a field on the details form: it left
+  // `UpdateProfileDto` when the code flow landed.
+  requestPhoneCode: meProfileApi.requestPhoneCode,
+  confirmPhoneCode: meProfileApi.confirmPhoneCode,
+  removePhone: meProfileApi.removePhone,
+
   /**
    * The photo, in the API's two steps: ask where to PUT, send the bytes
    * straight to storage, then confirm. The file never passes through this app

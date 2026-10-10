@@ -9,6 +9,15 @@ export { api, type Query, type ReadOptions } from './client'
 export { ApiError, NetworkError } from './ApiError'
 export { messageOf } from './messageOf'
 export {
+  meAccountApi,
+  type LoginSessionWire,
+  type NotificationPreferencePatch,
+  type NotificationPreferenceWire,
+  type RecoveryCodesWire,
+  type TwoFactorStartWire,
+  type TwoFactorWire,
+} from './meAccount'
+export {
   meProfileApi,
   type ProfilePatch,
   type ProfileWire,

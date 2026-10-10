@@ -38,6 +38,8 @@ export function toAttendeeProfileCard(profile: ProfileWire): AttendeeProfileCard
     pendingEmail: profile.pendingEmail,
     emailStatus: profile.emailVerified ? VERIFIED : PENDING,
     phone: text(profile.phone),
+    pendingPhone: profile.pendingPhone,
+    phoneVerified: profile.phoneVerified,
     city: text(profile.city),
     // Passed through as the `YYYY-MM-DD` the API stores, deliberately WITHOUT
     // going through `@/lib/format`'s Bangkok formatters. A date of birth is a
@@ -74,7 +76,10 @@ const cleared = (form: FormData, field: string): string | null => typed(form, fi
 export function toProfilePatch(form: FormData): ProfilePatch {
   return {
     name: typed(form, 'name'),
-    phone: cleared(form, 'phone'),
+    // NO `phone`. It left `UpdateProfileDto` when confirm-by-code landed, and
+    // `forbidNonWhitelisted` refuses the key outright — so sending it, even as
+    // `null`, failed the WHOLE save with 400 "property phone should not
+    // exist". The number now has its own request/confirm flow.
     city: cleared(form, 'city'),
     // Straight through as the `YYYY-MM-DD` the box held — never via `Date`,
     // for the reason given above.

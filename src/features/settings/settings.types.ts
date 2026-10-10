@@ -101,25 +101,26 @@ export interface PermissionRow {
 
 /* ── security ─────────────────────────────────────────────────────────── */
 
-export interface LoginSessionWire {
-  id: string
-  device: string
-  ipAddress: string
-  signedInAt: string
-  expiresAt: string
-  isCurrent: boolean
-}
+/**
+ * The account wires come from `@/lib/api`: the attendee portal reads the very
+ * same `/me/*` routes, and this file used to carry a second, independently
+ * hand-written copy of each — which had already drifted (`ipAddress` was
+ * `string` here and `string | null` there; the API says nullable).
+ */
+import type { NotificationPreferenceWire as SharedNotificationWire } from '@/lib/api'
 
-export interface TwoFactorWire {
-  enabled: boolean
-  /** Started but not confirmed — the QR was shown and nothing came back. */
-  pending: boolean
-  recoveryCodesRemaining: number
-}
+export type {
+  LoginSessionWire,
+  NotificationPreferencePatch,
+  RecoveryCodesWire,
+  TwoFactorStartWire,
+  TwoFactorWire,
+} from '@/lib/api'
 
 export interface SessionRow {
   id: string
   device: string
+  /** `—` where the API recorded none; a blank cell reads as a bug. */
   ipAddress: string
   /** `Aug 14, 2026 · 16:37`, Bangkok. */
   signedIn: string
@@ -137,13 +138,8 @@ export type NotificationCategory =
   | 'alert'
   | 'task'
 
-export interface NotificationPrefWire {
-  category: NotificationCategory
-  emailEnabled: boolean
-  smsEnabled: boolean
-  /** False where the product cannot send an SMS for this category at all. */
-  smsAvailable: boolean
-}
+/** This console's own category set over the shared wire shape. */
+export type NotificationPrefWire = SharedNotificationWire<NotificationCategory>
 
 export interface NotificationRow {
   category: NotificationCategory

@@ -1,8 +1,7 @@
-import { api } from '@/lib/api'
+import { meAccountApi } from '@/lib/api'
 import type {
   AttendeeNotificationCategory,
   NotificationPreferencePatch,
-  NotificationPreferenceWire,
 } from './accountSettings.types'
 
 /**
@@ -14,7 +13,7 @@ import type {
  */
 export const accountSettingsApi = {
   /** Every topic this persona may set, with the API's defaults filled in. */
-  notifications: () => api.get<NotificationPreferenceWire[]>('/me/notification-preferences'),
+  notifications: () => meAccountApi.notifications<AttendeeNotificationCategory>(),
 
   /**
    * One topic at a time, which is how the API takes it: a partial patch per
@@ -25,5 +24,5 @@ export const accountSettingsApi = {
   setNotification: (
     category: AttendeeNotificationCategory,
     body: NotificationPreferencePatch,
-  ) => api.patch<unknown>(`/me/notification-preferences/${category}`, body),
+  ) => meAccountApi.setNotification(category, body),
 }

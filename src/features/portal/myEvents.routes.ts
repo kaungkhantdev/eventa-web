@@ -73,6 +73,14 @@ export function historyQueryOf(params: URLSearchParams) {
  */
 export const EMAIL_CHANGE_INTENT = 'email'
 
+/**
+ * The number is proved by a texted code, so it takes three submissions where
+ * the rest of the details form takes one (US-DISC-11 AC3).
+ */
+export const PHONE_REQUEST_INTENT = 'phone'
+export const PHONE_CONFIRM_INTENT = 'phone-code'
+export const PHONE_REMOVE_INTENT = 'phone-remove'
+
 /** One notification switch (US-DISC-12, criterion 1). */
 export const NOTIFICATION_INTENT = 'notification'
 
@@ -107,6 +115,15 @@ export const TWO_FACTOR_DISABLE_INTENT = 'disable-two-factor'
  */
 const SUBMISSIONS: Record<string, (form: FormData) => Promise<unknown>> = {
   [EMAIL_CHANGE_INTENT]: (form) => profileApi.changeEmail(String(form.get('email') ?? '').trim()),
+
+  /** Holds the number and texts a code to it; the old one keeps working. */
+  [PHONE_REQUEST_INTENT]: (form) =>
+    profileApi.requestPhoneCode(String(form.get('phone') ?? '').trim()),
+
+  [PHONE_CONFIRM_INTENT]: (form) =>
+    profileApi.confirmPhoneCode(String(form.get('code') ?? '').trim()),
+
+  [PHONE_REMOVE_INTENT]: () => profileApi.removePhone(),
 
   [NOTIFICATION_INTENT]: (form) => {
     const patch = toNotificationPatch(form)

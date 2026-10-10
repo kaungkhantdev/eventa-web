@@ -1,11 +1,7 @@
-import { api } from '@/lib/api'
+import { api, meAccountApi } from '@/lib/api'
 import type {
   DeleteAccountBody,
   DeletionWarningWire,
-  LoginSessionWire,
-  RecoveryCodesWire,
-  TwoFactorStartWire,
-  TwoFactorWire,
 } from './security.types'
 
 /**
@@ -28,16 +24,16 @@ export const securityApi = {
     api.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),
 
   /** Only the count is used; the portal draws no device list. */
-  sessions: () => api.get<LoginSessionWire[]>('/me/sessions'),
+  sessions: meAccountApi.sessions,
 
   /**
    * Everything but this device. The current session is deliberately kept —
    * the API's own rule, so the page doing the asking survives it. The count it
    * answers with is not used: the loader re-reads the sessions either way.
    */
-  revokeOtherSessions: () => api.post<{ revoked: number }>('/me/sessions/revoke-others'),
+  revokeOtherSessions: meAccountApi.revokeOtherSessions,
 
-  twoFactor: () => api.get<TwoFactorWire>('/me/two-factor'),
+  twoFactor: meAccountApi.twoFactor,
 
   /**
    * Mint a seed and the `otpauth://` URI the QR encodes.
@@ -47,7 +43,7 @@ export const securityApi = {
    * again while an enrolment is pending mints a fresh one, which is why an
    * abandoned setup is simply restarted rather than resumed.
    */
-  startTwoFactor: () => api.post<TwoFactorStartWire>('/me/two-factor/start'),
+  startTwoFactor: meAccountApi.startTwoFactor,
 
   /**
    * Prove the authenticator, and receive the recovery codes (criterion 5).
@@ -55,11 +51,10 @@ export const securityApi = {
    * The codes come back exactly once — the API stores only their hashes — so
    * this answer is the single moment they can be given to the reader.
    */
-  confirmTwoFactor: (code: string) =>
-    api.post<RecoveryCodesWire>('/me/two-factor/confirm', { code }),
+  confirmTwoFactor: meAccountApi.confirmTwoFactor,
 
   /** One call, but it still wants a current code before it will turn off. */
-  disableTwoFactor: (code: string) => api.post<void>('/me/two-factor/disable', { code }),
+  disableTwoFactor: meAccountApi.disableTwoFactor,
 
   /** The preflight: what deleting right now walks away from (US-DISC-14). */
   deletionWarning: () => api.get<DeletionWarningWire>('/me/account/deletion'),

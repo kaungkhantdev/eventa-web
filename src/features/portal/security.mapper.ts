@@ -157,23 +157,3 @@ export function passwordsMismatch(form: FormData): boolean {
 }
 
 /* ----------------------------- recovery codes ---------------------------- */
-
-/**
- * The codes as a file somebody can actually keep (criterion 5).
- *
- * Shown once and never again, so "read them off the screen" is not a plan: the
- * modal offers this text to copy and to save. It names the account because a
- * file of ten unlabelled strings in a downloads folder is unusable a year
- * later, and it says what they are for — each code signs in once, in place of
- * the authenticator.
- */
-export function recoveryCodesText(codes: readonly string[], email: string): string {
-  return [
-    'Eventa recovery codes',
-    `Account: ${email}`,
-    'Each code signs you in once if you lose your authenticator. Keep them somewhere safe.',
-    '',
-    ...codes,
-    '',
-  ].join('\n')
-}

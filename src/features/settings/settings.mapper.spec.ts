@@ -1,3 +1,4 @@
+import { MASKED } from '@/lib/format'
 import { describe, expect, it } from 'vitest'
 import {
   grantedSeed,
@@ -271,6 +272,17 @@ const session = (over: Partial<LoginSessionWire> = {}): LoginSessionWire => ({
 })
 
 describe('toSessionRow', () => {
+  /**
+   * `SessionResponseDto.ipAddress` is `string | null` over a nullable `inet()`
+   * column, and this file's wire type said `string` — so a session with no
+   * recorded address was typed as though it always had one, and the cell
+   * rendered empty. The portal had the same wire right; keeping two
+   * hand-written copies of one endpoint is what let them disagree.
+   */
+  it('shows a dash where no address was recorded', () => {
+    expect(toSessionRow(session({ ipAddress: null })).ipAddress).toBe(MASKED)
+  })
+
   // 09:37 UTC is 16:37 in Bangkok — somebody checking whether that sign-in was
   // theirs is reading their own clock.
   it('dates the sign-in on the Bangkok clock', () => {

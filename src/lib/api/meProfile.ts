@@ -26,7 +26,12 @@ export interface ProfileWire {
   pendingEmail: string | null
   /** False while an email change is unconfirmed. */
   emailVerified: boolean
+  /** Only ever a CONFIRMED number — the one Eventa texts. */
   phone: string | null
+  /** False until a code texted to the number has been typed back. */
+  phoneVerified: boolean
+  /** A requested number waiting for its code; the old one still works. */
+  pendingPhone: string | null
   timezone: string | null
   locale: 'en' | 'th' | null
   avatarUrl: string | null
@@ -47,7 +52,12 @@ export interface ProfileWire {
  */
 export interface ProfilePatch {
   name?: string
-  phone?: string | null
+  /**
+   * NO `phone`. It left `UpdateProfileDto` when confirm-by-code landed
+   * (US-DISC-11 AC3) and `forbidNonWhitelisted` is on, so including the key —
+   * even as `null` — is answered 400 "property phone should not exist" and
+   * the WHOLE save is refused. Use the three phone calls below.
+   */
   timezone?: string | null
   locale?: 'en' | 'th' | null
   city?: string | null
@@ -73,4 +83,19 @@ export const meProfileApi = {
    * so this returns with the change merely requested, never applied.
    */
   changeEmail: (email: string) => api.post<ProfileWire>('/me/profile/email', { email }),
+
+  /**
+   * Ask to use a new number. The number is HELD (`pendingPhone`) and a code is
+   * texted to it; the number already on the account goes on working until the
+   * code comes back, which is why this answers 202 rather than 200.
+   */
+  requestPhoneCode: (phone: string) =>
+    api.post<ProfileWire>('/me/profile/phone', { phone }),
+
+  /** Type the code back: the held number becomes the one Eventa texts. */
+  confirmPhoneCode: (code: string) =>
+    api.post<ProfileWire>('/me/profile/phone/confirm', { code }),
+
+  /** Take the number off entirely, along with anything in flight. */
+  removePhone: () => api.delete<ProfileWire>('/me/profile/phone'),
 }

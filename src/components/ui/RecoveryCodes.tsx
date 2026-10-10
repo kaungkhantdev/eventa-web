@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Icon } from '@/components/ui'
-import { recoveryCodesText } from '../security.mapper'
+import { recoveryCodesText } from '@/lib/recoveryCodes'
+import { Icon } from './Icon'
 
 /**
  * The recovery codes, shown exactly once (US-DISC-12, criterion 5).

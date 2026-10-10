@@ -1,10 +1,10 @@
+import { recoveryCodesText } from '@/lib/recoveryCodes'
 import { describe, expect, it } from 'vitest'
 import {
   DELETE_CONFIRMATION,
   countOtherDevices,
   isDeleteConfirmed,
   passwordsMismatch,
-  recoveryCodesText,
   toDeleteBody,
   toDeletionWarning,
   toTwoFactorCard,

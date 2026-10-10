@@ -42,3 +42,4 @@ export {
   type DonutSegment,
   type SparklineProps,
 } from './charts'
+export { RecoveryCodes } from './RecoveryCodes'

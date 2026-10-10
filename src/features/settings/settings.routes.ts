@@ -1,5 +1,11 @@
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { api, meProfileApi, type Query } from '@/lib/api'
+import {
+  api,
+  meAccountApi,
+  meProfileApi,
+  type NotificationPreferencePatch,
+  type Query,
+} from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import type { IssuedUpload } from '@/lib/signedUpload'
 import { intParam } from '@/lib/urlFilters'
@@ -19,11 +25,9 @@ import {
 import type {
   AuditEntryWire,
   AuditRow,
-  LoginSessionWire,
   MemberRow,
   MemberWire,
   NotificationCategory,
-  NotificationPrefWire,
   NotificationRow,
   PermissionOption,
   PermissionWire,
@@ -64,18 +68,18 @@ const settingsApi = {
   setPermissions: (id: number, permissions: string[]) =>
     api.put<RoleWire>(`/roles/${id}/permissions`, { permissions }),
 
-  sessions: () => api.get<LoginSessionWire[]>('/me/sessions'),
-  revokeSession: (id: string) => api.delete<void>(`/me/sessions/${id}`),
-  revokeOthers: () => api.post<void>('/me/sessions/revoke-others'),
-  twoFactor: () => api.get<TwoFactorWire>('/me/two-factor'),
-  // `otpauthUri`, matching `TwoFactorStartDto`. It was declared `otpauthUrl`
-  // here, so the field read `undefined` and the QR had nothing to encode even
-  // once the action stopped discarding the payload — the same re-typed-wire
-  // drift `@/lib/wireEnums` exists to stop.
-  startTwoFactor: () =>
-    api.post<{ secret: string; otpauthUri: string }>('/me/two-factor/start'),
-  confirmTwoFactor: (code: string) => api.post<unknown>('/me/two-factor/confirm', { code }),
-  disableTwoFactor: (code: string) => api.post<void>('/me/two-factor/disable', { code }),
+  // The account routes are the attendee portal's too, so they live in
+  // `@/lib/api`. Re-typing them here is what declared `otpauthUrl` for
+  // `otpauthUri` (the QR encoded `undefined`), typed a nullable `ipAddress`
+  // as `string`, and threw away the recovery codes by typing the confirm
+  // response `unknown`.
+  sessions: meAccountApi.sessions,
+  revokeSession: meAccountApi.revokeSession,
+  revokeOthers: meAccountApi.revokeOtherSessions,
+  twoFactor: meAccountApi.twoFactor,
+  startTwoFactor: meAccountApi.startTwoFactor,
+  confirmTwoFactor: meAccountApi.confirmTwoFactor,
+  disableTwoFactor: meAccountApi.disableTwoFactor,
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<void>('/auth/change-password', { currentPassword, newPassword }),
 
@@ -86,11 +90,11 @@ const settingsApi = {
    */
   audit: () => api.list<AuditEntryWire>('/audit', { query: { limit: AUDIT_PAGE_SIZE } }),
 
-  notifications: () => api.get<NotificationPrefWire[]>('/me/notification-preferences'),
+  notifications: () => meAccountApi.notifications<NotificationCategory>(),
   setNotification: (
     category: NotificationCategory,
-    body: { emailEnabled?: boolean; smsEnabled?: boolean },
-  ) => api.patch<unknown>(`/me/notification-preferences/${category}`, body),
+    body: NotificationPreferencePatch,
+  ) => meAccountApi.setNotification(category, body),
 }
 
 /* ── users ────────────────────────────────────────────────────────────── */
@@ -294,8 +298,13 @@ async function runSecurityAction({ request }: LoaderArgs): Promise<unknown> {
   }
   if (intent === 'start-2fa') return settingsApi.startTwoFactor()
   if (intent === 'confirm-2fa') {
-    await settingsApi.confirmTwoFactor(String(form.get('code') ?? ''))
-    return null
+    // Returned, not awaited and dropped. The API mints the recovery codes
+    // here and stores only their hashes, so this response is the single
+    // moment they exist anywhere the organizer can see them. Discarding it
+    // left this console counting codes ("3 recovery codes left") that it had
+    // never once shown — and an organizer who loses their authenticator with
+    // no codes is locked out of their own workspace.
+    return settingsApi.confirmTwoFactor(String(form.get('code') ?? ''))
   }
   if (intent === 'disable-2fa') {
     await settingsApi.disableTwoFactor(String(form.get('code') ?? ''))
@@ -364,7 +373,9 @@ export const profileRoute = {
     }
     return accountApi.saveProfile({
       name: field(form, 'name'),
-      phone: nullable(form, 'phone'),
+      // NO `phone` — see `ProfilePatch`. The key is refused outright, so
+      // including it failed every save on this form with a 400 about a field
+      // the organizer cannot see.
       city: nullable(form, 'city'),
       timezone: nullable(form, 'timezone'),
       locale: field(form, 'locale') === 'th' ? 'th' : 'en',

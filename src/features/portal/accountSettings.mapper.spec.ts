@@ -32,6 +32,8 @@ const profile = (over: Partial<ProfileWire> = {}): ProfileWire => ({
   pendingEmail: null,
   emailVerified: true,
   phone: '+66812345678',
+  phoneVerified: false,
+  pendingPhone: null,
   timezone: 'Asia/Bangkok',
   locale: 'en',
   avatarUrl: null,

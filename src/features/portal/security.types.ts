@@ -14,37 +14,18 @@ import type { Panel } from '@/app/panels'
 
 /* ------------------------------- two-factor ------------------------------ */
 
-/** `GET /me/two-factor` — the service's `TwoFactorStatus`. */
-export interface TwoFactorWire {
-  enabled: boolean
-  /** Started and never confirmed: a seed exists, no code ever proved it. */
-  pending: boolean
-  recoveryCodesRemaining: number
-}
+/**
+ * The account wires come from `@/lib/api`. The organizer console reads the
+ * very same `/me/*` routes from `settings`, and both files used to carry an
+ * independently hand-written copy of each — which had already drifted.
+ */
+export type {
+  LoginSessionWire,
+  RecoveryCodesWire,
+  TwoFactorStartWire,
+  TwoFactorWire,
+} from '@/lib/api'
 
-/** `POST /me/two-factor/start` — `TwoFactorStartDto`. */
-export interface TwoFactorStartWire {
-  /** `otpauth://…` — what the QR encodes, and the only place the seed is. */
-  otpauthUri: string
-  /** The same seed, for an app that cannot scan. */
-  secret: string
-}
-
-/** `POST /me/two-factor/confirm` — `RecoveryCodesDto`, shown exactly once. */
-export interface RecoveryCodesWire {
-  recoveryCodes: string[]
-}
-
-/** `GET /me/sessions` — `SessionResponseDto`. */
-export interface LoginSessionWire {
-  id: string
-  device: string
-  ipAddress: string | null
-  signedInAt: string
-  expiresAt: string
-  /** The device making this request. */
-  isCurrent: boolean
-}
 
 /* ----------------------------- the danger zone --------------------------- */
 

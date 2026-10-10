@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { useFetcher, useRevalidator } from 'react-router'
-import { Hint, Icon, Panel } from '@/components/ui'
+import { Hint, Icon, Panel, RecoveryCodes} from '@/components/ui'
 import { messageOf } from '@/lib/api'
 import { useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
@@ -9,7 +9,6 @@ import { TWO_FACTOR_DISABLE_INTENT } from '../myEvents.routes'
 import { securityApi } from '../security.api'
 import type { TwoFactorCard, TwoFactorStartWire } from '../security.types'
 import { CodeField } from './CodeField'
-import { RecoveryCodes } from './RecoveryCodes'
 
 /**
  * Two-factor, in one panel for both directions (US-DISC-12, criterion 5).

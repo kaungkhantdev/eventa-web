@@ -5,7 +5,11 @@ import { messageOf } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
-import { EMAIL_CHANGE_INTENT } from '../myEvents.routes'
+import { EMAIL_CHANGE_INTENT,
+  PHONE_CONFIRM_INTENT,
+  PHONE_REMOVE_INTENT,
+  PHONE_REQUEST_INTENT,
+} from '../myEvents.routes'
 import { profileApi } from '../profile.api'
 import { PHOTO_ACCEPT_ATTRIBUTE, checkProfilePhoto } from '../profile.photo'
 import type { AttendeeProfileCard } from '../profile.types'
@@ -35,6 +39,16 @@ import type { AttendeeProfileCard } from '../profile.types'
  * quotable in a `form=` attribute.
  */
 const EMAIL_FORM_ID = 'portal-profile-email'
+
+/**
+ * The phone's three submissions, each its own form — and like the email's,
+ * all OUTSIDE the details form, because forms cannot nest: a nested one is
+ * dropped by the browser and its button silently submits the outer form
+ * instead.
+ */
+const PHONE_REQUEST_FORM_ID = 'portal-profile-phone'
+const PHONE_CONFIRM_FORM_ID = 'portal-profile-phone-code'
+const PHONE_REMOVE_FORM_ID = 'portal-profile-phone-remove'
 
 export function ProfileTab({ profile }: { profile: AttendeeProfileCard }) {
   return (
@@ -221,6 +235,11 @@ function DetailsCard({ profile }: { profile: AttendeeProfileCard }) {
   const id = useId()
   const save = useFetcher<ActionResult>()
   const email = useFetcher<ActionResult>()
+  const phone = {
+    request: useFetcher<ActionResult>(),
+    confirm: useFetcher<ActionResult>(),
+    remove: useFetcher<ActionResult>(),
+  }
   const [discards, discard] = useState(0)
 
   const error = save.data?.ok === false ? save.data.error : null
@@ -241,6 +260,16 @@ function DetailsCard({ profile }: { profile: AttendeeProfileCard }) {
         <input type="hidden" name="intent" value={EMAIL_CHANGE_INTENT} />
       </email.Form>
 
+      <phone.request.Form method="post" id={PHONE_REQUEST_FORM_ID}>
+        <input type="hidden" name="intent" value={PHONE_REQUEST_INTENT} />
+      </phone.request.Form>
+      <phone.confirm.Form method="post" id={PHONE_CONFIRM_FORM_ID}>
+        <input type="hidden" name="intent" value={PHONE_CONFIRM_INTENT} />
+      </phone.confirm.Form>
+      <phone.remove.Form method="post" id={PHONE_REMOVE_FORM_ID}>
+        <input type="hidden" name="intent" value={PHONE_REMOVE_INTENT} />
+      </phone.remove.Form>
+
       <save.Form method="post" key={`${loadedSignature(profile)}#${discards}`}>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Across the row: the kit's "Last name" is gone, because the API
@@ -260,31 +289,8 @@ function DetailsCard({ profile }: { profile: AttendeeProfileCard }) {
             />
           </div>
           <EmailField profile={profile} fieldId={`${id}-email`} fetcher={email} />
-          <div>
-            <label className="label" htmlFor={`${id}-phone`}>
-              Phone
-            </label>
-            <input
-              id={`${id}-phone`}
-              className="input"
-              type="tel"
-              name="phone"
-              autoComplete="tel"
-              defaultValue={profile.phone}
-            />
-            {/*
-             * Said plainly because the number goes live the moment it saves.
-             * US-DISC-11 asks for a confirm-by-code step before it is used for
-             * texts, and there is no endpoint for one — eventa-api has no
-             * phone-verification route, and `UpdateProfileDto` takes the string
-             * straight through. Until that exists, the honest thing is to tell
-             * the reader what actually happens rather than leave the one field
-             * with a missing step as the only one that explains nothing.
-             */}
-            <Hint className="mt-1">
-              Used for texts about your bookings as soon as you save it.
-            </Hint>
-          </div>
+          <PhoneField profile={profile} fieldId={`${id}-phone`} phone={phone} />
+
           <div>
             <label className="label" htmlFor={`${id}-city`}>
               City
@@ -431,6 +437,141 @@ function EmailField({
         <p role="alert" className="mt-2 text-[13px] text-red-500">
           {error}
         </p>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The number, which is proved by a texted code before Eventa will use it
+ * (US-DISC-11 AC3).
+ *
+ * Not part of the details form, and that is the API's shape rather than a
+ * layout choice: `phone` left `UpdateProfileDto` when the code flow landed,
+ * and `forbidNonWhitelisted` refuses the key outright — so while this was an
+ * ordinary input, every save of this form, even one that only touched the
+ * bio, was answered 400 about a field the reader could see no fault in.
+ *
+ * Three states, because there are three: nothing on file, a number waiting
+ * for its code, and a confirmed one. Each gets its own form with its own
+ * intent, so a half-typed code cannot ride along with anything else.
+ */
+function PhoneField({
+  profile,
+  fieldId,
+  phone,
+}: {
+  profile: AttendeeProfileCard
+  fieldId: string
+  /**
+   * Owned by the card above, because the form elements live outside this cell
+   * — forms cannot nest, and a nested one is dropped by the browser, so its
+   * button would submit the DETAILS form instead.
+   */
+  phone: {
+    request: ReturnType<typeof useFetcher<ActionResult>>
+    confirm: ReturnType<typeof useFetcher<ActionResult>>
+    remove: ReturnType<typeof useFetcher<ActionResult>>
+  }
+}) {
+  const { request, confirm, remove } = phone
+  const busy =
+    request.state !== 'idle' ||
+    confirm.state !== 'idle' ||
+    remove.state !== 'idle'
+
+  const failure =
+    (request.data?.ok === false ? request.data.error : null) ??
+    (confirm.data?.ok === false ? confirm.data.error : null) ??
+    (remove.data?.ok === false ? remove.data.error : null)
+  useFailureToast(!busy ? failure : null)
+  useSavedToast(
+    request.state === 'idle' && request.data?.ok === true,
+    'Code sent. Check your phone.',
+  )
+  useSavedToast(
+    confirm.state === 'idle' && confirm.data?.ok === true,
+    'Number confirmed.',
+  )
+
+  return (
+    <div>
+      <label className="label" htmlFor={fieldId}>
+        Phone
+      </label>
+
+      <div className="flex gap-2">
+        {/* Keyed on what is on file so the box resets once a code is on its
+            way, rather than leaving the reader looking at a number that is
+            not in use above a line saying a code was texted to it. */}
+        <input
+          key={profile.pendingPhone ?? profile.phone}
+          id={fieldId}
+          className="input flex-1"
+          type="tel"
+          name="phone"
+          form={PHONE_REQUEST_FORM_ID}
+          autoComplete="tel"
+          placeholder="081 234 5678"
+          defaultValue={profile.phone}
+        />
+        <button
+          type="submit"
+          form={PHONE_REQUEST_FORM_ID}
+          className="btn btn-soft btn-sm shrink-0"
+          disabled={busy}
+        >
+          Send code
+        </button>
+      </div>
+
+      <Hint className="mt-1">
+        Eventa texts a code to confirm it. Until you type the code back, the
+        number is not used for anything.
+      </Hint>
+
+      {profile.pendingPhone && (
+        <>
+          <div className="mt-2 flex gap-2">
+            <input
+              className="input flex-1"
+              name="code"
+              form={PHONE_CONFIRM_FORM_ID}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="6-digit code"
+              aria-label={`Code texted to ${profile.pendingPhone}`}
+              required
+            />
+            <button
+              type="submit"
+              form={PHONE_CONFIRM_FORM_ID}
+              className="btn btn-primary btn-sm shrink-0"
+              disabled={busy}
+            >
+              Confirm
+            </button>
+          </div>
+          <Hint className="mt-2">
+            Waiting for the code texted to{' '}
+            <span className="font-semibold text-ink">{profile.pendingPhone}</span>.
+          </Hint>
+        </>
+      )}
+
+      {profile.phone && profile.phoneVerified && (
+        <Hint className="mt-2">
+          <span className="font-semibold text-ink">{profile.phone}</span> is
+          confirmed.{' '}
+          <button
+            type="submit"
+            form={PHONE_REMOVE_FORM_ID}
+            className="underline"
+            disabled={busy}
+          >
+            Remove it
+          </button>
+        </Hint>
       )}
     </div>
   )

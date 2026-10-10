@@ -490,6 +490,8 @@ const SAVED: ProfileWire = {
   pendingEmail: null,
   emailVerified: true,
   phone: '+66 81 234 5678',
+  phoneVerified: false,
+  pendingPhone: null,
   timezone: 'Asia/Bangkok',
   locale: 'th',
   avatarUrl: null,

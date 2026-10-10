@@ -17,6 +17,8 @@ const wire = (over: Partial<ProfileWire> = {}): ProfileWire => ({
   pendingEmail: null,
   emailVerified: true,
   phone: '+66812345678',
+  phoneVerified: false,
+  pendingPhone: null,
   timezone: 'Asia/Bangkok',
   locale: 'en',
   avatarUrl: null,
@@ -143,8 +145,27 @@ const filled = {
 }
 
 describe('saving the details form', () => {
+  /**
+   * The number is NOT part of this save, and these tests used to insist it
+   * was. `phone` left `UpdateProfileDto` when confirm-by-code landed
+   * (US-DISC-11 AC3), and `forbidNonWhitelisted` refuses an unknown key
+   * outright — so every save from this form was answered 400 "property phone
+   * should not exist", including one that only touched the bio. The fixture
+   * agreed with the code and both were wrong about the API.
+   */
+  it('never carries the phone number, which the API refuses outright', () => {
+    const patch = toProfilePatch(submitted({ ...filled, phone: '081 234 5678' }))
+
+    expect('phone' in patch).toBe(false)
+  })
+
   it('sends what was typed, trimmed', () => {
-    expect(toProfilePatch(submitted({ ...filled, name: '  Araya Phanit  ' }))).toEqual(filled)
+    expect(toProfilePatch(submitted({ ...filled, name: '  Araya Phanit  ' }))).toEqual({
+      name: filled.name,
+      city: filled.city,
+      dateOfBirth: filled.dateOfBirth,
+      bio: filled.bio,
+    })
   })
 
   it('clears an emptied box rather than saving an empty string', () => {
@@ -153,7 +174,6 @@ describe('saving the details form', () => {
     const patch = toProfilePatch(submitted({ name: 'Araya Phanit' }))
     expect(patch).toEqual({
       name: 'Araya Phanit',
-      phone: null,
       city: null,
       dateOfBirth: null,
       bio: null,
@@ -169,7 +189,7 @@ describe('saving the details form', () => {
     // from this form, so they must be absent from the body. Sending them as
     // `null` would clear, from here, settings this tab never displayed.
     const keys = Object.keys(toProfilePatch(submitted(filled))).sort()
-    expect(keys).toEqual(['bio', 'city', 'dateOfBirth', 'name', 'phone'])
+    expect(keys).toEqual(['bio', 'city', 'dateOfBirth', 'name'])
   })
 
   it('never carries the email address', () => {
