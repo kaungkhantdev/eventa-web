@@ -34,6 +34,8 @@ export function toProfileCard(profile: ProfileWire): ProfileCard {
     // still works until then — so it is shown rather than quietly swapped.
     pendingEmail: profile.pendingEmail,
     phone: text(profile.phone),
+    pendingPhone: profile.pendingPhone,
+    phoneVerified: profile.phoneVerified,
     timezone: text(profile.timezone),
     locale: profile.locale ?? DEFAULT_LOCALE,
     city: text(profile.city),

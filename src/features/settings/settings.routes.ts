@@ -361,6 +361,11 @@ export interface ProfileData {
   profile: ProfileCard
 }
 
+/** The phone's three submissions on the console's profile form (US-SET-01). */
+export const PHONE_REQUEST_INTENT = 'phone'
+export const PHONE_CONFIRM_INTENT = 'phone-code'
+export const PHONE_REMOVE_INTENT = 'phone-remove'
+
 export const profileRoute = {
   loader: pageData(async (): Promise<ProfileData> => ({
     profile: toProfileCard(await accountApi.profile()),
@@ -368,9 +373,21 @@ export const profileRoute = {
 
   action: pageAction(async ({ request }: LoaderArgs) => {
     const form = await request.formData()
-    if (form.get('intent') === 'email') {
+    const intent = form.get('intent')
+    if (intent === 'email') {
       return accountApi.changeEmail(field(form, 'email'))
     }
+    // US-SET-01 asks that a member can edit their phone and have the change
+    // kept. The API proves it by code first, so the one box became three
+    // submissions — the same flow the attendee portal uses, over the same
+    // `/me/profile/phone` routes.
+    if (intent === PHONE_REQUEST_INTENT) {
+      return accountApi.requestPhoneCode(field(form, 'phone'))
+    }
+    if (intent === PHONE_CONFIRM_INTENT) {
+      return accountApi.confirmPhoneCode(field(form, 'code'))
+    }
+    if (intent === PHONE_REMOVE_INTENT) return accountApi.removePhone()
     return accountApi.saveProfile({
       name: field(form, 'name'),
       // NO `phone` — see `ProfilePatch`. The key is refused outright, so
@@ -491,6 +508,12 @@ export const accountApi = {
   saveProfile: meProfileApi.saveProfile,
   /** Confirms at the new address before it replaces the old one. */
   changeEmail: meProfileApi.changeEmail,
+
+  // The number is proved by a texted code (US-DISC-11 AC3), which is why it
+  // is three calls rather than a field on the details form.
+  requestPhoneCode: meProfileApi.requestPhoneCode,
+  confirmPhoneCode: meProfileApi.confirmPhoneCode,
+  removePhone: meProfileApi.removePhone,
 
   organization: () => api.get<OrganizationWire>('/organization'),
   /** Events hosted and team members. Its own call: `/organization` is the form. */

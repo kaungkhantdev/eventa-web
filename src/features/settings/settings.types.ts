@@ -167,7 +167,12 @@ export interface ProfileCard {
   emailVerified: boolean
   /** The address awaiting confirmation, or `null` when none is. */
   pendingEmail: string | null
+  /** The CONFIRMED number, or `''`. */
   phone: string
+  /** A number waiting for its code; the confirmed one still works. */
+  pendingPhone: string | null
+  /** False until a texted code has been typed back (US-DISC-11 AC3). */
+  phoneVerified: boolean
   timezone: string
   locale: 'en' | 'th'
   city: string
