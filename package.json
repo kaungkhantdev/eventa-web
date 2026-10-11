@@ -1,6 +1,7 @@
 {
   "name": "eventa-ui-kit-react",
   "private": true,
+  "packageManager": "pnpm@11.9.0",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
