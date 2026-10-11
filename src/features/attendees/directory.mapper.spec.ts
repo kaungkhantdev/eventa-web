@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { toAttendeeRow } from './directory.mapper'
-import { emailsOf } from './directory.routes'
 import type { AttendeeWire } from './directory.types'
 
 const wire = (over: Partial<AttendeeWire> = {}): AttendeeWire => ({
@@ -15,10 +14,25 @@ const wire = (over: Partial<AttendeeWire> = {}): AttendeeWire => ({
   eventCount: 3,
   ticketCount: 5,
   checkedInCount: 2,
+  version: 4,
   ...over,
 })
 
 describe('toAttendeeRow', () => {
+  /**
+   * The panel seeds its hidden twins from `contact`, so a version dropped here
+   * is a save with nothing to guard it — the organizer would overwrite a row
+   * somebody else had already corrected, and be told nothing.
+   */
+  it('carries the version into the details the panel edits', () => {
+    expect(toAttendeeRow(wire({ version: 9 })).contact).toEqual({
+      name: 'Anong Pattana',
+      email: 'anong.p@example.com',
+      phone: '02 555 0107',
+      version: 9,
+    })
+  })
+
   it('reads as a person, with their initials for the avatar', () => {
     const row = toAttendeeRow(wire())
 
@@ -47,29 +61,31 @@ describe('toAttendeeRow', () => {
     expect(toAttendeeRow(wire()).lastActivity).toBe('Jul 9, 2026')
   })
 
+  /**
+   * The dash belongs to the cell, not to the form behind it (US-REG-08).
+   *
+   * `phone` is already formatted for the table, so an edit panel seeded from it
+   * would put "—" in the box and PATCH that string as somebody's phone number.
+   * `contact` is what the row actually stores, untouched.
+   */
+  it('keeps the stored details apart from the formatted cells', () => {
+    expect(toAttendeeRow(wire()).contact).toEqual({
+      name: 'Anong Pattana',
+      email: 'anong.p@example.com',
+      phone: '02 555 0107',
+      version: 4,
+    })
+  })
+
+  it('leaves an unrecorded phone absent for the form, where the cell shows a dash', () => {
+    const row = toAttendeeRow(wire({ phone: null }))
+
+    expect(row.phone).toBe('—')
+    expect(row.contact.phone).toBeNull()
+  })
+
   it('tints a tagged attendee, and leaves an untagged one plain', () => {
     expect(toAttendeeRow(wire({ tag: 'Speaker' })).tagClass).toBeTruthy()
     expect(toAttendeeRow(wire({ tag: null })).tag).toBeNull()
-  })
-})
-
-describe('emailsOf', () => {
-  it('takes addresses however they were pasted in', () => {
-    expect(emailsOf('a@x.co, b@x.co\nc@x.co; d@x.co')).toEqual([
-      'a@x.co',
-      'b@x.co',
-      'c@x.co',
-      'd@x.co',
-    ])
-  })
-
-  // Two invitations to the same event is how a workspace's mail gets marked
-  // as spam — and case is not a difference between two people.
-  it('sends each person one invitation', () => {
-    expect(emailsOf('a@x.co\nA@X.CO')).toEqual(['a@x.co'])
-  })
-
-  it('ignores anything that is not an address', () => {
-    expect(emailsOf('please invite: a@x.co and friends')).toEqual(['a@x.co'])
   })
 })

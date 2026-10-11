@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { MASKED } from '@/lib/format'
-import { toMyEventRow, toPaymentTotals, toTransactionRow } from './myEvents.mapper'
+import {
+  toMyEventRow,
+  toPaymentTotals,
+  toTransactionRow,
+  type TransactionStatusWire,
+} from './myEvents.mapper'
 import type {
   MyRegistrationWire,
   PaymentSummaryWire,
@@ -31,7 +36,10 @@ const transaction = (over: Partial<TransactionWire> = {}): TransactionWire => ({
   reference: 'PAY-2026-0009',
   eventName: 'Tech Summit 2026',
   method: 'Card',
-  status: 'succeeded',
+  // `paid`, not Stripe's `succeeded`: the row carries this product's own
+  // `payment_status`, and a fixture using the processor's word let a status
+  // nobody checked stand in for the two the endpoint can actually send.
+  status: 'paid',
   amountSatang: 240_000,
   amountLabel: '฿2,400',
   paidAt: '2026-07-08T03:00:00.000Z',
@@ -106,6 +114,44 @@ describe('a payment in the attendee’s history', () => {
   it('marks a refund, so the table can show money coming back', () => {
     expect(toTransactionRow(transaction({ status: 'refunded' })).refunded).toBe(true)
     expect(toTransactionRow(transaction()).refunded).toBe(false)
+  })
+
+  /**
+   * The only two statuses this endpoint can send. `payment_status` holds four
+   * (`paid`, `pending`, `refunded`, `failed`), but the repository filters the
+   * history to the settled two (`attendee-payments.repository.ts` `SETTLED`)
+   * and `TransactionDto.status` republishes just those — `enum: ['paid',
+   * 'refunded']`.
+   *
+   * Literals rather than a list derived from `TransactionStatusWire`, because
+   * that union is the thing that drifts from the API — derived from it, this
+   * list would only ever test itself. `satisfies` ties the two together, so a
+   * status the endpoint starts sending cannot be listed here without the union
+   * being widened, and widening it turns the mapper's own map red in `tsc`.
+   */
+  const API_TRANSACTION_STATUSES = [
+    'paid',
+    'refunded',
+  ] as const satisfies readonly TransactionStatusWire[]
+
+  // The history is a binary on screen — struck through and badged "Refunded",
+  // or badged "Paid" — so every status the endpoint can send has to land on the
+  // right side of it, not merely fail to be a refund.
+  const CAME_BACK: Record<TransactionStatusWire, boolean> = { paid: false, refunded: true }
+
+  it.each(API_TRANSACTION_STATUSES)('places %s on the right side of the badge', (status) => {
+    expect(toTransactionRow(transaction({ status })).refunded).toBe(CAME_BACK[status])
+  })
+
+  // `partially_refunded` was invented here and has never been a `payment_status`
+  // value. A reversal is a row of its own in the `refunds` table, carrying the
+  // amount and a `refund_status` of its own, and the payment it reverses flips
+  // to plain `refunded` — so there is no partial status for this row to wear.
+  // It survived because the lookup it sat in was a `Set<string>`, which `tsc`
+  // cannot check; the typed map in the mapper is what stops the next one, and
+  // that pin lives in `tsc -b` rather than in this suite.
+  it('does not read the invented partially_refunded as money coming back', () => {
+    expect(toTransactionRow(transaction({ status: 'partially_refunded' })).refunded).toBe(false)
   })
 })
 

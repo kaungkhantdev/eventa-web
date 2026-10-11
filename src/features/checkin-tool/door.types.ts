@@ -29,7 +29,13 @@ export interface AttendanceCountsWire {
 
 /** `POST .../scan` and `POST ...` — what the door saw. */
 export interface ScanResultWire {
-  outcome: 'admitted' | 'already_in' | 'invalid' | 'wrong_event' | 'denied'
+  /**
+   * The API's `scan_outcome` enum, verbatim: it is a database enum and
+   * `openapi.json` publishes its values, so these names are the API's to
+   * choose and this union follows them exactly. Renaming one here is not a
+   * cosmetic choice — it silently unhooks the outcome from `OUTCOMES`.
+   */
+  outcome: 'admitted' | 'already_checked_in' | 'invalid' | 'wrong_event' | 'cancelled'
   ticketId: string | null
   holderName: string | null
   ticketLabel: string | null

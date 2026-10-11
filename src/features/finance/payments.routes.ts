@@ -39,8 +39,13 @@ interface LedgerQuery extends Query {
 
 const paymentsApi = {
   list: (query: LedgerQuery) => api.list<LedgerEntryWire>('/payments', { query }),
-  refund: (id: string, amountSatang: number | null, reason: string | undefined) =>
-    api.post<void>(`/payments/${id}/refund`, { amountSatang, reason }),
+  /**
+   * A FULL refund — the only kind this release (US-FIN-02). No amount and no
+   * reason: `RefundPaymentDto` declares neither, so sending them was answered
+   * 400 and the refund never happened. The key is what AC5 rests on.
+   */
+  refund: (id: string, idempotencyKey: string) =>
+    api.post<void>(`/payments/${id}/refund`, { idempotencyKey }),
 }
 
 export function tabOf(params: URLSearchParams): LedgerTab {
@@ -121,26 +126,14 @@ function withPage(current: string, page: number): string {
   return url.pathname + url.search
 }
 
-/**
- * Baht typed into the refund box → integer satang, or null for the full amount.
- *
- * An empty box means "all of it", which the API spells as a null amount. Sending
- * 0 would ask it to refund nothing and call that a success.
- */
-export function refundAmountOf(raw: string): number | null {
-  const baht = Number(raw)
-  if (!raw.trim() || !Number.isFinite(baht) || baht <= 0) return null
-  return Math.round(baht * SATANG_PER_BAHT)
-}
-
-const SATANG_PER_BAHT = 100
 
 async function runPaymentsAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
+  // The dialog carries the key; see US-FIN-02 AC5. Nothing else is sent —
+  // the amount is the payment's own and the DTO declares no reason.
   await paymentsApi.refund(
     String(form.get('paymentId') ?? ''),
-    refundAmountOf(String(form.get('amount') ?? '')),
-    String(form.get('reason') ?? '').trim() || undefined,
+    String(form.get('idempotencyKey') ?? ''),
   )
 }
 

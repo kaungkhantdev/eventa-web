@@ -1,7 +1,15 @@
 import { useRef, useState } from 'react'
+import { uploadLogo } from '../logoUpload'
 import { useRevalidator } from 'react-router'
 import { Button, Card, Icon } from '@/components/ui'
 import { messageOf } from '@/lib/api'
+import {
+  UPLOADABLE_IMAGE_TYPES,
+  UPLOAD_MAX_MIB,
+  acceptAttribute,
+  imageRefusal,
+  type ImageRefusal,
+} from '@/lib/imageUploads'
 import { toast } from '@/lib/toast'
 import { accountApi } from '../settings.routes'
 
@@ -13,13 +21,34 @@ import { accountApi } from '../settings.routes'
  * the API signs. It never passes through this app, which is why there is no
  * form post here and no multipart body anywhere: ask, PUT, confirm.
  *
- * The API is what actually decides whether the bytes are an image. The checks
- * here are a courtesy so somebody learns before uploading rather than after —
- * they are not the guard, and are not treated as one.
+ * The API is what actually decides whether the bytes are an image — it reads
+ * the leading bytes and signs the exact length into the URL. The check here is
+ * a courtesy so somebody learns before uploading rather than after, and it is
+ * not treated as the guard.
+ *
+ * What it allows comes from `@/lib/imageUploads`, mirrored once from the limit
+ * and allow-list eventa-api applies to every image upload. This card used to
+ * keep its own copy of the type list and no size check at all, so a 50 MB logo
+ * was accepted here and refused by storage minutes later.
+ *
+ * It offers the API's whole allow-list, WebP included, because the line under
+ * the button says so. The portal profile card and the event cover dropzone
+ * promise "JPG or PNG" and so offer the narrower list — a real difference in
+ * what each surface advertises, not a copy that fell behind.
  */
 
-/** Kept in step with the API's own allow-list. */
-const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp']
+const LOGO_ACCEPT = acceptAttribute(UPLOADABLE_IMAGE_TYPES)
+
+/**
+ * This card's own wording. A total lookup, so a reason added to the shared
+ * type must be worded here before this file compiles — no refusal can reach
+ * somebody as a blank message.
+ */
+const REFUSAL: Readonly<Record<ImageRefusal, string>> = {
+  'wrong-type': 'A logo has to be a JPEG, PNG or WebP image.',
+  empty: 'That file is empty.',
+  'too-large': `That logo is over ${UPLOAD_MAX_MIB}MB. Try a smaller one, or export it at 512×512.`,
+}
 
 export function LogoCard({
   logoUrl,
@@ -38,20 +67,24 @@ export function LogoCard({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /**
+   * A refused file replaces nothing: no request is made, so the logo on screen
+   * is still the one the workspace has, and only the message changes.
+   */
+  function take(chosen: File): void {
+    const refusal = imageRefusal(chosen, UPLOADABLE_IMAGE_TYPES)
+    if (refusal) {
+      setError(REFUSAL[refusal])
+      return
+    }
+    void upload(chosen)
+  }
+
   async function upload(chosen: File): Promise<void> {
     setBusy(true)
     setError(null)
     try {
-      const issued = await accountApi.logoUploadUrl(chosen.type, chosen.size)
-      const put = await fetch(issued.uploadUrl, {
-        method: 'PUT',
-        // Verbatim: they are covered by the signature, so changing or adding
-        // one makes the upload fail.
-        headers: issued.headers,
-        body: chosen,
-      })
-      if (!put.ok) throw new Error('The upload could not be sent to storage.')
-      await accountApi.confirmLogo(issued.key)
+      await uploadLogo(chosen)
       // The loader owns this page's data; re-read rather than keeping a copy.
       await revalidator.revalidate()
       toast.success('Logo updated.')
@@ -160,13 +193,13 @@ export function LogoCard({
       <input
         ref={file}
         type="file"
-        accept={ACCEPTED.join(',')}
+        accept={LOGO_ACCEPT}
         className="hidden"
         onChange={(e) => {
           const chosen = e.target.files?.[0]
           // Cleared first: picking the same file twice must fire again.
           e.target.value = ''
-          if (chosen) void upload(chosen)
+          if (chosen) take(chosen)
         }}
       />
     </Card>

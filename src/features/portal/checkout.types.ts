@@ -181,6 +181,22 @@ export interface CheckoutView {
   paymentRequired: boolean
 }
 
+/**
+ * What the buyer boxes start out holding (US-DISC-11, criterion 5).
+ *
+ * Defaults, not a mirror of the profile: somebody buying a ticket for a
+ * colleague types over them, and what they type is what is submitted. Every
+ * field is a string because each one binds to an input — `null` in a value
+ * renders the word "null" — and all three are empty for a guest, who has no
+ * saved profile and must see the page exactly as it is today.
+ */
+export interface BuyerDefaults {
+  name: string
+  email: string
+  /** `''` when the profile holds no phone: not given, not "null". */
+  phone: string
+}
+
 /** The order summary panel — every line a label the API wrote. */
 export interface SummaryLines {
   /** e.g. `2 × General admission`. */

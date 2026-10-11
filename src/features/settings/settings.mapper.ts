@@ -1,5 +1,5 @@
 import type { BadgeTone } from '@/components/ui'
-import { bangkokDate, bangkokTime, initials } from '@/lib/format'
+import { MASKED, bangkokDate, bangkokTime, initials } from '@/lib/format'
 import type {
   AuditEntryWire,
   AuditRow,
@@ -11,6 +11,7 @@ import type {
   NotificationPrefWire,
   NotificationRow,
   PermissionOption,
+  PermissionRow,
   PermissionWire,
   RoleCard,
   RoleWire,
@@ -55,6 +56,7 @@ export function toRoleCard(wire: RoleWire): RoleCard {
     name: wire.name,
     description: wire.description,
     permissions: wire.permissions,
+    neverOffered: wire.neverOfferedPermissions,
     members: memberCount(wire.memberCount),
     isSystem: wire.isSystem,
   }
@@ -84,6 +86,68 @@ export function toPermissionOption(wire: PermissionWire): PermissionOption {
 function humanise(key: string): string {
   const spaced = key.replace(/([A-Z])/g, ' $1').toLowerCase().trim()
   return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+/**
+ * The switches a freshly opened editor starts with, and the set a save submits.
+ *
+ * The role's own grants, and deliberately nothing derived from the catalog rows
+ * drawn beside them, so a key the catalog no longer lists stays in the set.
+ * That key has no switch on screen and so cannot be turned off; keeping it
+ * here is what stops `RolesPage`, which submits this set verbatim as the `PUT`
+ * payload, from withdrawing a grant nobody touched — the same reversal the
+ * backfill was removed for. The guarantee needs both halves: narrowing this
+ * seed, or submitting anything other than this set, reintroduces it.
+ *
+ * A never-offered key is absent because nothing here has answered it yet.
+ */
+export function grantedSeed(role: RoleCard | null): Set<string> {
+  return new Set(role?.permissions ?? [])
+}
+
+/**
+ * The editor's permission rows, with each key's state resolved.
+ *
+ * `role_permissions` carries three states and only two of them are grants: a
+ * row saying yes, a row saying no, and no row at all. The first two are
+ * decisions this workspace made; the third is a question nobody here has been
+ * asked, and it reaches the editor because the automatic backfill that used to
+ * answer it was withdrawn — every version of it silently reversed an
+ * organizer's "no". So this marks the gaps, and leaves a refusal unmarked.
+ *
+ * `options` decides membership and order — a key the catalog has dropped must
+ * not surface as a question nobody can answer. Whether that order matches the
+ * server's is settled upstream, where the catalog is fetched; this function
+ * preserves whatever it is handed rather than sorting it again.
+ */
+export function toPermissionRows(
+  options: readonly PermissionOption[],
+  role: RoleCard | null,
+  /** The keys the form has switched on right now — `grantedSeed` plus edits. */
+  pending: ReadonlySet<string>,
+): PermissionRow[] {
+  // A role being created has no decisions recorded at all, so every key in the
+  // catalog would qualify — a wall of markers saying nothing, in front of
+  // somebody who is deciding all of them right now.
+  const gaps = new Set(role?.neverOffered ?? [])
+  const granted = new Set(role?.permissions ?? [])
+
+  return options.map((option) => ({
+    key: option.key,
+    label: option.label,
+    // Two different answers close the question, and either one is enough.
+    //
+    // A recorded grant settles it on the server's side: the API reports the two
+    // lists disjoint, but a payload that contradicted itself must not leave a
+    // switch reading "on" and "never decided" at once — and switching that key
+    // off is then an answer too, not a reopened question.
+    //
+    // The pending set settles it on this screen's side: the organizer has
+    // answered the row, and a marker still saying nobody has would contradict
+    // the switch beside it until the page was reloaded.
+    neverOffered:
+      gaps.has(option.key) && !granted.has(option.key) && !pending.has(option.key),
+  }))
 }
 
 /**
@@ -134,7 +198,9 @@ export function toSessionRow(wire: LoginSessionWire): SessionRow {
   return {
     id: wire.id,
     device: describeDevice(wire.device),
-    ipAddress: wire.ipAddress,
+    // `—`, not an empty cell: the API records no address for some sessions
+    // (`inet()` is nullable), and a blank reads as a column that failed.
+    ipAddress: wire.ipAddress ?? MASKED,
     // Somebody checking whether a sign-in was theirs is reading their own
     // clock, which in this product is Bangkok's.
     signedIn: `${bangkokDate(wire.signedInAt)} · ${bangkokTime(wire.signedInAt)}`,

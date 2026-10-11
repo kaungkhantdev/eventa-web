@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useFetcher, useLoaderData } from 'react-router'
+import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Button,
   Card,
@@ -8,6 +8,7 @@ import {
   HeaderUser,
   Hint,
   Icon,
+  IconButton,
   Input,
   Label,
   NoResults,
@@ -17,17 +18,21 @@ import {
   Panel,
   PastEnd,
   PillTabs,
-  Textarea,
   type PillTabItem,
 } from '@/components/ui'
+import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
+import { can } from '@/features/auth/permissions'
+import type { Me } from '@/features/auth/types'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
-import type { ActionResult } from '@/app/loaders'
-import { TAGS, type DirectoryData } from '../directory.routes'
+import { AttendeeProfilePanel } from '../components/AttendeeProfilePanel'
+import { EditContactPanel } from '../components/EditContactPanel'
+import { PROFILE_PARAM, TAGS, type DirectoryData } from '../directory.routes'
 import type { AttendeeRow, AttendeeSegment, AttendeeSort } from '../directory.types'
+import { useOpenProfileId } from '../useOpenProfileId'
 
 /**
  * The attendee directory (US-CHK-06/07). Layout ported from attendees.html.
@@ -55,10 +60,73 @@ export default function AttendeesPage() {
   // No defaults are declared: the sort select writes its value even when it is
   // the default one, but sorting reorders rather than hides, so `useFilters`
   // does not count it as narrowing in the first place.
-  const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
+  //
+  // Which profile is open is page state, not a filter: it hides nothing, so an
+  // empty table with a panel over it is still a first run and not a search that
+  // matched nothing — and "Clear filters" must not close the panel either.
+  const { params, set, clear, emptyReason } = useFilters({
+    total: data.window.total,
+    ignore: [PROFILE_PARAM],
+  })
   const filtering = useIsFiltering()
   const invite = useDisclosure()
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
+  // Correcting contact details is `regManage`; the directory itself is only
+  // `regView`, which Staff hold so the door can look people up. This hides a
+  // control they cannot use — the API is what enforces it, and the panel still
+  // shows the 403 if it ever gets that far.
+  const canManage = can(me, 'regManage')
+  const edit = useDisclosure()
+  // The id rather than the row: a save revalidates this loader, and holding the
+  // row would leave the panel editing a copy of what the directory used to say.
+  // Looked up afresh on every render, so the details it submits as "what the
+  // row said" are the ones the table is showing now.
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const editing = data.rows.find((row) => row.id === editingId) ?? null
+
+  const openId = useOpenProfileId()
+  // Whose details the panel is drawing. While it slides shut the URL has
+  // already stopped naming anybody, so it falls back to the profile the loader
+  // last read — which keeps the closing panel readable instead of emptying
+  // under the animation, and is still router state rather than a copy of it.
+  const shownId = openId ?? data.activity?.attendeeId ?? null
+  // A `?profile=` naming somebody who is not on this page opens nothing: the
+  // panel's subject is the row's own contact details, and no second read exists
+  // to recover them.
+  const viewing = data.rows.find((row) => row.id === shownId) ?? null
+  // The history, once the loader has read *this* attendee's. Null while that is
+  // in flight — including on the click that opened the panel, which shows
+  // before its timeline could possibly have arrived.
+  const timeline = data.activity?.attendeeId === shownId ? data.activity.timeline : null
+
+  // The page number rides along in every patch. `nextParams` drops it for any
+  // other change, because page 4 of a new filter is not page 4 of the old one —
+  // but opening a panel narrows nothing, and losing page 4 would take the row
+  // the panel was opened from off the screen behind it.
+  const setProfile = (id: number | null) =>
+    set({ [PROFILE_PARAM]: id, page: params.get('page') })
+
+  /**
+   * The kit's Edit lives in the profile footer, and its buttons close the panel
+   * behind them — one route into the form rather than two.
+   *
+   * The profile is hidden by the condition on its `open` prop rather than by
+   * clearing `?profile=`. Clearing it NAVIGATES, and the navigation discarded
+   * the state set on the two lines above it, so Edit closed the profile and
+   * opened nothing — found by clicking it, which is the only way: it type-
+   * checks, and no unit test covers two panels and a loader between them.
+   *
+   * Keeping the parameter is better than a fix anyway: the form is a step
+   * inside the profile, so closing it returns to the person it was opened from
+   * instead of to a bare directory.
+   */
+  const onEditProfile = () => {
+    if (!viewing) return
+    setEditingId(viewing.id)
+    edit.onOpen()
+  }
 
   // Nothing has been registered yet: there is nothing to search, tab through or
   // page, so the controls go with the table and the page explains itself.
@@ -200,15 +268,20 @@ export default function AttendeesPage() {
                   <th>Tickets</th>
                   <th>Tags</th>
                   <th>Last activity</th>
+                  {/* The kit's own Actions column. Opening a profile is reading,
+                      so it is offered to everyone who may read the directory —
+                      the Edit button inside the panel is what needs the extra
+                      permission. */}
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="text-[13px]">
                 {data.rows.map((row) => (
-                  <AttendeeTableRow key={row.id} row={row} />
+                  <AttendeeTableRow key={row.id} row={row} onView={() => setProfile(row.id)} />
                 ))}
                 {data.rows.length === 0 && (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       {emptyReason === 'past-end' ? (
                         /* A bookmarked `?page=4` that no longer has anybody on
                            it. Back to the first page keeping the search: it is
@@ -240,6 +313,21 @@ export default function AttendeesPage() {
       <PageFooter />
 
       <InvitePanel open={invite.open} onClose={invite.onClose} events={data.events} />
+
+      <AttendeeProfilePanel
+        row={viewing}
+        timeline={timeline}
+        open={openId !== null && viewing !== null && !edit.open}
+        onClose={() => setProfile(null)}
+        onEdit={canManage ? onEditProfile : null}
+      />
+
+      {/* Rendered for anyone who may edit, not only once a row is chosen: the
+          element stays mounted so the kit's slide-in transition has something
+          to run on. Without a row it is never opened. */}
+      {canManage && (
+        <EditContactPanel row={editing} open={edit.open} onClose={edit.onClose} />
+      )}
     </>
   )
 }
@@ -273,7 +361,7 @@ function pills(data: DirectoryData): PillTabItem<AttendeeSegment>[] {
   ]
 }
 
-function AttendeeTableRow({ row }: { row: AttendeeRow }) {
+function AttendeeTableRow({ row, onView }: { row: AttendeeRow; onView: () => void }) {
   return (
     <tr>
       <td>
@@ -299,16 +387,40 @@ function AttendeeTableRow({ row }: { row: AttendeeRow }) {
         )}
       </td>
       <td className="tnum text-muted">{row.lastActivity}</td>
+      <td className="text-right">
+        {/* The kit's actions cell. Its "More" button is still left out rather
+            than wired to nothing; "View profile" now opens the panel it names,
+            and the Edit that used to sit here moved into that panel's footer,
+            where the kit puts it. */}
+        <div className="flex items-center justify-end gap-1">
+          <IconButton onClick={onView} title="View profile">
+            <Icon name="hgi-eye" size={16} />
+            <span className="sr-only">View {row.name}’s profile</span>
+          </IconButton>
+        </div>
+      </td>
     </tr>
   )
 }
 
 /**
- * Inviting people to an event (US-CHK-07).
+ * Inviting somebody to an event (US-REG-06).
+ *
+ * ONE NAMED PERSON, which is what the story asks for: "Given I enter a
+ * recipient name, email and exactly one event". This was a textarea of
+ * addresses with no name field — a bulk invite that appears in no story and
+ * that no endpoint accepts. Two of the story's five criteria (the recipient
+ * name, and the inline error when it is missing) could not be met by a form
+ * with nowhere to type one, and the route it posted to was the event-wide
+ * broadcast, which refused every request.
  *
  * The event is required: an invitation is to something, and the API has no
  * notion of a workspace-wide one.
  */
+/** `SendInviteDto`: `@MaxLength(120)` on the name, 250 on the note. */
+const MAX_RECIPIENT_NAME = 120
+const MAX_INVITE_MESSAGE = 250
+
 function InvitePanel({
   open,
   onClose,
@@ -329,7 +441,7 @@ function InvitePanel({
 
   useEffect(() => {
     if (!sent || !open) return
-    toast.success('Invitations sent.')
+    toast.success('Invitation sent.')
     onClose()
   }, [sent, open, onClose])
 
@@ -337,7 +449,7 @@ function InvitePanel({
     <Panel
       open={open}
       onClose={onClose}
-      title="Invite attendees"
+      title="Invite someone to an event"
       footer={
         <>
           <Button variant="soft" className="flex-1" onClick={onClose} disabled={sending}>
@@ -350,7 +462,7 @@ function InvitePanel({
             form="invite-form"
             disabled={sending}
           >
-            {sending ? 'Sending…' : 'Send invitations'}
+            {sending ? 'Sending…' : 'Send invitation'}
           </Button>
         </>
       }
@@ -378,19 +490,38 @@ function InvitePanel({
           />
         </div>
         <div>
-          <Label htmlFor="invite-emails">Email addresses</Label>
-          <Textarea
-            id="invite-emails"
-            name="emails"
-            rows={4}
+          <Label htmlFor="invite-name">Recipient name</Label>
+          <Input
+            id="invite-name"
+            name="recipientName"
             required
-            placeholder="anong@example.com, somchai@example.com"
+            maxLength={MAX_RECIPIENT_NAME}
+            placeholder="Anong Pattana"
           />
-          <Hint>One per line or separated by commas. Duplicates are only sent once.</Hint>
+        </div>
+        <div>
+          <Label htmlFor="invite-email">Email address</Label>
+          <Input
+            id="invite-email"
+            name="recipientEmail"
+            type="email"
+            required
+            placeholder="anong@example.com"
+          />
         </div>
         <div>
           <Label htmlFor="invite-message">Message</Label>
-          <Input id="invite-message" name="message" type="text" placeholder="Optional note" />
+          <Input
+            id="invite-message"
+            name="message"
+            type="text"
+            maxLength={MAX_INVITE_MESSAGE}
+            placeholder="Optional note"
+          />
+          <Hint>
+            Appears at the top of the invitation. Sending the same person the
+            same invitation twice in a day does not send a second email.
+          </Hint>
         </div>
       </fetcher.Form>
     </Panel>

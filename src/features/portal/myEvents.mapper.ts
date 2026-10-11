@@ -16,8 +16,32 @@ import type {
  * abroad needs to know when the event starts where it happens.
  */
 
-/** A payment whose status means money went back to them. */
-const REFUNDED = new Set(['refunded', 'partially_refunded'])
+/**
+ * Every status `GET /me/payments` can put on a row.
+ *
+ * `payment_status` holds four values, but this endpoint shows only settled
+ * money: the repository filters on `SETTLED` and `TransactionDto.status`
+ * republishes the narrowed pair as `enum: ['paid', 'refunded']`
+ * (`eventa-api/src/modules/attendee-payments`). `TransactionWire.status` is a
+ * plain `string`, so nothing on the wire narrows it for us — naming the two
+ * here is what makes the map below total.
+ */
+export type TransactionStatusWire = 'paid' | 'refunded'
+
+/**
+ * Did money go back to them?
+ *
+ * A total map rather than a set of the refund statuses, because the history is
+ * a binary on screen — a row is struck through and badged "Refunded", or it is
+ * badged "Paid" — so every status has to be placed, and a status nobody placed
+ * would quietly read as "Paid". `partially_refunded` sat in the old
+ * `Set<string>` for exactly that reason: a set of plain strings accepts a value
+ * the API cannot send, while a missing or invented key here is a `tsc` error.
+ */
+const MONEY_CAME_BACK: Record<TransactionStatusWire, boolean> = {
+  paid: false,
+  refunded: true,
+}
 
 export function toMyEventRow(wire: MyRegistrationWire): MyEventRow {
   return {
@@ -57,7 +81,9 @@ export function toTransactionRow(wire: TransactionWire): TransactionRow {
     amount: wire.amountLabel,
     // A payment that never completed has no date; today's would be a lie.
     date: bangkokDate(wire.paidAt),
-    refunded: REFUNDED.has(wire.status),
+    // The narrowing happens here, since the wire says only `string`: a status
+    // outside the published pair matches no key and is not claimed as a refund.
+    refunded: MONEY_CAME_BACK[wire.status as TransactionStatusWire] ?? false,
   }
 }
 

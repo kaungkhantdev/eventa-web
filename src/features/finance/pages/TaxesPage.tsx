@@ -203,10 +203,34 @@ function FileModal({
             </p>
           )}
 
+          {/*
+           * No "amount remitted" box. US-FIN-12 is explicit that the remitted
+           * figure IS the period's VAT — "its remitted amount shows ฿210,896"
+           * for a period whose VAT is ฿210,896 — so it is derived, not typed,
+           * and `FileTaxPeriodDto` declares no such field. Sending it was
+           * refused outright and every filing answered 400, which reached the
+           * admin as a bare "Validation failed." The VAT being recorded is
+           * restated above instead, which is the whole of the decision.
+           */}
+          <Hint className="mt-3">
+            This records the VAT above as remitted and marks the period Filed.
+          </Hint>
+
+          {/*
+           * Withholding is the one figure the filing actually carries —
+           * `FileTaxPeriodDto` declares `whtSatang` and nothing else. The
+           * ledger has shown a Withholding headline all along (US-FIN-11:
+           * "the withholding headline sums those figures and is tracked
+           * separately from VAT payable"), but nothing in this app ever wrote
+           * one, so it could only ever read zero.
+           */}
           <div className="mt-4">
-            <Label htmlFor="remitted">Amount remitted (฿)</Label>
-            <Input id="remitted" name="remitted" type="number" min={0} step={1} />
-            <Hint>Leave blank to record the VAT figure above.</Hint>
+            <Label htmlFor="wht">Withholding tax (฿)</Label>
+            <Input id="wht" name="wht" type="number" min={0} step={1} />
+            <Hint>
+              Thai PND withheld for this period, if any. Tracked separately
+              from VAT payable.
+            </Hint>
           </div>
 
           <div className="mt-4 flex gap-2">

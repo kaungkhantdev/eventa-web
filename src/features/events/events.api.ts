@@ -1,4 +1,5 @@
 import { api, type Query } from '@/lib/api'
+import type { IssuedUpload } from '@/lib/signedUpload'
 import type {
   CalendarWire,
   EventBucket,
@@ -93,18 +94,8 @@ export const eventsApi = {
    * form is saved.
    */
   coverUploadUrl: (contentType: string, byteSize: number) =>
-    api.post<CoverUploadWire>('/events/cover/upload-url', { contentType, byteSize }),
+    api.post<IssuedUpload>('/events/cover/upload-url', { contentType, byteSize }),
 
   confirmCover: (key: string) =>
     api.post<{ coverImage: string }>('/events/cover', { key }),
-}
-
-/** The capability the API hands the browser to PUT one file, once. */
-export interface CoverUploadWire {
-  key: string
-  uploadUrl: string
-  /** Sent verbatim — they are covered by the signature. */
-  headers: Record<string, string>
-  expiresInSeconds: number
-  maxBytes: number
 }

@@ -1,8 +1,11 @@
+import { MASKED } from '@/lib/format'
 import { describe, expect, it } from 'vitest'
 import {
+  grantedSeed,
   toMemberRow,
   toNotificationRow,
   toPermissionOption,
+  toPermissionRows,
   toRoleCard,
   describeDevice,
   toAuditRow,
@@ -12,6 +15,7 @@ import type {
   AuditEntryWire,
   LoginSessionWire,
   MemberWire,
+  PermissionOption,
   RoleWire,
 } from './settings.types'
 
@@ -52,6 +56,7 @@ const role = (over: Partial<RoleWire> = {}): RoleWire => ({
   name: 'Organizer',
   description: 'Runs events day to day',
   permissions: ['evCreate', 'regView'],
+  neverOfferedPermissions: [],
   memberCount: 3,
   isSystem: false,
   ...over,
@@ -67,6 +72,176 @@ describe('toRoleCard', () => {
   // and worth saying plainly.
   it('says so plainly when nobody holds it', () => {
     expect(toRoleCard(role({ memberCount: 0 })).members).toBe('No members yet')
+  })
+
+  // The card carries the gap through so the editor can ask about it. Dropping
+  // it here would leave the page unable to tell the third state from a refusal
+  // however carefully it rendered.
+  it('carries the keys nobody here has decided about', () => {
+    expect(toRoleCard(role({ neverOfferedPermissions: ['finManage'] })).neverOffered).toEqual([
+      'finManage',
+    ])
+  })
+})
+
+const option = (key: string, label = key): PermissionOption => ({ key, label, group: 'Events' })
+
+describe('grantedSeed', () => {
+  // The switches start from what the role holds, in that order. This case
+  // passes no catalog, so it says nothing about a key the catalog dropped —
+  // that is the last case in this block, which exercises both together.
+  it('starts from the grants the role holds', () => {
+    const card = toRoleCard(role({ permissions: ['evCreate', 'regView'] }))
+
+    expect([...grantedSeed(card)]).toEqual(['evCreate', 'regView'])
+  })
+
+  // A never-offered key is an unanswered question, so the switch opens off.
+  it('leaves a key nobody has answered switched off', () => {
+    const card = toRoleCard(role({ permissions: [], neverOfferedPermissions: ['finManage'] }))
+
+    expect(grantedSeed(card).has('finManage')).toBe(false)
+  })
+
+  it('starts a role being created with nothing switched on', () => {
+    expect(grantedSeed(null).size).toBe(0)
+  })
+
+  /*
+   * The reversal the withdrawn backfill used to cause, asserted rather than
+   * described. A key the catalog has dropped has no switch on screen, so
+   * nothing can turn it off — but it is still a grant this workspace made, and
+   * the `PUT` replaces the whole set. Were the seed narrowed to the catalog,
+   * opening a role and pressing save with no edit at all would withdraw it.
+   */
+  it('keeps a grant the catalog no longer lists, so saving cannot withdraw it', () => {
+    const card = toRoleCard(role({ permissions: ['evCreate', 'legacyExport'] }))
+    const catalog = [option('evCreate', 'Create events')]
+
+    const seed = grantedSeed(card)
+    const rows = toPermissionRows(catalog, card, seed)
+
+    expect(seed.has('legacyExport')).toBe(true)
+    // And it is not drawn as a row: a question nobody can answer.
+    expect(rows.map((r) => r.key)).toEqual(['evCreate'])
+  })
+})
+
+describe('toPermissionRows', () => {
+  /*
+   * The rule this whole change exists for. On disk, a key an organizer turned
+   * off and a key nobody here was ever asked about are both "not granted" — and
+   * reversing the first was why the automatic backfill was withdrawn. The
+   * editor has to draw them differently, so the derivation is the thing to pin
+   * down.
+   */
+  it('tells a key nobody was offered apart from one that was turned off', () => {
+    const card = toRoleCard(
+      role({ permissions: ['evCreate'], neverOfferedPermissions: ['finManage'] }),
+    )
+
+    const rows = toPermissionRows(
+      [option('evCreate'), option('finManage'), option('setUsers')],
+      card,
+      grantedSeed(card),
+    )
+
+    expect(rows.map((row) => [row.key, row.neverOffered])).toEqual([
+      ['evCreate', false],
+      ['finManage', true],
+      // In neither list: a refusal somebody recorded, and not an open question.
+      ['setUsers', false],
+    ])
+  })
+
+  it('carries the label the editor already humanised', () => {
+    const card = toRoleCard(role())
+
+    const rows = toPermissionRows([option('evCreate', 'Create events')], card, grantedSeed(card))
+
+    expect(rows).toEqual([{ key: 'evCreate', label: 'Create events', neverOffered: false }])
+  })
+
+  // A role being created has no recorded decisions at all, so every key in the
+  // catalog would qualify as a gap — a wall of markers that tells the person
+  // nothing, since they are deciding all of them right now.
+  it('marks nothing while a role is being created', () => {
+    const rows = toPermissionRows([option('evCreate'), option('finManage')], null, grantedSeed(null))
+
+    expect(rows.every((row) => !row.neverOffered)).toBe(true)
+  })
+
+  // The catalog decides membership and order, exactly as it does on the server:
+  // a key the catalog has dropped must not surface as a question nobody can
+  // answer, and the groups have to read the same way on every open.
+  it('shows the catalog, not the role’s lists', () => {
+    const card = toRoleCard(
+      role({ permissions: [], neverOfferedPermissions: ['finManage', 'evCreate'] }),
+    )
+
+    const rows = toPermissionRows([option('evCreate'), option('regView')], card, grantedSeed(card))
+
+    expect(rows.map((row) => row.key)).toEqual(['evCreate', 'regView'])
+  })
+
+  // The API reports the two lists disjoint. If a payload ever contradicted
+  // itself, a switch must not read "on" and "never decided" at the same time —
+  // a grant is a decision, so it wins.
+  it('treats a key reported as both granted and never-offered as granted', () => {
+    const card = toRoleCard(
+      role({ permissions: ['evCreate'], neverOfferedPermissions: ['evCreate'] }),
+    )
+
+    expect(toPermissionRows([option('evCreate')], card, grantedSeed(card))[0].neverOffered).toBe(
+      false,
+    )
+  })
+
+  // The marker describes the key's state, not the payload it arrived in: once
+  // the organizer switches it on there is an answer on screen waiting to be
+  // saved, and a row still reading "never decided" would contradict the switch
+  // beside it until the page was reloaded.
+  it('clears the marker once the switch is turned on in this session', () => {
+    const card = toRoleCard(role({ permissions: [], neverOfferedPermissions: ['finManage'] }))
+
+    const rows = toPermissionRows([option('finManage')], card, new Set(['finManage']))
+
+    expect(rows[0].neverOffered).toBe(false)
+  })
+
+  // Turning it back off restores the question, because it is one again: the
+  // save has not happened, so nothing is recorded either way yet.
+  //
+  // Driven through the ON position first, because the round trip is the claim.
+  // An "off" set on its own is `grantedSeed` again — the state the first case
+  // in this block already pins — so asserting only that would pass whatever
+  // this derivation did with `pending`, and say nothing about a toggle.
+  it('marks it again when the switch is turned back off', () => {
+    const card = toRoleCard(role({ permissions: [], neverOfferedPermissions: ['finManage'] }))
+    const switchedOn = new Set([...grantedSeed(card), 'finManage'])
+    const switchedBackOff = new Set([...switchedOn].filter((key) => key !== 'finManage'))
+
+    const whileOn = toPermissionRows([option('finManage')], card, switchedOn)
+    const afterOff = toPermissionRows([option('finManage')], card, switchedBackOff)
+
+    expect(whileOn[0].neverOffered).toBe(false)
+    expect(afterOff[0].neverOffered).toBe(true)
+  })
+
+  // Switching off a key the role holds is an answer, not a gap, so the stored
+  // grant has to be consulted and not just the switches: a derivation that
+  // asked `pending` alone would mark this row, because the switch is off. Only
+  // a payload that contradicted itself could reach this state, and when one
+  // does, "decided" is the reading that cannot leave a switch saying "on" and
+  // "never decided" at the same time.
+  it('answers from the stored grant, not from the switch alone', () => {
+    const card = toRoleCard(
+      role({ permissions: ['evCreate'], neverOfferedPermissions: ['evCreate'] }),
+    )
+
+    const rows = toPermissionRows([option('evCreate')], card, new Set<string>())
+
+    expect(rows[0].neverOffered).toBe(false)
   })
 })
 
@@ -97,6 +272,17 @@ const session = (over: Partial<LoginSessionWire> = {}): LoginSessionWire => ({
 })
 
 describe('toSessionRow', () => {
+  /**
+   * `SessionResponseDto.ipAddress` is `string | null` over a nullable `inet()`
+   * column, and this file's wire type said `string` — so a session with no
+   * recorded address was typed as though it always had one, and the cell
+   * rendered empty. The portal had the same wire right; keeping two
+   * hand-written copies of one endpoint is what let them disagree.
+   */
+  it('shows a dash where no address was recorded', () => {
+    expect(toSessionRow(session({ ipAddress: null })).ipAddress).toBe(MASKED)
+  })
+
   // 09:37 UTC is 16:37 in Bangkok — somebody checking whether that sign-in was
   // theirs is reading their own clock.
   it('dates the sign-in on the Bangkok clock', () => {

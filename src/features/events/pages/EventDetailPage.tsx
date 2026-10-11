@@ -30,6 +30,7 @@ import {
   type SpeakerCard,
   type TicketRow,
 } from '../eventDetail.mapper'
+import { paymentPill } from '../eventDetail.presentation'
 import {
   EVENT_TABS,
   REGISTRATION_FILTERS,
@@ -67,13 +68,6 @@ const FILTER_LABEL: Record<RegistrationFilter, string> = {
 
 /** Long enough to read, short enough to try again. */
 const COPIED_MS = 1500
-
-/** Payment status → pill classes, copied from the kit. */
-const PAYMENT_PILL: Record<string, string> = {
-  Paid: 'bg-brand-soft text-brand-dark dark:text-brand',
-  Pending: 'bg-amber-50 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300',
-  Refunded: 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300',
-}
 
 /** tone → avatar chip classes (light + dark). */
 const TONE: Record<AvatarTone, string> = {
@@ -773,7 +767,7 @@ function RegistrationsPanel({
                         <span
                           className={cn(
                             'rounded-full px-2.5 py-1 text-[11px] font-medium',
-                            PAYMENT_PILL[r.status] ?? 'bg-canvas text-muted',
+                            paymentPill(r.status),
                           )}
                         >
                           {r.status}

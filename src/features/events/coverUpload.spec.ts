@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_COVER_BYTES, rejectionOf } from './coverUpload'
+import { UPLOAD_MAX_BYTES } from '@/lib/imageUploads'
+import { rejectionOf } from './coverUpload'
 
 /**
  * A courtesy check, not the control. The API verifies the content type, reads
@@ -32,7 +33,7 @@ describe('rejectionOf', () => {
   })
 
   it('refuses one over the size ceiling, and says the ceiling', () => {
-    const refusal = rejectionOf(file({ size: MAX_COVER_BYTES + 1 }))
+    const refusal = rejectionOf(file({ size: UPLOAD_MAX_BYTES + 1 }))
     expect(refusal).toContain('5MB')
   })
 
@@ -40,7 +41,7 @@ describe('rejectionOf', () => {
     // The API signs `byteSize` into the URL and allows up to the max, so a file
     // of exactly that size uploads. Refusing it here would be stricter than the
     // rule it is meant to preview.
-    expect(rejectionOf(file({ size: MAX_COVER_BYTES }))).toBeNull()
+    expect(rejectionOf(file({ size: UPLOAD_MAX_BYTES }))).toBeNull()
   })
 
   /** An empty file is not a picture, and the API's `@Min(1)` refuses it too. */

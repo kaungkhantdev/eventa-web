@@ -1,7 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { MASKED } from '@/lib/format'
 import { toRegistrationRow } from './registrations.mapper'
-import type { RegistrationEntry } from './registrations.types'
+import { STATUS_BADGE } from './registrations.presentation'
+import type { RegistrationEntry, RegistrationWireStatus } from './registrations.types'
+
+/**
+ * Every value the API can put on the wire for `order_status`, copied verbatim
+ * from the `orderStatusEnum` pgEnum in `eventa-api/src/db/schema/enums.ts`,
+ * which `RegistrationEntryDto` republishes as
+ * `@ApiProperty({ enum: orderStatusEnum.enumValues })` and which the
+ * registrations service hands back unmapped (`status: row.status`).
+ *
+ * They are written out as literals rather than derived from this repo's own
+ * union, because that union is the thing that drifted: a list taken from it
+ * would only ever test itself, which is exactly how `expired` reached the admin
+ * queue as a thrown TypeError while both repos type-checked clean. The
+ * `satisfies` clause ties the two together in the other direction, so a future
+ * seventh API value cannot be added here without widening the union first.
+ */
+const API_ORDER_STATUSES = [
+  'confirmed',
+  'pending',
+  'waitlisted',
+  'cancelled',
+  'rejected',
+  'expired',
+] as const satisfies readonly RegistrationWireStatus[]
 
 const entry = (o: Partial<RegistrationEntry> = {}): RegistrationEntry => ({
   id: 'o-1',
@@ -101,8 +125,38 @@ describe('a registration row, as the queue shows it (US-REG-01)', () => {
       ['waitlisted', 'Waitlisted'],
       ['cancelled', 'Cancelled'],
       ['rejected', 'Rejected'],
+      ['expired', 'Expired'],
     ] as const)('renders %s as %s', (wire, shown) => {
       expect(toRegistrationRow(entry({ status: wire })).status).toBe(shown)
+    })
+
+    // `STATUS_LABEL` has no fallback, so a wire value missing from it does not
+    // degrade — it yields `undefined`, which the page then uses as a key into
+    // `STATUS_BADGE` and throws on. Asserting a non-empty string here catches
+    // that one step before the crash, for every value the API can send.
+    it.each(API_ORDER_STATUSES)('has a label of its own for %s', (status) => {
+      const shown = toRegistrationRow(entry({ status })).status
+      expect(shown).toBeTypeOf('string')
+      expect(shown).not.toBe('')
+    })
+
+    // Six statuses are six different facts for whoever reconciles the queue.
+    // Collapsing any two onto one word would lose the distinction the API's
+    // own enum comments insist on (a lapse is not a decision).
+    it('gives every API status a label no other status shares', () => {
+      const labels = API_ORDER_STATUSES.map((status) => toRegistrationRow(entry({ status })).status)
+      expect(new Set(labels).size).toBe(API_ORDER_STATUSES.length)
+    })
+
+    // The defect lived in the seam between the mapper and the badge map, where
+    // neither file was wrong on its own: the mapper returned `undefined` for a
+    // status it had no row for, and the page used that as a key. This walks the
+    // same two steps the page does, so the seam itself is covered rather than
+    // each half separately.
+    it.each(API_ORDER_STATUSES)('reaches a renderable badge for %s', (status) => {
+      const badge = STATUS_BADGE[toRegistrationRow(entry({ status })).status]
+      expect(badge).toBeDefined()
+      expect(badge.cls).not.toBe('')
     })
   })
 

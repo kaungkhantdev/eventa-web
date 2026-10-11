@@ -6,10 +6,21 @@ export type MeetingMode = 'Video' | 'In person' | 'Phone'
 
 export type MeetingBucket = 'today' | 'upcoming' | 'past'
 
-export type MeetingStatus = 'scheduled' | 'cancelled' | 'completed'
+/**
+ * The whole of the API's `meeting_status` pgEnum, which has exactly two values.
+ *
+ * There is deliberately no `completed`: whether a meeting has happened is
+ * derived from its date, never stored, so the API has no such status to send.
+ * Declaring one here would type-check clean in both repos while inviting a
+ * branch that can never run.
+ */
+export type MeetingStatus = 'scheduled' | 'cancelled'
 
-/** Whether the calendar invite has gone out yet (US-MTG-04). */
-export type SyncStatus = 'pending' | 'synced' | 'failed' | 'not_applicable'
+/**
+ * Whether the calendar invite has gone out yet (US-MTG-04) — the whole of the
+ * API's `meeting_sync_status` pgEnum, spelled exactly as the API spells it.
+ */
+export type SyncStatus = 'pending' | 'synced' | 'failed' | 'not_connected'
 
 export interface MeetingWire {
   id: string

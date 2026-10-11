@@ -22,6 +22,14 @@ export interface SurveyCard {
   /** Null until responses exist at all. Never 0. */
   responses: number | null
   questions: SurveyWire['questions']
+  /**
+   * The version this card was read at; the editor sends it back on save.
+   *
+   * Carried for the write rather than for display — authoring replaces the
+   * whole question set, so without it a save built on a stale read deletes the
+   * other editor's question instead of merely overwriting a title.
+   */
+  version: number
 }
 
 const STATUS: Record<SurveyStatus, { label: string; tone: BadgeTone }> = {
@@ -40,6 +48,9 @@ export function toSurveyCard(wire: SurveyWire): SurveyCard {
     collecting: wire.status === 'live',
     responses: null,
     questions: wire.questions,
+    // Carried for the save, not for display: without it on the view model
+    // there is nothing for the editor to send back and no lock to check.
+    version: wire.version,
   }
 }
 

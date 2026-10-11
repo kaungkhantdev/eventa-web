@@ -49,7 +49,10 @@ const SYNC_NOTE: Record<SyncStatus, string | null> = {
   pending: 'The calendar invite has not been sent yet.',
   failed: "The calendar invite couldn't be sent.",
   synced: null,
-  not_applicable: null,
+  // Nothing went wrong and nothing will, until a calendar is connected — which
+  // is the organizer's to do, so it is said rather than left as a blank the
+  // reader would take for "the invite went out".
+  not_connected: 'No calendar is connected, so no invite was sent.',
 }
 
 export function toMeetingCard(wire: MeetingWire): MeetingCard {
@@ -76,7 +79,12 @@ export function toMeetingCard(wire: MeetingWire): MeetingCard {
     // cancelled, and that the link is ready.
     canJoin: wire.canJoin,
     canEdit: wire.canEdit,
-    syncNote: SYNC_NOTE[wire.syncStatus],
+    // A lookup miss yields `undefined`, which is falsy and so renders as the
+    // same blank as "nothing to report" — a status whose copy was never
+    // written would look correct on screen. The card promises `string | null`,
+    // so an unrecognised status is normalised to a deliberate silence instead.
+    // Every value the API can send has a row above, so nothing real lands here.
+    syncNote: SYNC_NOTE[wire.syncStatus] ?? null,
     cancellationReason: wire.cancellationReason,
     edit: {
       id: wire.id,

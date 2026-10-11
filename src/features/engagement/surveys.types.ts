@@ -29,4 +29,13 @@ export interface SurveyWire {
   status: SurveyStatus
   questions: SurveyQuestionWire[]
   createdAt: string
+  /**
+   * The optimistic lock, sent back on save.
+   *
+   * Authoring replaces the whole question set, so a save built on a stale read
+   * did not overwrite a title — it deleted the other editor's question. The API
+   * refuses a save carrying a version somebody has moved past, with a 409 whose
+   * message says to reload.
+   */
+  version: number
 }

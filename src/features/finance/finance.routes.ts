@@ -177,8 +177,21 @@ export const invoicesRoute = {
 
 const taxesApi = {
   ledger: (year: number) => api.get<VatLedgerWire>('/tax-periods', { query: { year } }),
-  file: (year: number, month: number, remittedSatang: number | null) =>
-    api.post<void>(`/tax-periods/${year}/${month}/file`, { remittedSatang }),
+  /**
+   * Record the PP30 filing.
+   *
+   * The remitted figure is NOT sent: it is the period's own VAT (US-FIN-12),
+   * derived rather than typed. Withholding is the one thing the filing
+   * carries, and it is optional — `FileTaxPeriodDto` declares `whtSatang`
+   * and nothing else.
+   */
+  file: (year: number, month: number, whtSatang: number | null) =>
+    api.post<void>(
+      `/tax-periods/${year}/${month}/file`,
+      // Absent rather than null: the DTO is `@IsOptional() @IsInt()`, so a
+      // null would be read as a value and refused.
+      whtSatang === null ? {} : { whtSatang },
+    ),
 }
 
 export interface TaxesData {
@@ -241,13 +254,25 @@ function bangkokYear(): number {
   )
 }
 
+/**
+ * Baht typed into the withholding box → integer satang, or null for none.
+ *
+ * Blank means "none withheld", which is absence rather than a zero: sending
+ * 0 would record a filing that explicitly withheld nothing, and the ledger's
+ * headline cannot tell that from never having been told.
+ */
+export function withholdingSatangOf(raw: string): number | null {
+  const baht = Number(raw)
+  if (!raw.trim() || !Number.isFinite(baht) || baht <= 0) return null
+  return Math.round(baht * SATANG_PER_BAHT)
+}
+
 async function runTaxesAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
-  const remitted = Number(form.get('remitted'))
   await taxesApi.file(
     Number(form.get('year')),
     Number(form.get('month')),
-    Number.isFinite(remitted) && remitted > 0 ? Math.round(remitted * SATANG_PER_BAHT) : null,
+    withholdingSatangOf(String(form.get('wht') ?? '')),
   )
 }
 

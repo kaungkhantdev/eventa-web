@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Badge,
@@ -11,8 +11,6 @@ import {
   HeaderUser,
   Hint,
   Icon,
-  Input,
-  Label,
   NoResults,
   PageFooter,
   PageHeader,
@@ -309,6 +307,14 @@ function RefundModal({
   const fetcher = useFetcher<ActionResult>()
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const done = fetcher.state === 'idle' && fetcher.data?.ok === true
+  // One key per payment: re-opening the dialog for a DIFFERENT payment must
+  // not reuse the previous key and be deduped into it. The id is part of the
+  // key rather than only a dependency, so what it is scoped to is visible in
+  // the value itself — and in a log line, if one ever carries it.
+  const idempotencyKey = useMemo(
+    () => `${target?.id ?? 'none'}:${crypto.randomUUID()}`,
+    [target?.id],
+  )
 
   useEffect(() => {
     if (!done || !open) return
@@ -322,6 +328,13 @@ function RefundModal({
       <div className={cn('modal', open && 'open')} role="dialog" aria-modal="true">
         <fetcher.Form method="post" className="p-5">
           <input type="hidden" name="paymentId" value={target?.id ?? ''} />
+          {/*
+           * AC5: "the same refund submitted twice… only one refund is ever
+           * issued." The key is generated once per open dialog and reused by
+           * a double-click, which is what makes the API's dedupe work — and
+           * it is REQUIRED by the DTO, so the route 400'd without it.
+           */}
+          <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300">
             <Icon name="hgi-arrow-turn-backward" size={18} />
           </div>
@@ -336,15 +349,17 @@ function RefundModal({
             </p>
           )}
 
-          <div className="mt-4">
-            <Label htmlFor="refund-amount">Amount (฿)</Label>
-            <Input id="refund-amount" name="amount" type="number" min={0} step={1} />
-            <Hint>Leave blank to refund the full amount.</Hint>
-          </div>
-          <div className="mt-3">
-            <Label htmlFor="refund-reason">Reason</Label>
-            <Input id="refund-reason" name="reason" type="text" placeholder="Optional note" />
-          </div>
+          {/*
+           * No amount box and no reason box. US-FIN-02 is explicit — "Baseline
+           * is full refunds only; partial refunds are out of scope this
+           * release" — and `RefundPaymentDto` declares neither, so both keys
+           * were refused outright and EVERY refund answered 400. The figure is
+           * the payment's own, restated above, which is what AC1 asks for; the
+           * DTO's docstring gives the reason a typed one is refused: "a
+           * client-supplied number is a way to refund more than was ever
+           * charged."
+           */}
+          <Hint className="mt-3">This cannot be undone.</Hint>
 
           <div className="mt-4 flex gap-2">
             <Button variant="soft" className="flex-1" onClick={onClose}>

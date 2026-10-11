@@ -499,6 +499,18 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // Where a teammate's invitation link lands — the API builds it as
+        // `${PUBLIC_WEB_URL}/accept-invite?token=…`, so this path is fixed by
+        // that and sits beside `/reset-password` rather than under /auth. Not
+        // `guestOnly`: somebody already signed in on this device may be the
+        // one opening a colleague's invitation on their behalf.
+        path: '/accept-invite',
+        ...livePage(
+          () => import('@/features/auth/pages/AcceptInvitePage'),
+          () => import('@/features/auth/acceptInvite.routes').then((m) => m.acceptInviteRoute),
+        ),
+      },
+      {
         // Where every reset email's link lands — the API builds it as
         // `${PUBLIC_WEB_URL}/reset-password?token=…`, so this path is fixed by
         // that and is not under /auth. Serves both personas, and is not

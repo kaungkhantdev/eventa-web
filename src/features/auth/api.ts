@@ -49,6 +49,13 @@ interface RawLogin {
  * worked, so a page that navigates on success can rely on the next request
  * being authenticated.
  */
+/** `POST /auth/accept-invite` — `AcceptInviteResponseDto`. */
+export interface AcceptedInvite {
+  userId: string
+  email: string
+  status: string
+}
+
 export const authApi = {
   async login(credentials: Credentials): Promise<LoginResult> {
     // The persona travels inside `credentials`, built by `credentialsOf` — the
@@ -103,6 +110,20 @@ export const authApi = {
    * name `ResetPasswordDto` requires — the API's whitelist refuses any other.
    * Resolves with the API's confirmation, worded for the person reading it.
    */
+  /**
+   * Accept a teammate's invitation: set a password and activate (US-SET-11).
+   *
+   * `anonymous` because the person has no session yet — the token in the
+   * emailed link is the whole of their authority, and it is single-use.
+   */
+  acceptInvite(token: string, password: string): Promise<AcceptedInvite> {
+    return api.post<AcceptedInvite>(
+      '/auth/accept-invite',
+      { token, password },
+      { anonymous: true },
+    )
+  },
+
   resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
     return api.post<{ message: string }>(
       '/auth/reset-password',

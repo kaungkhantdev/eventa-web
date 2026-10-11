@@ -6,13 +6,45 @@ import type {
   RegistrationWireStatus,
 } from './registrations.types'
 
-/** Wire status → the kit's wording. A lookup, so a new status is one line. */
+/**
+ * Wire status → the kit's wording. A lookup, so a new status is one line.
+ *
+ * Deliberately an exhaustive `Record` with NO `??` fallback, and the badge map
+ * in `registrations.presentation.ts` is deliberately the same. The choice is
+ * between failing at compile time and degrading at runtime, and this path is
+ * better off failing at compile time:
+ *
+ * A fallback would have turned this defect into a quiet one. The bug was not a
+ * missing default — it was this union being a member short of the API enum,
+ * and an exhaustive `Record` is what makes that a build error the moment the
+ * union is corrected. Add a seventh value to `RegistrationWireStatus` and
+ * `tsc` names this object and the badge map until both are filled in; nobody
+ * has to notice a row looking odd in production. Keyed by a value NOT in the
+ * union, this returns `undefined` and the row crashes — loud and immediate,
+ * which is the runtime behaviour we want when the contract has drifted again.
+ *
+ * That crash is not a test guarantee, and it would be comfortable to pretend
+ * otherwise: the spec's list of API values is hand-maintained too, and
+ * `satisfies` only proves the list is a subset of the union — it cannot force
+ * the list to grow when the API does. A seventh status appearing upstream is
+ * caught here at the moment somebody widens the union, and in production
+ * otherwise.
+ *
+ * A neutral fallback would be the more robust choice for a lookup fed by
+ * genuinely open-ended input. This one is not: every value it can receive is
+ * fixed by a database enum that the DTO republishes verbatim, so the complete
+ * set is knowable at build time. Defaulting here would buy a soft landing at
+ * the price of never being told to update the list — which is precisely how a
+ * cancelled-looking row that is really an expired one would reach whoever is
+ * reconciling the money, and that is a worse outcome than a build failure.
+ */
 const STATUS_LABEL: Record<RegistrationWireStatus, RegistrationStatus> = {
   confirmed: 'Confirmed',
   pending: 'Pending',
   waitlisted: 'Waitlisted',
   cancelled: 'Cancelled',
   rejected: 'Rejected',
+  expired: 'Expired',
 }
 
 const PAID = 'paid'

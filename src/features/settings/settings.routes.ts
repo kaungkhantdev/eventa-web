@@ -1,6 +1,13 @@
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { api, type Query } from '@/lib/api'
+import {
+  api,
+  meAccountApi,
+  meProfileApi,
+  type NotificationPreferencePatch,
+  type Query,
+} from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
+import type { IssuedUpload } from '@/lib/signedUpload'
 import { intParam } from '@/lib/urlFilters'
 import {
   toOrganizationForm,
@@ -18,18 +25,15 @@ import {
 import type {
   AuditEntryWire,
   AuditRow,
-  LoginSessionWire,
   MemberRow,
   MemberWire,
   NotificationCategory,
-  NotificationPrefWire,
   NotificationRow,
   PermissionOption,
   PermissionWire,
   RoleCard,
   RoleWire,
   OrganizationForm,
-  LogoUploadWire,
   OrganizationSummaryWire,
   OrganizationWire,
   PaymentSettingsCard,
@@ -38,7 +42,6 @@ import type {
   PaymentSettingsWire,
   StoredKeysWire,
   ProfileCard,
-  ProfileWire,
   SessionRow,
   TwoFactorWire,
 } from './settings.types'
@@ -55,8 +58,22 @@ const settingsApi = {
   removeMember: (id: number) => api.delete<void>(`/members/${id}`),
   suspend: (id: number) => api.post<void>(`/members/${id}/suspend`),
   reactivate: (id: number) => api.post<void>(`/members/${id}/reactivate`),
-  /** Send the invitation email again for somebody who has not accepted. */
-  resend: (email: string) => api.post<unknown>('/invitations', { email }),
+  /**
+   * Send the invitation again to somebody who has not accepted.
+   *
+   * The same route as the first invite, deliberately: US-SET-11 says a second
+   * invite to an already-invited address "is simply re-sent rather than
+   * duplicated", so the API decides which it is from the member's status —
+   * there is no separate resend endpoint and there does not need to be.
+   *
+   * It used to post `{email}` to `POST /invitations`, which is the EVENT
+   * invitation route for US-REG-06. That DTO wants an `eventId`, a
+   * `recipientName` and a `recipientEmail`, so the call failed on three
+   * missing required fields and one that should not exist: the button could
+   * never work.
+   */
+  resend: (body: { name: string; email: string; roleId: number }) =>
+    api.post<unknown>('/members', body),
 
   roles: () => api.get<RoleWire[]>('/roles'),
   permissions: () => api.get<PermissionWire[]>('/permissions'),
@@ -65,13 +82,18 @@ const settingsApi = {
   setPermissions: (id: number, permissions: string[]) =>
     api.put<RoleWire>(`/roles/${id}/permissions`, { permissions }),
 
-  sessions: () => api.get<LoginSessionWire[]>('/me/sessions'),
-  revokeSession: (id: string) => api.delete<void>(`/me/sessions/${id}`),
-  revokeOthers: () => api.post<void>('/me/sessions/revoke-others'),
-  twoFactor: () => api.get<TwoFactorWire>('/me/two-factor'),
-  startTwoFactor: () => api.post<{ secret: string; otpauthUrl: string }>('/me/two-factor/start'),
-  confirmTwoFactor: (code: string) => api.post<unknown>('/me/two-factor/confirm', { code }),
-  disableTwoFactor: (code: string) => api.post<void>('/me/two-factor/disable', { code }),
+  // The account routes are the attendee portal's too, so they live in
+  // `@/lib/api`. Re-typing them here is what declared `otpauthUrl` for
+  // `otpauthUri` (the QR encoded `undefined`), typed a nullable `ipAddress`
+  // as `string`, and threw away the recovery codes by typing the confirm
+  // response `unknown`.
+  sessions: meAccountApi.sessions,
+  revokeSession: meAccountApi.revokeSession,
+  revokeOthers: meAccountApi.revokeOtherSessions,
+  twoFactor: meAccountApi.twoFactor,
+  startTwoFactor: meAccountApi.startTwoFactor,
+  confirmTwoFactor: meAccountApi.confirmTwoFactor,
+  disableTwoFactor: meAccountApi.disableTwoFactor,
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<void>('/auth/change-password', { currentPassword, newPassword }),
 
@@ -82,11 +104,11 @@ const settingsApi = {
    */
   audit: () => api.list<AuditEntryWire>('/audit', { query: { limit: AUDIT_PAGE_SIZE } }),
 
-  notifications: () => api.get<NotificationPrefWire[]>('/me/notification-preferences'),
+  notifications: () => meAccountApi.notifications<NotificationCategory>(),
   setNotification: (
     category: NotificationCategory,
-    body: { emailEnabled?: boolean; smsEnabled?: boolean },
-  ) => api.patch<unknown>(`/me/notification-preferences/${category}`, body),
+    body: NotificationPreferencePatch,
+  ) => meAccountApi.setNotification(category, body),
 }
 
 /* ── users ────────────────────────────────────────────────────────────── */
@@ -175,7 +197,11 @@ async function runUsersAction({ request }: LoaderArgs): Promise<void> {
     return
   }
   if (intent === 'resend') {
-    await settingsApi.resend(String(form.get('email') ?? ''))
+    await settingsApi.resend({
+      name: String(form.get('name') ?? ''),
+      email: String(form.get('email') ?? ''),
+      roleId: Number(form.get('roleId')),
+    })
     return
   }
   await settingsApi.removeMember(id)
@@ -211,9 +237,24 @@ async function loadRoles(): Promise<RolesData> {
   }
 }
 
+/**
+ * The permission keys a save asks for.
+ *
+ * `getAll`, not `get`: the editor's switches are React state and reach the
+ * action as one hidden field per key that is on, so reading a single value
+ * would send the first switch and drop every other permission the role holds.
+ *
+ * A key the role has never been offered arrives in that same field, which is
+ * what makes answering one an ordinary grant — the marker on its row is a
+ * label, and the `PUT` that replaces the whole set never sees it.
+ */
+export function permissionsOf(form: FormData): string[] {
+  return form.getAll('permissions').map(String)
+}
+
 async function runRolesAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
-  const permissions = form.getAll('permissions').map(String)
+  const permissions = permissionsOf(form)
 
   if (String(form.get('intent')) === 'create') {
     await settingsApi.createRole({
@@ -275,8 +316,13 @@ async function runSecurityAction({ request }: LoaderArgs): Promise<unknown> {
   }
   if (intent === 'start-2fa') return settingsApi.startTwoFactor()
   if (intent === 'confirm-2fa') {
-    await settingsApi.confirmTwoFactor(String(form.get('code') ?? ''))
-    return null
+    // Returned, not awaited and dropped. The API mints the recovery codes
+    // here and stores only their hashes, so this response is the single
+    // moment they exist anywhere the organizer can see them. Discarding it
+    // left this console counting codes ("3 recovery codes left") that it had
+    // never once shown — and an organizer who loses their authenticator with
+    // no codes is locked out of their own workspace.
+    return settingsApi.confirmTwoFactor(String(form.get('code') ?? ''))
   }
   if (intent === 'disable-2fa') {
     await settingsApi.disableTwoFactor(String(form.get('code') ?? ''))
@@ -333,6 +379,11 @@ export interface ProfileData {
   profile: ProfileCard
 }
 
+/** The phone's three submissions on the console's profile form (US-SET-01). */
+export const PHONE_REQUEST_INTENT = 'phone'
+export const PHONE_CONFIRM_INTENT = 'phone-code'
+export const PHONE_REMOVE_INTENT = 'phone-remove'
+
 export const profileRoute = {
   loader: pageData(async (): Promise<ProfileData> => ({
     profile: toProfileCard(await accountApi.profile()),
@@ -340,12 +391,26 @@ export const profileRoute = {
 
   action: pageAction(async ({ request }: LoaderArgs) => {
     const form = await request.formData()
-    if (form.get('intent') === 'email') {
+    const intent = form.get('intent')
+    if (intent === 'email') {
       return accountApi.changeEmail(field(form, 'email'))
     }
+    // US-SET-01 asks that a member can edit their phone and have the change
+    // kept. The API proves it by code first, so the one box became three
+    // submissions — the same flow the attendee portal uses, over the same
+    // `/me/profile/phone` routes.
+    if (intent === PHONE_REQUEST_INTENT) {
+      return accountApi.requestPhoneCode(field(form, 'phone'))
+    }
+    if (intent === PHONE_CONFIRM_INTENT) {
+      return accountApi.confirmPhoneCode(field(form, 'code'))
+    }
+    if (intent === PHONE_REMOVE_INTENT) return accountApi.removePhone()
     return accountApi.saveProfile({
       name: field(form, 'name'),
-      phone: nullable(form, 'phone'),
+      // NO `phone` — see `ProfilePatch`. The key is refused outright, so
+      // including it failed every save on this form with a 400 about a field
+      // the organizer cannot see.
       city: nullable(form, 'city'),
       timezone: nullable(form, 'timezone'),
       locale: field(form, 'locale') === 'th' ? 'th' : 'en',
@@ -454,10 +519,19 @@ function nullable(form: FormData, name: string): string | null {
  * account reference the provider issued; the card details never reach this app.
  */
 export const accountApi = {
-  profile: () => api.get<ProfileWire>('/me/profile'),
-  saveProfile: (body: Record<string, unknown>) => api.patch<ProfileWire>('/me/profile', body),
+  // Shared with the attendee portal's Profile tab — same row, same three
+  // routes. `saveProfile` was typed `Record<string, unknown>` here, so a
+  // misspelled or stale field name reached the API with nothing to catch it.
+  profile: meProfileApi.profile,
+  saveProfile: meProfileApi.saveProfile,
   /** Confirms at the new address before it replaces the old one. */
-  changeEmail: (email: string) => api.post<unknown>('/me/profile/email', { email }),
+  changeEmail: meProfileApi.changeEmail,
+
+  // The number is proved by a texted code (US-DISC-11 AC3), which is why it
+  // is three calls rather than a field on the details form.
+  requestPhoneCode: meProfileApi.requestPhoneCode,
+  confirmPhoneCode: meProfileApi.confirmPhoneCode,
+  removePhone: meProfileApi.removePhone,
 
   organization: () => api.get<OrganizationWire>('/organization'),
   /** Events hosted and team members. Its own call: `/organization` is the form. */
@@ -472,7 +546,7 @@ export const accountApi = {
    * or the API — only the browser and the bucket ever hold it.
    */
   logoUploadUrl: (contentType: string, byteSize: number) =>
-    api.post<LogoUploadWire>('/organization/logo/upload-url', {
+    api.post<IssuedUpload>('/organization/logo/upload-url', {
       contentType,
       byteSize,
     }),

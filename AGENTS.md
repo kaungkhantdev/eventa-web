@@ -11,10 +11,17 @@ HTML/Tailwind kit **eventa-ui-kit** (see `CONVENTIONS.md` for the authoritative 
 It's the UI for **Eventa**, an event registration & management product: a public attendee **portal**,
 public event **landing pages**, and an organizer **admin console**. Package manager is **pnpm**.
 
-**It is mid-migration from prototype to real product.** Sign-in is real (JWT against **eventa-api**)
-and `/admin/*` is behind a session guard. Every *page*, however, still reads in-memory typed modules
-under `features/*/data/` until it is migrated one at a time — see **Talking to the API** below for the
-seam and the per-feature playbook. A page is either fully on the API or fully on demo data; never half.
+**The migration from prototype to real product is all but finished.** Sign-in is real (JWT against
+**eventa-api**) and `/admin/*` is behind a session guard. Nearly every page is now wired to the API
+through a route loader — `grep -c 'livePage(' src/app/routes.tsx` is the count, and the rest are
+auth/portal forms that fetch nothing. **One page is still on demo data:** `ReportsPayoutsPage`, the
+last holder of a `features/*/data/` module — `find src/features -type d -name data` will tell you
+whether that is still true. See **Talking to the API** below for the seam and the per-feature
+playbook. A page is either fully on the API or fully on demo data; never half.
+
+(Counts are given as commands on purpose. This file previously said every page still read demo data,
+long after all but one had been migrated, and a reader who believed it would have re-done finished
+work.)
 
 ## Principles (non-negotiable)
 
@@ -41,8 +48,10 @@ hole.
 7. **The API is the source of truth; never dual-write.** Don't keep a local copy of server state that
    can diverge — after a mutation, revalidate. Optimistic UI is allowed only where a failure can be
    fully rolled back and shown.
-8. **`openapi.json` is the contract.** Don't invent fields or guess a shape; if the API doesn't return
-   it, the change starts in **eventa-api**.
+8. **The OpenAPI document is the contract.** Don't invent fields or guess a shape; if the API doesn't
+   return it, the change starts in **eventa-api**. It is *not* a committed file: read it from a running
+   API at `/api/docs/json` (Swagger UI at `/api/docs`), or regenerate `eventa-api/openapi.json` by
+   starting that repo with `EMIT_OPENAPI` set in a non-production env.
 9. **Config only through typed `import.meta.env`** (declared in `src/vite-env.d.ts`, template in
    `.env.example`) — never a hard-coded URL, host, port or key in a component.
 10. **Ask before architectural changes**, and don't refactor unrelated code while implementing a feature.
@@ -50,43 +59,54 @@ hole.
 ## Commands
 
 ```bash
-pnpm dev            # Vite dev server (the .claude/launch.json config runs it on port 5180)
+pnpm dev            # Vite dev server (the .claude/launch.json config runs it on port 5173)
 pnpm build          # tsc -b && vite build  — type-checks the whole project, then bundles
 pnpm lint           # eslint .
 pnpm test           # vitest run   — the rules: mappers, formatting, permission gates
 pnpm test:watch     # vitest       — while writing them
+pnpm test:cov       # vitest run --coverage
 pnpm preview        # serve the production build
 npx tsc -b          # type-check only (fast feedback; run this to verify a change compiles)
 ```
 
-Run a **single test**: `pnpm test -- <path-or-name-pattern>` — e.g. `pnpm test -- registrations.mapper`
-or `pnpm test -- -t "masks the amount"`.
+Run a **single test**: `npx vitest run <path-or-name-pattern>` — e.g.
+`npx vitest run registrations.mapper`, or `npx vitest run -t "masks revenue"` to select by test name.
+
+Use `npx`, not `pnpm test -- …`. pnpm swallows the `--` before `vitest run` ever sees it, so
+`pnpm test -- registrations.mapper` silently runs **all 96 files** and reports a pass over the whole
+suite. Nothing warns you: it looks exactly like a filtered run that happened to be green.
 
 **Definition of done** for any change: `pnpm test` green · `tsc -b` passes · `pnpm lint` no *new*
 problems · the route renders in the browser with **zero console errors** and every interactive control
-still works (`CONVENTIONS.md` §"Definition of done"). A green `tsc` is not evidence a page works —
-open it. Anything under `/admin` needs the **eventa-api** server running and reachable at
+still works (`CONVENTIONS.md` §"Definition of done for a ported page", and §"… for a page wired to the
+API"). A green `tsc` is not evidence a page works — open it. Anything under `/admin` needs the
+**eventa-api** server running and reachable at
 `VITE_API_URL`; start it with `pnpm start:dev` in that repo, wherever it is checked out.
 
 ## Architecture (the parts that span multiple files)
 
-**Feature-based, with a hard isolation rule.** Code lives in `src/features/<feature>/{pages,components,data,types}`.
-A feature **never imports another feature's `pages/`** — anything shared goes in `@/components/ui` or
-`@/lib`. Demo data is always a typed, exported `const` in `features/<feature>/data/*.ts`, never inlined.
+**Feature-based, with a hard isolation rule.** Code lives in `src/features/<feature>/`: `pages/` and
+`components/` are directories, and the feature's non-visual files sit flat beside them as
+`<feature>.api.ts` · `.mapper.ts` · `.routes.ts` · `.types.ts` · `.presentation.ts` (there is no
+`types/` directory — types are a flat `<feature>.types.ts`). A feature **never imports another
+feature's `pages/`** — anything shared goes in `@/components/ui` or `@/lib`. The one surviving demo-data
+module is a typed, exported `const` in `features/insights/data/reportsPayouts.ts`, never inlined.
 
 **The router and nav model are separate, data-driven files in `src/app/`:**
-- `routes.tsx` — the whole route manifest, every page **code-split** via `lazy`. Each admin route carries
-  a `handle.page` id (the static kit's old `data-page`) that drives **sidebar active state**, and
-  `handle.focused: true` hides the sub-nav panel for focused flows (e.g. the create-event wizard). Root
-  `/` redirects to the public `/portal/discover`.
+- `routes.tsx` — the whole route manifest, every page **code-split** via `lazy`. Each admin *page* route
+  carries a `handle.page` id (the static kit's old `data-page`) that drives **sidebar active state**, and
+  `handle.focused: true` hides the sub-nav panel for focused flows (e.g. the create-event wizard). The
+  two loader-only resource routes (`tickets/share`, `check-in/search`) have no component and no
+  `handle` — there is nothing to highlight. Root `/` redirects to the public `/portal/discover`.
 - `navigation.ts` — the `MODULES` array is the **single source of truth** for the admin icon rail and its
   grouped sub-nav panel. Add/rename admin nav here, not in the shell. `moduleOfPage()` maps a page id → its rail module.
 
 **Skeleton loading is wired at the router, not in the pages.** Every route carries a `loader`, so
 React Router reports `navigation.state === 'loading'` on every visit. A migrated page's loader is its
-real API fetch; a page still on demo data gets `pageLoader`, an artificial `PAGE_LOAD_MS` wait that
-exists only so its skeleton is visible against data that is already in memory (set it to 0 to drop the
-delay; both it and `pageLoader` go when the last page is migrated). Two layouts turn that into a
+real API fetch; the handful of routes that fetch nothing get `pageLoader` (in `routes.tsx`), an
+artificial `PAGE_LOAD_MS` wait — 350 ms — so their skeleton is visible at all. Those 8 routes are the
+auth/portal forms plus the one remaining demo-data page, `reports-payouts` (set `PAGE_LOAD_MS` to 0 to
+drop the delay; both it and `pageLoader` go when the last page is migrated). Two layouts turn that into a
 placeholder: `AdminShell` swaps its `<Outlet>` for the destination's skeleton on admin→admin moves
 (the rail and sub-nav stay mounted and jump to the destination via `routeStateOfPath`), and
 `RootLayout` replaces the whole screen for first paint (`HydrateFallback`), public routes, and
@@ -126,7 +146,7 @@ TS 7 drops it). Never use long relative chains.
 - Colors come from **semantic `@theme` tokens** (`bg-canvas`, `bg-surface`, `text-ink`, `text-muted`,
   `border-hair`, `border-line`, `bg-brand`, `bg-brand-soft`) that flip per theme — **never hard-code a hex**
   unless the source HTML does.
-- A base rule sets bare `border-*` to `rgb(var(--hair))` (v4 defaults to `currentColor`; the kit has ~185
+- A base rule sets bare `border-*` to `rgb(var(--hair))` (v4 defaults to `currentColor`; the kit has ~295
   bare borders relying on the v3 grey) and sets `#root { height: 100% }` (restores the body→shell height
   chain so `main` scrolls internally instead of pushing the rail's bottom items off-screen).
 
@@ -136,13 +156,17 @@ TS 7 drops it). Never use long relative chains.
   `verbatimModuleSyntax` is on (use `import type { … }`). Derive row types from data modules
   (`type Ticket = (typeof TICKETS)[number]`).
 - **Reuse component classes** already in `styles/components.css` (`.btn`, `.card`, `.badge`, `.input`,
-  `.select`, `.data-table`, `.panel`, `.modal`, `.pilltab`, `.segmented`, `.tnum`) — don't redefine them.
+  `.select`, `.data-table`, `.panel`, `.modal`, `.pilltab`, `.segmented`) — don't redefine them.
+  `.tnum` (tabular numerals) lives in `styles/tokens.css`, not `components.css`.
 - **Imperative-DOM → React state** when porting: `useDisclosure()`+`<Panel>`/`<Modal>` for slide-overs,
   `<PillTabs>`/`<Tabs>`/`<Segmented>` for tab toggles, `usePagination()`+`<Paginator>` for paging,
   `useMemo` for search/filter. Keep filtering/sorting semantics and empty-state copy identical to the source.
 - A few features use **real libraries** where the static kit did: `quill` powers the rich-text editor on
   the create-event page (instantiated imperatively in `useEffect` with a StrictMode re-init guard);
-  `qrcode-generator` renders 2FA QR codes; the invoice PDF is hand-rolled from raw PDF operators (no lib).
+  `qrcode-generator` (via `features/portal/lib/qr.ts`) draws the 2FA QR, the PromptPay payment QR and the
+  ticket pass. **This app renders no documents itself** — the API renders an invoice and serves it as an
+  **SVG** (`/invoices/:id/invoice.svg`, fetched by `<DownloadButton>`), and report exports (CSV/XLSX/PDF)
+  are API routes too; see `@/lib/exportFormats`.
 
 ## Test-driven development (must follow)
 
@@ -291,8 +315,9 @@ Every rule above is stated here in full. These siblings are where the product's 
 they are normally checked out next to this one, but nothing in this document depends on that, and a
 missing sibling changes none of the standards.
 
-- `eventa-api` — the backend this app consumes. Its `openapi.json` is the request/response contract, and
-  its controller DTOs drive it: if a field isn't there, the change starts in that repo, not this one.
+- `eventa-api` — the backend this app consumes. Its OpenAPI document is the request/response contract
+  (served at `/api/docs/json`; emitted to `openapi.json` only on demand — see principle 8), and its
+  controller DTOs drive it: if a field isn't there, the change starts in that repo, not this one.
   It carries the same principles and house rules, server-adapted.
 - `eventa-ui-kit` — the static HTML/Tailwind kit this app ports; the **visual** source of truth
   (`CONVENTIONS.md` is the porting contract, and it lives here).

@@ -53,6 +53,14 @@ export interface RoleWire {
   name: string
   description: string
   permissions: string[]
+  /**
+   * Keys with no decision recorded for this role — never granted, and never
+   * turned off either. A key in neither list was turned off deliberately, and
+   * that difference is the whole contract: an automatic backfill was withdrawn
+   * because nothing on disk could tell "never offered" from "an organizer said
+   * no", so the gap is reported here and a person closes it.
+   */
+  neverOfferedPermissions: string[]
   /** Live members holding this role. */
   memberCount: number
   /** Built-in roles every workspace starts with. */
@@ -64,6 +72,8 @@ export interface RoleCard {
   name: string
   description: string
   permissions: string[]
+  /** Keys this role has no recorded decision for — see `RoleWire`. */
+  neverOffered: string[]
   /** `3 members`, or `No members yet`. */
   members: string
   isSystem: boolean
@@ -77,27 +87,40 @@ export interface PermissionOption {
   group: PermissionGroup
 }
 
+/** One permission as the roles editor draws it, with its state resolved. */
+export interface PermissionRow {
+  key: string
+  label: string
+  /**
+   * True only for the third state — this role has no decision recorded for the
+   * key. The switch is off either way; this is what lets the editor say *why*,
+   * instead of drawing a gap and a refusal identically.
+   */
+  neverOffered: boolean
+}
+
 /* ── security ─────────────────────────────────────────────────────────── */
 
-export interface LoginSessionWire {
-  id: string
-  device: string
-  ipAddress: string
-  signedInAt: string
-  expiresAt: string
-  isCurrent: boolean
-}
+/**
+ * The account wires come from `@/lib/api`: the attendee portal reads the very
+ * same `/me/*` routes, and this file used to carry a second, independently
+ * hand-written copy of each — which had already drifted (`ipAddress` was
+ * `string` here and `string | null` there; the API says nullable).
+ */
+import type { NotificationPreferenceWire as SharedNotificationWire } from '@/lib/api'
 
-export interface TwoFactorWire {
-  enabled: boolean
-  /** Started but not confirmed — the QR was shown and nothing came back. */
-  pending: boolean
-  recoveryCodesRemaining: number
-}
+export type {
+  LoginSessionWire,
+  NotificationPreferencePatch,
+  RecoveryCodesWire,
+  TwoFactorStartWire,
+  TwoFactorWire,
+} from '@/lib/api'
 
 export interface SessionRow {
   id: string
   device: string
+  /** `—` where the API recorded none; a blank cell reads as a bug. */
   ipAddress: string
   /** `Aug 14, 2026 · 16:37`, Bangkok. */
   signedIn: string
@@ -115,13 +138,8 @@ export type NotificationCategory =
   | 'alert'
   | 'task'
 
-export interface NotificationPrefWire {
-  category: NotificationCategory
-  emailEnabled: boolean
-  smsEnabled: boolean
-  /** False where the product cannot send an SMS for this category at all. */
-  smsAvailable: boolean
-}
+/** This console's own category set over the shared wire shape. */
+export type NotificationPrefWire = SharedNotificationWire<NotificationCategory>
 
 export interface NotificationRow {
   category: NotificationCategory
@@ -134,23 +152,12 @@ export interface NotificationRow {
 
 /* ── profile, organization and payments ───────────────────────────────── */
 
-/** `GET /me/profile` — the signed-in person's own record. */
-export interface ProfileWire {
-  id: string
-  name: string
-  email: string
-  /** An address awaiting confirmation; the old one is still in use. */
-  pendingEmail: string | null
-  emailVerified: boolean
-  phone: string | null
-  timezone: string | null
-  locale: 'en' | 'th' | null
-  avatarUrl: string | null
-  city: string | null
-  dateOfBirth: string | null
-  bio: string | null
-  displayCurrency: string | null
-}
+/**
+ * `ProfileWire` comes from `@/lib/api`: the attendee portal's Profile tab
+ * edits the same `/me/profile` row, and this file used to carry a second,
+ * independently hand-written copy of the shape.
+ */
+export type { ProfilePatch, ProfileWire } from '@/lib/api'
 
 export interface ProfileCard {
   name: string
@@ -160,24 +167,25 @@ export interface ProfileCard {
   emailVerified: boolean
   /** The address awaiting confirmation, or `null` when none is. */
   pendingEmail: string | null
+  /** The CONFIRMED number, or `''`. */
   phone: string
+  /** A number waiting for its code; the confirmed one still works. */
+  pendingPhone: string | null
+  /** False until a texted code has been typed back (US-DISC-11 AC3). */
+  phoneVerified: boolean
   timezone: string
   locale: 'en' | 'th'
   city: string
   bio: string
 }
 
-/** `GET /organization` — the workspace itself. */
-/** The capability the API hands the browser to PUT one file, once. */
-export interface LogoUploadWire {
-  key: string
-  uploadUrl: string
-  /** Sent verbatim — they are covered by the signature. */
-  headers: Record<string, string>
-  expiresInSeconds: number
-  maxBytes: number
-}
-
+/**
+ * `GET /organization` — the workspace itself.
+ *
+ * The logo upload the API issues is not declared here: it is `IssuedUpload` in
+ * `@/lib/signedUpload`, one shape for every image this app uploads, with the
+ * note on what its signed headers bind and why they go verbatim.
+ */
 export interface OrganizationWire {
   id: number
   name: string
