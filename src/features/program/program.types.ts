@@ -70,6 +70,8 @@ export interface SpeakerCard {
   sessionCount: number
   /** `4.9`, or `—` when nobody has rated them yet. */
   rating: string
+  /** Sent back on edit, so a stale save is refused rather than overwriting. */
+  version: number
 }
 
 export interface AgendaBlock {

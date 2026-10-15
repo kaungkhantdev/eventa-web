@@ -59,6 +59,12 @@ describe('toSpeakerCard', () => {
     expect(card.avatar).toBeTruthy()
     expect(card.avatar).toBe(toSpeakerCard(speaker({ tone: null })).avatar)
   })
+
+  // The edit form sends this back, so a colleague's save in between is
+  // refused instead of silently overwritten (US-PROG-10).
+  it('carries the version the card was read at', () => {
+    expect(toSpeakerCard(speaker({ version: 7 })).version).toBe(7)
+  })
 })
 
 const session = (over: Partial<SessionWire> = {}): SessionWire => ({

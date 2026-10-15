@@ -52,6 +52,7 @@ export function toSpeakerCard(wire: SpeakerWire): SpeakerCard {
     // An unrated speaker has no rating — not a rating of zero. `0.0` beside a
     // name is a claim about their audience that nobody made.
     rating: wire.rating || MASKED,
+    version: wire.version,
   }
 }
 
