@@ -1,10 +1,17 @@
-import type { ReactNode } from 'react'
-import { Link, useNavigate, useOutletContext, useRouteLoaderData } from 'react-router'
+import { useEffect, type ReactNode } from 'react'
+import { Link, useFetcher, useNavigate, useOutletContext, useRouteLoaderData } from 'react-router'
 import type { AdminOutletContext } from '@/layouts/AdminShell'
 import { ADMIN_ROUTE_ID } from '@/app/loaders'
+import type { Panel } from '@/app/panels'
 import { authApi } from '@/features/auth/api'
 import { displayRole } from '@/features/auth/permissions'
 import type { Me } from '@/features/auth/types'
+import { NotificationBody } from '@/features/engagement/components/NotificationBody'
+import type {
+  NotificationPreview,
+  NotificationView,
+} from '@/features/engagement/notifications.mapper'
+import { NOTIFICATION_TINT } from '@/features/engagement/notifications.presentation'
 import { useTheme } from '@/lib/useTheme'
 import { UserAvatar } from './Avatar'
 import { Dropdown } from './Dropdown'
@@ -49,93 +56,181 @@ export function PageHeader({
 
 /* ---------- Notification bell + dropdown ---------- */
 
-type Note = { icon: string; tone: string; title: string; time: string }
+/** The bell's resource route, and the feed it previews (US-MSG-03). */
+const PREVIEW_HREF = '/admin/notifications/preview'
+const FEED_HREF = '/admin/notifications'
 
-const RECENT_NOTES: Note[] = [
-  {
-    icon: 'hgi-user-add-01',
-    tone: 'text-brand bg-brand-soft',
-    title: 'New registration for Tech Summit 2026',
-    time: '2m ago',
-  },
-  {
-    icon: 'hgi-wallet-01',
-    tone: 'text-blue-600 bg-blue-50 dark:bg-blue-500/15 dark:text-blue-300',
-    title: 'Payout of ฿82,400 sent to your bank',
-    time: '1h ago',
-  },
-  {
-    icon: 'hgi-alert-02',
-    tone: 'text-amber-600 bg-amber-50 dark:bg-amber-500/15 dark:text-amber-300',
-    title: 'Bangkok Jazz Night is 90% sold out',
-    time: '3h ago',
-  },
-  {
-    icon: 'hgi-comment-01',
-    tone: 'text-purple-600 bg-purple-50 dark:bg-purple-500/15 dark:text-purple-300',
-    title: '12 new survey responses',
-    time: 'Yesterday',
-  },
-]
+type Preview = Panel<NotificationPreview>
 
-/** Notification bell that opens a preview dropdown of recent activity. */
-export function NotificationBell({ unread = true }: { unread?: boolean }) {
+/**
+ * Notification bell: the feed's unread count, and a dropdown of its newest rows.
+ * Markup ported from the kit's header dropdown (`notifItem` in shell.js).
+ *
+ * Loaded when the bell mounts, which is once per admin page because each page
+ * renders its own header, and revalidated by React Router after any action on
+ * the page — that is what clears the count after "Mark all read". It is NOT
+ * refreshed when only the query string changes on the same page (a tab or a
+ * filter), so it can trail that page until the next navigation or action.
+ */
+export function NotificationBell() {
+  const preview = useFetcher<Preview>()
+  const { load } = preview
+  const refresh = () => void load(PREVIEW_HREF)
+  useEffect(() => {
+    void load(PREVIEW_HREF)
+  }, [load])
+
+  const unread = preview.data?.ok ? preview.data.data.unread : 0
   return (
     <Dropdown
       align="right"
-      panelClassName="w-80"
-      trigger={({ open, toggle }) => (
-        <button
-          type="button"
-          onClick={toggle}
-          title="Notifications"
-          aria-expanded={open}
-          className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface text-muted transition hover:text-ink"
-        >
-          <Icon name="hgi-notification-03" size={18} />
-          {unread && (
-            <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-surface" />
-          )}
-        </button>
-      )}
+      panelClassName="w-[340px]"
+      trigger={({ open, toggle }) => <BellButton open={open} toggle={toggle} unread={unread} />}
     >
       {(close) => (
         <div>
           <div className="flex items-center justify-between border-b border-hair px-4 py-3">
-            <p className="text-[13px] font-bold text-ink">Notifications</p>
-            <span className="badge badge-green">4 new</span>
+            <div className="flex items-center gap-2">
+              <h3 className="text-[14px] font-bold text-ink">Notifications</h3>
+              {unread > 0 && (
+                <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-brand-soft px-1.5 text-[11px] font-semibold text-brand">
+                  {unread}
+                </span>
+              )}
+            </div>
           </div>
-          <ul className="max-h-80 overflow-y-auto py-1">
-            {RECENT_NOTES.map((n, i) => (
-              <li key={i}>
-                <Link
-                  to="/admin/notifications"
-                  onClick={close}
-                  className="flex items-start gap-3 px-4 py-2.5 transition hover:bg-line"
-                >
-                  <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${n.tone}`}>
-                    <Icon name={n.icon} size={15} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[12.5px] font-medium leading-snug text-ink">
-                      {n.title}
-                    </span>
-                    <span className="mt-0.5 block text-[11px] text-muted">{n.time}</span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <BellContents
+            data={preview.data}
+            busy={preview.state !== 'idle'}
+            onPick={close}
+            onRetry={refresh}
+          />
           <Link
-            to="/admin/notifications"
+            to={FEED_HREF}
             onClick={close}
-            className="block border-t border-hair px-4 py-2.5 text-center text-[12px] font-semibold text-brand transition hover:bg-line"
+            className="block border-t border-hair px-4 py-2.5 text-center text-[13px] font-semibold text-brand hover:bg-line"
           >
             View all notifications
           </Link>
         </div>
       )}
     </Dropdown>
+  )
+}
+
+function BellButton({
+  open,
+  toggle,
+  unread,
+}: {
+  open: boolean
+  toggle: () => void
+  unread: number
+}) {
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      title="Notifications"
+      aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+      aria-expanded={open}
+      className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-surface text-muted transition hover:text-ink"
+    >
+      <Icon name="hgi-notification-03" size={18} />
+      {unread > 0 && (
+        <span className="absolute right-2.5 top-2.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-surface" />
+      )}
+    </button>
+  )
+}
+
+/** The dropdown's body in each of its states: loading, failed, empty, rows. */
+function BellContents({
+  data,
+  busy,
+  onPick,
+  onRetry,
+}: {
+  data: Preview | undefined
+  busy: boolean
+  onPick: () => void
+  onRetry: () => void
+}) {
+  if (!data) return <BellMessage>Loading notifications…</BellMessage>
+  if (!data.ok) return <BellFailure error={data.error} busy={busy} onRetry={onRetry} />
+  if (data.data.items.length === 0) return <BellMessage>No notifications yet.</BellMessage>
+  return (
+    <ul className="max-h-[340px] overflow-y-auto py-1">
+      {data.data.items.map((item) => (
+        <li key={item.id}>
+          <BellRow item={item} onPick={onPick} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function BellMessage({ children }: { children: ReactNode }) {
+  return (
+    <p role="status" className="px-4 py-6 text-center text-[12px] text-muted">
+      {children}
+    </p>
+  )
+}
+
+/**
+ * A failed read, with the API's own sentence and a retry. The retry re-runs the
+ * bell's fetcher only — revalidating would reload the whole page under it.
+ */
+function BellFailure({
+  error,
+  busy,
+  onRetry,
+}: {
+  error: string
+  busy: boolean
+  onRetry: () => void
+}) {
+  return (
+    <div className="px-4 py-6 text-center">
+      <p role="alert" className="text-[12px] text-muted">
+        {error}
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        disabled={busy}
+        className="mt-2 text-[12px] font-semibold text-brand hover:text-brand-dark disabled:opacity-60"
+      >
+        Try again
+      </button>
+    </div>
+  )
+}
+
+/** One row, as the kit's `notifItem`: title · sentence, time beneath, unread dot last. */
+function BellRow({ item, onPick }: { item: NotificationView; onPick: () => void }) {
+  return (
+    <Link to={FEED_HREF} onClick={onPick} className="flex gap-3 px-4 py-2.5 transition hover:bg-line">
+      <span
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${NOTIFICATION_TINT[item.kind]}`}
+      >
+        <Icon name={item.icon} size={17} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] leading-snug text-ink">
+          <span className="font-semibold">{item.title}</span> ·{' '}
+          <NotificationBody segments={item.body} />
+        </p>
+        <p className="mt-0.5 text-[11px] text-muted">{item.time}</p>
+      </div>
+      {item.unread && (
+        <>
+          <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand" />
+          <span className="sr-only">(unread)</span>
+        </>
+      )}
+    </Link>
   )
 }
 

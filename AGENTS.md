@@ -96,8 +96,14 @@ module is a typed, exported `const` in `features/insights/data/reportsPayouts.ts
 - `routes.tsx` — the whole route manifest, every page **code-split** via `lazy`. Each admin *page* route
   carries a `handle.page` id (the static kit's old `data-page`) that drives **sidebar active state**, and
   `handle.focused: true` hides the sub-nav panel for focused flows (e.g. the create-event wizard). The
-  two loader-only resource routes (`tickets/share`, `check-in/search`) have no component and no
-  `handle` — there is nothing to highlight. Root `/` redirects to the public `/portal/discover`.
+  loader-only resource routes (`grep -n 'A resource route' src/app/routes.tsx` lists them) have no
+  component and no `handle` — there is nothing to highlight. **A resource route that a fetcher loads
+  must not throw** for anything but the 401 that `pageData` turns into the sign-in redirect: React
+  Router 8 renders a fetcher's thrown error at the boundary of the page that called it on the first
+  load, but at the **root** boundary when it is revalidated after an action (the resource route is
+  never among the page's matches), which replaces the whole admin shell. Return the failure as data —
+  `notifications/preview` (`previewPanel` in `notifications.routes.ts`) is the worked example.
+  Root `/` redirects to the public `/portal/discover`.
 - `navigation.ts` — the `MODULES` array is the **single source of truth** for the admin icon rail and its
   grouped sub-nav panel. Add/rename admin nav here, not in the shell. `moduleOfPage()` maps a page id → its rail module.
 

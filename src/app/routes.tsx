@@ -359,6 +359,15 @@ const adminChildren = [
     handle: { page: 'notifications' },
   },
   {
+    // A resource route: the header bell's preview of the feed. The bell loads it
+    // itself, on every admin page that shows one; it never answers a navigation.
+    path: 'notifications/preview',
+    lazy: async () => ({
+      loader: (await import('@/features/engagement/notifications.routes')).notificationPreviewRoute
+        .loader,
+    }),
+  },
+  {
     path: 'messaging-templates',
     ...livePage(
       () => import('@/features/engagement/pages/MessagingTemplatesPage'),

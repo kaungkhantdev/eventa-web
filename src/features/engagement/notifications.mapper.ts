@@ -1,5 +1,5 @@
 import { bangkokDayKey, satangAmount } from '@/lib/format'
-import type { FeedBucket, FeedItemWire, FeedKind } from './notifications.types'
+import type { FeedBucket, FeedItemWire, FeedKind, NotificationFeedWire } from './notifications.types'
 
 /**
  * The feed's view model (US-MSG-03).
@@ -63,6 +63,38 @@ export function toNotification(item: FeedItemWire, now: Date): NotificationView 
     // The API decides what is unread — it holds the watermark. The page only
     // renders the answer.
     unread: item.unread,
+  }
+}
+
+/** How many rows the notification bell previews. */
+export const NOTIFICATION_PREVIEW_SIZE = 5
+
+/** What the bell shows: the newest few rows, and the WHOLE feed's unread count. */
+export interface NotificationPreview {
+  unread: number
+  items: NotificationView[]
+}
+
+/**
+ * The bell's preview of the feed.
+ *
+ * Newest across every group, the older ones the feed page folds away included —
+ * the bell answers "what happened lately", and the next-newest thing is still
+ * that when the page would hide it. The API sends groups newest first and each
+ * group's items in the same order, so flattening is enough; nothing is re-sorted
+ * here. The count is the API's, not the length of what fits in the dropdown.
+ */
+export function toNotificationPreview(
+  feed: NotificationFeedWire,
+  now: Date,
+  size: number,
+): NotificationPreview {
+  return {
+    unread: feed.counts.unread,
+    items: feed.groups
+      .flatMap((group) => group.items)
+      .slice(0, size)
+      .map((item) => toNotification(item, now)),
   }
 }
 
