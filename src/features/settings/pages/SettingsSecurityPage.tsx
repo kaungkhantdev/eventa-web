@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import { useFetcher, useLoaderData, useRevalidator, useRouteLoaderData } from 'react-router'
 import {
   Badge,
   Button,
@@ -14,11 +14,13 @@ import {
   Toggle,
 } from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
+import { useDownload } from '@/lib/useDownload'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
 import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
 import type { Me } from '@/features/auth/types'
 import { SettingsHeader } from '../components/SettingsHeader'
+import { AUDIT_EXPORT_PATH, auditExportOf } from '../auditExport'
 import { auditLook } from '../settings.presentation'
 import type { SecurityData } from '../settings.routes'
 import type { AuditRow, SessionRow } from '../settings.types'
@@ -451,11 +453,7 @@ function AuditLogPanel({
       onClose={onClose}
       title="Audit log"
       subtitle="Sign-ins, permission changes and exports."
-      footer={
-        <Button variant="soft" className="w-full" onClick={onClose}>
-          Close
-        </Button>
-      }
+      footer={<AuditExportForm onClose={onClose} />}
     >
       {rows.length === 0 ? (
         <p className="text-[13px] text-muted">Nothing has been recorded yet.</p>
@@ -467,6 +465,57 @@ function AuditLogPanel({
         </div>
       )}
     </Panel>
+  )
+}
+
+/**
+ * The kit's footer — Close and "Export log" — with the date range the export
+ * is for (US-SET-05). The API records the export as a new entry, so the page
+ * re-reads its loader afterwards and the panel shows it.
+ */
+function AuditExportForm({ onClose }: { onClose: () => void }) {
+  const { busy, error: failed, download } = useDownload()
+  const { revalidate } = useRevalidator()
+  const [refused, setRefused] = useState<string | null>(null)
+  const error = refused ?? failed
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const request = auditExportOf(String(form.get('from') ?? ''), String(form.get('to') ?? ''))
+    setRefused(request.ok ? null : request.error)
+    if (!request.ok) return
+    await download(AUDIT_EXPORT_PATH, request.filename, request.query)
+    await revalidate()
+  }
+
+  return (
+    <form className="w-full space-y-3" onSubmit={(event) => void onSubmit(event)}>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label htmlFor="audit-from">From</Label>
+          <Input id="audit-from" name="from" type="date" required />
+        </div>
+        <div>
+          <Label htmlFor="audit-to">To</Label>
+          <Input id="audit-to" name="to" type="date" required />
+        </div>
+      </div>
+      {error && (
+        <p role="alert" className="text-[12px] text-red-500">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button variant="soft" type="button" className="flex-1" onClick={onClose}>
+          Close
+        </Button>
+        <Button variant="primary" type="submit" className="flex-1" disabled={busy}>
+          <Icon name="hgi-download-01" size={16} />
+          {busy ? 'Preparing…' : 'Export log'}
+        </Button>
+      </div>
+    </form>
   )
 }
 
