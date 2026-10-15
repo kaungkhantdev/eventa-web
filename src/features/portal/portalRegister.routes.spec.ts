@@ -1,12 +1,11 @@
 import { redirect } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import type { BookingClaim } from '@/features/auth/api'
-import type { BookingClaimInput } from '@/features/auth/signUpInput'
+import { PASSWORDS_DIFFER, type BookingClaimInput } from '@/features/auth/signUpInput'
 import type { LoginResult } from '@/features/auth/types'
 import { ApiError, NetworkError } from '@/lib/api'
 import {
   INCOMPLETE_CLAIM_LINK,
-  PASSWORDS_DIFFER,
   loadPortalRegister,
   shouldRecheckClaim,
   submitBookingClaim,
@@ -181,6 +180,7 @@ describe('submitBookingClaim', () => {
   })
 
   // A typo guard, not a security rule: the API is never sent the secret twice.
+  // The words are the ordinary sign-up's own, from the one place both read.
   it('stops at a confirmation that does not match, without calling the API', async () => {
     const claim = claiming()
 

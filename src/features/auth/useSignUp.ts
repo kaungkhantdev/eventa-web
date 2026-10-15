@@ -5,7 +5,7 @@ import type { Persona } from '@/lib/persona'
 import { useFailureToast } from '@/lib/useSavedToast'
 import { authApi } from './api'
 import { checkEmailPathFor } from './personas'
-import { signUpInputOf } from './signUpInput'
+import { PASSWORDS_DIFFER, signUpInputOf } from './signUpInput'
 
 /**
  * Signing up, for either audience.
@@ -40,7 +40,7 @@ export function useSignUp(persona: Persona) {
     e.preventDefault()
     if (pending) return
     if (password !== confirm) {
-      setError('Those passwords do not match.')
+      setError(PASSWORDS_DIFFER)
       return
     }
     const form = new FormData(e.currentTarget)

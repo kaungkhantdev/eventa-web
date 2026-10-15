@@ -3,7 +3,11 @@ import { queryOf, type LoaderArgs } from '@/app/loaders'
 import { authApi, type BookingClaim } from '@/features/auth/api'
 import { guestOnly } from '@/features/auth/guestOnly'
 import { homeFor } from '@/features/auth/personas'
-import { bookingClaimInputOf, type BookingClaimInput } from '@/features/auth/signUpInput'
+import {
+  PASSWORDS_DIFFER,
+  bookingClaimInputOf,
+  type BookingClaimInput,
+} from '@/features/auth/signUpInput'
 import type { LoginResult } from '@/features/auth/types'
 import { ApiError, NetworkError, messageOf } from '@/lib/api'
 import { adoptGuestSaves } from './guestSaves'
@@ -29,9 +33,6 @@ const CLAIM_PARAM = 'claim'
 
 export const INCOMPLETE_CLAIM_LINK =
   'This link is incomplete. Open the most recent link in your email, or ask for a new one from your booking confirmation.'
-
-/** The same words the sign-up form uses for the same typo. */
-export const PASSWORDS_DIFFER = 'Those passwords do not match.'
 
 type InspectClaim = (token: string) => Promise<BookingClaim>
 type ClaimAccount = (input: BookingClaimInput) => Promise<LoginResult>

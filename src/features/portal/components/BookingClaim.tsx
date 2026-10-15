@@ -6,6 +6,7 @@ import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { PasswordInput } from '@/features/auth/components/PasswordInput'
 import { PasswordStrengthMeter } from '@/features/auth/components/PasswordStrengthMeter'
 import { MIN_PASSWORD_LENGTH } from '@/features/auth/passwordStrength'
+import { signInPathFor } from '@/features/auth/personas'
 import { useFailureToast } from '@/lib/useSavedToast'
 import type { ClaimRefusal, RegisterScreen } from '../portalRegister.types'
 
@@ -264,7 +265,7 @@ function SignInInstead({ question }: { question: string }) {
   return (
     <p className="mt-6 text-center text-[13px] text-muted">
       {question}{' '}
-      <Link to="/portal/login" className="font-semibold text-brand hover:underline">
+      <Link to={signInPathFor('attendee')} className="font-semibold text-brand hover:underline">
         Sign in
       </Link>
     </p>
