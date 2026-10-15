@@ -30,4 +30,8 @@ export const discoverApi = {
   save: (eventId: string) => api.put<unknown>(`/me/saved-events/${eventId}`),
 
   unsave: (eventId: string) => api.delete<void>(`/me/saved-events/${eventId}`),
+
+  /** Adopt the saves a guest made before signing in; ids already saved are skipped. */
+  merge: (eventIds: string[]) =>
+    api.post<{ merged: number }>('/me/saved-events/merge', { eventIds }),
 }

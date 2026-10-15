@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { useSignIn } from '@/features/auth/useSignIn'
+import { adoptGuestSaves } from '../guestSaves'
 
 /* Attendee sign-in — the portal's own login, separate from the organizer
    login at /auth/login. It lands on "My tickets" (never the admin shell), and
@@ -19,7 +20,9 @@ import { useSignIn } from '@/features/auth/useSignIn'
    when that is fixed. */
 export default function PortalLoginPage() {
   const [showPw, setShowPw] = useState(false)
-  const { pending, error, challenge, submit } = useSignIn('attendee')
+  const { pending, error, challenge, submit } = useSignIn('attendee', {
+    afterSignIn: () => adoptGuestSaves(),
+  })
 
   return (
     <AuthLayout
