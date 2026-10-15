@@ -107,6 +107,20 @@ export function ticketChoices(ticketIds: readonly string[]): TicketChoice[] {
   return ticketIds.map((value, index) => ({ value, label: `Ticket ${index + 1}` }))
 }
 
+/**
+ * The loaded pass, only while it answers the ticket asked for. The router
+ * reports a fetcher's next load a render late, so without this the last
+ * ticket's QR is shown under the next one's name.
+ */
+export function passOnShow(
+  ticketId: string | null,
+  loaded: Panel<TicketPass> | null,
+): Panel<TicketPass> | null {
+  if (!ticketId || !loaded) return null
+  if (loaded.ok && loaded.data.id !== ticketId) return null
+  return loaded
+}
+
 function placeOf(wire: MyRegistrationWire): string {
   if (wire.isOnline) return 'Online event'
   return [wire.venueName, wire.city].filter(Boolean).join(', ')

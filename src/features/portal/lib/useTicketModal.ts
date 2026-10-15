@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useFetcher } from 'react-router'
 import type { Panel } from '@/app/panels'
 import { useDisclosure } from '@/lib/useDisclosure'
+import { passOnShow } from '../myEvents.mapper'
 import { ticketPassPath } from '../myEvents.routes'
 import type { MyEventRow, TicketPass } from '../myEvents.types'
 
@@ -48,7 +49,7 @@ export function useTicketModal() {
     event,
     ticketId,
     show,
-    pass: loaded,
+    pass: passOnShow(ticketId, loaded),
   }
   return { openFor, state }
 }

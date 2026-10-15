@@ -3,6 +3,7 @@ import type { Panel } from '@/app/panels'
 import { MASKED } from '@/lib/format'
 import { qrDataUrl } from './lib/qr'
 import {
+  passOnShow,
   ticketChoices,
   toMyEventRow,
   toPaymentTotals,
@@ -13,6 +14,7 @@ import {
 import type {
   MyRegistrationWire,
   PaymentSummaryWire,
+  TicketPass,
   TicketPassWire,
   TransactionWire,
 } from './myEvents.types'
@@ -210,6 +212,32 @@ describe('choosing among an order’s tickets', () => {
   // One ticket needs no switcher.
   it('offers no choice when there is only one', () => {
     expect(ticketChoices(['t-1'])).toEqual([])
+  })
+})
+
+describe('the pass on show while switching tickets (US-DISC-07)', () => {
+  const first: Panel<TicketPass> = { ok: true, data: toTicketPass(ticketPass(), PRINTED) }
+
+  it('is the pass that was loaded for the ticket asked for', () => {
+    expect(passOnShow('t-1', first)).toBe(first)
+  })
+
+  // The router publishes a fetcher's "loading" a render after the switch, so
+  // for that render the last ticket's pass is still the one loaded. Its QR
+  // must not be shown as the next ticket's — the door would admit the wrong one.
+  it('is never the last ticket’s pass, shown as another', () => {
+    expect(passOnShow('t-2', first)).toBeNull()
+  })
+
+  // A registration with nothing to open must not inherit the last one's
+  // download link.
+  it('is nothing when no ticket is asked for', () => {
+    expect(passOnShow(null, first)).toBeNull()
+  })
+
+  it('carries a refusal through, so it can be read', () => {
+    const refused: Panel<TicketPass> = { ok: false, error: "This ticket isn't available." }
+    expect(passOnShow('t-1', refused)).toBe(refused)
   })
 })
 
