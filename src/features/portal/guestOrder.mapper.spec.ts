@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AWAITING_APPROVAL_FREE_STATE,
   AWAITING_APPROVAL_PAID_STATE,
+  accountOfferFor,
   receiptHeading,
   toGuestOrder,
 } from './guestOrder.mapper'
@@ -438,6 +439,199 @@ describe('toGuestOrder', () => {
 
     it('is empty while the order is unpaid, rather than inventing one', () => {
       expect(order({ tickets: [], paymentRequired: true }).tickets).toEqual([])
+    })
+  })
+
+  /**
+   * Whether there is a ticket to keep — the only order the account offer is
+   * about (US-DISC-15: "Given I have just confirmed a registration … alongside
+   * my ticket").
+   */
+  describe('ticketed', () => {
+    const ISSUED = WIRE.tickets[0]
+
+    it('is true for a confirmed order holding a ticket that admits', () => {
+      expect(order().ticketed).toBe(true)
+      expect(order({ tickets: [{ ...ISSUED, status: 'checked_in' }] }).ticketed).toBe(true)
+    })
+
+    it('is false while the money is owed, in line, or waiting for the organizer', () => {
+      expect(order(UNPAID).ticketed).toBe(false)
+      expect(order({ status: 'waitlisted', paymentStatus: 'pending', tickets: [] }).ticketed).toBe(
+        false,
+      )
+      expect(
+        order({ status: 'pending', awaitingApproval: true, paymentStatus: 'paid', tickets: [] })
+          .ticketed,
+      ).toBe(false)
+    })
+
+    it('is false once the order lapsed, was cancelled, refunded or turned down', () => {
+      expect(order({ ...UNPAID, status: 'expired', holdExpiresAt: null }).ticketed).toBe(false)
+      expect(order({ status: 'cancelled', tickets: [] }).ticketed).toBe(false)
+      expect(
+        order({ paymentStatus: 'refunded', tickets: [{ ...ISSUED, status: 'refunded' }] }).ticketed,
+      ).toBe(false)
+      expect(order({ status: 'rejected', paymentStatus: 'refunded', tickets: [] }).ticketed).toBe(
+        false,
+      )
+    })
+
+    // Belt and braces: the state decides, whatever a stray ticket row says.
+    it('is false for an order that is not confirmed even if a ticket still reads as issued', () => {
+      expect(order({ status: 'cancelled' }).ticketed).toBe(false)
+      expect(order({ paymentStatus: 'refunded' }).ticketed).toBe(false)
+    })
+
+    it('is false for a confirmed order with no ticket that admits', () => {
+      expect(order({ tickets: [] }).ticketed).toBe(false)
+      expect(order({ tickets: [{ ...ISSUED, status: 'void' }] }).ticketed).toBe(false)
+    })
+  })
+})
+
+/**
+ * The account offer under the order (US-DISC-15).
+ *
+ * Opening this page proves nothing about who reads the buyer's inbox — its
+ * link is shown to whoever booked, before anybody reads that inbox — so the
+ * offer never makes an account here. "Create account" emails the booking's
+ * address a link, and the account is made from that.
+ */
+describe('accountOfferFor', () => {
+  const ORDER = {
+    orderId: '0b9c6a52-3f43-4f7e-9d1e-5a0c1f2b7e11',
+    buyerEmail: 'anan@example.test',
+    ticketed: true,
+  }
+  const SIGN_IN_HERE =
+    '/portal/login?from=%2Fmy%2Ftickets%2Forders%2F0b9c6a52-3f43-4f7e-9d1e-5a0c1f2b7e11'
+  const NOT_NOW = 'Not now — your ticket is already in your email'
+  const NO_ACCOUNT = { accountExists: false, signedIn: false }
+  const HAS_ACCOUNT = { accountExists: true, signedIn: false }
+  const SIGNED_IN = { accountExists: true, signedIn: true }
+
+  // "… a way to dismiss it that says the ticket is already in my email."
+  it('offers to create an account for the booking’s address, dismissable', () => {
+    expect(accountOfferFor(ORDER, NO_ACCOUNT)).toEqual({
+      kind: 'create',
+      prompt: 'Create an account for anan@example.test and every booking is in one place.',
+      signInTo: SIGN_IN_HERE,
+      dismiss: NOT_NOW,
+      error: null,
+    })
+  })
+
+  // An unpaid, waiting or turned-down order has no ticket, and no ticket
+  // email went out — so there is nothing to keep, and the dismiss line would
+  // be false. No offer at all, rather than an offer that lies.
+  it('makes no offer, and so no ticket-in-your-email claim, for an order with no ticket', () => {
+    const noTicketYet = [
+      order(UNPAID),
+      order({ status: 'waitlisted', paymentStatus: 'pending', tickets: [] }),
+      order({ status: 'pending', awaitingApproval: true, paymentStatus: 'paid', tickets: [] }),
+      order({ status: 'pending', awaitingApproval: true, paymentStatus: 'pending', tickets: [] }),
+    ]
+    for (const waiting of noTicketYet) {
+      expect(accountOfferFor(waiting, NO_ACCOUNT)).toBeNull()
+      expect(accountOfferFor(waiting, HAS_ACCOUNT)).toBeNull()
+    }
+  })
+
+  it('makes it for a confirmed order straight from the mapper', () => {
+    expect(accountOfferFor(order(), NO_ACCOUNT)).toMatchObject({ kind: 'create', dismiss: NOT_NOW })
+  })
+
+  // "Given I registered with an email that already has an account, when I
+  // follow the link, then I am invited to sign in instead of being offered a
+  // duplicate."
+  it('invites a buyer who already has an account to sign in, offering no duplicate', () => {
+    expect(accountOfferFor(ORDER, HAS_ACCOUNT)).toEqual({
+      kind: 'sign-in',
+      prompt:
+        'You already have an account for anan@example.test. Sign in to see every booking in one place.',
+      signInTo: SIGN_IN_HERE,
+      dismiss: NOT_NOW,
+      error: null,
+    })
+  })
+
+  // The address is the one the API sent to, not the one this page holds.
+  it('says where the link went once it is on its way, in place of the offer', () => {
+    expect(accountOfferFor(ORDER, NO_ACCOUNT, { sentTo: 'anan@example.test' })).toEqual({
+      kind: 'sent',
+      message:
+        "We've sent a link to anan@example.test. Open it to choose a password — it proves the address is yours.",
+    })
+  })
+
+  // A throttle, or an account made since the page loaded: the API's sentence,
+  // as it is, beside the offer that is still there to use.
+  it('keeps the offer and shows the API’s refusal verbatim', () => {
+    const refused = 'An account already uses this email. Sign in instead.'
+
+    expect(accountOfferFor(ORDER, HAS_ACCOUNT, { error: refused })).toMatchObject({
+      kind: 'sign-in',
+      error: refused,
+    })
+    expect(accountOfferFor(ORDER, NO_ACCOUNT, { error: 'Please wait before asking again.' })).toMatchObject(
+      { kind: 'create', error: 'Please wait before asking again.' },
+    )
+  })
+
+  // Back from signing in through the offer (TC-DISC-32), or booked while
+  // signed in: "Sign in" would bounce off the guest-only sign-in, and
+  // "Create account" would ask for an account they are already using.
+  it('points somebody already signed in at My Events instead of asking them to sign in', () => {
+    expect(accountOfferFor(ORDER, SIGNED_IN)).toEqual({
+      kind: 'signed-in',
+      prompt: 'You’re signed in — My Events lists every booking made with your account’s email.',
+      myEventsTo: '/portal/my-events',
+    })
+    expect(accountOfferFor(ORDER, { accountExists: false, signedIn: true })).toMatchObject({
+      kind: 'signed-in',
+    })
+  })
+
+  it('still makes no offer to somebody signed in when there is no ticket', () => {
+    expect(accountOfferFor(order(UNPAID), SIGNED_IN)).toBeNull()
+  })
+
+  /**
+   * The API emails a claim link only for a booking it has confirmed, and
+   * refuses any other in its own words. That refusal is never reached from
+   * here: "Create account" exists only on an offer, an offer only for a
+   * confirmed order holding a ticket that admits, and the API issues tickets
+   * only in the step that confirms an order. So every status it has besides
+   * `confirmed`, in each shape it actually sends, makes no offer — to anybody.
+   */
+  describe('for a booking the API has not confirmed', () => {
+    const LAPSED = '2026-08-17T04:59:00.000Z'
+    const NOT_CONFIRMED: [string, Partial<GuestOrderWire>][] = [
+      ['pending, seats held for payment', UNPAID],
+      ['pending, hold lapsed but not yet swept', { ...UNPAID, holdExpiresAt: LAPSED }],
+      [
+        'pending, paid and awaiting approval',
+        { status: 'pending', awaitingApproval: true, paymentStatus: 'paid', tickets: [] },
+      ],
+      [
+        'pending, free and awaiting approval',
+        { status: 'pending', awaitingApproval: true, paymentStatus: 'pending', tickets: [] },
+      ],
+      ['waitlisted', { status: 'waitlisted', paymentStatus: 'pending', tickets: [] }],
+      ['expired', { ...UNPAID, status: 'expired', holdExpiresAt: null }],
+      ['cancelled, its ticket still reading as issued', { status: 'cancelled' }],
+      ['rejected after payment', { status: 'rejected', paymentStatus: 'refunded', tickets: [] }],
+      [
+        'rejected before any payment',
+        { status: 'rejected', paymentStatus: 'pending', paymentRequired: false, tickets: [] },
+      ],
+    ]
+
+    it.each(NOT_CONFIRMED)('makes no offer — %s', (_, shape) => {
+      for (const context of [NO_ACCOUNT, HAS_ACCOUNT, SIGNED_IN]) {
+        expect(accountOfferFor(order(shape), context)).toBeNull()
+      }
     })
   })
 })

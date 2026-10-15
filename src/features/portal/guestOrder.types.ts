@@ -127,6 +127,13 @@ export interface GuestOrder {
    */
   holdExpiresAt: string | null
   /**
+   * Confirmed, with a ticket that still admits — so there is a ticket to keep,
+   * and the confirmation email carried it. The account offer is made for this
+   * order and no other (US-DISC-15): an unpaid, waiting or turned-down one has
+   * no ticket, and no ticket email went out.
+   */
+  ticketed: boolean
+  /**
    * True while a payment can still be started.
    *
    * Deliberately not just "unpaid": once the hold lapses the seats are back on
@@ -135,3 +142,47 @@ export interface GuestOrder {
    */
   payable: boolean
 }
+
+/* ── the account offer under the order (US-DISC-15) ───────────────────── */
+
+/** What the offer needs to know besides the order. */
+export interface AccountOfferContext {
+  /** An attendee account already uses the buyer's email — offer sign-in only. */
+  accountExists: boolean
+  /** Whoever is looking is signed in to an attendee account already. */
+  signedIn: boolean
+}
+
+/** What asking for the account link reported: where it went, or why not. */
+export interface AccountLinkResult {
+  /** The booking's own address, as the API sent to it. */
+  sentTo?: string
+  /** The API's own sentence, shown verbatim — it was written for the reader. */
+  error?: string
+}
+
+/**
+ * What the offer says and offers. `create` and `sign-in` are the offer itself,
+ * either of which can be dismissed; `sent` replaces it once the link is on its
+ * way, because the next step happens in an inbox; `signed-in` replaces it for
+ * somebody already signed in, who has nothing left to create or sign in to.
+ * An order with no ticket to keep gets no offer at all — `accountOfferFor`
+ * answers `null`.
+ */
+export type AccountOffer =
+  | {
+      kind: 'create' | 'sign-in'
+      prompt: string
+      /** The portal's sign-in, returning here afterwards. */
+      signInTo: string
+      /** Saying no, and why it costs nothing: the ticket is already in their inbox. */
+      dismiss: string
+      error: string | null
+    }
+  | { kind: 'sent'; message: string }
+  | {
+      kind: 'signed-in'
+      prompt: string
+      /** Where every booking made with their address is listed. */
+      myEventsTo: string
+    }

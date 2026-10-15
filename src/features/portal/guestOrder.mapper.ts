@@ -1,6 +1,10 @@
+import { homeFor, signInPathFor } from '@/features/auth/personas'
 import { bangkokDate, satang } from '@/lib/format'
 import { QR_FILE_EXTENSION, qrDataUrl } from '@/lib/qr'
 import type {
+  AccountLinkResult,
+  AccountOffer,
+  AccountOfferContext,
   GuestOrder,
   GuestOrderLineWire,
   GuestOrderWire,
@@ -105,8 +109,79 @@ export function receiptHeading({ canPay, paid }: { canPay: boolean; paid: boolea
   return paid ? RECEIPT_HEADING.paid : RECEIPT_HEADING.neither
 }
 
+/** Settled: paid or free, approved, and still standing. */
+const CONFIRMED_STATE: OrderState = {
+  label: 'Confirmed',
+  tone: 'green',
+  detail: 'Show the code below at the door.',
+}
+
+/** How the offer is turned down — true only because it is made only for a ticketed order. */
+const NOT_NOW = 'Not now — your ticket is already in your email'
+
+/** For somebody already signed in, the offer's whole point: where every booking is. */
+const SIGNED_IN_PROMPT =
+  'You’re signed in — My Events lists every booking made with your account’s email.'
+
+/** Where this order lives — the link in the confirmation email. */
+export function guestOrderPath(orderId: string): string {
+  return `/my/tickets/orders/${orderId}`
+}
+
+/**
+ * The account offer under the order (US-DISC-15), or `null` for none.
+ *
+ * Made only for an order with a ticket to keep — "I have just confirmed a
+ * registration", "alongside my ticket" — because its dismiss line says the
+ * ticket is already in their email, which is false for an order still unpaid,
+ * waiting or turned down: no ticket exists and no ticket email went out.
+ *
+ * Opening this page proves nothing about who reads the buyer's inbox — its
+ * link is shown to whoever booked, before anybody reads that inbox — so no
+ * account is ever made here, and no password is ever asked for here. "Create
+ * account" emails the booking's address a one-time link, and the account is
+ * made from that. An address that already has an account is invited to sign
+ * in instead, with no way to ask for a duplicate — and somebody already
+ * signed in, back from doing just that, is pointed at My Events rather than
+ * asked to sign in again.
+ *
+ * `link` is what the request for the link reported, when one was made.
+ */
+export function accountOfferFor(
+  order: Pick<GuestOrder, 'orderId' | 'buyerEmail' | 'ticketed'>,
+  { accountExists, signedIn }: AccountOfferContext,
+  link?: AccountLinkResult,
+): AccountOffer | null {
+  if (!order.ticketed) return null
+  if (signedIn) {
+    return { kind: 'signed-in', prompt: SIGNED_IN_PROMPT, myEventsTo: homeFor('attendee') }
+  }
+  if (link?.sentTo) {
+    return {
+      kind: 'sent',
+      message: `We've sent a link to ${link.sentTo}. Open it to choose a password — it proves the address is yours.`,
+    }
+  }
+  return {
+    kind: accountExists ? 'sign-in' : 'create',
+    prompt: accountExists
+      ? `You already have an account for ${order.buyerEmail}. Sign in to see every booking in one place.`
+      : `Create an account for ${order.buyerEmail} and every booking is in one place.`,
+    signInTo: signInBackTo(order.orderId),
+    dismiss: NOT_NOW,
+    error: link?.error ?? null,
+  }
+}
+
+/** The portal's sign-in, coming back to this order afterwards. */
+function signInBackTo(orderId: string): string {
+  return `${signInPathFor('attendee')}?from=${encodeURIComponent(guestOrderPath(orderId))}`
+}
+
 export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
   const holdLive = isHoldLive(wire, now)
+  const state = stateOf(wire, holdLive)
+  const tickets = wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName))
   return {
     orderId: wire.orderId,
     reference: wire.reference,
@@ -114,19 +189,22 @@ export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
     buyerName: wire.buyerName,
     buyerEmail: wire.buyerEmail,
     placedOn: bangkokDate(wire.placedAt),
-    state: stateOf(wire, holdLive),
+    state,
     lines: wire.lines.map(toLine),
     subtotal: satang(wire.subtotalSatang),
     // Nothing taken off is not a discount of zero: the row is simply absent.
     discount: wire.discountSatang > 0 ? satang(wire.discountSatang) : null,
     vat: satang(wire.vatSatang),
     total: satang(wire.totalSatang),
-    tickets: wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName)),
+    tickets,
     awaitingPayment: isOwed(wire),
     paid: MONEY_CHANGED_HANDS.has(wire.paymentStatus),
     onWaitlist: wire.status === WAITLISTED,
     awaitingApproval: wire.awaitingApproval,
     ticketsExplained: ticketsExplained(wire),
+    // The state decides first: a stray ticket row on a cancelled or refunded
+    // order is not a ticket to keep.
+    ticketed: state === CONFIRMED_STATE && tickets.some((ticket) => ticket.valid),
     holdExpiresAt: wire.holdExpiresAt,
     payable: isOwed(wire) && wire.status === 'pending' && holdLive,
   }
@@ -244,5 +322,5 @@ function stateOf(wire: GuestOrderWire, holdLive: boolean): OrderState {
       detail: 'Your seats are held until the countdown ends.',
     }
   }
-  return { label: 'Confirmed', tone: 'green', detail: 'Show the code below at the door.' }
+  return CONFIRMED_STATE
 }

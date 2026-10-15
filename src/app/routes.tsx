@@ -606,10 +606,14 @@ export const router = createBrowserRouter([
         // The attendee's own sign-up, paired with /portal/login. Separate from
         // the organizer's at /auth/register for the same reason the logins are
         // separate: different audience, different copy, different realm.
+        // Also where a booking's emailed account link lands — the API builds it
+        // as `${PUBLIC_WEB_URL}/portal/register?claim=…` (US-DISC-15) — so the
+        // loader checks that link, and keeps the guest guard for the ordinary
+        // sign-up only.
         path: '/portal/register',
-        ...page(
+        ...livePage(
           () => import('@/features/portal/pages/PortalRegisterPage'),
-          guestOnly('attendee'),
+          () => import('@/features/portal/portalRegister.routes').then((m) => m.portalRegisterRoute),
         ),
       },
       {

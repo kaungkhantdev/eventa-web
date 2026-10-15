@@ -1,6 +1,13 @@
 import type { Persona } from '@/lib/persona'
 
 /**
+ * The typo guard's words, for both attendee sign-ups — the ordinary form and
+ * the one opened from a booking's emailed link (US-DISC-15) — so they cannot
+ * drift apart.
+ */
+export const PASSWORDS_DIFFER = 'Those passwords do not match.'
+
+/**
  * The sign-up form, as `POST /auth/register` wants it.
  *
  * The mirror of `credentialsOf`, and a named function for the same reason: the
@@ -50,4 +57,30 @@ function workspaceOf(form: FormData, persona: Persona): { organizationName?: str
   if (persona === 'attendee') return {}
   const name = String(form.get('organizationName') ?? '').trim()
   return name ? { organizationName: name } : {}
+}
+
+/**
+ * The form behind the emailed claim link (US-DISC-15), as
+ * `POST /auth/register/from-booking/claim` wants it: the link's token, the
+ * password and the terms.
+ *
+ * No name and no email, whatever the form holds. The address is the one the
+ * link was sent to, read by the API from the token it signed, and the name is
+ * the booking's — the API's whitelist refuses either from a client, and a
+ * claim that could name its own address would be the takeover this link
+ * exists to prevent.
+ */
+export interface BookingClaimInput {
+  token: string
+  password: string
+  acceptTerms: boolean
+}
+
+export function bookingClaimInputOf(form: FormData, token: string): BookingClaimInput {
+  return {
+    token,
+    password: String(form.get('password') ?? ''),
+    // Passed through, never asserted — the same rule as `signUpInputOf`.
+    acceptTerms: form.get('acceptTerms') === 'on',
+  }
 }
