@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
+import type { Panel } from '@/app/panels'
 import { MASKED } from '@/lib/format'
+import { qrDataUrl } from './lib/qr'
 import {
+  ticketChoices,
   toMyEventRow,
   toPaymentTotals,
+  toTicketPass,
   toTransactionRow,
   type TransactionStatusWire,
 } from './myEvents.mapper'
 import type {
   MyRegistrationWire,
   PaymentSummaryWire,
+  TicketPassWire,
   TransactionWire,
 } from './myEvents.types'
 
@@ -26,10 +31,42 @@ const registration = (over: Partial<MyRegistrationWire> = {}): MyRegistrationWir
   coverImage: null,
   ticketTypeName: 'VIP',
   ticketCount: 2,
+  ticketIds: ['t-1', 't-2'],
   countdown: 'in 3 days',
   attended: false,
   ...over,
 })
+
+const TOKEN = 'K7M2Q9XW4RT8V3NP6JHY5CBD'
+
+const ticketPass = (over: Partial<TicketPassWire> = {}): TicketPassWire => ({
+  id: 't-1',
+  reference: 'ORD-7K2M9QX4',
+  qrToken: TOKEN,
+  status: 'issued',
+  valid: true,
+  holderName: 'Anan Suksawat',
+  ticketLabel: 'VIP',
+  admissionNumber: '1 of 2',
+  eventName: 'Tech Summit 2026',
+  eventSlug: 'tech-summit-2026',
+  startAt: '2026-07-18T02:00:00.000Z',
+  timezone: 'Asia/Bangkok',
+  venueName: 'BITEC',
+  venueAddress: null,
+  city: 'Bangkok',
+  isOnline: false,
+  seat: null,
+  ...over,
+})
+
+/** What `GET /me/tickets/{id}/pass.svg` answered. */
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg"><text>ORD-7K2M9QX4 · 1 of 2</text></svg>'
+const PRINTED: Panel<string> = { ok: true, data: SVG }
+const REFUSED: Panel<string> = {
+  ok: false,
+  error: 'This ticket is no longer valid and cannot be downloaded as a pass.',
+}
 
 const transaction = (over: Partial<TransactionWire> = {}): TransactionWire => ({
   paymentId: 'p-1',
@@ -88,6 +125,91 @@ describe('an event the attendee is registered for', () => {
 
   it('records whether they actually turned up', () => {
     expect(toMyEventRow(registration({ attended: true })).attended).toBe(true)
+  })
+
+  // A ticket is opened by its own id: the order alone cannot say which QR.
+  it('carries the order’s ticket ids, so each ticket can be opened', () => {
+    expect(toMyEventRow(registration()).ticketIds).toEqual(['t-1', 't-2'])
+  })
+})
+
+describe('one ticket, opened (US-DISC-07)', () => {
+  // The station looks a ticket up by its token and nothing else. The modal used
+  // to draw the event's public URL — the same picture for every buyer, and one
+  // the door answers "Invalid ticket".
+  it('encodes the ticket’s own token in the QR, never the event page', () => {
+    const { qr } = toTicketPass(ticketPass(), PRINTED)
+    expect(qr).toBe(qrDataUrl(TOKEN))
+    expect(qr).not.toBe(qrDataUrl('https://eventa.test/e/tech-summit-2026'))
+  })
+
+  it('gives each ticket of an order a QR of its own', () => {
+    const first = toTicketPass(ticketPass(), PRINTED)
+    const second = toTicketPass(
+      ticketPass({ id: 't-2', qrToken: 'Q4V8N2M7K3P9X6R5T1W0YHJC' }),
+      PRINTED,
+    )
+    expect(first.qr).not.toBe(second.qr)
+  })
+
+  it('shows its reference and which admission it is', () => {
+    expect(toTicketPass(ticketPass(), PRINTED)).toMatchObject({
+      id: 't-1',
+      reference: 'ORD-7K2M9QX4',
+      admission: '1 of 2',
+      valid: true,
+    })
+  })
+
+  // A refunded or voided ticket admits nobody, so it is not drawn as one.
+  it('draws no QR for a ticket that is no longer valid', () => {
+    const refunded = toTicketPass(ticketPass({ status: 'refunded', valid: false }), REFUSED)
+    expect(refunded.valid).toBe(false)
+    expect(refunded.qr).toBeNull()
+  })
+})
+
+describe('the downloadable ticket (US-DISC-07)', () => {
+  // The PNG this replaced was painted here, and invented most of what it
+  // printed: doors at start minus 30 minutes, VIP from a regex on the tier
+  // name, row, seat, gate and admission number hashed from the venue name, and
+  // the event's URL as the QR. The API's pass prints the real token, class,
+  // seat and admission number, and refuses a ticket that no longer admits.
+  it('is the pass the API printed, byte for byte', () => {
+    const { printable } = toTicketPass(ticketPass(), PRINTED)
+    expect(printable).not.toBeNull()
+    expect(printable!.startsWith('data:image/svg+xml')).toBe(true)
+    expect(decodeURIComponent(printable!.slice(printable!.indexOf(',') + 1))).toBe(SVG)
+  })
+
+  it('is saved under the ticket’s own name', () => {
+    expect(toTicketPass(ticketPass(), PRINTED).filename).toBe('eventa-ticket-t-1.svg')
+  })
+
+  it('is not offered for a ticket the API will not print, and says why', () => {
+    const refused = toTicketPass(ticketPass({ status: 'void', valid: false }), REFUSED)
+    expect(refused.printable).toBeNull()
+    expect(refused.printRefusal).toBe(
+      'This ticket is no longer valid and cannot be downloaded as a pass.',
+    )
+  })
+
+  it('has nothing to explain when it can be downloaded', () => {
+    expect(toTicketPass(ticketPass(), PRINTED).printRefusal).toBeNull()
+  })
+})
+
+describe('choosing among an order’s tickets', () => {
+  it('numbers them in admission order', () => {
+    expect(ticketChoices(['t-1', 't-2'])).toEqual([
+      { value: 't-1', label: 'Ticket 1' },
+      { value: 't-2', label: 'Ticket 2' },
+    ])
+  })
+
+  // One ticket needs no switcher.
+  it('offers no choice when there is only one', () => {
+    expect(ticketChoices(['t-1'])).toEqual([])
   })
 })
 
