@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { templateOf } from './eventForm.routes'
+import { ApiError } from '@/lib/api'
+import { categoryChoices, templateOf } from './eventForm.routes'
+import type { CategoryWire } from './types'
 
 /**
  * Which design the wizard opens on.
@@ -29,5 +31,45 @@ describe('templateOf', () => {
   it('ignores a template id it does not know, on either side', () => {
     expect(templateOf(query('template=gothic'), 'minimal')).toBe('minimal')
     expect(templateOf(query(''), 'gothic')).toBe('aurora')
+  })
+})
+
+/**
+ * The category picker's options (US-EVT-03). Listing categories needs the
+ * settings permission, which an organizer who may create events need not have.
+ * For them the wizard offers no picker rather than failing to open at all.
+ */
+describe('categoryChoices', () => {
+  const wire = (id: number, name: string): CategoryWire => ({
+    id,
+    name,
+    description: null,
+    icon: 'hgi-star',
+    color: 'brand',
+    eventCount: 0,
+    createdAt: '2026-01-01T00:00:00Z',
+    version: 1,
+  })
+
+  it('offers each category by name', async () => {
+    const choices = await categoryChoices(async () => [wire(1, 'Birthday'), wire(2, 'Wedding')])
+    expect(choices).toEqual([
+      { id: 1, name: 'Birthday' },
+      { id: 2, name: 'Wedding' },
+    ])
+  })
+
+  it('offers no picker to someone who may not list categories', async () => {
+    const forbidden = async () => {
+      throw new ApiError(403, { message: "You don't have access to that." })
+    }
+    expect(await categoryChoices(forbidden)).toBeNull()
+  })
+
+  it('still fails on anything else, rather than hiding it', async () => {
+    const broken = async () => {
+      throw new ApiError(500, {})
+    }
+    await expect(categoryChoices(broken)).rejects.toBeInstanceOf(ApiError)
   })
 })

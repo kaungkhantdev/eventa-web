@@ -39,6 +39,8 @@ export interface EventFormValues {
   name: string
   description: string
   type: EventType
+  /** The workspace category, or null for none (US-EVT-03). */
+  categoryId: number | null
   /** `2026-07-18` and `09:00`, the Bangkok wall clock the organizer set. */
   startDate: string
   startTime: string
@@ -77,6 +79,7 @@ function emptyValues(): EventFormValues {
     name: '',
     description: '',
     type: DEFAULT_TYPE,
+    categoryId: null,
     startDate: '',
     startTime: '',
     endDate: '',
@@ -130,6 +133,7 @@ export function toEventFormValues(
     name: event.name,
     description: event.description ?? '',
     type: event.type,
+    categoryId: event.categoryId ?? null,
     startDate: bangkokDayKey(event.startAt),
     startTime: bangkokTime(event.startAt),
     endDate: event.endAt ? bangkokDayKey(event.endAt) : '',
@@ -162,7 +166,13 @@ export function toCreateBody(values: EventFormValues) {
     type: values.type,
     startAt: bangkokInstant(values.startDate, values.startTime),
     ...(description ? { description } : {}),
+    ...(values.categoryId === null ? {} : { categoryId: values.categoryId }),
   }
+}
+
+/** The category picker's value → the id, or null for its "No category" option. */
+export function categoryIdOf(value: string): number | null {
+  return value === '' ? null : Number(value)
 }
 
 /**
@@ -178,6 +188,8 @@ export function toUpdateBody(values: EventFormValues) {
     name: values.name.trim(),
     description: values.description.trim(),
     type: values.type,
+    // null clears it — leaving the key out would mean "unchanged".
+    categoryId: values.categoryId,
     startAt: bangkokInstant(values.startDate, values.startTime),
     endAt: bangkokInstant(values.endDate, values.endTime),
     venueName: values.venueName.trim(),

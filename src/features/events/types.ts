@@ -76,6 +76,11 @@ export interface EventWire {
   /** The public page's design — null until one has been chosen. */
   landingTemplateId?: string | null
   /**
+   * The workspace category it is filed under, or null for none. Optional: only
+   * the full event response is relied on to carry it.
+   */
+  categoryId?: number | null
+  /**
    * `public` | `unlisted` | `private` (`EventResponseDto.visibility`). Only a
    * `public` event is served by slug, so this decides whether a real public
    * page exists to link to. Optional: the calendar's slimmer payload omits it.

@@ -7,7 +7,12 @@ import type { ActionResult } from '@/app/loaders'
 import { NotificationBell, SignedInChip, Toggle, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
-import { publishGaps, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
+import {
+  categoryIdOf,
+  publishGaps,
+  type EventFormValues,
+  type TicketDraft,
+} from '../eventForm.mapper'
 import type { EventFormData } from '../eventForm.routes'
 import { EVENT_TYPES } from '../events.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
@@ -219,7 +224,7 @@ function DescriptionEditor({
 export default function EventFormPage() {
   const ctx = useOutletContext<AdminOutletContext | null>()
 
-  const { values: initial, template } = useLoaderData() as EventFormData
+  const { values: initial, template, categories } = useLoaderData() as EventFormData
   const fetcher = useFetcher<ActionResult>()
   const saving = fetcher.state !== 'idle'
 
@@ -231,6 +236,7 @@ export default function EventFormPage() {
   const [title, setTitle] = useState(initial.name)
   const [description, setDescription] = useState(initial.description)
   const [type, setType] = useState<EventType>(initial.type)
+  const [categoryId, setCategoryId] = useState<number | null>(initial.categoryId)
   const [startDate, setStartDate] = useState(initial.startDate)
   const [startTime, setStartTime] = useState(initial.startTime)
   const [endDate, setEndDate] = useState(initial.endDate)
@@ -273,6 +279,7 @@ export default function EventFormPage() {
     name: title,
     description,
     type,
+    categoryId,
     startDate,
     startTime,
     endDate,
@@ -595,6 +602,28 @@ export default function EventFormPage() {
                       ))}
                     </select>
                   </div>
+                  {/* Absent for someone who may not list the workspace's
+                      categories; their event keeps whatever it has. */}
+                  {categories && (
+                    <div>
+                      <label className="label" htmlFor="event-category">
+                        Category
+                      </label>
+                      <select
+                        id="event-category"
+                        className="select"
+                        value={categoryId ?? ''}
+                        onChange={(e) => setCategoryId(categoryIdOf(e.target.value))}
+                      >
+                        <option value="">No category</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
