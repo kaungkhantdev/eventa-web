@@ -20,6 +20,8 @@ import { PAGE_SIZES, type PageWindow } from '@/lib/paging'
 import type { ListEmptyReason } from '@/lib/urlFilters'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
+import { CancelEventModal } from '../components/CancelEventModal'
+import { DeleteEventModal } from '../components/DeleteEventModal'
 import { EventCalendar } from '../components/EventCalendar'
 import { COVER, STATUS_PILL, eventDetailPath as detailPath } from '../events.presentation'
 import { EVENT_SORTS, EVENT_TYPES, type EventsData } from '../events.routes'
@@ -328,6 +330,24 @@ function EventsTable({
   empty: ReactNode
 }) {
   const menu = useRowMenu()
+  // Delete in the menu only asks; the dialog is what deletes (US-EVT-08). It
+  // lives here rather than in the menu, which closes on any click outside it.
+  const [subject, setSubject] = useState<{ row: EventRow | null; attempt: number }>({
+    row: null,
+    attempt: 0,
+  })
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const askDelete = (row: EventRow) => {
+    menu.close()
+    setSubject((prev) => ({ row, attempt: prev.attempt + 1 }))
+    setDeleteOpen(true)
+  }
+  // The API refused the delete and said to cancel instead (US-EVT-08).
+  const cancelInstead = () => {
+    setDeleteOpen(false)
+    setCancelOpen(true)
+  }
 
   return (
     <section className="card mt-3 scroll-mt-4 p-4">
@@ -366,8 +386,19 @@ function EventsTable({
           position={menu.position}
           menuRef={menu.ref}
           onClose={menu.close}
+          onDelete={askDelete}
         />
       )}
+
+      <DeleteEventModal
+        dialog={{ ...subject, open: deleteOpen }}
+        onClose={() => setDeleteOpen(false)}
+        onCancelInstead={cancelInstead}
+      />
+      <CancelEventModal
+        dialog={{ ...subject, open: cancelOpen }}
+        onClose={() => setCancelOpen(false)}
+      />
     </section>
   )
 }
@@ -430,6 +461,7 @@ function RowMenu({
   position,
   menuRef,
   onClose,
+  onDelete,
 }: {
   row: EventRow
   canDuplicate: boolean
@@ -437,13 +469,15 @@ function RowMenu({
   position: { left: number; top: number }
   menuRef: React.RefObject<HTMLDivElement | null>
   onClose: () => void
+  /** Ask to delete — the confirmation dialog, not this menu, does it. */
+  onDelete: (row: EventRow) => void
 }) {
   const fetcher = useFetcher<ActionResult>()
   const refusal = fetcher.data?.error
   const busy = fetcher.state !== 'idle'
 
-  // The row is gone once the delete lands, so the popover pointing at it goes
-  // too. A refusal keeps it open, with the reason under the button.
+  // The copy is made once the duplicate lands, so the popover goes. A refusal
+  // keeps it open, with the reason under the button.
   useEffect(() => {
     if (fetcher.state === 'idle' && fetcher.data?.ok) onClose()
   }, [fetcher.state, fetcher.data, onClose])
@@ -475,26 +509,18 @@ function RowMenu({
       {canDelete && (
         <>
           <div className="my-1 h-px bg-line" />
-          <fetcher.Form method="post">
-            <input type="hidden" name="id" value={row.id} />
-            <input type="hidden" name="version" value={row.version} />
-            <button
-              type="submit"
-              disabled={busy}
-              className={cn(
-                MENU_ITEM,
-                'text-red-500 hover:bg-red-50 disabled:opacity-60 dark:hover:bg-red-500/15',
-              )}
-            >
-              <Icon name="hgi-delete-02" size={15} />
-              {busy ? 'Deleting…' : 'Delete'}
-            </button>
-          </fetcher.Form>
+          <button
+            type="button"
+            onClick={() => onDelete(row)}
+            className={cn(MENU_ITEM, 'text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15')}
+          >
+            <Icon name="hgi-delete-02" size={15} />
+            Delete
+          </button>
         </>
       )}
       {/* The API decides what may be done and writes the refusal for the person
-          reading it — a published event has to be cancelled so that attendees
-          are refunded and told. Shown verbatim. */}
+          reading it. Shown verbatim. */}
       {refusal && (
         <p role="alert" className="px-2.5 py-2 text-[12px] leading-snug text-red-500">
           {refusal}

@@ -65,6 +65,25 @@ export function toDraftPreview(params: URLSearchParams): LandingEvent {
 }
 
 /**
+ * A live event's saved page with what is typed in the wizard laid over it
+ * (US-PAGE-09): the preview shows the organizer's edits before they are saved.
+ *
+ * Only the fields the wizard sends are touched, and only when it sent them —
+ * the landing gallery and Discover open the same URL with none, and get the
+ * saved page as it is. A field sent empty is cleared, except the title: a live
+ * event always has one, and a blank hero previews nothing.
+ */
+export function overlayDraft(params: URLSearchParams, event: LandingEvent): LandingEvent {
+  return {
+    ...event,
+    title: params.get('title')?.trim() || event.title,
+    venue: params.get('venue')?.trim() ?? event.venue,
+    online: params.has('online') ? params.get('online') === '1' : event.online,
+    highlights: params.has('hl') ? highlightsOf(params.get('hl')) : event.highlights,
+  }
+}
+
+/**
  * `hgi-wifi:Free WiFi|hgi-coffee:Lunch` → the pairs the wizard packed.
  *
  * Split on the FIRST colon only: a label may perfectly well contain one, and

@@ -59,6 +59,12 @@ describe('toSpeakerCard', () => {
     expect(card.avatar).toBeTruthy()
     expect(card.avatar).toBe(toSpeakerCard(speaker({ tone: null })).avatar)
   })
+
+  // The edit form sends this back, so a colleague's save in between is
+  // refused instead of silently overwritten (US-PROG-10).
+  it('carries the version the card was read at', () => {
+    expect(toSpeakerCard(speaker({ version: 7 })).version).toBe(7)
+  })
 })
 
 const session = (over: Partial<SessionWire> = {}): SessionWire => ({
@@ -120,6 +126,26 @@ describe('toAgendaBlock', () => {
 
     expect(block.top).toBe(0)
     expect(block.height).toBeGreaterThan(0)
+  })
+
+  // "Ends" may be left blank, and the API stores that as no end at all. One
+  // such session used to throw inside the loader and take the whole agenda
+  // down with it (US-PROG-01).
+  describe('a session with no end time', () => {
+    const open = () => toAgendaBlock(session({ startTime: '10:00:00', endTime: null }))
+
+    it('is still placed at its start', () => {
+      expect(open().top).toBe(HOUR_HEIGHT)
+      expect(open().height).toBeGreaterThan(0)
+    })
+
+    it('shows only when it starts', () => {
+      expect(open().time).toBe('10:00')
+    })
+
+    it('opens the edit form with the end left blank', () => {
+      expect(open().edit.endTime).toBe('')
+    })
   })
 })
 

@@ -138,17 +138,53 @@ function withPage(current: string, page: number): string {
 }
 
 /**
- * What the row menu can do: duplicate an event, or delete a draft. Anything
- * else the API refuses, and says why.
+ * A delete the organizer confirmed, or null when the form does not say they
+ * did. Only the confirmation dialog posts `confirm` (US-EVT-08).
+ */
+export function confirmedDeleteOf(form: FormData): { id: string; version: number } | null {
+  if (!deleteConfirmed(form)) return null
+  return { id: String(form.get('id') ?? ''), version: Number(form.get('version')) }
+}
+
+/** Only a confirmation dialog posts `confirm`. */
+function deleteConfirmed(form: FormData): boolean {
+  return form.get('confirm') === 'true'
+}
+
+/** Thrown for a delete nothing in the console posts — a bug, not a refusal. */
+const UNCONFIRMED_DELETE = 'This delete was not confirmed.'
+
+/** A cancellation, as `POST /events/:id/cancel` wants it (US-EVT-08). */
+export function cancelInputOf(form: FormData): { id: string; reason: string; version?: number } {
+  const version = Number(form.get('version'))
+  return {
+    id: String(form.get('id') ?? ''),
+    reason: String(form.get('reason') ?? '').trim(),
+    version: Number.isInteger(version) && version > 0 ? version : undefined,
+  }
+}
+
+/**
+ * What the list can do: duplicate an event, delete a draft once that is
+ * confirmed, or cancel an event that cannot be deleted. Anything else the API
+ * refuses, and says why.
  */
 async function runEventsAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
-  const id = String(form.get('id') ?? '')
-  if (form.get('intent') === 'duplicate') {
-    await eventsApi.duplicate(id)
+  const intent = form.get('intent')
+  if (intent === 'duplicate') {
+    await eventsApi.duplicate(String(form.get('id') ?? ''))
     return
   }
-  await eventsApi.remove(id, Number(form.get('version')))
+  if (intent === 'cancel') {
+    const { id, ...body } = cancelInputOf(form)
+    await eventsApi.cancel(id, body)
+    return
+  }
+  const deletion = intent === 'delete' ? confirmedDeleteOf(form) : null
+  // A delete nobody confirmed must not be the way a bug shows itself.
+  if (!deletion) throw new Error(UNCONFIRMED_DELETE)
+  await eventsApi.remove(deletion.id, deletion.version)
 }
 
 export const eventsRoute = {
@@ -283,6 +319,14 @@ export function categoryInputOf(form: FormData): CategoryInput {
   }
 }
 
+/**
+ * The category the organizer confirmed deleting, or null when the form does
+ * not say they did (US-EVT-11).
+ */
+export function categoryDeletionOf(form: FormData): number | null {
+  return deleteConfirmed(form) ? Number(form.get('id')) : null
+}
+
 /** Create, rename or remove a category. */
 async function runCategoriesAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
@@ -290,7 +334,9 @@ async function runCategoriesAction({ request }: LoaderArgs): Promise<void> {
   const id = Number(form.get('id'))
 
   if (intent === 'delete') {
-    await categoriesApi.remove(id)
+    const deletion = categoryDeletionOf(form)
+    if (deletion === null) throw new Error(UNCONFIRMED_DELETE)
+    await categoriesApi.remove(deletion)
     return
   }
 

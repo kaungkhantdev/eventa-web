@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { useFetcher, useLoaderData } from 'react-router'
+import { useLoaderData } from 'react-router'
 import { Button, EmptyState, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters } from '@/lib/useFilters'
 import { EventChooser } from '../components/EventChooser'
+import { RemoveSessionModal } from '../components/RemoveSessionModal'
 import { SessionPanel } from '../components/SessionPanel'
 import { HOUR_HEIGHT, calendarHours } from '../program.mapper'
 import type { AgendaData } from '../program.routes'
-import type { ActionResult } from '@/app/loaders'
 import type { AgendaBlock, AgendaDay, SessionColor, SessionDraft } from '../program.types'
 
 /**
@@ -33,7 +33,10 @@ export default function AgendaPage() {
   const panel = useDisclosure()
   const hours = calendarHours()
   const [editing, setEditing] = useState<SessionDraft | null>(null)
-  const remove = useFetcher<ActionResult>()
+  // The session awaiting the organizer's confirmation; nothing is removed
+  // until they confirm (US-PROG-04).
+  const [removing, setRemoving] = useState<string | null>(null)
+  const stopRemoving = () => setRemoving(null)
   const event = data.event
 
   const open = (session: SessionDraft | null) => {
@@ -161,19 +164,16 @@ export default function AgendaPage() {
         editing={editing}
         onDelete={() => {
           if (!editing) return
-          remove.submit(
-            { intent: 'delete', eventId: event.id, sessionId: editing.id },
-            { method: 'post' },
-          )
           panel.onClose()
+          setRemoving(editing.id)
         }}
       />
 
-      {remove.data?.ok === false && (
-        <p role="alert" className="mt-3 text-[13px] text-red-500">
-          {remove.data.error}
-        </p>
-      )}
+      <RemoveSessionModal
+        sessionId={removing}
+        onClose={stopRemoving}
+        fields={{ intent: 'delete', eventId: event.id }}
+      />
     </>
   )
 }

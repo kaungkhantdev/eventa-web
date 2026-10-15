@@ -4,6 +4,7 @@ import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/li
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { programApi } from '@/features/program/program.api'
 import { sessionTypeOf } from '@/features/program/program.mapper'
+import { removalConfirmed } from '@/features/program/program.routes'
 import { ticketingApi } from '@/features/ticketing/ticketing.api'
 import { eventDetailApi } from './eventDetail.api'
 import {
@@ -171,7 +172,7 @@ async function runEventDetailAction({ request }: LoaderArgs): Promise<void> {
   }
 
   if (form.get('intent') === 'remove-session') {
-    await programApi.removeSession(id, String(form.get('sessionId') ?? ''))
+    await programApi.removeSession(id, String(form.get('sessionId') ?? ''), removalConfirmed(form))
     return
   }
 

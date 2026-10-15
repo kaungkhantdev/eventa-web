@@ -40,6 +40,7 @@ import {
 } from '../eventDetail.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
 import { STATUS_PILL, copyLabel, type CopyState } from '../events.presentation'
+import { RemoveSessionModal } from '@/features/program/components/RemoveSessionModal'
 
 /* ---------- Event detail — admin/event-detail.html ----------
    Pill tabs switch between Overview, Registrations (filter + paging),
@@ -68,6 +69,9 @@ const FILTER_LABEL: Record<RegistrationFilter, string> = {
 
 /** Long enough to read, short enough to try again. */
 const COPIED_MS = 1500
+
+/** How this page's action names a session removal. */
+const REMOVE_SESSION_FIELDS = { intent: 'remove-session' }
 
 /** tone → avatar chip classes (light + dark). */
 const TONE: Record<AvatarTone, string> = {
@@ -134,6 +138,10 @@ export default function EventDetailPage() {
   const [sessionOpen, setSessionOpen] = useState(false)
   const [ticketOpen, setTicketOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  // The session awaiting the organizer's confirmation; nothing is removed
+  // until they confirm (US-PROG-04).
+  const [removingSession, setRemovingSession] = useState<string | null>(null)
+  const stopRemovingSession = () => setRemovingSession(null)
 
   const { header, overview } = data
   const publicUrl = overview.publicUrl
@@ -264,9 +272,7 @@ export default function EventDetailPage() {
         onTab={goTab}
         onAddSession={() => setSessionOpen(true)}
         onAddTicket={() => setTicketOpen(true)}
-        onRemoveSession={(sessionId) =>
-          fetcher.submit({ intent: 'remove-session', sessionId }, { method: 'post' })
-        }
+        onRemoveSession={setRemovingSession}
       />
 
       <p className="mt-4 text-center text-[11px] text-muted/70">
@@ -277,6 +283,11 @@ export default function EventDetailPage() {
         open={sessionOpen}
         onClose={() => setSessionOpen(false)}
         onAdd={(values) => fetcher.submit({ intent: 'add-session', ...values }, { method: 'post' })}
+      />
+      <RemoveSessionModal
+        sessionId={removingSession}
+        onClose={stopRemovingSession}
+        fields={REMOVE_SESSION_FIELDS}
       />
       <TicketPanel
         open={ticketOpen}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { toDraftPreview } from './draftPreview'
+import { overlayDraft, toDraftPreview } from './draftPreview'
+import type { LandingEvent } from './types'
 
 const preview = (query: string) => toDraftPreview(new URLSearchParams(query))
 
@@ -58,5 +59,52 @@ describe('toDraftPreview', () => {
   // Nothing has been published, so there is nowhere to send anybody.
   it('offers no registration link', () => {
     expect(preview('title=Tech Summit').registerUrl).toBe('')
+  })
+})
+
+/**
+ * Previewing a live event (US-PAGE-09): the saved page, with what is typed in
+ * the wizard laid over it — saved or not.
+ */
+describe('overlayDraft', () => {
+  const saved: LandingEvent = {
+    ...preview(''),
+    slug: 'tech-summit',
+    title: 'Tech Summit',
+    venue: 'BITEC',
+    online: false,
+    highlights: [{ icon: 'hgi-mic', label: '20 speakers' }],
+    agenda: [{ time: '09:00', title: 'Keynote', desc: 'Anong Prasert' }],
+  }
+  const over = (query: string) => overlayDraft(new URLSearchParams(query), saved)
+
+  it('shows the typed title, highlights and online choice', () => {
+    const page = over('event=tech-summit&title=Tech Summit 2026&online=1&hl=hgi-wifi:Free WiFi')
+    expect(page).toMatchObject({
+      title: 'Tech Summit 2026',
+      online: true,
+      highlights: [{ icon: 'hgi-wifi', label: 'Free WiFi' }],
+    })
+  })
+
+  it('keeps everything the wizard does not type — the agenda, the address', () => {
+    expect(over('event=tech-summit&title=New').agenda).toEqual(saved.agenda)
+    expect(over('event=tech-summit&title=New').slug).toBe('tech-summit')
+  })
+
+  it('takes a cleared field as cleared, not as unchanged', () => {
+    const page = over('event=tech-summit&venue=&online=0&hl=')
+    expect(page.venue).toBe('')
+    expect(page.online).toBe(false)
+    expect(page.highlights).toEqual([])
+  })
+
+  // The landing gallery and Discover open the same URL with nothing typed.
+  it('is the saved page untouched when nothing was typed', () => {
+    expect(over('event=tech-summit')).toEqual(saved)
+  })
+
+  it('keeps the saved title rather than showing a blank one', () => {
+    expect(over('event=tech-summit&title=').title).toBe('Tech Summit')
   })
 })

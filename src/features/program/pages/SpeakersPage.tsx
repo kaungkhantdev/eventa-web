@@ -20,6 +20,7 @@ import type { ActionResult } from '@/app/loaders'
 import { ConfirmDeleteModal } from '@/features/ticketing/components/ConfirmDeleteModal'
 import { EventChooser } from '../components/EventChooser'
 import { SpeakerPanel } from '../components/SpeakerPanel'
+import { speakerRemovalWarning } from '../program.presentation'
 import type { SpeakersData } from '../program.routes'
 import type { SpeakerCard } from '../program.types'
 
@@ -331,10 +332,11 @@ function SpeakerTile({ card, list, onEdit, onDelete }: SpeakerTileProps) {
 }
 
 /**
- * Removing a speaker.
+ * Removing a speaker (US-PROG-11).
  *
- * The API refuses while they are still booked into sessions and says so — that
- * sentence replaces the warning, because the fix is to unbook them first.
+ * Their sessions stay and simply stop listing them, so the warning says so
+ * first, and only the Remove here posts the confirmation the API requires. Any
+ * refusal the API still answers with replaces the warning, verbatim.
  */
 function DeleteSpeakerModal({
   open,
@@ -347,7 +349,10 @@ function DeleteSpeakerModal({
   target: SpeakerCard | null
   eventId: string
 }) {
-  const fetcher = useFetcher<ActionResult>()
+  // Keyed by speaker. The dialog stays mounted, so an unkeyed fetcher would
+  // still hold the last removal's success when the next speaker's opens — and
+  // the effect below would close it and announce a removal never sent.
+  const fetcher = useFetcher<ActionResult>({ key: `remove-speaker-${target?.id ?? ''}` })
   const refused = fetcher.data?.ok === false ? fetcher.data.error : null
   const done = fetcher.state === 'idle' && fetcher.data?.ok === true
 
@@ -362,12 +367,15 @@ function DeleteSpeakerModal({
       open={open}
       onClose={onClose}
       title="Remove speaker?"
-      message={refused ?? `This removes ${target?.name ?? 'the speaker'} from the event.`}
+      message={refused ?? speakerRemovalWarning(target?.name ?? 'this speaker')}
       tone={refused ? 'error' : 'default'}
       confirmLabel={fetcher.state === 'idle' ? 'Remove' : 'Removing…'}
       onConfirm={() =>
         target &&
-        fetcher.submit({ intent: 'delete', eventId, speakerId: target.id }, { method: 'post' })
+        fetcher.submit(
+          { intent: 'delete', eventId, speakerId: target.id, confirm: 'true' },
+          { method: 'post' },
+        )
       }
     />
   )

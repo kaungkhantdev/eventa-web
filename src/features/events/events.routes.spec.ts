@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cancelInputOf,
+  categoryDeletionOf,
   categoryInputOf,
+  confirmedDeleteOf,
   listQueryOf,
   monthOf,
   searchOf,
@@ -153,5 +156,57 @@ describe('ordering the categories', () => {
   it('does not disturb the list it was given', () => {
     sortCategories(cards, 'count-desc')
     expect(cards.map((c) => c.eventCount)).toEqual([12, 24, 8])
+  })
+})
+
+const formOf = (entries: Record<string, string>) => {
+  const data = new FormData()
+  for (const [key, value] of Object.entries(entries)) data.append(key, value)
+  return data
+}
+
+/**
+ * Deleting an event is permanent, so it happens only once the organizer has
+ * confirmed it (US-EVT-08: "No confirmation-free deletion is ever allowed").
+ * The row menu's Delete used to post the delete itself, on one click.
+ */
+describe('confirmedDeleteOf', () => {
+  it('reads the event and the version the organizer confirmed deleting', () => {
+    expect(confirmedDeleteOf(formOf({ id: 'ev-1', version: '3', confirm: 'true' }))).toEqual({
+      id: 'ev-1',
+      version: 3,
+    })
+  })
+
+  it('is nothing at all without the confirmation', () => {
+    expect(confirmedDeleteOf(formOf({ id: 'ev-1', version: '3' }))).toBeNull()
+    expect(confirmedDeleteOf(formOf({ id: 'ev-1', version: '3', confirm: 'on' }))).toBeNull()
+  })
+})
+
+/** US-EVT-08: a cancellation carries the reason the attendees are given. */
+describe('cancelInputOf', () => {
+  it('reads the event, the version on screen and the reason, trimmed', () => {
+    expect(
+      cancelInputOf(formOf({ id: 'ev-1', version: '5', reason: '  Venue became unavailable ' })),
+    ).toEqual({ id: 'ev-1', reason: 'Venue became unavailable', version: 5 })
+  })
+
+  it('sends no version it does not have', () => {
+    expect(cancelInputOf(formOf({ id: 'ev-1', reason: 'Storm' })).version).toBeUndefined()
+  })
+})
+
+/**
+ * US-EVT-11: a category is removed "when I confirm Delete". The row's delete
+ * icon used to post the delete itself, on one click.
+ */
+describe('categoryDeletionOf', () => {
+  it('reads the category the organizer confirmed deleting', () => {
+    expect(categoryDeletionOf(formOf({ id: '12', confirm: 'true' }))).toBe(12)
+  })
+
+  it('is nothing at all without the confirmation', () => {
+    expect(categoryDeletionOf(formOf({ id: '12' }))).toBeNull()
   })
 })

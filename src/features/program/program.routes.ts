@@ -114,7 +114,7 @@ async function runAgendaAction({ request }: LoaderArgs): Promise<void> {
     await programApi.updateSession(eventId, id, sessionInputOf(form))
     return
   }
-  await programApi.removeSession(eventId, id)
+  await programApi.removeSession(eventId, id, removalConfirmed(form))
 }
 
 export const agendaRoute = {
@@ -176,6 +176,14 @@ export function speakerInputOf(form: FormData): SpeakerInput {
   }
 }
 
+/**
+ * Whether the organizer confirmed a removal. Only the confirmation dialog posts
+ * `confirm`; it is passed to the API, which refuses a removal without it.
+ */
+export function removalConfirmed(form: FormData): boolean {
+  return form.get('confirm') === 'true'
+}
+
 async function runSpeakersAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
   const intent = String(form.get('intent') ?? '')
@@ -190,7 +198,7 @@ async function runSpeakersAction({ request }: LoaderArgs): Promise<void> {
     await programApi.updateSpeaker(eventId, id, speakerInputOf(form))
     return
   }
-  await programApi.removeSpeaker(eventId, id)
+  await programApi.removeSpeaker(eventId, id, removalConfirmed(form))
 }
 
 export const speakersRoute = {

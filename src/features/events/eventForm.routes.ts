@@ -1,9 +1,12 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
+import { ApiError } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { ticketingApi } from '@/features/ticketing/ticketing.api'
+import { categoriesApi } from './categories.api'
 import { eventContentApi } from './eventContent.api'
-import { eventsApi } from './events.api'
+import { eventsApi, type PageSettingsBody } from './events.api'
+import { CATEGORIES_LIMIT } from './events.routes'
 import {
   satangOf,
   toCreateBody,
@@ -12,6 +15,7 @@ import {
   type EventFormValues,
 } from './eventForm.mapper'
 import { isTemplateId, type TemplateId } from './landingTemplates'
+import type { CategoryWire } from './types'
 
 /**
  * The create/edit wizard (US-EVT-02..07).
@@ -20,15 +24,46 @@ import { isTemplateId, type TemplateId } from './landingTemplates'
  * returns a draft; from then on the wizard is editing an id, and each step
  * PATCHes, or calls ticketing, seating or highlights. So the loader has two
  * branches — `?id=` present hydrates from the server, absent starts blank and
- * makes no calls at all — and the action's first job on a new event is to
- * create it and put its id in the URL, so a refresh never loses the work.
+ * fetches only the category picker's options — and the action's first job on
+ * a new event is to create it and put its id in the URL, so a refresh never
+ * loses the work.
  */
+
+/** One option in the Basics step's category picker. */
+export interface CategoryChoice {
+  id: number
+  name: string
+}
 
 export interface EventFormData {
   values: EventFormValues
   /** The template chosen on the landing gallery, carried in via `?template=`. */
   template: TemplateId
+  /** The workspace's categories, or null when this person may not list them. */
+  categories: CategoryChoice[] | null
 }
+
+/**
+ * The category picker's options (US-EVT-03).
+ *
+ * Listing categories takes the settings permission, which an organizer who may
+ * create events need not have. "You may not" means no picker for them — not a
+ * wizard that refuses to open. Any other failure still fails.
+ */
+export async function categoryChoices(
+  list: () => Promise<readonly CategoryWire[]>,
+): Promise<CategoryChoice[] | null> {
+  try {
+    return (await list()).map(({ id, name }) => ({ id, name }))
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.isForbidden) return null
+    throw cause
+  }
+}
+
+/** Every category in the workspace, A–Z — the API's own maximum page. */
+const listCategories = async () =>
+  (await categoriesApi.list({ limit: CATEGORIES_LIMIT, sort: 'name' })).items
 
 const DEFAULT_TEMPLATE: TemplateId = 'aurora'
 
@@ -51,15 +86,22 @@ async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
   const params = queryOf(request)
   const id = params.get('id')
 
-  if (!id) return { values: toEventFormValues(null, [], []), template: templateOf(params) }
+  if (!id) {
+    return {
+      values: toEventFormValues(null, [], []),
+      template: templateOf(params),
+      categories: await categoryChoices(listCategories),
+    }
+  }
 
-  // Four independent reads; the wizard cannot render a half-loaded form, so
-  // they go together and a failure lands on the route's error element.
-  const [event, tickets, highlights, seating] = await Promise.all([
+  // Independent reads; the wizard cannot render a half-loaded form, so they go
+  // together and a failure lands on the route's error element.
+  const [event, tickets, highlights, seating, categories] = await Promise.all([
     eventsApi.get(id),
     ticketingApi.forEvent(id),
     eventContentApi.highlights(id),
     eventContentApi.seating(id),
+    categoryChoices(listCategories),
   ])
 
   const values = toEventFormValues(event, tickets, highlights)
@@ -73,7 +115,33 @@ async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
       seatsPerRow: seating.seatMap ? String(seating.seatMap.seatsPerRow) : '',
     },
     template: templateOf(params, event.landingTemplateId),
+    categories,
   }
+}
+
+/**
+ * What the organizer changed of the page's address and colour (US-PAGE-10),
+ * read against the values the wizard was loaded with. Null when nothing did —
+ * an unchanged address need not be re-checked, and an emptied box is not a
+ * request for an address or a colour of nothing.
+ */
+export function pageChangesOf(saved: EventFormValues, form: FormData): PageSettingsBody | null {
+  const changes: PageSettingsBody = {}
+  const slug = String(form.get('slug') ?? '').trim()
+  const accentColor = String(form.get('accentColor') ?? '').trim()
+  if (slug && slug !== saved.slug) changes.slug = slug
+  if (accentColor && accentColor !== saved.accentColor) changes.accentColor = accentColor
+  return Object.keys(changes).length > 0 ? changes : null
+}
+
+/**
+ * Save the page's address and colour, when either changed. Before the rest, so
+ * an address already in use stops the save with the API's own sentence and
+ * nothing is half-written.
+ */
+async function savePage(id: string, saved: EventFormValues, form: FormData): Promise<void> {
+  const changes = pageChangesOf(saved, form)
+  if (changes) await eventsApi.updatePage(id, changes)
 }
 
 /** Everything the wizard's buttons do. */
@@ -133,6 +201,7 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
   }
 
   if (intent === 'publish') {
+    await savePage(id, values, form)
     const published = await eventsApi.publish(id, {
       visibility: String(form.get('visibility') ?? 'public'),
       landingTemplateId: String(form.get('template') ?? DEFAULT_TEMPLATE),
@@ -148,6 +217,7 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
   }
 
   // The default: save the step that is open.
+  await savePage(id, values, form)
   await eventsApi.update(id, toUpdateBody(values))
   await eventContentApi.setHighlights(
     id,

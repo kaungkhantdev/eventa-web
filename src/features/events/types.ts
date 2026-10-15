@@ -76,6 +76,13 @@ export interface EventWire {
   /** The public page's design — null until one has been chosen. */
   landingTemplateId?: string | null
   /**
+   * The workspace category it is filed under, or null for none. Optional: only
+   * the full event response is relied on to carry it.
+   */
+  categoryId?: number | null
+  /** The public page's accent colour, or null until one is set (US-PAGE-10). */
+  accentColor?: string | null
+  /**
    * `public` | `unlisted` | `private` (`EventResponseDto.visibility`). Only a
    * `public` event is served by slug, so this decides whether a real public
    * page exists to link to. Optional: the calendar's slimmer payload omits it.
@@ -155,6 +162,17 @@ export interface EventRow {
    */
   cover: string | null
   version: number
+}
+
+/**
+ * A dialog about one row of the events list — deleting it, or cancelling it
+ * instead. The row is kept after closing so the dialog still reads correctly
+ * as it fades out; `attempt` counts openings, so each starts afresh.
+ */
+export interface EventDialog {
+  row: EventRow | null
+  open: boolean
+  attempt: number
 }
 
 /** A card in the upcoming grid. */

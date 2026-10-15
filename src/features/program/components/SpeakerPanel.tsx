@@ -54,7 +54,12 @@ export function SpeakerPanel({ open, onClose, editing, eventId, eventName }: Spe
       <fetcher.Form id={FORM_ID} key={subject ?? 'new'} method="post" className="space-y-4">
         <input type="hidden" name="intent" value={editing ? 'update' : 'create'} />
         <input type="hidden" name="eventId" value={eventId} />
-        {editing && <input type="hidden" name="speakerId" value={editing.id} />}
+        {editing && (
+          <>
+            <input type="hidden" name="speakerId" value={editing.id} />
+            <input type="hidden" name="version" value={editing.version} />
+          </>
+        )}
 
         {error && (
           <p

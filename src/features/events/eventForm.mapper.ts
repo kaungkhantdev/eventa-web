@@ -34,11 +34,15 @@ export interface EventFormValues {
   status: EventWireStatus | null
   /** The public page's address; empty until the event exists. */
   slug: string
+  /** The public page's accent colour; empty until one is set (US-PAGE-10). */
+  accentColor: string
   /** `public` | `unlisted` | `private`; empty until the event exists. */
   visibility: string
   name: string
   description: string
   type: EventType
+  /** The workspace category, or null for none (US-EVT-03). */
+  categoryId: number | null
   /** `2026-07-18` and `09:00`, the Bangkok wall clock the organizer set. */
   startDate: string
   startTime: string
@@ -73,10 +77,12 @@ function emptyValues(): EventFormValues {
     id: null,
     status: null,
     slug: '',
+    accentColor: '',
     visibility: '',
     name: '',
     description: '',
     type: DEFAULT_TYPE,
+    categoryId: null,
     startDate: '',
     startTime: '',
     endDate: '',
@@ -126,10 +132,12 @@ export function toEventFormValues(
     id: event.id,
     status: event.status,
     slug: event.slug,
+    accentColor: event.accentColor ?? '',
     visibility: event.visibility ?? '',
     name: event.name,
     description: event.description ?? '',
     type: event.type,
+    categoryId: event.categoryId ?? null,
     startDate: bangkokDayKey(event.startAt),
     startTime: bangkokTime(event.startAt),
     endDate: event.endAt ? bangkokDayKey(event.endAt) : '',
@@ -162,7 +170,13 @@ export function toCreateBody(values: EventFormValues) {
     type: values.type,
     startAt: bangkokInstant(values.startDate, values.startTime),
     ...(description ? { description } : {}),
+    ...(values.categoryId === null ? {} : { categoryId: values.categoryId }),
   }
+}
+
+/** The category picker's value → the id, or null for its "No category" option. */
+export function categoryIdOf(value: string): number | null {
+  return value === '' ? null : Number(value)
 }
 
 /**
@@ -170,14 +184,17 @@ export function toCreateBody(values: EventFormValues) {
  *
  * A cleared text field is sent as `''` rather than omitted: omission means
  * "leave it alone" to the API, and the organizer meant "remove it". Fields the
- * wizard has no input for — `contactEmail`, `accentColor` — are left out
- * entirely, so a value set on another screen survives a save here.
+ * wizard has no input for — `contactEmail` — are left out entirely, so a value
+ * set on another screen survives a save here. `accentColor` is left out too:
+ * it belongs to the page, and goes through `PATCH /events/:id/page`.
  */
 export function toUpdateBody(values: EventFormValues) {
   return {
     name: values.name.trim(),
     description: values.description.trim(),
     type: values.type,
+    // null clears it — leaving the key out would mean "unchanged".
+    categoryId: values.categoryId,
     startAt: bangkokInstant(values.startDate, values.startTime),
     endAt: bangkokInstant(values.endDate, values.endTime),
     venueName: values.venueName.trim(),

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   bahtOf,
+  categoryIdOf,
   publishGaps,
   satangOf,
   toCreateBody,
@@ -141,6 +142,12 @@ describe('hydrating the wizard from an event being edited', () => {
 
   it('has no address when the event has none', () => {
     expect(toEventFormValues(event({ venueAddress: null }), [], []).venueAddress).toBe('')
+  })
+
+  // The publish step shows the page's colour so it can be changed (US-PAGE-10).
+  it('reads the page’s accent colour back, and none as blank', () => {
+    expect(toEventFormValues(event({ accentColor: '#1BA770' }), [], []).accentColor).toBe('#1BA770')
+    expect(toEventFormValues(event({ accentColor: null }), [], []).accentColor).toBe('')
   })
 
   it('starts empty for a brand-new event', () => {
@@ -304,6 +311,43 @@ describe('what PATCH /events/:id may carry', () => {
       expect(toUpdateBody({ ...base, requiresApproval: true }).requiresApproval).toBe(true)
       expect(toUpdateBody({ ...base, requiresApproval: false }).requiresApproval).toBe(false)
     })
+  })
+})
+
+/**
+ * The event's category (US-EVT-03, US-EVT-11). No screen could set or clear
+ * it, so a category in use could never be emptied and deleted: the refusal
+ * says to move its events to another category, and nothing let anyone do so.
+ */
+describe('the category', () => {
+  it('reads the category back, and none as none', () => {
+    expect(toEventFormValues(event({ categoryId: 4 }), [], []).categoryId).toBe(4)
+    expect(toEventFormValues(event({ categoryId: null }), [], []).categoryId).toBeNull()
+    expect(toEventFormValues(null, [], []).categoryId).toBeNull()
+  })
+
+  it('sends the category chosen, or null to clear it', () => {
+    // null, not omission: the API leaves an absent key alone, so "No
+    // category" would otherwise save as "unchanged".
+    const base = toEventFormValues(event({ categoryId: 4 }), [], [])
+    expect(toUpdateBody({ ...base, categoryId: 7 }).categoryId).toBe(7)
+    expect(toUpdateBody({ ...base, categoryId: null }).categoryId).toBeNull()
+  })
+
+  it('creates the draft in the category already picked on step one', () => {
+    const fresh = {
+      ...toEventFormValues(null, [], []),
+      name: 'Tech Summit 2026',
+      startDate: '2026-07-18',
+      startTime: '09:00',
+    }
+    expect(toCreateBody({ ...fresh, categoryId: 7 }).categoryId).toBe(7)
+    expect(toCreateBody(fresh)).not.toHaveProperty('categoryId')
+  })
+
+  it('reads the picker: an id, or the "No category" option as none', () => {
+    expect(categoryIdOf('7')).toBe(7)
+    expect(categoryIdOf('')).toBeNull()
   })
 })
 

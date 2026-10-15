@@ -15,6 +15,7 @@ import {
   NoResults,
 } from '@/components/ui'
 import type { ActionResult } from '@/app/loaders'
+import { ConfirmDeleteModal } from '@/features/ticketing/components/ConfirmDeleteModal'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
@@ -99,10 +100,8 @@ export default function EventCategoriesPage() {
   // nothing, so it must not make an empty page read as a filtered one.
   const { params, set, clear, filtered } = useFilters({ ignore: ['view'] })
   const filtering = useIsFiltering()
-  // Deleting and saving get their own fetchers. A shared one would still be
-  // holding the previous success when the panel is opened again, and the panel
-  // closes itself on success — so it would shut the moment it was reopened.
-  const deleter = useFetcher<ActionResult>()
+  // The category whose delete is waiting on the organizer's confirmation.
+  const [deleting, setDeleting] = useState<CategoryCard | null>(null)
 
   const view = categoryViewOf(params)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
@@ -119,9 +118,8 @@ export default function EventCategoriesPage() {
     panel.onOpen()
   }
 
-  const remove = (card: CategoryCard) => {
-    deleter.submit({ intent: 'delete', id: String(card.id) }, { method: 'post' })
-  }
+  /** Only asks — the confirmation dialog is what deletes (US-EVT-11). */
+  const remove = (card: CategoryCard) => setDeleting(card)
 
   const viewBtn = (active: boolean) =>
     cn(
@@ -150,15 +148,6 @@ export default function EventCategoriesPage() {
           </>
         }
       />
-
-      {deleter.data?.error && (
-        <p
-          role="alert"
-          className="mb-3 rounded-lg bg-rose-500/10 px-3 py-2.5 text-[13px] text-rose-600 dark:text-rose-400"
-        >
-          {deleter.data.error}
-        </p>
-      )}
 
       {firstRun ? (
         /* Nothing to search or sort yet, so the toolbar and the count go with
@@ -295,12 +284,63 @@ export default function EventCategoriesPage() {
         />
       )}
 
+      {deleting && (
+        <DeleteCategoryModal
+          key={deleting.id}
+          category={deleting}
+          onClose={() => setDeleting(null)}
+        />
+      )}
+
       {/* tailwind JIT safelist for dynamic category colours */}
       <div
         aria-hidden="true"
         className="hidden bg-pink-500 bg-blue-500 bg-amber-500 bg-brand bg-violet-500 bg-indigo-500 bg-teal-500 bg-red-500 bg-orange-500 bg-cyan-500"
       />
     </>
+  )
+}
+
+/**
+ * Deleting a category, once confirmed (US-EVT-11).
+ *
+ * Mounted only while open, like the panel, so its fetcher starts each time
+ * with no result. A category still used by events is refused with the API's
+ * own sentence — how many, and to move them first — shown in place of the
+ * warning.
+ */
+function DeleteCategoryModal({
+  category,
+  onClose,
+}: {
+  category: CategoryCard
+  onClose: () => void
+}) {
+  const fetcher = useFetcher<ActionResult>()
+  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
+  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
+
+  useEffect(() => {
+    if (!done) return
+    toast.success('Category deleted.')
+    onClose()
+  }, [done, onClose])
+
+  return (
+    <ConfirmDeleteModal
+      open
+      onClose={onClose}
+      title={`Delete ${category.name}?`}
+      message={refused ?? 'This permanently removes the category.'}
+      tone={refused ? 'error' : 'default'}
+      confirmLabel={fetcher.state === 'idle' ? 'Delete' : 'Deleting…'}
+      onConfirm={() =>
+        fetcher.submit(
+          { intent: 'delete', id: String(category.id), confirm: 'true' },
+          { method: 'post' },
+        )
+      }
+    />
   )
 }
 
