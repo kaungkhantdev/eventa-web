@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { insertAt } from './merge-field'
+import { insertAt, insertAtCursor } from './merge-field'
 
 const TAG = '{{first_name}}'
 
@@ -39,5 +39,33 @@ describe('placing a merge field where the cursor was', () => {
 
   it('fills an empty field', () => {
     expect(insertAt('', TAG, 0, 0)).toEqual({ text: TAG, caret: TAG.length })
+  })
+})
+
+/**
+ * A field nobody has clicked into still reports a caret: a textarea that opens
+ * with wording in it says 0 in Chromium. That is not a cursor the organizer
+ * placed, so it must not decide where the field goes.
+ */
+describe('placing a merge field before any field has been focused', () => {
+  const untouched = { selectionStart: 0, selectionEnd: 0 }
+
+  it('adds it at the end, not before the first word', () => {
+    expect(insertAtCursor('Hello there', TAG, untouched, false)).toEqual({
+      text: 'Hello there{{first_name}}',
+      caret: 11 + TAG.length,
+    })
+  })
+
+  it('uses the cursor once the field has been focused', () => {
+    const placed = { selectionStart: 3, selectionEnd: 3 }
+    expect(insertAtCursor('Hi , welcome', TAG, placed, true)).toEqual({
+      text: 'Hi {{first_name}}, welcome',
+      caret: 3 + TAG.length,
+    })
+  })
+
+  it('adds it at the end when there is no field to read', () => {
+    expect(insertAtCursor('Hi ', TAG, null, true)).toEqual({ text: 'Hi {{first_name}}', caret: 17 })
   })
 })

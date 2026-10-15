@@ -20,7 +20,7 @@ import {
 import { cn } from '@/lib/cn'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useSavedToast } from '@/lib/useSavedToast'
-import { insertAt } from '../merge-field'
+import { insertAtCursor } from '../merge-field'
 import type { TemplateCard } from '../templates.mapper'
 import type { TemplatesData } from '../templates.routes'
 
@@ -229,20 +229,15 @@ function WordingEditor({
 
   const subjectField = useRef<HTMLInputElement>(null)
   const bodyField = useRef<HTMLTextAreaElement>(null)
-  // Where a chip writes (US-MSG-02): the field last focused, the opening until
-  // the subject has been.
-  const target = useRef<'subject' | 'body'>('body')
+  // Where a chip writes (US-MSG-02): the field last focused, or the end of the
+  // opening while neither has been.
+  const target = useRef<'subject' | 'body' | null>(null)
 
   const insert = (tag: string) => {
     const inSubject = target.current === 'subject'
     const key = inSubject ? subjectKey : bodyKey
     const field = inSubject ? subjectField.current : bodyField.current
-    const placed = insertAt(
-      draft[key],
-      tag,
-      field?.selectionStart ?? null,
-      field?.selectionEnd ?? null,
-    )
+    const placed = insertAtCursor(draft[key], tag, field, target.current !== null)
     setDraft((current) => ({ ...current, [key]: placed.text }))
     // Once React has written the new value — which leaves the caret at the
     // end — put it back just after the field, so typing carries on from there.
