@@ -349,7 +349,10 @@ function DeleteSpeakerModal({
   target: SpeakerCard | null
   eventId: string
 }) {
-  const fetcher = useFetcher<ActionResult>()
+  // Keyed by speaker. The dialog stays mounted, so an unkeyed fetcher would
+  // still hold the last removal's success when the next speaker's opens — and
+  // the effect below would close it and announce a removal never sent.
+  const fetcher = useFetcher<ActionResult>({ key: `remove-speaker-${target?.id ?? ''}` })
   const refused = fetcher.data?.ok === false ? fetcher.data.error : null
   const done = fetcher.state === 'idle' && fetcher.data?.ok === true
 
