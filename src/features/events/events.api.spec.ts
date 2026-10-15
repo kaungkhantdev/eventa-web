@@ -38,3 +38,18 @@ describe('eventsApi.cancel', () => {
     })
   })
 })
+
+describe('eventsApi.updatePage', () => {
+  // US-PAGE-10: the address and colour live on the page endpoint, which
+  // answers 409 when the address is already in use.
+  it('patches the event’s page with only what it is given', async () => {
+    const fetch = answering({ slug: 'bkk-summit', template: 'aurora', accentColor: '#2563EB', published: false })
+
+    await eventsApi.updatePage('ev-1', { slug: 'bkk-summit' })
+
+    const [url, init] = fetch.mock.calls[0]
+    expect(new URL(url).pathname).toMatch(/\/events\/ev-1\/page$/)
+    expect(init?.method).toBe('PATCH')
+    expect(JSON.parse(String(init?.body))).toEqual({ slug: 'bkk-summit' })
+  })
+})

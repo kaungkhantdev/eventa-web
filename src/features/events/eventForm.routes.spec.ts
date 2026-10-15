@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
-import { categoryChoices, templateOf } from './eventForm.routes'
+import { toEventFormValues } from './eventForm.mapper'
+import { categoryChoices, pageChangesOf, templateOf } from './eventForm.routes'
 import type { CategoryWire } from './types'
 
 /**
@@ -71,5 +72,50 @@ describe('categoryChoices', () => {
       throw new ApiError(500, {})
     }
     await expect(categoryChoices(broken)).rejects.toBeInstanceOf(ApiError)
+  })
+})
+
+/**
+ * The page's public address and accent colour (US-PAGE-10), saved through
+ * `PATCH /events/:id/page`. Only what the organizer changed is sent: an
+ * unchanged address would be re-checked for nothing, and a colour never set
+ * would be written as the default.
+ */
+describe('pageChangesOf', () => {
+  const saved = {
+    ...toEventFormValues(null, [], []),
+    id: 'evt-1',
+    slug: 'tech-summit-2026',
+    accentColor: '#1BA770',
+  }
+  const typed = (fields: Record<string, string>) => {
+    const data = new FormData()
+    for (const [key, value] of Object.entries(fields)) data.append(key, value)
+    return data
+  }
+
+  it('sends a new address', () => {
+    expect(
+      pageChangesOf(saved, typed({ slug: ' bkk-summit ', accentColor: '#1BA770' })),
+    ).toEqual({ slug: 'bkk-summit' })
+  })
+
+  it('sends a new colour', () => {
+    expect(
+      pageChangesOf(saved, typed({ slug: 'tech-summit-2026', accentColor: '#2563EB' })),
+    ).toEqual({ accentColor: '#2563EB' })
+  })
+
+  it('sends nothing when neither changed, or neither was on the form', () => {
+    expect(
+      pageChangesOf(saved, typed({ slug: 'tech-summit-2026', accentColor: '#1BA770' })),
+    ).toBeNull()
+    expect(pageChangesOf(saved, typed({}))).toBeNull()
+  })
+
+  // An emptied box is not a request for an address, or a colour, of nothing.
+  it('keeps the address or the colour when its box is emptied', () => {
+    expect(pageChangesOf(saved, typed({ slug: '  ', accentColor: '#1BA770' }))).toBeNull()
+    expect(pageChangesOf(saved, typed({ slug: 'tech-summit-2026', accentColor: '' }))).toBeNull()
   })
 })

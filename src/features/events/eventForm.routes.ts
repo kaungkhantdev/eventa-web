@@ -5,7 +5,7 @@ import { toast } from '@/lib/toast'
 import { ticketingApi } from '@/features/ticketing/ticketing.api'
 import { categoriesApi } from './categories.api'
 import { eventContentApi } from './eventContent.api'
-import { eventsApi } from './events.api'
+import { eventsApi, type PageSettingsBody } from './events.api'
 import { CATEGORIES_LIMIT } from './events.routes'
 import {
   satangOf,
@@ -119,6 +119,31 @@ async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
   }
 }
 
+/**
+ * What the organizer changed of the page's address and colour (US-PAGE-10),
+ * read against the values the wizard was loaded with. Null when nothing did —
+ * an unchanged address need not be re-checked, and an emptied box is not a
+ * request for an address or a colour of nothing.
+ */
+export function pageChangesOf(saved: EventFormValues, form: FormData): PageSettingsBody | null {
+  const changes: PageSettingsBody = {}
+  const slug = String(form.get('slug') ?? '').trim()
+  const accentColor = String(form.get('accentColor') ?? '').trim()
+  if (slug && slug !== saved.slug) changes.slug = slug
+  if (accentColor && accentColor !== saved.accentColor) changes.accentColor = accentColor
+  return Object.keys(changes).length > 0 ? changes : null
+}
+
+/**
+ * Save the page's address and colour, when either changed. Before the rest, so
+ * an address already in use stops the save with the API's own sentence and
+ * nothing is half-written.
+ */
+async function savePage(id: string, saved: EventFormValues, form: FormData): Promise<void> {
+  const changes = pageChangesOf(saved, form)
+  if (changes) await eventsApi.updatePage(id, changes)
+}
+
 /** Everything the wizard's buttons do. */
 async function runEventFormAction({ request }: LoaderArgs): Promise<Response | void> {
   const form = await request.formData()
@@ -176,6 +201,7 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
   }
 
   if (intent === 'publish') {
+    await savePage(id, values, form)
     const published = await eventsApi.publish(id, {
       visibility: String(form.get('visibility') ?? 'public'),
       landingTemplateId: String(form.get('template') ?? DEFAULT_TEMPLATE),
@@ -191,6 +217,7 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
   }
 
   // The default: save the step that is open.
+  await savePage(id, values, form)
   await eventsApi.update(id, toUpdateBody(values))
   await eventContentApi.setHighlights(
     id,

@@ -80,6 +80,8 @@ export interface EventWire {
    * the full event response is relied on to carry it.
    */
   categoryId?: number | null
+  /** The public page's accent colour, or null until one is set (US-PAGE-10). */
+  accentColor?: string | null
   /**
    * `public` | `unlisted` | `private` (`EventResponseDto.visibility`). Only a
    * `public` event is served by slug, so this decides whether a real public

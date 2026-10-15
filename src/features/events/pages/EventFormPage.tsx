@@ -64,6 +64,10 @@ const REQUIREMENT_MET: Record<(typeof PUBLISH_REQUIREMENTS)[number], string> = {
   'at least one ticket type': 'At least one ticket type',
 }
 
+/** The longest address and colour `UpdatePageDto` accepts. */
+const PAGE_SLUG_MAX = 80
+const PAGE_ACCENT_MAX = 9
+
 /** A stored status → the word the console uses. */
 function statusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1)
@@ -256,6 +260,18 @@ export default function EventFormPage() {
   const mapLink = mapLinkFor({ venueName: venue, address, city: initial.city })
   const [landingTpl, setLandingTpl] = useState<LandingTpl>(template)
   const [visibility, setVisibility] = useState('public')
+  // The page's address and colour (US-PAGE-10). Re-seeded when a save changes
+  // what is stored, so the boxes show what the API kept — a tidied address, or
+  // the default colour standing in for one it could not use.
+  const [pageSlug, setPageSlug] = useState(initial.slug)
+  const [accent, setAccent] = useState(initial.accentColor)
+  const savedPage = `${initial.slug}\n${initial.accentColor}`
+  const [seenPage, setSeenPage] = useState(savedPage)
+  if (savedPage !== seenPage) {
+    setSeenPage(savedPage)
+    setPageSlug(initial.slug)
+    setAccent(initial.accentColor)
+  }
 
   // Rows start as whatever the API has stored; a row with no id has not been
   // saved yet, which is also what the publish gate checks.
@@ -300,8 +316,12 @@ export default function EventFormPage() {
     tickets,
   })
 
+  /** `values` is what the API stored; `slug` and `accentColor` what is typed. */
   const submit = (fields: Record<string, string> = {}) =>
-    fetcher.submit({ values: JSON.stringify(collect()), ...fields }, { method: 'post' })
+    fetcher.submit(
+      { values: JSON.stringify(collect()), slug: pageSlug, accentColor: accent, ...fields },
+      { method: 'post' },
+    )
 
   /** What the API still needs before it will publish this one. */
   const gaps = publishGaps(collect())
@@ -1242,6 +1262,40 @@ export default function EventFormPage() {
                   </select>
                 </div>
               </div>
+              {/* The page exists once the event does — and so does its address. */}
+              {initial.id && (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label" htmlFor="page-slug">
+                      Public address
+                    </label>
+                    <input
+                      id="page-slug"
+                      className="input"
+                      type="text"
+                      maxLength={PAGE_SLUG_MAX}
+                      value={pageSlug}
+                      onChange={(e) => setPageSlug(e.target.value)}
+                    />
+                    <p className="hint mt-1">The link you share: /e/{pageSlug.trim() || '…'}</p>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="page-accent">
+                      Accent colour
+                    </label>
+                    <input
+                      id="page-accent"
+                      className="input"
+                      type="text"
+                      maxLength={PAGE_ACCENT_MAX}
+                      placeholder="#2563EB"
+                      value={accent}
+                      onChange={(e) => setAccent(e.target.value)}
+                    />
+                    <p className="hint mt-1">A hex colour; anything else uses the default.</p>
+                  </div>
+                </div>
+              )}
               <p className="hint mt-2">
                 Public events are listed on the Eventa discovery page. You can edit details anytime
                 before it goes live.
