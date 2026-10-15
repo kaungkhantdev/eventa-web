@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { cameraFailureMessage, scannerUnavailableMessage } from './cameraFallback'
 
 /**
  * Reading QR codes from the device camera, for the door station (US-REG-12).
  *
  * Uses the platform's own `BarcodeDetector` rather than a bundled decoder —
  * Chromium ships it, and a scanner that costs nothing to download is one the
- * door can open on a borrowed phone. Where it is missing (Safari, Firefox) the
- * hook reports `supported: false` and the station falls back to the code box,
- * which is what a hardware scanner types into anyway.
+ * door can open on a borrowed phone. Where it is missing (Safari, Firefox, or
+ * any page not served over https) the hook reports `supported: false` and the
+ * station points to the manual lookup, whose search a hardware scanner can
+ * type into anyway.
  *
  * The kit faked all of this: a canned queue of outcomes on a timer. Nothing
  * here is simulated — a code is read off the sensor or it is not read at all.
@@ -47,7 +49,7 @@ export interface QrCamera {
   supported: boolean
   live: boolean
   starting: boolean
-  /** The browser's own refusal, shown verbatim — it says why far better. */
+  /** Why no code could be read, in plain words, with where to go instead. */
   error: string | null
   torchOn: boolean
   hasTorch: boolean
@@ -108,7 +110,7 @@ export function useQrCamera(onCode: (code: string) => void): QrCamera {
   const start = useCallback(() => {
     const Detector = detectorCtor()
     if (!Detector) {
-      setError('This browser cannot read QR codes. Use the code box below.')
+      setError(scannerUnavailableMessage(window.isSecureContext))
       return
     }
     setStarting(true)
@@ -147,9 +149,10 @@ export function useQrCamera(onCode: (code: string) => void): QrCamera {
         setLive(true)
       })
       .catch((cause: unknown) => {
-        // Shown as the browser worded it: "Permission denied" and "no camera
-        // found" need different things done about them.
-        setError(cause instanceof Error ? cause.message : 'The camera could not be started.')
+        // Permission denied, no camera and camera in use need different things
+        // done about them, so each gets its own reason — and every one of them
+        // points to the upload and the manual lookup (US-REG-12).
+        setError(cameraFailureMessage(cause))
       })
       .finally(() => setStarting(false))
   }, [facing, report])
@@ -182,7 +185,7 @@ export function useQrCamera(onCode: (code: string) => void): QrCamera {
     (file: File) => {
       const Detector = detectorCtor()
       if (!Detector) {
-        setError('This browser cannot read QR codes. Use the code box below.')
+        setError(scannerUnavailableMessage(window.isSecureContext))
         return
       }
       setError(null)

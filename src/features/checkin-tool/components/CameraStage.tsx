@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { scannerUnavailableMessage } from '../cameraFallback'
 import type { QrCamera } from '../useQrCamera'
 
 /**
@@ -124,9 +125,7 @@ export function CameraStage({ camera, busy }: { camera: QrCamera; busy: boolean 
 
 /** What the viewport says it is doing, in the kit's own words where they fit. */
 function Hint({ camera, busy }: { camera: QrCamera; busy: boolean }) {
-  if (!camera.supported) {
-    return <>This browser cannot use the camera — key the code in below instead</>
-  }
+  if (!camera.supported) return <>{scannerUnavailableMessage(window.isSecureContext)}</>
   if (busy) return <>Checking that ticket…</>
   if (camera.live) return <>Hold the ticket’s QR code inside the frame</>
   return (
