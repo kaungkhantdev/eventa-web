@@ -9,15 +9,6 @@ import { credentialsOf } from './credentials'
 import { homeFor } from './personas'
 import { safeRedirect } from './redirect'
 
-/**
- * Signing in, for either audience.
- *
- * The organizer console and the attendee portal are separate products with
- * separate logins, but the *flow* is one thing: submit, maybe be asked for a
- * code, then land somewhere. Shared here so the second page cannot drift from
- * the first — the interesting differences (which fields exist, where you land)
- * are data, not another copy of this.
- */
 export interface SignInOptions {
   /**
    * Runs once a sign-in has completed and before landing anywhere. The portal
@@ -28,6 +19,15 @@ export interface SignInOptions {
   afterSignIn?: () => Promise<void>
 }
 
+/**
+ * Signing in, for either audience.
+ *
+ * The organizer console and the attendee portal are separate products with
+ * separate logins, but the *flow* is one thing: submit, maybe be asked for a
+ * code, then land somewhere. Shared here so the second page cannot drift from
+ * the first — the interesting differences (which fields exist, where you land)
+ * are data, not another copy of this.
+ */
 export function useSignIn(persona: Persona, { afterSignIn }: SignInOptions = {}) {
   const navigate = useNavigate()
   const [params] = useSearchParams()
