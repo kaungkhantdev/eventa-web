@@ -162,8 +162,8 @@ const NO_COUNTS: RegistrationCounts = {
 /**
  * The workspace's events, for the filter's options.
  *
- * The queue needs `regView` but `GET /events` needs `evCreate`, so Staff can
- * legitimately work this page without being allowed to list events. That 403 is
+ * The queue needs `regView` but `GET /events` needs `evCreate` or `regCheckin`,
+ * so a view-only member can work this page without being allowed to list events. That 403 is
  * an answer about a *filter*, not about the queue — it costs them the dropdown,
  * and must not take the registrations down with it. Any other failure still
  * propagates to the route's error element.

@@ -146,8 +146,8 @@ function exportQuery(query: Record<string, unknown>): Record<string, string> {
  * The events the filter offers, on the two reports Staff read.
  *
  * Registrations and attendance need `regView`, which Staff hold (US-RPT-08 AC3,
- * US-RPT-12 AC1); `GET /events` needs `evCreate`, which they do not. That 403
- * costs them the event dropdown, not the report.
+ * US-RPT-12 AC1); `GET /events` needs `evCreate` or `regCheckin`, which a
+ * view-only member lacks. That 403 costs them the event dropdown, not the report.
  */
 function staffEventOptions(): Promise<EventOption[]> {
   return withoutForbidden(() => eventOptions())

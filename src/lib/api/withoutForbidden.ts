@@ -5,10 +5,10 @@ import { ApiError } from './ApiError'
  *
  * For the reads a page makes BESIDE its subject — the events a filter offers,
  * the tiers a panel books against — where the route the page itself needs is
- * open to the caller but the auxiliary one is not. Staff work the registrations
- * queue and the registrations report with `regView`, while `GET /events` needs
- * `evCreate`: that 403 costs them the dropdown, and must not take the page down
- * with it. Anything else — a 500, an expired session, the network — is a real
+ * open to the caller but the auxiliary one is not. A member can work the
+ * registrations queue and the registrations report with `regView` alone, while
+ * `GET /events` needs `evCreate` or `regCheckin`: that 403 costs them the
+ * dropdown, and must not take the page down with it. Anything else — a 500, an expired session, the network — is a real
  * failure and still propagates to the route's error element.
  */
 export function withoutForbidden<T>(load: () => Promise<T[]>): Promise<T[]> {

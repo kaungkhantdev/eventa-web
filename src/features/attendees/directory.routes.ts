@@ -172,8 +172,8 @@ async function loadDirectory({ request }: LoaderArgs): Promise<DirectoryData> {
   const profileId = profileIdOf(params)
   const [page, events, activity] = await Promise.all([
     attendeesApi.list(query),
-    // Staff read the directory on `regView`, but listing events is `evCreate`.
-    // Their 403 costs them the invite panel's event list, not the directory.
+    // The directory needs only `regView`; listing events needs `evCreate` or
+    // `regCheckin`. That 403 costs the invite panel its event list, not the page.
     withoutForbidden(() => eventOptions()),
     // Wrapped rather than awaited bare: the profile's subject is the contact
     // details, which the directory row already carries, and the history is
