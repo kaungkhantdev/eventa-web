@@ -2,13 +2,19 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
+import { CreateAccountPrompt } from '@/features/auth/components/CreateAccountPrompt'
+import { signUpPathFor } from '@/features/auth/personas'
 import { useSignIn } from '@/features/auth/useSignIn'
 import { adoptGuestSaves } from '../guestSaves'
 
 /* Attendee sign-in — the portal's own login, separate from the organizer
-   login at /auth/login. It lands on "My tickets" (never the admin shell), and
-   its footer nudges guests to browse events instead (registering for an event
-   never requires an account).
+   login at /auth/login. It lands on "My tickets" (never the admin shell).
+
+   Its footer is the kit's one sign-in footer, shared with the organizer's:
+   "Create one" opens the attendee's ordinary sign-up (US-DISC-08), the email
+   empty and editable and confirmed by email before use — nothing here knows a
+   booking, so it is never the booking-claim form. Browsing needs no account
+   at all; the Eventa lockup above the card leads to Discover.
 
    No workspace field: an attendee has one platform-wide realm, and naming a
    workspace is refused with a 422 rather than ignored.
@@ -33,14 +39,7 @@ export default function PortalLoginPage() {
           : 'Sign in to view your tickets and registrations.'
       }
       homeTo="/portal/discover"
-      footer={
-        <p className="mt-6 text-center text-[13px] text-muted">
-          Just browsing?{' '}
-          <Link to="/portal/discover" className="font-semibold text-brand hover:underline">
-            Discover events
-          </Link>
-        </p>
-      }
+      footer={<CreateAccountPrompt to={signUpPathFor('attendee')} />}
     >
       <form className="space-y-4" onSubmit={submit}>
         {error && (

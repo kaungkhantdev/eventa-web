@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
+import { CreateAccountPrompt } from '@/features/auth/components/CreateAccountPrompt'
 import { SocialAuth } from '@/features/auth/components/SocialAuth'
+import { signUpPathFor } from '@/features/auth/personas'
 import { useSignIn } from '@/features/auth/useSignIn'
 import { ORG_PARAM } from '@/features/auth/verifiedSignIn'
 
@@ -26,14 +28,7 @@ export default function LoginPage() {
           ? 'Open your authenticator app and enter the 6-digit code, or use a recovery code.'
           : 'Sign in to manage your events and registrations.'
       }
-      footer={
-        <p className="mt-6 text-center text-[13px] text-muted">
-          Don't have an account?{' '}
-          <Link to="/auth/register" className="font-semibold text-brand hover:underline">
-            Create one
-          </Link>
-        </p>
-      }
+      footer={<CreateAccountPrompt to={signUpPathFor('admin')} />}
     >
       <form className="space-y-4" onSubmit={onSubmit}>
         {error && (
