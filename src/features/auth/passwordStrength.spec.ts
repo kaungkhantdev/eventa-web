@@ -11,28 +11,53 @@ describe('scorePassword', () => {
   // Written against the constant rather than a literal, so moving the floor
   // moves the test with it instead of quietly leaving it behind.
   it('scores a password shorter than the API accepts as too short', () => {
-    expect(scorePassword('a'.repeat(MIN_PASSWORD_LENGTH - 1))).toBe(0)
+    expect(scorePassword('1!' + 'a'.repeat(MIN_PASSWORD_LENGTH - 3))).toBe(0)
   })
 
   it('accepts the floor itself', () => {
-    expect(scorePassword('a'.repeat(MIN_PASSWORD_LENGTH))).toBe(1)
+    expect(scorePassword('1!' + 'a'.repeat(MIN_PASSWORD_LENGTH - 2))).toBe(1)
+  })
+
+  // US-SET-02: a strong password is "at least 8 characters with a number and a
+  // symbol" — the floor the API enforces at sign-up, reset, change and invite.
+  it('holds the floor at 8 characters', () => {
+    expect(MIN_PASSWORD_LENGTH).toBe(8)
+  })
+
+  it('scores a long password with no number as one the API refuses', () => {
+    expect(scorePassword('password!word')).toBe(0)
+  })
+
+  it('scores a long password with no symbol as one the API refuses', () => {
+    expect(scorePassword('Passw0rdPassw0rd')).toBe(0)
+  })
+
+  it('asks for no letter — a number and a symbol are the rule', () => {
+    expect(scorePassword('12345678!')).toBe(1)
+  })
+
+  // A Thai letter or vowel sign is a letter, not a symbol, so it never stands
+  // in for the one the rule asks for.
+  it('does not count Thai letters as symbols', () => {
+    expect(scorePassword('สวัสดีครับ1')).toBe(0)
+    expect(scorePassword('สวัสดีคะ1!')).toBe(1)
   })
 
   it('says so in words', () => {
-    expect(STRENGTH_TEXTS[0]).toBe(`Use ${MIN_PASSWORD_LENGTH}+ characters`)
+    expect(STRENGTH_TEXTS[0]).toBe(`Use ${MIN_PASSWORD_LENGTH}+ characters with a number and a symbol`)
   })
 
-  it('scores a long-enough password as weak on its own', () => {
-    expect(scorePassword('aaaaaaaaaa')).toBe(1)
+  it('scores a password that only meets the floor as weak', () => {
+    expect(scorePassword('aaaaaaa1!')).toBe(1)
   })
 
-  it('rewards mixing case and digits', () => {
-    expect(scorePassword('Passw0rdaa')).toBe(2)
+  it('rewards mixing case', () => {
+    expect(scorePassword('Passw0rd!')).toBe(2)
   })
 
-  // The last point needs length as well as a symbol — the kit awarded it two
-  // characters above its own minimum, and that relationship is kept.
-  it('rewards a symbol at a comfortable length', () => {
+  // The last point needs length — the kit awarded it a few characters above
+  // its own minimum, and that relationship is kept.
+  it('rewards a comfortable length', () => {
     expect(scorePassword('Passw0rd!a')).toBe(2)
     expect(scorePassword('Passw0rd!aaa')).toBe(3)
   })
