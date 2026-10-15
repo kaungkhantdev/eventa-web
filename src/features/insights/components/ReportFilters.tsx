@@ -9,8 +9,17 @@ import { useFilters, useSearchBox } from '@/lib/useFilters'
  * so a request is made once the organizer pauses rather than per keystroke, and
  * changing either drops the page number — page 4 of the old result set is not
  * page 4 of the new one.
+ *
+ * `searchLabel` says what the search actually matches, which is the API's
+ * decision per report — the payouts search covers references as well as events.
  */
-export function ReportFilters({ events }: { events: EventOption[] }) {
+export function ReportFilters({
+  events,
+  searchLabel = 'Search events',
+}: {
+  events: EventOption[]
+  searchLabel?: string
+}) {
   const { params, set } = useFilters()
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
@@ -23,8 +32,8 @@ export function ReportFilters({ events }: { events: EventOption[] }) {
           value={term}
           onChange={(event) => setTerm(event.target.value)}
           className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-          placeholder="Search events…"
-          aria-label="Search events"
+          placeholder={`${searchLabel}…`}
+          aria-label={searchLabel}
         />
       </div>
       <div className="relative w-full sm:w-52">

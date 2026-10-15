@@ -24,13 +24,13 @@ import { guestOnly } from '@/features/auth/guestOnly'
 /**
  * Simulated per-page fetch latency, in milliseconds.
  *
- * Applies only to pages NOT YET wired to the API. Those still read from their
- * feature's `data/` module, so they have nothing to wait for and their
- * skeletons would flash past in the handful of milliseconds a chunk takes.
- * A migrated page passes its own loader to `page()` and waits on the real
- * request instead — see `@/app/loaders`.
+ * Applies only to routes that fetch nothing — a few public forms (the
+ * check-your-email screens, forgot-password). With no request to wait on,
+ * their skeletons would flash past in the handful of milliseconds a chunk
+ * takes. Every admin page is wired to the API and waits on its real request
+ * instead — see `@/app/loaders`.
  *
- * When the last page is migrated this constant and `pageLoader` go with it.
+ * It outlived the last demo-data page on purpose: those forms still use it.
  */
 export const PAGE_LOAD_MS = 350
 
@@ -314,7 +314,10 @@ const adminChildren = [
   },
   {
     path: 'reports-payouts',
-    ...page(() => import('@/features/insights/pages/ReportsPayoutsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsPayoutsPage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.payoutsReportRoute),
+    ),
     handle: { page: 'reports-payouts' },
   },
   {

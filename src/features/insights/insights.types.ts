@@ -199,6 +199,42 @@ export interface TransactionsReportWire {
   }
 }
 
+/* ── payouts (US-RPT-07) ───────────────────────────────────────────────── */
+
+/**
+ * The report's own three statuses. The table stores four; a failed payout is
+ * not in this report at all (it is Finance Payouts' to show, with its retry).
+ */
+export type ReportPayoutStatus = 'paid' | 'in_transit' | 'pending'
+
+export interface PayoutRowWire {
+  /** Unique within the workspace — what the organizer quotes to their bank. */
+  reference: string
+  /** UTC. When it landed, or when it was requested if it has not yet. */
+  at: string
+  /** Masked by the API to the last four digits. Shown exactly as sent. */
+  bankAccount: string
+  /** Every event whose payments it settles; empty when it carries none. */
+  events: { eventId: string; eventName: string }[]
+  amountSatang: number
+  status: ReportPayoutStatus
+}
+
+export interface PayoutsReportWire {
+  period: ReportPeriodWire
+  rows: PayoutRowWire[]
+  matchedPayouts: number
+  totals: {
+    payouts: number
+    paidOutSatang: number
+    inTransitSatang: number
+    /** Scheduled and not yet sent — NOT Finance Payouts' "pending" balance. */
+    pendingSatang: number
+    /** Null when nothing matched: there is no average of no payouts. */
+    averageSatang: number | null
+  }
+}
+
 /* ── the overview (US-RPT-01/03) ───────────────────────────────────────── */
 
 export const OVERVIEW_RANGES = ['7d', '30d', '90d', 'year'] as const

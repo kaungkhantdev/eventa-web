@@ -15,6 +15,8 @@ import {
   toMixSlices,
   toOverviewTiles,
   toTransactionRow,
+  toPayoutRow,
+  toPayoutTiles,
   toTrendLabels,
   toIncomeRow,
   toIncomeTiles,
@@ -27,6 +29,7 @@ import {
   type EventPerformanceRow,
   type MixSlice,
   type TransactionRow,
+  type PayoutRow,
   type IncomeReportRow,
   type RegistrationReportRow,
 } from './insights.mapper'
@@ -36,6 +39,7 @@ import type {
   OverviewRange,
   OverviewWire,
   TransactionsReportWire,
+  PayoutsReportWire,
   EventsReportWire,
   IncomeReportWire,
   RegistrationsReportWire,
@@ -68,6 +72,7 @@ const reportsApi = {
     api.get<DiscountsReportWire>('/reports/discounts', { query }),
   transactions: (query: Query) =>
     api.get<TransactionsReportWire>('/reports/transactions', { query }),
+  payouts: (query: Query) => api.get<PayoutsReportWire>('/reports/payouts', { query }),
   overview: (query: Query) => api.get<OverviewWire>('/reports/overview', { query }),
 }
 
@@ -309,6 +314,29 @@ async function loadTransactions({
   }
 }
 
+export type PayoutsReportData = ReportData<PayoutRow, ReturnType<typeof toPayoutTiles>>
+
+/**
+ * Payouts and settlement (US-RPT-07).
+ *
+ * Which payouts match — a payout covering several events matches a filter on
+ * any one of them — and every sum are the API's; this only maps them.
+ */
+async function loadPayouts({ request }: LoaderArgs): Promise<PayoutsReportData> {
+  const query = reportQuery(request)
+  const [report, events] = await Promise.all([reportsApi.payouts(query), eventOptions()])
+  guardPage(request, report.matchedPayouts, query)
+
+  return {
+    rows: report.rows.map(toPayoutRow),
+    tiles: toPayoutTiles(report.totals),
+    window: windowOf(report.matchedPayouts, query),
+    period: report.period,
+    events,
+    exportQuery: exportQuery(query),
+  }
+}
+
 /** How many events the overview previews before "View all". */
 const TOP_EVENTS = 6
 
@@ -380,6 +408,7 @@ async function loadOverview({ request }: LoaderArgs): Promise<OverviewData> {
 
 export const overviewReportRoute = { loader: pageData(loadOverview) }
 export const transactionsReportRoute = { loader: pageData(loadTransactions) }
+export const payoutsReportRoute = { loader: pageData(loadPayouts) }
 export const discountsReportRoute = { loader: pageData(loadDiscounts) }
 export const eventsReportRoute = { loader: pageData(loadEvents) }
 export const registrationsReportRoute = { loader: pageData(loadRegistrations) }

@@ -14,6 +14,7 @@ const REPORTS = [
   'income',
   'discounts',
   'transactions',
+  'payouts',
 ] as const
 
 type Report = (typeof REPORTS)[number]
