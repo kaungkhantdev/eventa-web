@@ -86,9 +86,38 @@ describe('landingPreviewHref', () => {
   const live = { slug: 'bangkok-trail-run-2026', status: 'upcoming', visibility: 'public' }
 
   it('opens the real public page once the event is live', () => {
-    expect(landingPreviewHref('aurora', live, typed)).toBe(
-      '/landing/aurora?event=bangkok-trail-run-2026',
-    )
+    const href = landingPreviewHref('aurora', live, typed)
+    expect(href).toMatch(/^\/landing\/aurora\?/)
+    expect(new URLSearchParams(href.split('?')[1]).get('event')).toBe('bangkok-trail-run-2026')
+  })
+
+  /**
+   * US-PAGE-09 / US-EVT-07: Preview shows what is typed, saved or not. A live
+   * event's preview fetched its saved page and nothing else, so an edited
+   * title or highlight never appeared until it was saved.
+   */
+  it('carries what is typed over the live page, saved or not', () => {
+    const href = landingPreviewHref('aurora', live, {
+      title: 'Bangkok Night Run',
+      venue: '',
+      online: true,
+      highlights: [{ icon: 'hgi-wifi-01', label: 'Free WiFi' }],
+    })
+    const params = new URLSearchParams(href.split('?')[1])
+    expect(params.get('event')).toBe('bangkok-trail-run-2026')
+    expect(params.get('title')).toBe('Bangkok Night Run')
+    expect(params.get('online')).toBe('1')
+    expect(params.get('hl')).toBe('hgi-wifi-01:Free WiFi')
+  })
+
+  // Over a saved page, leaving a field out would mean "keep the saved one" —
+  // so switching back to in person, or removing every highlight, is said
+  // explicitly rather than lost.
+  it('states every typed field over a live page, even an empty one', () => {
+    const params = new URLSearchParams(landingPreviewHref('aurora', live, typed).split('?')[1])
+    expect(params.get('online')).toBe('0')
+    expect(params.get('hl')).toBe('')
+    expect(params.get('venue')).toBe('Lumpini Park')
   })
 
   it('previews what is typed while the event is still a draft', () => {
@@ -120,9 +149,9 @@ describe('landingPreviewHref', () => {
   })
 
   it('escapes the slug, so it cannot add a second query parameter', () => {
-    expect(landingPreviewHref('aurora', { ...live, slug: 'a&b=c' }, typed)).toBe(
-      '/landing/aurora?event=a%26b%3Dc',
-    )
+    const href = landingPreviewHref('aurora', { ...live, slug: 'a&b=c' }, typed)
+    expect(href).toContain('event=a%26b%3Dc')
+    expect(new URLSearchParams(href.split('?')[1]).get('b')).toBeNull()
   })
 
   it('packs the typed highlights as icon:label pairs', () => {

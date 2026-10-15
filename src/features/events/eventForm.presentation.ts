@@ -143,33 +143,51 @@ function publicSlugOf(saved: SavedEvent | null): string | null {
   return served ? saved.slug : null
 }
 
+/** The typed highlights as `icon:label` pairs, the way `toDraftPreview` reads them. */
+function packedHighlights(typed: TypedEvent): string {
+  return typed.highlights
+    .map((h) => (h.label.trim() ? `${h.icon}:${h.label.trim()}` : null))
+    .filter((entry): entry is string => entry !== null)
+    .join('|')
+}
+
 /** The wizard's own fields, packed the way `toDraftPreview` unpacks them. */
 function draftParams(typed: TypedEvent): URLSearchParams {
   const params = new URLSearchParams()
   const title = typed.title.trim()
   const venue = typed.venue.trim()
+  const highlights = packedHighlights(typed)
   if (title) params.set('title', title)
   if (venue) params.set('venue', venue)
   if (typed.online) params.set('online', '1')
-  const packed = typed.highlights
-    .map((h) => (h.label.trim() ? `${h.icon}:${h.label.trim()}` : null))
-    .filter((entry): entry is string => entry !== null)
-  if (packed.length) params.set('hl', packed.join('|'))
+  if (highlights) params.set('hl', highlights)
   return params
 }
 
 /**
- * Where Preview goes.
+ * The same fields laid over a live page, the way `overlayDraft` reads them.
+ * Every one is stated, empty or not: over a saved page an absent field means
+ * "keep the saved one", so a cleared one would otherwise not show as cleared.
+ */
+function overlayParams(slug: string, typed: TypedEvent): URLSearchParams {
+  return new URLSearchParams({
+    event: slug,
+    title: typed.title.trim(),
+    venue: typed.venue.trim(),
+    online: typed.online ? '1' : '0',
+    hl: packedHighlights(typed),
+  })
+}
+
+/**
+ * Where Preview goes (US-PAGE-09).
  *
  * Two different pages behind one button, because there are two different
- * things to look at. Once an event is live its page really exists, and the
- * only honest preview is that page — the same URL an attendee opens, with the
- * agenda, speakers, tickets and FAQs the organizer actually entered. Before
- * then nothing is published, so the page is built from what is in the form,
- * which shows the design and the typed copy and nothing borrowed.
- *
- * Note the first branch shows what is SAVED, not what is on screen: it is a
- * fetch of the live page. The caller is responsible for saying so.
+ * things to look at. Once an event is live its page really exists, so the
+ * preview is that page — the agenda, speakers, tickets and FAQs the organizer
+ * actually entered — with what is typed in the wizard laid over it, saved or
+ * not. Before then nothing is published, so the page is built from what is in
+ * the form, which shows the design and the typed copy and nothing borrowed.
  */
 export function landingPreviewHref(
   template: string,
@@ -177,7 +195,7 @@ export function landingPreviewHref(
   typed: TypedEvent,
 ): string {
   const slug = publicSlugOf(saved)
-  const params = slug === null ? draftParams(typed) : new URLSearchParams({ event: slug })
+  const params = slug === null ? draftParams(typed) : overlayParams(slug, typed)
   const query = params.toString()
   return `/landing/${template}${query ? `?${query}` : ''}`
 }

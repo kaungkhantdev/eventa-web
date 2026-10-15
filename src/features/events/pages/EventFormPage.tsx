@@ -421,8 +421,8 @@ export default function EventFormPage() {
     setHighlights((prev) => prev.map((h, j) => (j === i ? { ...h, [field]: value } : h)))
 
   /**
-   * Recomputed as they type, so the draft branch previews what is in the boxes
-   * now rather than what was there when the page loaded.
+   * Recomputed as they type, so the preview shows what is in the boxes now
+   * rather than what was there when the page loaded — saved or not.
    */
   const previewHref = landingPreviewHref(
     landingTpl,
@@ -431,15 +431,6 @@ export default function EventFormPage() {
       : null,
     { title, venue, online, highlights },
   )
-  /**
-   * A live event previews its real published page, so what is on screen but not
-   * yet saved will not appear there — said plainly rather than left to surprise
-   * somebody who just typed a new title.
-   */
-  const previewsSaved = previewHref.includes('event=')
-  const previewTitle = previewsSaved
-    ? 'Opens the live public page — unsaved changes are not shown'
-    : 'Opens a preview of this draft in a new tab'
 
   /* A new tab, not a navigation: the wizard holds the open step's edits in
      component state, so leaving the page would discard them. */
@@ -470,7 +461,7 @@ export default function EventFormPage() {
             type="button"
             onClick={previewLanding}
             className="btn btn-soft"
-            title={previewTitle}
+            title="Opens a preview of this event in a new tab"
           >
             <i className="hgi-stroke hgi-arrow-up-right-01 text-[16px]" />
             <span className="hidden sm:inline">Preview</span>
