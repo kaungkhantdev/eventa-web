@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useFetcher, useLoaderData } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
@@ -10,6 +10,9 @@ import {
   scorePassword,
 } from '@/features/auth/passwordStrength'
 import { useSignUp } from '@/features/auth/useSignUp'
+import { ClaimExists, ClaimForm, ClaimInvalid } from '../components/BookingClaim'
+import { registerScreenOf } from '../portalRegister.mapper'
+import type { ClaimRefusal, PortalRegisterData } from '../portalRegister.types'
 
 /* Attendee sign-up — the portal's own, separate from the organizer sign-up at
    /auth/register, exactly as the two logins are separate. It creates a
@@ -21,16 +24,31 @@ import { useSignUp } from '@/features/auth/useSignUp'
    No workspace field: an attendee has one platform-wide realm, and naming a
    workspace is refused with a 422 rather than ignored.
 
-   A buyer is never handed in from their order with the address fixed: the
-   order page is open to whoever booked, so it proves nothing about whose inbox
-   that is. A booking becomes an account through the link emailed to its
-   address (US-DISC-15).
+   Two modes (US-DISC-15). Opened directly, the email is empty and editable and
+   the account is confirmed by email before it can be used. Opened from the
+   one-time link emailed to a booking's address (`?claim=`), the link is that
+   proof: the name and email are the booking's, shown fixed, only a password is
+   asked for, and the person is signed in to My Events. Which one — and which
+   screen of the second — is `registerScreenOf`'s call; the claim screens live
+   in `BookingClaim`.
 
    No Google or Apple button, for the same reason the portal sign-in has none:
    `POST /auth/social/attendee` needs an orgSlug the portal cannot name, and the
    account it would create lands in the wrong organization (open API defect).
    They come back when that is fixed. */
 export default function PortalRegisterPage() {
+  const data = useLoaderData() as PortalRegisterData
+  const claim = useFetcher<ClaimRefusal>()
+  const screen = registerScreenOf(data, claim.data)
+
+  if (screen.kind === 'claim') return <ClaimForm screen={screen} claim={claim} />
+  if (screen.kind === 'exists') return <ClaimExists screen={screen} />
+  if (screen.kind === 'invalid') return <ClaimInvalid screen={screen} />
+  return <DirectSignUp />
+}
+
+/** The ordinary sign-up, submitted by `useSignUp` and confirmed by email. */
+function DirectSignUp() {
   const [showPw, setShowPw] = useState(false)
   const [showCpw, setShowCpw] = useState(false)
   const [password, setPassword] = useState('')
