@@ -1,8 +1,13 @@
-import { ApiError, NetworkError, api, messageOf } from '@/lib/api'
+import { ApiError, NetworkError, api, messageOf, session } from '@/lib/api'
 import type { LoaderArgs } from '@/app/loaders'
 import { authApi, type BookingAccount, type BookingClaimLink } from '@/features/auth/api'
 import { toGuestOrder } from './guestOrder.mapper'
-import type { AccountLinkResult, GuestOrder, GuestOrderWire } from './guestOrder.types'
+import type {
+  AccountLinkResult,
+  AccountOfferContext,
+  GuestOrder,
+  GuestOrderWire,
+} from './guestOrder.types'
 import { checkoutApi } from './checkout.api'
 import { toPaymentStep } from './checkout.mapper'
 import type { PaymentStep } from './checkout.types'
@@ -32,10 +37,9 @@ export interface PayResult {
 /** The account offer's submission; the payment form has no intent of its own. */
 export const ACCOUNT_LINK_INTENT = 'account-link'
 
-export interface GuestOrderData {
+/** The order, and what the account offer under it needs to know. */
+export interface GuestOrderData extends AccountOfferContext {
   order: GuestOrder
-  /** An attendee account already uses the buyer's email — offer sign-in only. */
-  accountExists: boolean
 }
 
 /**
@@ -113,11 +117,13 @@ async function pay(orderId: string, method: FormDataEntryValue | null): Promise<
 export const guestOrderRoute = {
   loader: async ({ params }: LoaderArgs): Promise<GuestOrderData> => {
     const orderId = String(params.orderId)
+    // Read, never required: the page is open to anybody holding the link.
+    const signedIn = session.persona() === 'attendee'
     const [wire, accountExists] = await Promise.all([
       api.get<GuestOrderWire>(`/public/orders/${orderId}`),
       knownAccount(authApi.bookingAccount(orderId)),
     ])
-    return { order: toGuestOrder(wire, new Date()), accountExists }
+    return { order: toGuestOrder(wire, new Date()), accountExists, signedIn }
   },
 
   /** The page's two forms — paying, and asking for the account link. */

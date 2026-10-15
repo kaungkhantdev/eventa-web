@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, NetworkError } from '@/lib/api'
+import { ApiError, NetworkError, session } from '@/lib/api'
 import { ACCOUNT_LINK_INTENT, guestOrderRoute, knownAccount, requestAccountLink } from './guestOrder.routes'
 
 /**
@@ -74,6 +74,85 @@ describe('requestAccountLink', () => {
     })
 
     await expect(requestAccountLink(ORDER_ID, broken)).rejects.toBeInstanceOf(TypeError)
+  })
+})
+
+/**
+ * Whether the person looking is already signed in to an attendee account, so
+ * the offer stops asking them to sign in (TC-DISC-32: signing in from the
+ * offer returns them to this page).
+ */
+describe('guestOrderRoute.loader', () => {
+  const ORDER_WIRE = {
+    orderId: ORDER_ID,
+    reference: 'ORD-27VEEC7Y',
+    status: 'confirmed',
+    paymentStatus: 'paid',
+    eventName: 'Founders Coffee Connect',
+    buyerEmail: 'anan@example.test',
+    buyerName: 'Anan Suksawat',
+    totalSatang: 0,
+    vatSatang: 0,
+    subtotalSatang: 0,
+    discountSatang: 0,
+    currency: 'THB',
+    lines: [],
+    tickets: [],
+    paymentRequired: false,
+    awaitingApproval: false,
+    placedAt: '2026-08-17T04:50:58.000Z',
+    holdExpiresAt: null,
+  }
+
+  function answering() {
+    const envelope = (data: unknown) =>
+      new Response(JSON.stringify({ success: true, statusCode: 200, message: '', data }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        envelope(url.includes('/public/orders/') ? ORDER_WIRE : { accountExists: true }),
+      ),
+    )
+  }
+
+  function storing(persona: 'attendee' | 'admin' | null) {
+    const entries = new Map<string, string>()
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => entries.get(key) ?? null,
+        setItem: (key: string, value: string) => void entries.set(key, value),
+        removeItem: (key: string) => void entries.delete(key),
+      },
+    })
+    if (persona) session.start({ accessToken: 'access', refreshToken: 'refresh', persona })
+  }
+
+  const load = () =>
+    guestOrderRoute.loader({
+      params: { orderId: ORDER_ID },
+      request: new Request(`http://localhost/my/tickets/orders/${ORDER_ID}`),
+    })
+
+  it('knows when an attendee is signed in', async () => {
+    storing('attendee')
+    answering()
+    expect(await load()).toMatchObject({ accountExists: true, signedIn: true })
+  })
+
+  it('treats a guest as not signed in', async () => {
+    storing(null)
+    answering()
+    expect(await load()).toMatchObject({ accountExists: true, signedIn: false })
+  })
+
+  // An organizer's session is not an attendee account: the offer still stands.
+  it('does not count an organizer’s session as an attendee account', async () => {
+    storing('admin')
+    answering()
+    expect(await load()).toMatchObject({ signedIn: false })
   })
 })
 

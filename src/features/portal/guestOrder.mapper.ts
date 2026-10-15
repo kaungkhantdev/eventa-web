@@ -1,8 +1,10 @@
+import { homeFor, signInPathFor } from '@/features/auth/personas'
 import { bangkokDate, satang } from '@/lib/format'
 import { QR_FILE_EXTENSION, qrDataUrl } from '@/lib/qr'
 import type {
   AccountLinkResult,
   AccountOffer,
+  AccountOfferContext,
   GuestOrder,
   GuestOrderLineWire,
   GuestOrderWire,
@@ -117,6 +119,10 @@ const CONFIRMED_STATE: OrderState = {
 /** How the offer is turned down — true only because it is made only for a ticketed order. */
 const NOT_NOW = 'Not now — your ticket is already in your email'
 
+/** For somebody already signed in, the offer's whole point: where every booking is. */
+const SIGNED_IN_PROMPT =
+  'You’re signed in — My Events lists every booking made with your account’s email.'
+
 /** Where this order lives — the link in the confirmation email. */
 export function guestOrderPath(orderId: string): string {
   return `/my/tickets/orders/${orderId}`
@@ -135,16 +141,21 @@ export function guestOrderPath(orderId: string): string {
  * account is ever made here, and no password is ever asked for here. "Create
  * account" emails the booking's address a one-time link, and the account is
  * made from that. An address that already has an account is invited to sign
- * in instead, with no way to ask for a duplicate.
+ * in instead, with no way to ask for a duplicate — and somebody already
+ * signed in, back from doing just that, is pointed at My Events rather than
+ * asked to sign in again.
  *
  * `link` is what the request for the link reported, when one was made.
  */
 export function accountOfferFor(
   order: Pick<GuestOrder, 'orderId' | 'buyerEmail' | 'ticketed'>,
-  accountExists: boolean,
+  { accountExists, signedIn }: AccountOfferContext,
   link?: AccountLinkResult,
 ): AccountOffer | null {
   if (!order.ticketed) return null
+  if (signedIn) {
+    return { kind: 'signed-in', prompt: SIGNED_IN_PROMPT, myEventsTo: homeFor('attendee') }
+  }
   if (link?.sentTo) {
     return {
       kind: 'sent',
@@ -156,10 +167,15 @@ export function accountOfferFor(
     prompt: accountExists
       ? `You already have an account for ${order.buyerEmail}. Sign in to see every booking in one place.`
       : `Create an account for ${order.buyerEmail} and every booking is in one place.`,
-    signInTo: `/portal/login?from=${encodeURIComponent(guestOrderPath(order.orderId))}`,
+    signInTo: signInBackTo(order.orderId),
     dismiss: NOT_NOW,
     error: link?.error ?? null,
   }
+}
+
+/** The portal's sign-in, coming back to this order afterwards. */
+function signInBackTo(orderId: string): string {
+  return `${signInPathFor('attendee')}?from=${encodeURIComponent(guestOrderPath(orderId))}`
 }
 
 export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {

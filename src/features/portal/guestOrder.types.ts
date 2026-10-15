@@ -145,6 +145,14 @@ export interface GuestOrder {
 
 /* ── the account offer under the order (US-DISC-15) ───────────────────── */
 
+/** What the offer needs to know besides the order. */
+export interface AccountOfferContext {
+  /** An attendee account already uses the buyer's email — offer sign-in only. */
+  accountExists: boolean
+  /** Whoever is looking is signed in to an attendee account already. */
+  signedIn: boolean
+}
+
 /** What asking for the account link reported: where it went, or why not. */
 export interface AccountLinkResult {
   /** The booking's own address, as the API sent to it. */
@@ -156,8 +164,10 @@ export interface AccountLinkResult {
 /**
  * What the offer says and offers. `create` and `sign-in` are the offer itself,
  * either of which can be dismissed; `sent` replaces it once the link is on its
- * way, because the next step happens in an inbox. An order with no ticket to
- * keep gets no offer at all — `accountOfferFor` answers `null`.
+ * way, because the next step happens in an inbox; `signed-in` replaces it for
+ * somebody already signed in, who has nothing left to create or sign in to.
+ * An order with no ticket to keep gets no offer at all — `accountOfferFor`
+ * answers `null`.
  */
 export type AccountOffer =
   | {
@@ -170,3 +180,9 @@ export type AccountOffer =
       error: string | null
     }
   | { kind: 'sent'; message: string }
+  | {
+      kind: 'signed-in'
+      prompt: string
+      /** Where every booking made with their address is listed. */
+      myEventsTo: string
+    }

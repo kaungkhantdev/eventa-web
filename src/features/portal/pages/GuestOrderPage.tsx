@@ -14,6 +14,7 @@ import { ACCOUNT_LINK_INTENT, type GuestOrderData } from '../guestOrder.routes'
 import type {
   AccountLinkResult,
   AccountOffer,
+  AccountOfferContext,
   GuestOrder,
   GuestTicket,
   OrderState,
@@ -44,7 +45,7 @@ const TONES: Record<OrderState['tone'], string> = {
 const DISCOVER = '/portal/discover'
 
 export default function GuestOrderPage() {
-  const { order, accountExists } = useLoaderData() as GuestOrderData
+  const { order, ...account } = useLoaderData() as GuestOrderData
   const { dark, toggle } = useTheme()
   // The hold can lapse while this page is open, so the clock — not the status
   // the loader fetched — decides whether paying is still on offer.
@@ -94,7 +95,7 @@ export default function GuestOrderPage() {
         {order.tickets.length === 0 && !order.ticketsExplained && <NothingToShow />}
 
         <Receipt order={order} heading={receiptHeading({ canPay, paid: order.paid })} />
-        <KeepThem order={order} accountExists={accountExists} />
+        <KeepThem order={order} account={account} />
 
         <p className="mt-8 text-center text-[11px] text-muted/70">
           Keep this link — it is how you get back to these tickets.
@@ -250,12 +251,13 @@ function Receipt({ order, heading }: { order: GuestOrder; heading: string }) {
  * Whether to make an offer at all, which one, and what the card says after,
  * is `accountOfferFor`'s call.
  */
-function KeepThem({ order, accountExists }: { order: GuestOrder; accountExists: boolean }) {
+function KeepThem({ order, account }: { order: GuestOrder; account: AccountOfferContext }) {
   const [dismissed, setDismissed] = useState(false)
   const link = useFetcher<AccountLinkResult>()
-  const offer = accountOfferFor(order, accountExists, link.data)
+  const offer = accountOfferFor(order, account, link.data)
   if (dismissed || !offer) return null
   if (offer.kind === 'sent') return <LinkSent message={offer.message} />
+  if (offer.kind === 'signed-in') return <AllBookings offer={offer} />
 
   return (
     <section className="card mt-4 p-5">
@@ -292,7 +294,7 @@ function OfferActions({
   orderId,
   link,
 }: {
-  offer: Exclude<AccountOffer, { kind: 'sent' }>
+  offer: Extract<AccountOffer, { kind: 'create' | 'sign-in' }>
   orderId: string
   link: FetcherWithComponents<AccountLinkResult>
 }) {
@@ -320,6 +322,25 @@ function OfferActions({
         </link.Form>
       )}
     </div>
+  )
+}
+
+/**
+ * Already signed in — back from signing in through the offer, or booked that
+ * way — so there is nothing left to create or sign in to, only the place
+ * every booking made with their address is listed.
+ */
+function AllBookings({ offer }: { offer: Extract<AccountOffer, { kind: 'signed-in' }> }) {
+  return (
+    <section className="card mt-4 flex flex-wrap items-center justify-between gap-3 p-5">
+      <div className="min-w-0">
+        <h2 className="text-[15px] font-bold tracking-tight">Every booking in one place</h2>
+        <p className="mt-0.5 text-[12.5px] text-muted">{offer.prompt}</p>
+      </div>
+      <Link to={offer.myEventsTo} className="btn btn-primary shrink-0">
+        See all your bookings
+      </Link>
+    </section>
   )
 }
 

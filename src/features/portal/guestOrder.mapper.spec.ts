@@ -507,10 +507,13 @@ describe('accountOfferFor', () => {
   const SIGN_IN_HERE =
     '/portal/login?from=%2Fmy%2Ftickets%2Forders%2F0b9c6a52-3f43-4f7e-9d1e-5a0c1f2b7e11'
   const NOT_NOW = 'Not now — your ticket is already in your email'
+  const NO_ACCOUNT = { accountExists: false, signedIn: false }
+  const HAS_ACCOUNT = { accountExists: true, signedIn: false }
+  const SIGNED_IN = { accountExists: true, signedIn: true }
 
   // "… a way to dismiss it that says the ticket is already in my email."
   it('offers to create an account for the booking’s address, dismissable', () => {
-    expect(accountOfferFor(ORDER, false)).toEqual({
+    expect(accountOfferFor(ORDER, NO_ACCOUNT)).toEqual({
       kind: 'create',
       prompt: 'Create an account for anan@example.test and every booking is in one place.',
       signInTo: SIGN_IN_HERE,
@@ -530,20 +533,20 @@ describe('accountOfferFor', () => {
       order({ status: 'pending', awaitingApproval: true, paymentStatus: 'pending', tickets: [] }),
     ]
     for (const waiting of noTicketYet) {
-      expect(accountOfferFor(waiting, false)).toBeNull()
-      expect(accountOfferFor(waiting, true)).toBeNull()
+      expect(accountOfferFor(waiting, NO_ACCOUNT)).toBeNull()
+      expect(accountOfferFor(waiting, HAS_ACCOUNT)).toBeNull()
     }
   })
 
   it('makes it for a confirmed order straight from the mapper', () => {
-    expect(accountOfferFor(order(), false)).toMatchObject({ kind: 'create', dismiss: NOT_NOW })
+    expect(accountOfferFor(order(), NO_ACCOUNT)).toMatchObject({ kind: 'create', dismiss: NOT_NOW })
   })
 
   // "Given I registered with an email that already has an account, when I
   // follow the link, then I am invited to sign in instead of being offered a
   // duplicate."
   it('invites a buyer who already has an account to sign in, offering no duplicate', () => {
-    expect(accountOfferFor(ORDER, true)).toEqual({
+    expect(accountOfferFor(ORDER, HAS_ACCOUNT)).toEqual({
       kind: 'sign-in',
       prompt:
         'You already have an account for anan@example.test. Sign in to see every booking in one place.',
@@ -555,7 +558,7 @@ describe('accountOfferFor', () => {
 
   // The address is the one the API sent to, not the one this page holds.
   it('says where the link went once it is on its way, in place of the offer', () => {
-    expect(accountOfferFor(ORDER, false, { sentTo: 'anan@example.test' })).toEqual({
+    expect(accountOfferFor(ORDER, NO_ACCOUNT, { sentTo: 'anan@example.test' })).toEqual({
       kind: 'sent',
       message:
         "We've sent a link to anan@example.test. Open it to choose a password — it proves the address is yours.",
@@ -567,12 +570,30 @@ describe('accountOfferFor', () => {
   it('keeps the offer and shows the API’s refusal verbatim', () => {
     const refused = 'An account already uses this email. Sign in instead.'
 
-    expect(accountOfferFor(ORDER, true, { error: refused })).toMatchObject({
+    expect(accountOfferFor(ORDER, HAS_ACCOUNT, { error: refused })).toMatchObject({
       kind: 'sign-in',
       error: refused,
     })
-    expect(accountOfferFor(ORDER, false, { error: 'Please wait before asking again.' })).toMatchObject(
+    expect(accountOfferFor(ORDER, NO_ACCOUNT, { error: 'Please wait before asking again.' })).toMatchObject(
       { kind: 'create', error: 'Please wait before asking again.' },
     )
+  })
+
+  // Back from signing in through the offer (TC-DISC-32), or booked while
+  // signed in: "Sign in" would bounce off the guest-only sign-in, and
+  // "Create account" would ask for an account they are already using.
+  it('points somebody already signed in at My Events instead of asking them to sign in', () => {
+    expect(accountOfferFor(ORDER, SIGNED_IN)).toEqual({
+      kind: 'signed-in',
+      prompt: 'You’re signed in — My Events lists every booking made with your account’s email.',
+      myEventsTo: '/portal/my-events',
+    })
+    expect(accountOfferFor(ORDER, { accountExists: false, signedIn: true })).toMatchObject({
+      kind: 'signed-in',
+    })
+  })
+
+  it('still makes no offer to somebody signed in when there is no ticket', () => {
+    expect(accountOfferFor(order(UNPAID), SIGNED_IN)).toBeNull()
   })
 })
