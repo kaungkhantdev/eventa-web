@@ -9,9 +9,11 @@ import {
   Icon,
   Input,
   Label,
+  Modal,
   Select,
   Toggle,
 } from '@/components/ui'
+import { useDisclosure } from '@/lib/useDisclosure'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
 import { useFilters } from '@/lib/useFilters'
@@ -152,23 +154,62 @@ function ProviderPanel({ payments }: { payments: PaymentSettingsCard }) {
         <Fact label="Settles in" value={payments.defaultCurrency} />
       </dl>
 
-      {payments.connected && (
-        <IntentAction intent="disconnect" done="Payment account disconnected.">
-          {(busy, run) => (
-            <Button
-              variant="danger"
-              size="sm"
-              type="button"
-              onClick={run}
-              disabled={busy}
-              className="mt-3 w-full"
-            >
-              Disconnect
-            </Button>
-          )}
-        </IntentAction>
-      )}
+      {payments.connected && <DisconnectAction provider={payments.provider} />}
     </div>
+  )
+}
+
+/**
+ * Disconnecting, behind a confirmation (US-SET-08: "when I disconnect and
+ * confirm"). One click used to post at once — deleting the saved keys and
+ * stopping paid checkout with no chance to take it back. Built from the kit's
+ * Modal, which has no markup for this.
+ */
+function DisconnectAction({ provider }: { provider: string }) {
+  const confirm = useDisclosure()
+  return (
+    <IntentAction intent="disconnect" done="Payment account disconnected.">
+      {(busy, run) => (
+        <>
+          <Button
+            variant="danger"
+            size="sm"
+            type="button"
+            onClick={confirm.onOpen}
+            disabled={busy}
+            className="mt-3 w-full"
+          >
+            Disconnect
+          </Button>
+          <Modal
+            open={confirm.open}
+            onClose={confirm.onClose}
+            title={`Disconnect ${provider}?`}
+            footer={
+              <>
+                <Button variant="soft" type="button" onClick={confirm.onClose}>
+                  Keep it connected
+                </Button>
+                <Button
+                  variant="danger"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    confirm.onClose()
+                    run()
+                  }}
+                >
+                  Disconnect
+                </Button>
+              </>
+            }
+          >
+            Paid checkout stops until you reconnect, and your saved keys are removed. Free
+            events keep working, and past orders and payouts are untouched.
+          </Modal>
+        </>
+      )}
+    </IntentAction>
   )
 }
 

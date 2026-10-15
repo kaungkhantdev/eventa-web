@@ -10,6 +10,7 @@ import type {
   BuyerDefaults,
   CheckoutView,
   PaymentStep,
+  PayMethod,
   PlacedOrder,
   SeatRow,
   SummaryLines,
@@ -49,7 +50,9 @@ export default function PortalCheckoutPage() {
   const [tierId, setTierId] = useState(() => firstSellable(checkout.tiers))
   const [quantity, setQuantity] = useState(1)
   const [seatIds, setSeatIds] = useState<number[]>([])
-  const [method, setMethod] = useState<'Card' | 'PromptPay'>('Card')
+  // The first way to pay the workspace offers (US-SET-09); Card when it
+  // offers none this page can take, which the API then refuses in words.
+  const [method, setMethod] = useState<PayMethod>(checkout.paymentMethods[0] ?? 'Card')
   const [discountCode, setDiscountCode] = useState('')
 
   const { eventId, mode } = checkout
@@ -149,6 +152,7 @@ export default function PortalCheckoutPage() {
             <StepHeading>4 · Payment</StepHeading>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_300px]">
               <PaymentMethods
+                offered={checkout.paymentMethods}
                 method={method}
                 onChange={setMethod}
                 discountCode={discountCode}
@@ -583,13 +587,16 @@ const METHODS = [
 ]
 
 function PaymentMethods({
+  offered,
   method,
   onChange,
   discountCode,
   onDiscountCode,
 }: {
-  method: 'Card' | 'PromptPay'
-  onChange: (next: 'Card' | 'PromptPay') => void
+  /** Only what the workspace switched on (US-SET-09). */
+  offered: readonly PayMethod[]
+  method: PayMethod
+  onChange: (next: PayMethod) => void
   discountCode: string
   onDiscountCode: (next: string) => void
 }) {
@@ -598,7 +605,7 @@ function PaymentMethods({
   return (
     <div className="card p-4 sm:p-5">
       <div className="grid grid-cols-2 gap-3">
-        {METHODS.map((option) => {
+        {METHODS.filter((option) => offered.includes(option.method)).map((option) => {
           const on = method === option.method
           return (
             <button

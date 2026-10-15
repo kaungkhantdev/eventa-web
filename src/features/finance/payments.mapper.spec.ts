@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { toPaymentRow } from './payments.mapper'
+import type { Me } from '@/features/auth/types'
+import { refundControl, toPaymentRow } from './payments.mapper'
 import type { LedgerEntryWire } from './payments.types'
 
 const BAHT = 100
@@ -62,5 +63,60 @@ describe('toPaymentRow', () => {
 
     expect(row.canRefund).toBe(false)
     expect(row.refundBlockedReason).toBe('Already refunded in full.')
+  })
+})
+
+/**
+ * US-FIN-02 / US-FIN-14: "Given an Organizer (not an Admin), when they view a
+ * paid payment, then the Refund action is not available to them." The button
+ * followed only the row's refundability, so an Organizer was offered a refund
+ * the API then refused with a 403.
+ */
+describe('refundControl', () => {
+  const me = (permissions: string[]): Me => ({
+    id: 'u-1',
+    name: 'Pim',
+    email: 'pim@demo.test',
+    persona: 'admin',
+    status: 'Active',
+    twoFactorEnabled: false,
+    organization: {
+      id: 1,
+      name: 'Demo Workspace',
+      slug: 'demo',
+      currency: 'THB',
+      timezone: 'Asia/Bangkok',
+      locale: 'en',
+    },
+    permissions,
+  })
+  const admin = me(['finView', 'finRefund'])
+  const organizer = me(['finView'])
+
+  it('offers an Admin the refund of a paid charge', () => {
+    expect(refundControl(toPaymentRow(wire()), admin)).toEqual({ enabled: true, title: 'Refund' })
+  })
+
+  it('does not offer an Organizer the refund, and says who can', () => {
+    expect(refundControl(toPaymentRow(wire()), organizer)).toEqual({
+      enabled: false,
+      title: 'Only an Admin can issue refunds.',
+    })
+  })
+
+  it('refuses everyone while the session is unknown', () => {
+    expect(refundControl(toPaymentRow(wire()), null).enabled).toBe(false)
+  })
+
+  it('gives an Admin the API’s reason when the charge cannot be refunded', () => {
+    const row = toPaymentRow(
+      wire({ status: 'refunded', canRefund: false, refundBlockedReason: 'Already refunded.' }),
+    )
+    expect(refundControl(row, admin)).toEqual({ enabled: false, title: 'Already refunded.' })
+  })
+
+  it('still says why when the API gave no reason', () => {
+    const row = toPaymentRow(wire({ canRefund: false, refundBlockedReason: null }))
+    expect(refundControl(row, admin).title).toBe('Not eligible for refund')
   })
 })

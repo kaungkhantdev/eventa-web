@@ -12,6 +12,7 @@ import type {
   InvoiceStatus,
   InvoiceWire,
   PayoutRow,
+  PayoutSettingsLinkWire,
   PayoutStatus,
   PayoutWire,
   TaxRow,
@@ -38,8 +39,8 @@ const payoutsApi = {
   list: (query: Query) => api.list<PayoutWire>('/payouts', { query }),
   balances: () => api.get<BalancesWire>('/payouts/balances'),
   retry: (reference: string) => api.post<void>(`/payouts/${reference}/retry`),
-  /** A one-time provider URL for connecting or changing the bank account. */
-  settingsLink: () => api.post<{ connected: boolean; url: string | null }>('/payouts/settings-link'),
+  /** The provider's page for changing the bank account, schedule and tax forms. */
+  settingsLink: () => api.post<PayoutSettingsLinkWire>('/payouts/settings-link'),
 }
 
 export interface PayoutsData {
@@ -77,18 +78,28 @@ async function loadPayouts({ request }: LoaderArgs): Promise<PayoutsData> {
 /**
  * Retrying a failed payout, or opening the provider's settings.
  *
- * The settings link is one-time and comes from the provider, so it is fetched
- * on demand rather than held in loader data where it could go stale in a tab
- * left open.
+ * The settings link comes from the API, so it is fetched on demand rather than
+ * held in loader data — and only when an Admin asks, since the API refuses it
+ * to anyone else.
  */
 async function runPayoutsAction({ request }: LoaderArgs): Promise<unknown> {
   const form = await request.formData()
   if (String(form.get('intent')) === 'connect') {
     const link = await payoutsApi.settingsLink()
-    return { url: link.url }
+    return providerRedirect(link) ?? { url: null }
   }
   await payoutsApi.retry(String(form.get('reference') ?? ''))
   return null
+}
+
+/**
+ * Off to the provider, where bank details, the payout schedule and tax forms
+ * are managed (US-FIN-05). A redirect to another origin is a full-page
+ * navigation, so the Admin leaves the console for the provider's own page.
+ * Null when the provider has no page to send them to yet.
+ */
+export function providerRedirect(link: PayoutSettingsLinkWire): Response | null {
+  return link.url ? redirect(link.url) : null
 }
 
 export const payoutsRoute = {
