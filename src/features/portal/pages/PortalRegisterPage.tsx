@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
@@ -9,7 +9,6 @@ import {
   STRENGTH_TEXTS,
   scorePassword,
 } from '@/features/auth/passwordStrength'
-import { handoffOf } from '@/features/auth/signupHandoff'
 import { useSignUp } from '@/features/auth/useSignUp'
 
 /* Attendee sign-up — the portal's own, separate from the organizer sign-up at
@@ -22,10 +21,10 @@ import { useSignUp } from '@/features/auth/useSignUp'
    No workspace field: an attendee has one platform-wide realm, and naming a
    workspace is refused with a 422 rather than ignored.
 
-   A buyer arriving from their own order brings their name and email with them,
-   carried in the router's history state rather than the query string — both are
-   personal data, and a URL ends up in server logs, browser history and
-   `Referer` headers.
+   A buyer is never handed in from their order with the address fixed: the
+   order page is open to whoever booked, so it proves nothing about whose inbox
+   that is. A booking becomes an account through the link emailed to its
+   address (US-DISC-15).
 
    No Google or Apple button, for the same reason the portal sign-in has none:
    `POST /auth/social/attendee` needs an orgSlug the portal cannot name, and the
@@ -37,27 +36,9 @@ export default function PortalRegisterPage() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const { pending, error, submit } = useSignUp('attendee')
-  const handoff = handoffOf(useLocation().state)
 
   const score = scorePassword(password)
   const cpwMatch = confirm === password
-
-  /**
-   * Arrived from an order, so the address is not a free field.
-   *
-   * Tickets are found by matching `orders.buyer_email` to the account's email
-   * on every read — there is no claim step that could repair a mismatch later.
-   * Signing up as someone else therefore creates a real, working, permanently
-   * empty account, and the person would have no way to tell what went wrong.
-   *
-   * `readOnly` rather than `disabled`: a disabled field is omitted from the
-   * submitted FormData entirely, which would post an empty email. This one is
-   * still submitted, still selectable, still readable by a screen reader.
-   * Somebody who genuinely wants a different address can sign up from
-   * /portal/register directly, where nothing is carried in and nothing is
-   * fixed.
-   */
-  const fromOrder = handoff.email !== ''
 
   return (
     <AuthLayout
@@ -95,7 +76,6 @@ export default function PortalRegisterPage() {
             placeholder="Jordan Lee"
             className="input"
             required
-            defaultValue={handoff.name}
           />
         </div>
 
@@ -109,17 +89,9 @@ export default function PortalRegisterPage() {
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
-            className={cn('input', fromOrder && 'cursor-not-allowed bg-canvas text-muted')}
+            className="input"
             required
-            defaultValue={handoff.email}
-            readOnly={fromOrder}
-            aria-describedby={fromOrder ? 'email-fixed' : undefined}
           />
-          {fromOrder && (
-            <p id="email-fixed" className="hint">
-              Your tickets are matched to this address, so your account has to use it.
-            </p>
-          )}
         </div>
 
         <div>
