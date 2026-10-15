@@ -1,4 +1,6 @@
 import type { BadgeTone } from '@/components/ui'
+import { can } from '@/features/auth/permissions'
+import type { Me } from '@/features/auth/types'
 import { MASKED, baht, bangkokDate } from '@/lib/format'
 import type {
   BalancesWire,
@@ -80,6 +82,19 @@ export function toBalances(wire: BalancesWire): Balances {
     paidOut: amount(wire.paidOutSatang),
     connected: wire.payoutsConnected,
   }
+}
+
+/** Bank, schedule and tax forms are an Admin's to change (US-FIN-05, US-FIN-14). */
+const PAYOUT_MANAGEMENT = 'finManage'
+
+/**
+ * Whether to offer "Manage payouts" — the way to the provider, where bank
+ * details, the payout schedule and tax forms live (US-FIN-05). Only to an
+ * Admin, and only once there is an account to manage: before that the page
+ * guides them to connect one instead.
+ */
+export function offersPayoutManagement(me: Me | null, connected: boolean): boolean {
+  return connected && can(me, PAYOUT_MANAGEMENT)
 }
 
 /* ── invoices ─────────────────────────────────────────────────────────── */
