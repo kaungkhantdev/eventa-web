@@ -51,6 +51,12 @@ export interface CheckoutSeatWire {
   available: boolean
 }
 
+/** A way to pay checkout can take (`PayOrderDto`). */
+export type PayMethod = 'Card' | 'PromptPay'
+
+/** Every one of them, in the order the page offers them. */
+export const PAY_METHODS: readonly PayMethod[] = ['Card', 'PromptPay']
+
 export interface CheckoutViewWire {
   event: CheckoutEventWire
   tiers: CheckoutTierWire[]
@@ -59,6 +65,8 @@ export interface CheckoutViewWire {
   notes: { seating: string | null; delivery: string | null; approval: string | null }
   maxPerBooking: number
   paymentRequired: boolean
+  /** The ways to pay the workspace has switched on (US-SET-09). */
+  paymentMethods: PayMethod[]
 }
 
 export interface OrderSummaryWire {
@@ -179,6 +187,8 @@ export interface CheckoutView {
   notes: string[]
   maxPerBooking: number
   paymentRequired: boolean
+  /** Only the ways to pay the workspace has switched on (US-SET-09). */
+  paymentMethods: PayMethod[]
 }
 
 /**

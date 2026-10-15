@@ -71,6 +71,7 @@ const VIEW: CheckoutViewWire = {
   notes: { seating: 'Seating is first-come, first-served.', delivery: null, approval: null },
   maxPerBooking: 8,
   paymentRequired: true,
+  paymentMethods: ['Card', 'PromptPay'],
 }
 
 const view = (patch: Partial<CheckoutViewWire> = {}) => toCheckoutView({ ...VIEW, ...patch })
@@ -78,6 +79,27 @@ const tier = (patch: Partial<CheckoutTierWire> = {}) =>
   view({ tiers: [{ ...TIER, ...patch }] }).tiers[0]
 
 describe('toCheckoutView', () => {
+  /**
+   * US-SET-09: "Given I disable a method, when new orders are placed, then
+   * that method no longer appears at checkout." The page offered Card and
+   * PromptPay whatever the workspace had switched off.
+   */
+  describe('the ways to pay', () => {
+    it('offers both when the workspace takes both', () => {
+      expect(view().paymentMethods).toEqual(['Card', 'PromptPay'])
+    })
+
+    it('no longer offers a method the workspace switched off', () => {
+      expect(view({ paymentMethods: ['PromptPay'] }).paymentMethods).toEqual(['PromptPay'])
+    })
+
+    // A method this page has no way to take is not offered, whatever arrives.
+    it('ignores a method checkout cannot take', () => {
+      const wire = { ...VIEW, paymentMethods: ['Apple Pay', 'Card'] } as unknown as CheckoutViewWire
+      expect(toCheckoutView(wire).paymentMethods).toEqual(['Card'])
+    })
+  })
+
   it('heads the page with the event', () => {
     expect(view().header).toEqual({
       name: 'Founders Coffee Connect',

@@ -1,6 +1,7 @@
 import { MASKED, bangkokDateRange } from '@/lib/format'
 import type { Persona } from '@/lib/persona'
 import type { ProfileWire } from './profile.types'
+import { PAY_METHODS } from './checkout.types'
 import type {
   BookingMode,
   BuyerDefaults,
@@ -13,6 +14,7 @@ import type {
   OrderSummaryWire,
   PaymentIntentWire,
   PaymentStep,
+  PayMethod,
   PlacedOrder,
   SeatRow,
   SummaryLines,
@@ -80,7 +82,16 @@ export function toCheckoutView(wire: CheckoutViewWire): CheckoutView {
     ),
     maxPerBooking: wire.maxPerBooking,
     paymentRequired: wire.paymentRequired,
+    paymentMethods: offeredMethods(wire.paymentMethods),
   }
+}
+
+/**
+ * The ways to pay this page offers: those the workspace switched on
+ * (US-SET-09), and only ones it knows how to take, in its own order.
+ */
+function offeredMethods(switchedOn: readonly string[]): PayMethod[] {
+  return PAY_METHODS.filter((method) => switchedOn.includes(method))
 }
 
 function toHeader(event: CheckoutEventWire): CheckoutHeader {
