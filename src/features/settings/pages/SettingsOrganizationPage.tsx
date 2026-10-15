@@ -1,4 +1,4 @@
-import { useFetcher, useLoaderData } from 'react-router'
+import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Button,
   Card,
@@ -11,9 +11,11 @@ import {
   Textarea,
 } from '@/components/ui'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
-import type { ActionResult } from '@/app/loaders'
+import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
+import type { Me } from '@/features/auth/types'
 import { LogoCard } from '../components/LogoCard'
 import { SettingsHeader } from '../components/SettingsHeader'
+import { canEditOrganization } from '../organizationAccess'
 import type { OrganizationData } from '../settings.routes'
 import type { OrganizationForm } from '../settings.types'
 
@@ -29,6 +31,10 @@ const TIMEZONES = ['Asia/Bangkok', 'Asia/Singapore', 'Asia/Tokyo', 'Europe/Londo
 
 export default function SettingsOrganizationPage() {
   const { organization, summary } = useLoaderData() as OrganizationData
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
+  // Organizer and Staff may read the profile but not change it (US-SET-07), so
+  // they get the same page with nothing on it they could only be refused.
+  const canEdit = canEditOrganization(me)
   const save = useFetcher<ActionResult>()
   const error = save.data?.ok === false ? save.data.error : null
   /**
@@ -55,6 +61,7 @@ export default function SettingsOrganizationPage() {
             name={organization.name}
             country={organization.country}
             summary={summary}
+            readOnly={!canEdit}
           />
           <FixedFacts organization={organization} />
         </div>
@@ -70,67 +77,71 @@ export default function SettingsOrganizationPage() {
                 somebody else's edit rather than letting it overwrite theirs. */}
             <input type="hidden" name="version" value={organization.version} />
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="org-name">Organization name</Label>
-                <Input id="org-name" name="name" required defaultValue={organization.name} aria-describedby={fields.name ? 'org-name-error' : undefined} />
-                <FieldError id="org-name-error" message={fields.name} />
+            {/* A disabled fieldset disables every control inside it, so a
+                read-only viewer cannot type into a box nobody will save. */}
+            <fieldset disabled={!canEdit} className="min-w-0">
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="org-name">Organization name</Label>
+                  <Input id="org-name" name="name" required defaultValue={organization.name} aria-describedby={fields.name ? 'org-name-error' : undefined} />
+                  <FieldError id="org-name-error" message={fields.name} />
+                </div>
+                <div>
+                  <Label htmlFor="org-website">Website</Label>
+                  <Input
+                    id="org-website"
+                    name="website"
+                    type="url"
+                    placeholder="https://"
+                    defaultValue={organization.website}
+                    aria-describedby={fields.website ? 'org-website-error' : undefined}
+                  />
+                  <FieldError id="org-website-error" message={fields.website} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label htmlFor="org-address">Address</Label>
+                  <Textarea id="org-address" name="address" rows={3} defaultValue={organization.address} aria-describedby={fields.address ? 'org-address-error' : undefined} />
+                  <FieldError id="org-address-error" message={fields.address} />
+                </div>
+                <div>
+                  <Label htmlFor="org-currency">Currency</Label>
+                  {/* The kit offers a picker. This one does not, because the API
+                      will not take a change: every invoice and receipt already
+                      issued was calculated in it. Shown in the kit's slot, in the
+                      state it is actually in, rather than as a control that looks
+                      live and silently does nothing. */}
+                  <Select id="org-currency" value={organization.currency} disabled onChange={() => {}}>
+                    <option value={organization.currency}>{organization.currency}</option>
+                  </Select>
+                  <Hint>Fixed once money has moved. Contact support to change it.</Hint>
+                </div>
+                <div>
+                  <Label htmlFor="org-tax-id">Tax ID</Label>
+                  <Input id="org-tax-id" name="taxId" defaultValue={organization.taxId} aria-describedby={fields.taxId ? 'org-tax-id-error' : undefined} />
+                  <FieldError id="org-tax-id-error" message={fields.taxId} />
+                </div>
+                <div>
+                  <Label htmlFor="org-timezone">Timezone</Label>
+                  <Select id="org-timezone" name="timezone" defaultValue={organization.timezone}>
+                    {TIMEZONES.map((zone) => (
+                      <option key={zone} value={zone}>
+                        {zone}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="org-descriptor">Statement descriptor</Label>
+                  <Input
+                    id="org-descriptor"
+                    name="statementDescriptor"
+                    maxLength={22}
+                    defaultValue={organization.statementDescriptor}
+                  />
+                  <Hint>What buyers see on their bank statement.</Hint>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="org-website">Website</Label>
-                <Input
-                  id="org-website"
-                  name="website"
-                  type="url"
-                  placeholder="https://"
-                  defaultValue={organization.website}
-                  aria-describedby={fields.website ? 'org-website-error' : undefined}
-                />
-                <FieldError id="org-website-error" message={fields.website} />
-              </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor="org-address">Address</Label>
-                <Textarea id="org-address" name="address" rows={3} defaultValue={organization.address} aria-describedby={fields.address ? 'org-address-error' : undefined} />
-                <FieldError id="org-address-error" message={fields.address} />
-              </div>
-              <div>
-                <Label htmlFor="org-currency">Currency</Label>
-                {/* The kit offers a picker. This one does not, because the API
-                    will not take a change: every invoice and receipt already
-                    issued was calculated in it. Shown in the kit's slot, in the
-                    state it is actually in, rather than as a control that looks
-                    live and silently does nothing. */}
-                <Select id="org-currency" value={organization.currency} disabled onChange={() => {}}>
-                  <option value={organization.currency}>{organization.currency}</option>
-                </Select>
-                <Hint>Fixed once money has moved. Contact support to change it.</Hint>
-              </div>
-              <div>
-                <Label htmlFor="org-tax-id">Tax ID</Label>
-                <Input id="org-tax-id" name="taxId" defaultValue={organization.taxId} aria-describedby={fields.taxId ? 'org-tax-id-error' : undefined} />
-                <FieldError id="org-tax-id-error" message={fields.taxId} />
-              </div>
-              <div>
-                <Label htmlFor="org-timezone">Timezone</Label>
-                <Select id="org-timezone" name="timezone" defaultValue={organization.timezone}>
-                  {TIMEZONES.map((zone) => (
-                    <option key={zone} value={zone}>
-                      {zone}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="org-descriptor">Statement descriptor</Label>
-                <Input
-                  id="org-descriptor"
-                  name="statementDescriptor"
-                  maxLength={22}
-                  defaultValue={organization.statementDescriptor}
-                />
-                <Hint>What buyers see on their bank statement.</Hint>
-              </div>
-            </div>
+            </fieldset>
 
             {unattached && (
               <p role="alert" className="mt-3 text-[13px] text-red-500">
@@ -138,17 +149,23 @@ export default function SettingsOrganizationPage() {
               </p>
             )}
 
-            <div className="mt-5 flex justify-end gap-2 border-t border-hair pt-4">
-              {/* `reset` rather than a navigation: the form is uncontrolled, so
-                  this puts every box back to what the loader supplied. */}
-              <Button variant="soft" size="sm" type="reset" disabled={save.state !== 'idle'}>
-                Cancel
-              </Button>
-              <Button variant="primary" size="sm" type="submit" disabled={save.state !== 'idle'}>
-                <Icon name="hgi-tick-02" size={15} />
-                {save.state === 'idle' ? 'Save changes' : 'Saving…'}
-              </Button>
-            </div>
+            {canEdit ? (
+              <div className="mt-5 flex justify-end gap-2 border-t border-hair pt-4">
+                {/* `reset` rather than a navigation: the form is uncontrolled, so
+                    this puts every box back to what the loader supplied. */}
+                <Button variant="soft" size="sm" type="reset" disabled={save.state !== 'idle'}>
+                  Cancel
+                </Button>
+                <Button variant="primary" size="sm" type="submit" disabled={save.state !== 'idle'}>
+                  <Icon name="hgi-tick-02" size={15} />
+                  {save.state === 'idle' ? 'Save changes' : 'Saving…'}
+                </Button>
+              </div>
+            ) : (
+              <Hint className="mt-5 border-t border-hair pt-4">
+                Only an Admin can change organization settings.
+              </Hint>
+            )}
           </save.Form>
         </Card>
 
