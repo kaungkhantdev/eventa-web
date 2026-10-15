@@ -4,7 +4,7 @@
    preview image and the PNG download. Only the helpers actually reached by
    buildFlyer are carried over — the static file left several unused. */
 
-import { makeQR, type QRCode } from './qr'
+import { makeQR, type QRCode } from '@/lib/qr'
 
 export { makeQR }
 
