@@ -1,4 +1,5 @@
 import { bangkokDate, satang } from '@/lib/format'
+import { QR_FILE_EXTENSION, qrDataUrl } from './lib/qr'
 import type {
   GuestOrder,
   GuestOrderLineWire,
@@ -187,13 +188,29 @@ function toLine(line: GuestOrderLineWire) {
   }
 }
 
-/** A ticket names nobody until somebody assigns it; the buyer bought it. */
+/**
+ * The ticket statuses that still admit — the API's own rule for a valid pass
+ * (`attendee-tickets.service.ts`). A scanned ticket is still the guest's.
+ */
+const ADMITS: ReadonlySet<string> = new Set(['issued', 'checked_in'])
+
+/**
+ * A ticket names nobody until somebody assigns it; the buyer bought it.
+ *
+ * The QR is drawn from the ticket's own token, the only thing the check-in
+ * station looks a ticket up by. One that no longer admits is not drawn: a
+ * picture the door refuses is worse than none.
+ */
 function toTicket(ticket: IssuedTicketWire, buyerName: string): GuestTicket {
+  const valid = ADMITS.has(ticket.status)
   return {
     id: ticket.id,
     qrToken: ticket.qrToken,
     holder: ticket.holderName ?? buyerName,
     label: ticket.ticketLabel ?? UNTITLED_TICKET,
+    valid,
+    qr: valid ? qrDataUrl(ticket.qrToken) : null,
+    download: `eventa-ticket-${ticket.id}${QR_FILE_EXTENSION}`,
   }
 }
 

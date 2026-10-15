@@ -119,11 +119,12 @@ function Summary({ order, state }: { order: GuestOrder; state: OrderState }) {
 }
 
 /**
- * The code, as text.
+ * One ticket: its scannable QR, a download of it, and the code as text.
  *
- * Not a rendered QR: this app has no encoder, and drawing a plausible-looking
- * square that scans as nothing would be worse than printing the token the door
- * can be told. The station accepts a typed code for exactly this reason.
+ * The QR encodes the ticket's own token, which is all the check-in station
+ * scans. This is the page the confirmation email links to, so for a guest it
+ * is the only place the ticket exists — no account, no sign-in (US-DISC-06).
+ * A ticket that no longer admits is not drawn.
  */
 function TicketCard({ ticket }: { ticket: GuestTicket }) {
   return (
@@ -131,11 +132,30 @@ function TicketCard({ ticket }: { ticket: GuestTicket }) {
       <div className="min-w-0">
         <p className="truncate text-[14px] font-semibold text-ink">{ticket.holder}</p>
         <p className="text-[12px] text-muted">{ticket.label}</p>
-      </div>
-      <div className="shrink-0 text-right">
-        <p className="text-[11px] uppercase tracking-wider text-muted">Code</p>
+        <p className="mt-2 text-[11px] uppercase tracking-wider text-muted">Code</p>
         <code className="tnum text-[15px] font-bold tracking-wide text-ink">{ticket.qrToken}</code>
       </div>
+      <TicketQr ticket={ticket} />
+    </div>
+  )
+}
+
+function TicketQr({ ticket }: { ticket: GuestTicket }) {
+  if (!ticket.valid) {
+    return <p className="shrink-0 text-[12px] font-semibold text-muted">No longer valid</p>
+  }
+  if (!ticket.qr) return null
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-2">
+      <img
+        src={ticket.qr}
+        alt={`QR code for ${ticket.holder}'s ticket`}
+        className="h-32 w-32 rounded-lg bg-white p-1.5 ring-1 ring-hair"
+      />
+      <a href={ticket.qr} download={ticket.download} className="btn btn-soft btn-sm">
+        <Icon name="hgi-download-04" size={14} />
+        Download
+      </a>
     </div>
   )
 }

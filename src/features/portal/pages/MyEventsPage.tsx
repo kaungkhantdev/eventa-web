@@ -11,14 +11,13 @@ import {
 } from '@/components/ui'
 import { authApi } from '@/features/auth/api'
 import { useTheme } from '@/lib/useTheme'
-import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters } from '@/lib/useFilters'
 import { initials, num } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { ProfileTab } from '../components/ProfileTab'
 import { SettingsTab } from '../components/SettingsTab'
 import { TicketModal } from '../components/TicketModal'
-import type { FlyerTicket } from '../lib/ticketFlyer'
+import { useTicketModal } from '../lib/useTicketModal'
 import type { MyEventsData } from '../myEvents.routes'
 import type { MyEventRow } from '../myEvents.types'
 import { EVENT_ICON, lookOf } from '../portal.presentation'
@@ -40,15 +39,7 @@ function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   e.currentTarget.style.display = 'none'
 }
 
-function UpcomingCard({
-  ev,
-  holder,
-  onTicket,
-}: {
-  ev: MyEventRow
-  holder: string
-  onTicket: (t: FlyerTicket) => void
-}) {
+function UpcomingCard({ ev, onTicket }: { ev: MyEventRow; onTicket: (ev: MyEventRow) => void }) {
   // Stable per event, so the same booking is the same colour on every visit.
   const look = lookOf(ev.slug)
 
@@ -109,20 +100,12 @@ function UpcomingCard({
             <Icon name="hgi-eye" size={14} />
             Details
           </Link>
+          {/* Opens the registration's own tickets, each with the QR the door
+              scans — never a picture of this event's public link. */}
           <button
             type="button"
             className="btn btn-primary btn-sm flex-1"
-            onClick={() =>
-              onTicket({
-                id: ev.reference,
-                event: ev.title,
-                date: ev.when,
-                venue: ev.where,
-                type: ev.ticket,
-                attendee: holder,
-                payload: `${window.location.origin}/e/${ev.slug}`,
-              })
-            }
+            onClick={() => onTicket(ev)}
           >
             <Icon name="hgi-qr-code-01" size={14} />
             Ticket
@@ -210,17 +193,11 @@ export default function MyEventsPage() {
     navigate('/portal/login', { replace: true })
   }
 
-  const modal = useDisclosure()
-  const [ticket, setTicket] = useState<FlyerTicket | null>(null)
+  const tickets = useTicketModal()
 
   function setTab(next: Tab) {
     setTabState(next)
     globalThis.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  function openTicket(t: FlyerTicket) {
-    setTicket(t)
-    modal.onOpen()
   }
 
   const tabItems: PillTabItem<Tab>[] = [
@@ -323,12 +300,7 @@ export default function MyEventsPage() {
                 {upcoming.length ? (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {upcoming.map((ev) => (
-                      <UpcomingCard
-                        key={ev.orderId}
-                        ev={ev}
-                        holder={me.name}
-                        onTicket={openTicket}
-                      />
+                      <UpcomingCard key={ev.orderId} ev={ev} onTicket={tickets.openFor} />
                     ))}
                   </div>
                 ) : (
@@ -539,7 +511,7 @@ export default function MyEventsPage() {
         </p>
       </main>
 
-      <TicketModal open={modal.open} onClose={modal.onClose} ticket={ticket} />
+      <TicketModal state={tickets.state} />
     </div>
   )
 }

@@ -61,6 +61,15 @@ export interface GuestTicket {
   qrToken: string
   holder: string
   label: string
+  /** False once refunded, voided or transferred — it admits nobody. */
+  valid: boolean
+  /**
+   * The QR as an image, encoding the ticket's own token — what the door scans.
+   * `null` for a ticket that no longer admits, or a token too long to draw.
+   */
+  qr: string | null
+  /** What the QR is saved as when downloaded. */
+  download: string
 }
 
 /** How the order stands, in one word the buyer understands. */

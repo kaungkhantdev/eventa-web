@@ -585,6 +585,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // A resource route: one ticket's pass, loaded when the ticket modal on
+        // My Events opens it. It never answers a navigation.
+        path: '/portal/my-events/tickets/:ticketId',
+        lazy: async () => ({
+          loader: (await import('@/features/portal/myEvents.routes')).ticketPassRoute.loader,
+        }),
+      },
+      {
         // Buying tickets — named for what it does. It was `/portal/register`,
         // which collided with registering an ACCOUNT next door; "register" now
         // means one thing in this app.

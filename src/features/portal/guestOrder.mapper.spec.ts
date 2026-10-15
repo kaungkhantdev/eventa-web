@@ -6,6 +6,7 @@ import {
   toGuestOrder,
 } from './guestOrder.mapper'
 import type { GuestOrderWire } from './guestOrder.types'
+import { qrDataUrl } from './lib/qr'
 
 const WIRE: GuestOrderWire = {
   orderId: 'o-1',
@@ -388,8 +389,40 @@ describe('toGuestOrder', () => {
   describe('tickets', () => {
     it('hands over each ticket with its code', () => {
       expect(order().tickets).toEqual([
-        { id: 't-1', qrToken: 'K7M2Q9XW', holder: 'Anan Suksawat', label: 'General' },
+        expect.objectContaining({
+          id: 't-1',
+          qrToken: 'K7M2Q9XW',
+          holder: 'Anan Suksawat',
+          label: 'General',
+        }),
       ])
+    })
+
+    // The confirmation email links here, and a guest has no other way to get
+    // through the door: the station scans a QR and nothing else (US-DISC-06,
+    // US-DISC-07). Printing the token as text gave it nothing to scan.
+    it('draws each ticket’s QR from its own token', () => {
+      expect(order().tickets[0].qr).toBe(qrDataUrl('K7M2Q9XW'))
+    })
+
+    it('offers that QR as a download, named for the ticket', () => {
+      expect(order().tickets[0]).toMatchObject({
+        valid: true,
+        download: 'eventa-ticket-t-1.gif',
+      })
+    })
+
+    it('still draws a ticket that was already scanned — scanned is not void', () => {
+      const scanned = order({
+        tickets: [{ ...WIRE.tickets[0], status: 'checked_in' }],
+      })
+      expect(scanned.tickets[0].qr).toBe(qrDataUrl('K7M2Q9XW'))
+    })
+
+    // A refunded or voided ticket admits nobody, so it is not drawn as one.
+    it.each(['refunded', 'void', 'transferred'])('draws no QR for a %s ticket', (status) => {
+      const gone = order({ tickets: [{ ...WIRE.tickets[0], status }] })
+      expect(gone.tickets[0]).toMatchObject({ valid: false, qr: null })
     })
 
     // A ticket names nobody until somebody assigns it; the buyer's own name is

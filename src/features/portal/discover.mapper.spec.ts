@@ -167,16 +167,18 @@ describe('toDiscoverCard', () => {
   })
 
   describe('href', () => {
-    it('opens the landing template chosen for the type, carrying the slug', () => {
-      expect(card({ type: 'Conference' }).href).toBe('/landing/aurora?event=tech-summit-2026')
-      expect(card({ type: 'Concert & Festival' }).href).toBe(
-        '/landing/atlas?event=tech-summit-2026',
-      )
-      expect(card({ type: 'Exhibition' }).href).toBe('/landing/noir?event=tech-summit-2026')
+    // The event's own public page, in the design its organizer chose
+    // (US-PAGE-10) — where a visitor can register (US-DISC-01). It used to open
+    // `/landing/<template>?event=`, the noindex preview, in a design picked
+    // from the event's type, so nobody from Discover saw the chosen one.
+    it('opens the event’s canonical public page, whatever its type', () => {
+      expect(card({ type: 'Conference' }).href).toBe('/e/tech-summit-2026')
+      expect(card({ type: 'Concert & Festival' }).href).toBe('/e/tech-summit-2026')
+      expect(card({ type: 'Exhibition' }).href).toBe('/e/tech-summit-2026')
     })
 
-    it('escapes a slug so it cannot break out of the query string', () => {
-      expect(card({ slug: 'a b&c' }).href).toBe('/landing/aurora?event=a%20b%26c')
+    it('escapes a slug so it cannot break out of the path', () => {
+      expect(card({ slug: 'a b&c/d' }).href).toBe('/e/a%20b%26c%2Fd')
     })
   })
 

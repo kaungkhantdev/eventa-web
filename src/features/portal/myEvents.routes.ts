@@ -1,5 +1,5 @@
 import { attendeeAction, attendeeData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { mapPanel, panel } from '@/app/panels'
+import { mapPanel, panel, type Panel } from '@/app/panels'
 import { authApi } from '@/features/auth/api'
 import type { Me } from '@/features/auth/types'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
@@ -13,8 +13,8 @@ import {
 } from './accountSettings.mapper'
 import type { AttendeeAccountSettings } from './accountSettings.types'
 import { myEventsApi } from './myEvents.api'
-import { toMyEventRow, toPaymentTotals, toTransactionRow } from './myEvents.mapper'
-import type { MyEventRow, PaymentTotals, TransactionRow } from './myEvents.types'
+import { toMyEventRow, toPaymentTotals, toTicketPass, toTransactionRow } from './myEvents.mapper'
+import type { MyEventRow, PaymentTotals, TicketPass, TransactionRow } from './myEvents.types'
 import { profileApi } from './profile.api'
 import { toAttendeeProfileCard, toProfilePatch } from './profile.mapper'
 import type { AttendeeProfileCard } from './profile.types'
@@ -232,5 +232,29 @@ export const myEventsRoute = {
   action: attendeeAction(async ({ request }: LoaderArgs) => {
     const form = await request.formData()
     return (SUBMISSIONS[String(form.get('intent') ?? '')] ?? SAVE_PROFILE)(form)
+  }),
+}
+
+/** Where the ticket modal loads one ticket's pass from — the route below. */
+export const ticketPassPath = (ticketId: string) =>
+  `/portal/my-events/tickets/${encodeURIComponent(ticketId)}`
+
+/**
+ * A resource route: one ticket's pass and its printable copy, fetched when the
+ * ticket modal opens it (US-DISC-07). Not part of the page's data — an order of
+ * four is eight requests to answer a question nobody asked.
+ *
+ * A refusal comes back as data and is never thrown: a fetcher's thrown error
+ * replaces the page — or, after a revalidation, the whole app — with an error
+ * screen, over one ticket that would not open.
+ */
+export const ticketPassRoute = {
+  loader: attendeeData(async ({ params }: LoaderArgs): Promise<Panel<TicketPass>> => {
+    const ticketId = params.ticketId ?? ''
+    const [pass, printed] = await Promise.all([
+      panel(myEventsApi.ticket(ticketId)),
+      panel(myEventsApi.printablePass(ticketId)),
+    ])
+    return mapPanel(pass, (wire) => toTicketPass(wire, printed))
   }),
 }
