@@ -20,18 +20,18 @@ export interface PayoutWire {
   canRetry: boolean
 }
 
-/**
- * The three headline balances.
- *
- * Every figure is null until a payout account is connected — the provider is
- * the one holding the money, and "not connected" is not "฿0".
- */
 /** `POST /payouts/settings-link` — the provider's page, once connected. */
 export interface PayoutSettingsLinkWire {
   connected: boolean
   url: string | null
 }
 
+/**
+ * The three headline balances.
+ *
+ * Every figure is null until a payout account is connected — the provider is
+ * the one holding the money, and "not connected" is not "฿0".
+ */
 export interface BalancesWire {
   availableSatang: number | null
   pendingSatang: number | null
