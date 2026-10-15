@@ -40,11 +40,11 @@ export const publicEventRoute = {
 /**
  * One template, shown on its own: `/landing/aurora?event=<slug>`.
  *
- * Two callers, two meanings. The landing-page switcher and Discover both name a
- * real event, which is fetched like any other public page. The create-event
- * wizard names none — it is previewing a draft that has not been saved — so the
- * page is built from what has been typed, and nothing is borrowed from an
- * event belonging to somebody else.
+ * Two callers, two meanings. The landing-page switcher names a real event,
+ * which is fetched like any other public page. The create-event wizard names
+ * none — it is previewing a draft that has not been saved — so the page is
+ * built from what has been typed, and nothing is borrowed from an event
+ * belonging to somebody else.
  *
  * Never indexed either way: this URL shows a design, and the event's own
  * canonical page is `/e/<slug>`.

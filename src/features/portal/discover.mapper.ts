@@ -24,7 +24,9 @@ export function toDiscoverCard(row: EventCardWire): DiscoverCard {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    href: `/landing/${look.template}?event=${encodeURIComponent(row.slug)}`,
+    // The event's canonical page, in the design its organizer chose — never a
+    // `/landing/<template>` preview, which is noindex and picks its own.
+    href: `/e/${encodeURIComponent(row.slug)}`,
     category: row.categoryName ?? row.type,
     accent: look.colour,
     when: bangkokDateRange(row.startAt, row.endAt, row.timezone),
