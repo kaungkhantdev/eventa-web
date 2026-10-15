@@ -114,7 +114,7 @@ async function runAgendaAction({ request }: LoaderArgs): Promise<void> {
     await programApi.updateSession(eventId, id, sessionInputOf(form))
     return
   }
-  await programApi.removeSession(eventId, id)
+  await programApi.removeSession(eventId, id, removalConfirmed(form))
 }
 
 export const agendaRoute = {

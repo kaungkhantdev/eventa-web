@@ -55,3 +55,26 @@ describe('programApi.removeSpeaker', () => {
     expect(sentBy(fetch).url.searchParams.has('confirm')).toBe(false)
   })
 })
+
+describe('programApi.removeSession', () => {
+  it('sends the organizer’s confirmation, which the API requires (US-PROG-04)', async () => {
+    const fetch = answering()
+
+    await programApi.removeSession('e-1', 'ss-1', true)
+
+    const sent = sentBy(fetch)
+    expect(sent.method).toBe('DELETE')
+    expect(sent.url.pathname).toMatch(/\/events\/e-1\/sessions\/ss-1$/)
+    expect(sent.url.searchParams.get('confirm')).toBe('true')
+  })
+
+  // It used to append confirm=true to every call, so the API's guard never
+  // applied and nothing stood between one click and the removal.
+  it('claims no confirmation the organizer did not give', async () => {
+    const fetch = answering()
+
+    await programApi.removeSession('e-1', 'ss-1', false)
+
+    expect(sentBy(fetch).url.searchParams.has('confirm')).toBe(false)
+  })
+})

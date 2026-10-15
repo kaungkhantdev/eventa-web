@@ -56,9 +56,12 @@ export const programApi = {
   updateSession: (eventId: string, id: string, input: SessionInput) =>
     api.patch<SessionWire>(`/events/${eventId}/sessions/${id}`, input),
 
-  /** `confirm` is required by the API — a delete without it is refused. */
-  removeSession: (eventId: string, id: string) =>
-    api.delete<void>(`/events/${eventId}/sessions/${id}`, { query: { confirm: true } }),
+  /**
+   * `confirm` says the organizer accepted the warning that attendees who
+   * bookmarked the session are not told; the API refuses the removal without it.
+   */
+  removeSession: (eventId: string, id: string, confirmed: boolean) =>
+    api.delete<void>(`/events/${eventId}/sessions/${id}`, { query: confirmation(confirmed) }),
 
   speakers: (eventId: string, query: SpeakerQuery = {}) =>
     api.list<SpeakerWire>(`/events/${eventId}/speakers`, { query }),

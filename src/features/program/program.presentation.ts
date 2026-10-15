@@ -1,5 +1,9 @@
 /** What the programme screens say before they remove something for good. */
 
+/** The session-removal confirmation (US-PROG-04). */
+export const SESSION_REMOVAL_WARNING =
+  'Removing this session won’t notify attendees who bookmarked it, and can’t be undone.'
+
 /**
  * The speaker-removal confirmation (US-PROG-11).
  *
