@@ -16,9 +16,17 @@
  * enforce. Two repos, one number — change both together or the meter starts
  * lying again.
  */
-export const MIN_PASSWORD_LENGTH = 6
+export const MIN_PASSWORD_LENGTH = 8
 
-/** A comfortable length, above which a symbol earns the last point. */
+/**
+ * The rest of the API's `PASSWORD_PATTERN`: a number and a symbol (US-SET-02).
+ * A symbol is anything that is not a letter, a combining mark or a number, so
+ * a Thai letter or vowel sign never passes for one.
+ */
+const DIGIT = /\d/
+const SYMBOL = /[^\p{L}\p{M}\p{N}]/u
+
+/** A comfortable length, which earns the last point. */
 const STRONG_LENGTH = 12
 
 export const STRENGTH_COLORS: Record<1 | 2 | 3, string> = {
@@ -28,7 +36,7 @@ export const STRENGTH_COLORS: Record<1 | 2 | 3, string> = {
 }
 
 export const STRENGTH_TEXTS: Record<0 | 1 | 2 | 3, string> = {
-  0: `Use ${MIN_PASSWORD_LENGTH}+ characters`,
+  0: `Use ${MIN_PASSWORD_LENGTH}+ characters with a number and a symbol`,
   1: 'Weak password',
   2: 'Fair password',
   3: 'Strong password',
@@ -37,13 +45,17 @@ export const STRENGTH_TEXTS: Record<0 | 1 | 2 | 3, string> = {
 /**
  * 0–3, where 0 means the API would refuse it outright.
  *
- * +1 for reaching the minimum, +1 for mixing case with a digit, +1 for a
- * symbol at a comfortable length.
+ * +1 for meeting the rule (the minimum length, a number and a symbol), +1 for
+ * mixing case with that digit, +1 for a comfortable length.
  */
 export function scorePassword(value: string): 0 | 1 | 2 | 3 {
-  if (value.length < MIN_PASSWORD_LENGTH) return 0
+  if (!meetsPasswordRule(value)) return 0
   let score = 1
   if (/[A-Z]/.test(value) && /[0-9]/.test(value)) score++
-  if (value.length >= STRONG_LENGTH && /[^A-Za-z0-9]/.test(value)) score++
+  if (value.length >= STRONG_LENGTH) score++
   return score as 1 | 2 | 3
+}
+
+function meetsPasswordRule(value: string): boolean {
+  return value.length >= MIN_PASSWORD_LENGTH && DIGIT.test(value) && SYMBOL.test(value)
 }
