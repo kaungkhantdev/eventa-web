@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useFetcher, useLoaderData } from 'react-router'
+import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Badge,
   Button,
@@ -24,7 +24,9 @@ import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
-import type { ActionResult } from '@/app/loaders'
+import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
+import type { Me } from '@/features/auth/types'
+import { refundControl } from '../payments.mapper'
 import { METHODS, type LedgerTab, type PaymentsData, type TabCounts } from '../payments.routes'
 import type { PaymentRow } from '../payments.types'
 
@@ -47,6 +49,7 @@ export default function PaymentsPage() {
   const refund = useDisclosure()
   const [refunding, setRefunding] = useState<PaymentRow | null>(null)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
 
   const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
   // Already loaded for the event filter, so this costs no extra request.
@@ -194,6 +197,7 @@ export default function PaymentsPage() {
                   <PaymentTableRow
                     key={row.id}
                     row={row}
+                    me={me}
                     onRefund={() => {
                       setRefunding(row)
                       refund.onOpen()
@@ -244,7 +248,16 @@ function tabItems(counts: TabCounts): PillTabItem<LedgerTab>[] {
   ]
 }
 
-function PaymentTableRow({ row, onRefund }: { row: PaymentRow; onRefund: () => void }) {
+function PaymentTableRow({
+  row,
+  me,
+  onRefund,
+}: {
+  row: PaymentRow
+  me: Me | null
+  onRefund: () => void
+}) {
+  const refund = refundControl(row, me)
   return (
     <tr>
       <td className="tnum font-medium text-ink">{row.txn}</td>
@@ -276,10 +289,10 @@ function PaymentTableRow({ row, onRefund }: { row: PaymentRow; onRefund: () => v
           type="button"
           className="btn-icon"
           onClick={onRefund}
-          disabled={!row.canRefund}
-          // The API's own words on the control that cannot be used, so a greyed
-          // button is an explanation rather than a dead end.
-          title={row.canRefund ? 'Refund' : (row.refundBlockedReason ?? 'Not eligible for refund')}
+          disabled={!refund.enabled}
+          // Why a greyed button cannot be used — not an Admin, or the API's own
+          // words — so it is an explanation rather than a dead end.
+          title={refund.title}
         >
           <Icon name="hgi-arrow-turn-backward" size={16} />
         </button>
