@@ -46,8 +46,24 @@ export function discoverQueryOf(params: URLSearchParams) {
 /** An attendee's shortlist lives on their account; anyone else's is local. */
 async function savedIdsFor(isSignedIn: boolean): Promise<string[]> {
   if (!isSignedIn) return savedEvents.ids()
-  const shortlist = await panel(discoverApi.saved())
-  return shortlist.ok ? shortlist.data.items.map((row) => row.id) : []
+  const shortlist = await panel(everySavedId())
+  return shortlist.ok ? shortlist.data : []
+}
+
+/**
+ * Every id on the account's shortlist, not just its first page.
+ *
+ * A card's heart is filled by finding its id here, so a save that fell off the
+ * first page read as never made: the API's default page is the twelve newest,
+ * and an older save showed an empty heart on return or on another device.
+ */
+async function everySavedId(): Promise<string[]> {
+  const ids: string[] = []
+  for (let page = 1; ; page += 1) {
+    const { items, meta } = await discoverApi.saved(page)
+    ids.push(...items.map((row) => row.id))
+    if (page >= meta.totalPages) return ids
+  }
 }
 
 export const discoverRoute = {

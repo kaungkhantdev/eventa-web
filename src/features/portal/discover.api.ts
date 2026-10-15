@@ -3,6 +3,9 @@ import type { EventCardWire } from './discover.types'
 
 /** Every call the What's on browser makes (US-DISC-01/02/03). */
 
+/** The most `GET /me/saved-events` sends in one page. */
+const SAVED_PAGE_LIMIT = 48
+
 export interface DiscoverQuery extends Query {
   page: number
   limit: number
@@ -16,8 +19,13 @@ export const discoverApi = {
 
   categories: () => api.get<string[]>('/public/discover/categories'),
 
-  /** An attendee's shortlist, once there is an account to keep it in. */
-  saved: () => api.list<EventCardWire>('/me/saved-events'),
+  /**
+   * One page of an attendee's shortlist, once there is an account to keep it
+   * in — as large a page as the API allows, because the shortlist is read
+   * whole (see `discover.routes.ts`).
+   */
+  saved: (page: number) =>
+    api.list<EventCardWire>('/me/saved-events', { query: { page, limit: SAVED_PAGE_LIMIT } }),
 
   save: (eventId: string) => api.put<unknown>(`/me/saved-events/${eventId}`),
 
