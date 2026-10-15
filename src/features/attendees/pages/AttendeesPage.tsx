@@ -138,8 +138,8 @@ export default function AttendeesPage() {
   //
   // Read in one direction only: a non-empty list proves events exist, so it can
   // withdraw an offer, but an empty one is not proof of the opposite anywhere it
-  // could have been masked (Registrations loads the same list through
-  // `withoutForbidden`, and gets `[]` for Staff who may not list events).
+  // could have been masked (the loader reads it through `withoutForbidden`, and
+  // gets `[]` for Staff who may not list events).
   const hasEvents = data.events.length > 0
 
   if (firstRun) {

@@ -39,3 +39,22 @@ export async function panel<T>(request: Promise<T>): Promise<Panel<T>> {
 export function mapPanel<T, U>(source: Panel<T>, to: (data: T) => U): Panel<U> {
   return source.ok ? { ok: true, data: to(source.data) } : source
 }
+
+/**
+ * Run an auxiliary list read, treating "you may not" as "you get no options".
+ *
+ * For the options behind a filter or a picker, which often need a permission
+ * the page itself does not: `GET /events` is `evCreate`, while Staff work the
+ * registration queue and the attendee directory on `regView` alone. That 403
+ * is an answer about a dropdown, so it costs them the dropdown and leaves the
+ * page standing. Every other failure still reaches the loader's guard or the
+ * route's error element.
+ */
+export async function withoutForbidden<T>(load: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await load()
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.isForbidden) return []
+    throw cause
+  }
+}

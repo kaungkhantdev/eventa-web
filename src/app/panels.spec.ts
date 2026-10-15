@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, NetworkError } from '@/lib/api'
-import { mapPanel, panel } from './panels'
+import { mapPanel, panel, withoutForbidden } from './panels'
 
 describe('panel', () => {
   it('carries the answer through when the request succeeds', async () => {
@@ -49,5 +49,34 @@ describe('mapPanel', () => {
     const failed = await panel(Promise.reject(new ApiError(503, { message: 'Down for now.' })))
 
     expect(mapPanel(failed, () => 'mapped')).toEqual({ ok: false, error: 'Down for now.' })
+  })
+})
+
+/*
+ * The options behind a filter or a picker, when the caller may not list them.
+ * `GET /events` needs `evCreate`, and Staff work pages built on `regView`
+ * alone; that 403 answers a question about a dropdown, not about the page.
+ */
+describe('withoutForbidden', () => {
+  it('carries the options through when the read succeeds', async () => {
+    expect(await withoutForbidden(() => Promise.resolve(['a', 'b']))).toEqual(['a', 'b'])
+  })
+
+  it('reads "you may not list these" as no options', async () => {
+    expect(await withoutForbidden(() => Promise.reject(new ApiError(403, {})))).toEqual([])
+  })
+
+  // Only the refusal is an answer. Anything else is a real failure, and the
+  // page's error element must hear about it rather than show an empty picker.
+  it.each([401, 500])('lets a %i through', async (status) => {
+    await expect(
+      withoutForbidden(() => Promise.reject(new ApiError(status, {}))),
+    ).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('lets a programming error through', async () => {
+    await expect(
+      withoutForbidden(() => Promise.reject(new TypeError('x is not a function'))),
+    ).rejects.toBeInstanceOf(TypeError)
   })
 })
