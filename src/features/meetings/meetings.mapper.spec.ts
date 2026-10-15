@@ -55,11 +55,11 @@ const API_SYNC_STATUSES = [
  * deliberately only two: whether a meeting has happened is derived from its
  * date, so the API has no `completed` to send.
  *
- * A type rather than a const, unlike the sync list above, because nothing
- * reads `MeetingWire.status` — there is no lookup keyed by it and so no
- * behaviour for a runtime case to assert. Written as a const it would have no
- * runtime use at all, and inventing an assertion to give it one would be the
- * very thing this file is cleaning up.
+ * A type rather than a const, unlike the sync list above, because there is no
+ * lookup keyed by `MeetingWire.status` — only the one `cancelled` check, which
+ * has its own case below. Written as a const it would have no runtime use at
+ * all, and inventing an assertion to give it one would be the very thing this
+ * file is cleaning up.
  */
 type ApiMeetingStatus = 'scheduled' | 'cancelled'
 
@@ -176,6 +176,19 @@ describe('toMeetingCard', () => {
   it('still declares the pins that tsc checks', () => {
     expect(SYNC_STATUS_MATCHES_API).toBe(true)
     expect(MEETING_STATUS_MATCHES_API).toBe(true)
+  })
+
+  // US-MTG-06: a cancelled meeting is marked Cancelled. The reason is
+  // optional, so the mark cannot ride on it — without one the card would read
+  // as a scheduled meeting that had lost its Edit button.
+  it('marks a cancelled meeting as cancelled, with or without a reason', () => {
+    const called = { status: 'cancelled', canJoin: false, canEdit: false } as const
+
+    expect(toMeetingCard(wire({ ...called, cancellationReason: null })).cancelled).toBe(true)
+    expect(toMeetingCard(wire({ ...called, cancellationReason: 'Venue closed' })).cancelled).toBe(
+      true,
+    )
+    expect(toMeetingCard(wire()).cancelled).toBe(false)
   })
 
   it('carries an edit draft with the times a form can use', () => {

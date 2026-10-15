@@ -79,6 +79,7 @@ export function toMeetingCard(wire: MeetingWire): MeetingCard {
     // cancelled, and that the link is ready.
     canJoin: wire.canJoin,
     canEdit: wire.canEdit,
+    cancelled: wire.status === 'cancelled',
     // A lookup miss yields `undefined`, which is falsy and so renders as the
     // same blank as "nothing to report" — a status whose copy was never
     // written would look correct on screen. The card promises `string | null`,
