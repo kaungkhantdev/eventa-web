@@ -135,3 +135,28 @@ export interface GuestOrder {
    */
   payable: boolean
 }
+
+/* ── the account offer under the order (US-DISC-15) ───────────────────── */
+
+/** What asking for the account link reported: where it went, or why not. */
+export interface AccountLinkResult {
+  /** The booking's own address, as the API sent to it. */
+  sentTo?: string
+  /** The API's own sentence, shown verbatim — it was written for the reader. */
+  error?: string
+}
+
+/**
+ * What the offer says and offers. `create` and `sign-in` are the offer itself,
+ * either of which can be dismissed; `sent` replaces it once the link is on its
+ * way, because the next step happens in an inbox.
+ */
+export type AccountOffer =
+  | {
+      kind: 'create' | 'sign-in'
+      prompt: string
+      /** The portal's sign-in, returning here afterwards. */
+      signInTo: string
+      error: string | null
+    }
+  | { kind: 'sent'; message: string }

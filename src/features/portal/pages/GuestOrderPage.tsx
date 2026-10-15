@@ -1,10 +1,22 @@
-import { Link, useLoaderData } from 'react-router'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useFetcher, useLoaderData } from 'react-router'
 import { EmptyState, Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useTheme } from '@/lib/useTheme'
 import { ExpiredNotice, PayNowPanel } from '../components/PayNowPanel'
-import { EXPIRED_STATE, receiptHeading } from '../guestOrder.mapper'
-import type { GuestOrder, GuestTicket, OrderState } from '../guestOrder.types'
+import {
+  EXPIRED_STATE,
+  accountOfferFor,
+  guestOrderPath,
+  receiptHeading,
+} from '../guestOrder.mapper'
+import { ACCOUNT_LINK_INTENT, type GuestOrderData } from '../guestOrder.routes'
+import type {
+  AccountLinkResult,
+  GuestOrder,
+  GuestTicket,
+  OrderState,
+} from '../guestOrder.types'
 import { useCountdown } from '../lib/countdown'
 
 /**
@@ -31,7 +43,7 @@ const TONES: Record<OrderState['tone'], string> = {
 const DISCOVER = '/portal/discover'
 
 export default function GuestOrderPage() {
-  const { order } = useLoaderData() as { order: GuestOrder }
+  const { order, accountExists } = useLoaderData() as GuestOrderData
   const { dark, toggle } = useTheme()
   // The hold can lapse while this page is open, so the clock — not the status
   // the loader fetched — decides whether paying is still on offer.
@@ -81,7 +93,7 @@ export default function GuestOrderPage() {
         {order.tickets.length === 0 && !order.ticketsExplained && <NothingToShow />}
 
         <Receipt order={order} heading={receiptHeading({ canPay, paid: order.paid })} />
-        <KeepThem order={order} />
+        <KeepThem order={order} accountExists={accountExists} />
 
         <p className="mt-8 text-center text-[11px] text-muted/70">
           Keep this link — it is how you get back to these tickets.
@@ -224,43 +236,94 @@ function Receipt({ order, heading }: { order: GuestOrder; heading: string }) {
 }
 
 /**
- * The account offer, at the one moment it is worth making.
+ * The account offer, at the one moment it is worth making (US-DISC-15).
  *
- * They have already given their name and email, so signing up is a password —
- * and their saved events merge on the way in, which is why the shortlist kept
- * locally while browsing is not lost.
+ * An upsell, never a step: it can be dismissed, and the tickets above are the
+ * same either way. Their saved events merge into the account on the way in,
+ * which is why the shortlist kept locally while browsing is not lost.
  *
- * `?persona=attendee` is what makes this an ATTENDEE account: the same sign-up
- * without it creates an organizer workspace, which cannot sign in at the portal
- * login this card offers beside it (US-DISC-08).
- *
- * The name and email travel in the router's history state, never the query
- * string — they are personal data, and a URL is copied into server logs,
- * browser history and `Referer` headers.
+ * "Create account" makes no account and asks for no password here. Anybody
+ * who books can type any address, and this page's link is in the booker's
+ * own browser before anybody reads that inbox — so it proves nothing about
+ * whose address it is. The button asks the API to email the booking's
+ * address a one-time link, and the account is made only from that link. Which
+ * offer to show, and what the card says after, is `accountOfferFor`'s call.
  */
-function KeepThem({ order }: { order: GuestOrder }) {
+function KeepThem({ order, accountExists }: { order: GuestOrder; accountExists: boolean }) {
+  const [dismissed, setDismissed] = useState(false)
+  const link = useFetcher<AccountLinkResult>()
+  if (dismissed) return null
+  const offer = accountOfferFor(order, accountExists, link.data)
+  if (offer.kind === 'sent') return <LinkSent message={offer.message} />
+  const sending = link.state !== 'idle'
+
   return (
-    <section className="card mt-4 flex flex-wrap items-center justify-between gap-3 p-5">
-      <div className="min-w-0">
-        <h2 className="text-[15px] font-bold tracking-tight">Keep these tickets</h2>
-        <p className="mt-0.5 text-[12.5px] text-muted">
-          Create an account for {order.buyerEmail} and every booking is in one place.
-        </p>
+    <section className="card mt-4 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-[15px] font-bold tracking-tight">Keep these tickets</h2>
+          <p className="mt-0.5 text-[12.5px] text-muted">{offer.prompt}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Link
+            to={offer.signInTo}
+            className={offer.kind === 'create' ? 'btn btn-soft' : 'btn btn-primary'}
+          >
+            Sign in
+          </Link>
+          {offer.kind === 'create' && (
+            <link.Form method="post" action={guestOrderPath(order.orderId)}>
+              <button
+                type="submit"
+                name="intent"
+                value={ACCOUNT_LINK_INTENT}
+                className="btn btn-primary"
+                disabled={sending}
+              >
+                {sending ? 'Sending…' : 'Create account'}
+              </button>
+            </link.Form>
+          )}
+        </div>
       </div>
-      <div className="flex shrink-0 gap-2">
-        <Link
-          to={`/portal/login?from=${encodeURIComponent(`/my/tickets/orders/${order.orderId}`)}`}
-          className="btn btn-soft"
-        >
-          Sign in
-        </Link>
-        <Link
-          to="/portal/register"
-          state={{ name: order.buyerName, email: order.buyerEmail }}
-          className="btn btn-primary"
-        >
-          Create account
-        </Link>
+      {offer.error && (
+        <p role="alert" className="mt-3 text-[13px] text-red-500">
+          {offer.error}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        className="mt-3 text-[12px] font-medium text-muted hover:text-ink"
+      >
+        Not now — your ticket is already in your email
+      </button>
+    </section>
+  )
+}
+
+/**
+ * The link is on its way. This replaces the card, taking the focused button
+ * with it, so focus moves to the sentence: a keyboard user keeps their place
+ * and a screen reader reads it — a live region that arrives already holding
+ * its text is often not announced.
+ */
+function LinkSent({ message }: { message: string }) {
+  const sentence = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    sentence.current?.focus()
+  }, [])
+
+  return (
+    <section className="card mt-4 flex items-start gap-3 p-5">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+        <Icon name="hgi-mail-send-01" size={20} />
+      </span>
+      <div className="min-w-0">
+        <h2 className="text-[15px] font-bold tracking-tight">Check your email</h2>
+        <p ref={sentence} tabIndex={-1} className="mt-0.5 text-[12.5px] text-muted">
+          {message}
+        </p>
       </div>
     </section>
   )

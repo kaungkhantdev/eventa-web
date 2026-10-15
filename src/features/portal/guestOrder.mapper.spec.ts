@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AWAITING_APPROVAL_FREE_STATE,
   AWAITING_APPROVAL_PAID_STATE,
+  accountOfferFor,
   receiptHeading,
   toGuestOrder,
 } from './guestOrder.mapper'
@@ -439,5 +440,64 @@ describe('toGuestOrder', () => {
     it('is empty while the order is unpaid, rather than inventing one', () => {
       expect(order({ tickets: [], paymentRequired: true }).tickets).toEqual([])
     })
+  })
+})
+
+/**
+ * The account offer under the order (US-DISC-15).
+ *
+ * Opening this page proves nothing about who reads the buyer's inbox — its
+ * link is shown to whoever booked, before anybody reads that inbox — so the
+ * offer never makes an account here. "Create account" emails the booking's
+ * address a link, and the account is made from that.
+ */
+describe('accountOfferFor', () => {
+  const ORDER = { orderId: '0b9c6a52-3f43-4f7e-9d1e-5a0c1f2b7e11', buyerEmail: 'anan@example.test' }
+  const SIGN_IN_HERE =
+    '/portal/login?from=%2Fmy%2Ftickets%2Forders%2F0b9c6a52-3f43-4f7e-9d1e-5a0c1f2b7e11'
+
+  it('offers to create an account for the booking’s address', () => {
+    expect(accountOfferFor(ORDER, false)).toEqual({
+      kind: 'create',
+      prompt: 'Create an account for anan@example.test and every booking is in one place.',
+      signInTo: SIGN_IN_HERE,
+      error: null,
+    })
+  })
+
+  // "Given I registered with an email that already has an account, when I
+  // follow the link, then I am invited to sign in instead of being offered a
+  // duplicate."
+  it('invites a buyer who already has an account to sign in, offering no duplicate', () => {
+    expect(accountOfferFor(ORDER, true)).toEqual({
+      kind: 'sign-in',
+      prompt:
+        'You already have an account for anan@example.test. Sign in to see every booking in one place.',
+      signInTo: SIGN_IN_HERE,
+      error: null,
+    })
+  })
+
+  // The address is the one the API sent to, not the one this page holds.
+  it('says where the link went once it is on its way, in place of the offer', () => {
+    expect(accountOfferFor(ORDER, false, { sentTo: 'anan@example.test' })).toEqual({
+      kind: 'sent',
+      message:
+        "We've sent a link to anan@example.test. Open it to choose a password — it proves the address is yours.",
+    })
+  })
+
+  // A throttle, or an account made since the page loaded: the API's sentence,
+  // as it is, beside the offer that is still there to use.
+  it('keeps the offer and shows the API’s refusal verbatim', () => {
+    const refused = 'An account already uses this email. Sign in instead.'
+
+    expect(accountOfferFor(ORDER, true, { error: refused })).toMatchObject({
+      kind: 'sign-in',
+      error: refused,
+    })
+    expect(accountOfferFor(ORDER, false, { error: 'Please wait before asking again.' })).toMatchObject(
+      { kind: 'create', error: 'Please wait before asking again.' },
+    )
   })
 })

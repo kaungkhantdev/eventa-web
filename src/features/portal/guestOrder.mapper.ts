@@ -1,6 +1,8 @@
 import { bangkokDate, satang } from '@/lib/format'
 import { QR_FILE_EXTENSION, qrDataUrl } from '@/lib/qr'
 import type {
+  AccountLinkResult,
+  AccountOffer,
   GuestOrder,
   GuestOrderLineWire,
   GuestOrderWire,
@@ -103,6 +105,44 @@ const RECEIPT_HEADING = {
 export function receiptHeading({ canPay, paid }: { canPay: boolean; paid: boolean }): string {
   if (canPay) return RECEIPT_HEADING.owed
   return paid ? RECEIPT_HEADING.paid : RECEIPT_HEADING.neither
+}
+
+/** Where this order lives — the link in the confirmation email. */
+export function guestOrderPath(orderId: string): string {
+  return `/my/tickets/orders/${orderId}`
+}
+
+/**
+ * The account offer under the order (US-DISC-15).
+ *
+ * Opening this page proves nothing about who reads the buyer's inbox — its
+ * link is shown to whoever booked, before anybody reads that inbox — so no
+ * account is ever made here, and no password is ever asked for here. "Create
+ * account" emails the booking's address a one-time link, and the account is
+ * made from that. An address that already has an account is invited to sign
+ * in instead, with no way to ask for a duplicate.
+ *
+ * `link` is what the request for the link reported, when one was made.
+ */
+export function accountOfferFor(
+  order: Pick<GuestOrder, 'orderId' | 'buyerEmail'>,
+  accountExists: boolean,
+  link?: AccountLinkResult,
+): AccountOffer {
+  if (link?.sentTo) {
+    return {
+      kind: 'sent',
+      message: `We've sent a link to ${link.sentTo}. Open it to choose a password — it proves the address is yours.`,
+    }
+  }
+  return {
+    kind: accountExists ? 'sign-in' : 'create',
+    prompt: accountExists
+      ? `You already have an account for ${order.buyerEmail}. Sign in to see every booking in one place.`
+      : `Create an account for ${order.buyerEmail} and every booking is in one place.`,
+    signInTo: `/portal/login?from=${encodeURIComponent(guestOrderPath(order.orderId))}`,
+    error: link?.error ?? null,
+  }
 }
 
 export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
