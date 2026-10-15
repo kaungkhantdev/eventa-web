@@ -596,4 +596,42 @@ describe('accountOfferFor', () => {
   it('still makes no offer to somebody signed in when there is no ticket', () => {
     expect(accountOfferFor(order(UNPAID), SIGNED_IN)).toBeNull()
   })
+
+  /**
+   * The API emails a claim link only for a booking it has confirmed, and
+   * refuses any other in its own words. That refusal is never reached from
+   * here: "Create account" exists only on an offer, an offer only for a
+   * confirmed order holding a ticket that admits, and the API issues tickets
+   * only in the step that confirms an order. So every status it has besides
+   * `confirmed`, in each shape it actually sends, makes no offer — to anybody.
+   */
+  describe('for a booking the API has not confirmed', () => {
+    const LAPSED = '2026-08-17T04:59:00.000Z'
+    const NOT_CONFIRMED: [string, Partial<GuestOrderWire>][] = [
+      ['pending, seats held for payment', UNPAID],
+      ['pending, hold lapsed but not yet swept', { ...UNPAID, holdExpiresAt: LAPSED }],
+      [
+        'pending, paid and awaiting approval',
+        { status: 'pending', awaitingApproval: true, paymentStatus: 'paid', tickets: [] },
+      ],
+      [
+        'pending, free and awaiting approval',
+        { status: 'pending', awaitingApproval: true, paymentStatus: 'pending', tickets: [] },
+      ],
+      ['waitlisted', { status: 'waitlisted', paymentStatus: 'pending', tickets: [] }],
+      ['expired', { ...UNPAID, status: 'expired', holdExpiresAt: null }],
+      ['cancelled, its ticket still reading as issued', { status: 'cancelled' }],
+      ['rejected after payment', { status: 'rejected', paymentStatus: 'refunded', tickets: [] }],
+      [
+        'rejected before any payment',
+        { status: 'rejected', paymentStatus: 'pending', paymentRequired: false, tickets: [] },
+      ],
+    ]
+
+    it.each(NOT_CONFIRMED)('makes no offer — %s', (_, shape) => {
+      for (const context of [NO_ACCOUNT, HAS_ACCOUNT, SIGNED_IN]) {
+        expect(accountOfferFor(order(shape), context)).toBeNull()
+      }
+    })
+  })
 })
