@@ -24,7 +24,7 @@ import { AUDIT_EXPORT_PATH, auditExportOf } from '../auditExport'
 import { auditLook } from '../settings.presentation'
 import type { SecurityData } from '../settings.routes'
 import type { AuditRow, SessionRow } from '../settings.types'
-import { twoFactorSetupStep } from '../twoFactorSetup'
+import { twoFactorDoneMessage, twoFactorSetupStep } from '../twoFactorSetup'
 
 /**
  * Password, two-factor and sessions (US-ACC-04..07), ported from
@@ -324,15 +324,12 @@ function TwoFactorPanel({
     act.data && 'recoveryCodes' in act.data ? act.data.recoveryCodes : undefined
   const step = twoFactorSetupStep(twoFactor, act.data?.ok ? act.data : undefined)
   useFailureToast(act.state === 'idle' ? error : null)
-  // Neither toast nor close while the codes are up. They are shown exactly
-  // once — the API keeps only their hashes — so closing the panel on success
-  // would destroy the only copy, and a toast would land on top of the one
-  // sentence that has to be read. The codes ARE the confirmation.
-  useSavedToast(
-    act.state === 'idle' && act.data?.ok === true && !codes,
-    twoFactor.enabled ? 'Two-factor turned off.' : 'Two-factor is on.',
-    onClose,
-  )
+  // Neither toast nor close while the seed or the codes are up: the seed is
+  // what the member must scan next, and the codes are shown exactly once —
+  // the API keeps only their hashes — so closing the panel on success would
+  // destroy the only copy. The codes ARE the confirmation.
+  const done = act.state === 'idle' ? twoFactorDoneMessage(act.data) : null
+  useSavedToast(done !== null, done ?? '', onClose)
 
   return (
     <Panel

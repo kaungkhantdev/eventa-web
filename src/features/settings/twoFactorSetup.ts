@@ -35,3 +35,20 @@ export function twoFactorSetupStep(
   if (status.pending) return { startLabel: 'Start over', seed: null, canConfirm: true }
   return { startLabel: 'Start setup', seed: null, canConfirm: false }
 }
+
+/**
+ * The toast a successful answer ends the panel with, or `null` when the panel
+ * must stay open (US-SET-03). Starting setup answers with the seed to scan, in
+ * this panel — closing it hid the QR behind a "Two-factor is on." that was not
+ * yet true. Confirming answers with the recovery codes, which are the
+ * confirmation and are shown once. Only turning two-factor off is finished.
+ *
+ * Decided from the answer, never the status: by the time it lands the loader
+ * has revalidated, and the status already says the opposite of what changed.
+ */
+export function twoFactorDoneMessage(
+  answer: { ok: boolean; error?: string; secret?: string; recoveryCodes?: string[] } | undefined,
+): string | null {
+  if (!answer?.ok || answer.secret || answer.recoveryCodes) return null
+  return 'Two-factor turned off.'
+}

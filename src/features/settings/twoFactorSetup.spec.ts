@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { twoFactorSetupStep } from './twoFactorSetup'
+import { twoFactorDoneMessage, twoFactorSetupStep } from './twoFactorSetup'
 
 /**
  * The console's two-factor setup panel (US-SET-03: "Given I start setup, when
@@ -51,5 +51,33 @@ describe('twoFactorSetupStep', () => {
 
     expect(step.startLabel).toBeNull()
     expect(step.seed?.key).toBe(STARTED.secret)
+  })
+})
+
+/*
+ * Which successful answer ends the panel with a toast. The panel closed on
+ * ANY success, so starting setup shut it on the QR it had just drawn and
+ * announced "Two-factor is on." before a code was ever entered — there was
+ * nothing left on screen to scan (US-SET-03).
+ */
+describe('twoFactorDoneMessage', () => {
+  it('keeps the panel open on the seed that starting setup answers with', () => {
+    expect(twoFactorDoneMessage({ ok: true, ...STARTED })).toBeNull()
+  })
+
+  // The codes are the confirmation, and are shown exactly once.
+  it('keeps the panel open on the recovery codes confirming answers with', () => {
+    expect(twoFactorDoneMessage({ ok: true, recoveryCodes: ['a1b2-c3d4'] })).toBeNull()
+  })
+
+  // Decided from the answer, not the status: by the time it lands the loader
+  // has revalidated and already says "off", which read "Two-factor is on.".
+  it('closes on turning two-factor off, and says so', () => {
+    expect(twoFactorDoneMessage({ ok: true })).toBe('Two-factor turned off.')
+  })
+
+  it('closes on nothing that failed', () => {
+    expect(twoFactorDoneMessage({ ok: false, error: 'That code is not right.' })).toBeNull()
+    expect(twoFactorDoneMessage(undefined)).toBeNull()
   })
 })
