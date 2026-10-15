@@ -7,6 +7,7 @@ import type { ActionResult } from '@/app/loaders'
 import { NotificationBell, SignedInChip, Toggle, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
+import { toast } from '@/lib/toast'
 import {
   categoryIdOf,
   publishGaps,
@@ -25,7 +26,9 @@ import {
   WAITLIST_HINT,
   finalLabel,
   headerSaveLabel,
+  POPUP_BLOCKED_HINT,
   landingPreviewHref,
+  openPreviewTab,
   summaryCapacity,
   type Highlight,
 } from '../eventForm.presentation'
@@ -434,7 +437,11 @@ export default function EventFormPage() {
 
   /* A new tab, not a navigation: the wizard holds the open step's edits in
      component state, so leaving the page would discard them. */
-  const previewLanding = () => window.open(previewHref, '_blank', 'noopener')
+  const previewLanding = () => {
+    if (!openPreviewTab(previewHref, (url, target) => window.open(url, target))) {
+      toast.error(POPUP_BLOCKED_HINT)
+    }
+  }
 
   return (
     <>

@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
+  POPUP_BLOCKED_HINT,
   finalLabel,
   headerSaveLabel,
   landingPreviewHref,
+  openPreviewTab,
   summaryCapacity,
 } from './eventForm.presentation'
 
@@ -177,5 +179,30 @@ describe('landingPreviewHref', () => {
     expect(
       landingPreviewHref('minimal', null, { title: '', venue: '', online: false, highlights: [] }),
     ).toBe('/landing/minimal')
+  })
+})
+
+/**
+ * US-PAGE-09: when the browser blocks the new tab, the organizer is told to
+ * allow pop-ups. The preview used to open with "noopener", which makes
+ * `window.open` return null whether or not anything opened — so a block could
+ * not even be noticed.
+ */
+describe('openPreviewTab', () => {
+  it('opens the preview in a new tab and cuts it off from this one', () => {
+    const tab = { opener: {} as unknown }
+    const open = vi.fn(() => tab as unknown as Window)
+
+    expect(openPreviewTab('/landing/aurora', open)).toBe(true)
+    expect(open).toHaveBeenCalledWith('/landing/aurora', '_blank')
+    expect(tab.opener).toBeNull()
+  })
+
+  it('reports a tab the browser refused to open', () => {
+    expect(openPreviewTab('/landing/aurora', () => null)).toBe(false)
+  })
+
+  it('has a hint that says what to do about it', () => {
+    expect(POPUP_BLOCKED_HINT).toMatch(/allow pop-ups/i)
   })
 })

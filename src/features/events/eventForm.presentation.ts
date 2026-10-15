@@ -199,3 +199,24 @@ export function landingPreviewHref(
   const query = params.toString()
   return `/landing/${template}${query ? `?${query}` : ''}`
 }
+
+/** What the organizer is told when the browser blocks the preview tab (US-PAGE-09). */
+export const POPUP_BLOCKED_HINT =
+  'Your browser blocked the preview — allow pop-ups for this site and try again.'
+
+/**
+ * Open the preview in a new tab; false when the browser blocked it.
+ *
+ * Not with "noopener": that makes `window.open` answer null whether or not a
+ * tab opened, so a blocked one could not be told apart. The opener is cut
+ * afterwards instead, which leaves the new page just as unable to reach back.
+ */
+export function openPreviewTab(
+  href: string,
+  open: (url: string, target: string) => Window | null,
+): boolean {
+  const tab = open(href, '_blank')
+  if (!tab) return false
+  tab.opener = null
+  return true
+}
