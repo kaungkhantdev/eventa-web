@@ -1,5 +1,5 @@
 import { bangkokDate, satang } from '@/lib/format'
-import { QR_FILE_EXTENSION, qrDataUrl } from './lib/qr'
+import { QR_FILE_EXTENSION, qrDataUrl } from '@/lib/qr'
 import type {
   GuestOrder,
   GuestOrderLineWire,

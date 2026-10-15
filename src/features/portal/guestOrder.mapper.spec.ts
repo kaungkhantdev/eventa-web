@@ -6,7 +6,7 @@ import {
   toGuestOrder,
 } from './guestOrder.mapper'
 import type { GuestOrderWire } from './guestOrder.types'
-import { qrDataUrl } from './lib/qr'
+import { qrDataUrl } from '@/lib/qr'
 
 const WIRE: GuestOrderWire = {
   orderId: 'o-1',

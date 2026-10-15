@@ -1,7 +1,7 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { mapPanel, panel, type Panel } from '@/app/panels'
-import { api, type Query } from '@/lib/api'
+import { api, withoutForbidden, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { toTimeline } from './activity.mapper'
@@ -172,7 +172,9 @@ async function loadDirectory({ request }: LoaderArgs): Promise<DirectoryData> {
   const profileId = profileIdOf(params)
   const [page, events, activity] = await Promise.all([
     attendeesApi.list(query),
-    eventOptions(),
+    // Staff read the directory on `regView`, but listing events is `evCreate`.
+    // Their 403 costs them the invite panel's event list, not the directory.
+    withoutForbidden(() => eventOptions()),
     // Wrapped rather than awaited bare: the profile's subject is the contact
     // details, which the directory row already carries, and the history is
     // context beside them. A failed read says so in its own section instead of

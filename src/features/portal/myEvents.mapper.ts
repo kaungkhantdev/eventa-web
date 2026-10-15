@@ -1,6 +1,6 @@
 import type { Panel } from '@/app/panels'
 import { MASKED, bangkokDate, bangkokTime, baht } from '@/lib/format'
-import { qrDataUrl } from './lib/qr'
+import { qrDataUrl } from '@/lib/qr'
 import type {
   MyEventRow,
   MyRegistrationWire,

@@ -3,6 +3,7 @@ import { useFetcher } from 'react-router'
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { SEARCH_DEBOUNCE_MS } from '@/lib/useFilters'
+import { MANUAL_LOOKUP_LABEL } from '../cameraFallback'
 import type { AttendanceRow } from '../door.types'
 
 /**
@@ -58,9 +59,7 @@ export function ManualSearch({ eventId }: { eventId: string }) {
         aria-expanded={open}
         className="flex w-full items-center justify-between text-left"
       >
-        <span className="text-[13px] font-semibold text-ink">
-          Can’t scan? Find attendee manually
-        </span>
+        <span className="text-[13px] font-semibold text-ink">{MANUAL_LOOKUP_LABEL}</span>
         <Icon
           name="hgi-arrow-down-01"
           size={16}

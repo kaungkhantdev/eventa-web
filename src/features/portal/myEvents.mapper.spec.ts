@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Panel } from '@/app/panels'
 import { MASKED } from '@/lib/format'
-import { qrDataUrl } from './lib/qr'
+import { qrDataUrl } from '@/lib/qr'
 import {
   passOnShow,
   ticketChoices,

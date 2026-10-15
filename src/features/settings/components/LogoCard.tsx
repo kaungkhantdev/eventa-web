@@ -55,12 +55,15 @@ export function LogoCard({
   name,
   country,
   summary,
+  readOnly = false,
 }: {
   logoUrl: string | null
   name: string
   country: string
   /** Counts the API derives; absent until the caller has them. */
   summary?: { eventsHosted: number; teamMembers: number }
+  /** Shows the logo without Upload, Replace or Remove (US-SET-07). */
+  readOnly?: boolean
 }) {
   const file = useRef<HTMLInputElement>(null)
   const revalidator = useRevalidator()
@@ -131,35 +134,37 @@ export function LogoCard({
           </span>
         )}
 
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="soft"
-              size="sm"
-              type="button"
-              disabled={busy}
-              onClick={() => file.current?.click()}
-            >
-              <Icon name="hgi-image-upload" size={15} />
-              {logoUrl ? 'Replace' : 'Upload'}
-            </Button>
-            {/* A text link, as the kit draws it — removing a logo should not
-                look as reachable as choosing one. */}
-            {logoUrl && (
-              <button
+        {!readOnly && (
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="soft"
+                size="sm"
                 type="button"
                 disabled={busy}
-                onClick={() => void remove()}
-                className="text-[12px] font-medium text-muted transition hover:text-red-500 disabled:opacity-50"
+                onClick={() => file.current?.click()}
               >
-                Remove
-              </button>
-            )}
+                <Icon name="hgi-image-upload" size={15} />
+                {logoUrl ? 'Replace' : 'Upload'}
+              </Button>
+              {/* A text link, as the kit draws it — removing a logo should not
+                  look as reachable as choosing one. */}
+              {logoUrl && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void remove()}
+                  className="text-[12px] font-medium text-muted transition hover:text-red-500 disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] leading-snug text-muted">
+              JPEG, PNG or WebP · square looks best
+            </p>
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-muted">
-            JPEG, PNG or WebP · square looks best
-          </p>
-        </div>
+        )}
       </div>
 
       {/* The kit's identity block: who this workspace is, then the two figures
