@@ -121,6 +121,26 @@ describe('toAgendaBlock', () => {
     expect(block.top).toBe(0)
     expect(block.height).toBeGreaterThan(0)
   })
+
+  // "Ends" may be left blank, and the API stores that as no end at all. One
+  // such session used to throw inside the loader and take the whole agenda
+  // down with it (US-PROG-01).
+  describe('a session with no end time', () => {
+    const open = () => toAgendaBlock(session({ startTime: '10:00:00', endTime: null }))
+
+    it('is still placed at its start', () => {
+      expect(open().top).toBe(HOUR_HEIGHT)
+      expect(open().height).toBeGreaterThan(0)
+    })
+
+    it('shows only when it starts', () => {
+      expect(open().time).toBe('10:00')
+    })
+
+    it('opens the edit form with the end left blank', () => {
+      expect(open().edit.endTime).toBe('')
+    })
+  })
 })
 
 describe('agendaDaysOf', () => {

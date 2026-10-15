@@ -44,7 +44,8 @@ export interface SessionWire {
   day: number
   /** `HH:MM:SS` wall clock — a time of day, with no zone of its own. */
   startTime: string
-  endTime: string
+  /** The same, or null when "Ends" was left blank — the API allows that. */
+  endTime: string | null
   title: string
   type: SessionType
   room: string
