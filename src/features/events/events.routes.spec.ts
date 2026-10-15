@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   categoryInputOf,
+  confirmedDeleteOf,
   listQueryOf,
   monthOf,
   searchOf,
@@ -153,5 +154,30 @@ describe('ordering the categories', () => {
   it('does not disturb the list it was given', () => {
     sortCategories(cards, 'count-desc')
     expect(cards.map((c) => c.eventCount)).toEqual([12, 24, 8])
+  })
+})
+
+const formOf = (entries: Record<string, string>) => {
+  const data = new FormData()
+  for (const [key, value] of Object.entries(entries)) data.append(key, value)
+  return data
+}
+
+/**
+ * Deleting an event is permanent, so it happens only once the organizer has
+ * confirmed it (US-EVT-08: "No confirmation-free deletion is ever allowed").
+ * The row menu's Delete used to post the delete itself, on one click.
+ */
+describe('confirmedDeleteOf', () => {
+  it('reads the event and the version the organizer confirmed deleting', () => {
+    expect(confirmedDeleteOf(formOf({ id: 'ev-1', version: '3', confirm: 'true' }))).toEqual({
+      id: 'ev-1',
+      version: 3,
+    })
+  })
+
+  it('is nothing at all without the confirmation', () => {
+    expect(confirmedDeleteOf(formOf({ id: 'ev-1', version: '3' }))).toBeNull()
+    expect(confirmedDeleteOf(formOf({ id: 'ev-1', version: '3', confirm: 'on' }))).toBeNull()
   })
 })

@@ -138,17 +138,30 @@ function withPage(current: string, page: number): string {
 }
 
 /**
- * What the row menu can do: duplicate an event, or delete a draft. Anything
- * else the API refuses, and says why.
+ * A delete the organizer confirmed, or null when the form does not say they
+ * did. Only the confirmation dialog posts `confirm` (US-EVT-08).
+ */
+export function confirmedDeleteOf(form: FormData): { id: string; version: number } | null {
+  if (form.get('confirm') !== 'true') return null
+  return { id: String(form.get('id') ?? ''), version: Number(form.get('version')) }
+}
+
+/**
+ * What the row menu can do: duplicate an event, or delete a draft once that is
+ * confirmed. Anything else the API refuses, and says why.
  */
 async function runEventsAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
-  const id = String(form.get('id') ?? '')
-  if (form.get('intent') === 'duplicate') {
-    await eventsApi.duplicate(id)
+  const intent = form.get('intent')
+  if (intent === 'duplicate') {
+    await eventsApi.duplicate(String(form.get('id') ?? ''))
     return
   }
-  await eventsApi.remove(id, Number(form.get('version')))
+  const deletion = intent === 'delete' ? confirmedDeleteOf(form) : null
+  // Nothing in the console posts this; it would be a bug, and a delete nobody
+  // confirmed must not be the way it shows.
+  if (!deletion) throw new Error('This delete was not confirmed.')
+  await eventsApi.remove(deletion.id, deletion.version)
 }
 
 export const eventsRoute = {
