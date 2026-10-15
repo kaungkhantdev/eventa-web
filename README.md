@@ -73,3 +73,9 @@ export default defineConfig([
 ])
 
 ```
+
+## License
+
+Proprietary — all rights reserved. This repository is public so that it can be
+read; it is not open-source software, and no right to use, copy, modify or run
+it is granted. See [LICENSE](LICENSE).
