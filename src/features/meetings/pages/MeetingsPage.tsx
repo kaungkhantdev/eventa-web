@@ -222,6 +222,7 @@ function MeetingRow({ card, onEdit }: { card: MeetingCard; onEdit: () => void })
           </span>
           {card.bucket === 'today' && <span className="badge badge-green">Today</span>}
           {card.bucket === 'past' && <span className="badge badge-gray">Past</span>}
+          {card.cancelled && <span className="badge badge-red">Cancelled</span>}
         </div>
         <p className="tnum mt-1 flex items-center gap-1.5 text-[12px] text-muted">
           <Icon name="hgi-clock-01" size={13} />
