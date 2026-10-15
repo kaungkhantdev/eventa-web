@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useFetcher, useLoaderData } from 'react-router'
+import { Link, useFetcher, useLoaderData, type FetcherWithComponents } from 'react-router'
 import { EmptyState, Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useTheme } from '@/lib/useTheme'
@@ -13,6 +13,7 @@ import {
 import { ACCOUNT_LINK_INTENT, type GuestOrderData } from '../guestOrder.routes'
 import type {
   AccountLinkResult,
+  AccountOffer,
   GuestOrder,
   GuestTicket,
   OrderState,
@@ -255,7 +256,6 @@ function KeepThem({ order, accountExists }: { order: GuestOrder; accountExists: 
   if (dismissed) return null
   const offer = accountOfferFor(order, accountExists, link.data)
   if (offer.kind === 'sent') return <LinkSent message={offer.message} />
-  const sending = link.state !== 'idle'
 
   return (
     <section className="card mt-4 p-5">
@@ -264,27 +264,7 @@ function KeepThem({ order, accountExists }: { order: GuestOrder; accountExists: 
           <h2 className="text-[15px] font-bold tracking-tight">Keep these tickets</h2>
           <p className="mt-0.5 text-[12.5px] text-muted">{offer.prompt}</p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          <Link
-            to={offer.signInTo}
-            className={offer.kind === 'create' ? 'btn btn-soft' : 'btn btn-primary'}
-          >
-            Sign in
-          </Link>
-          {offer.kind === 'create' && (
-            <link.Form method="post" action={guestOrderPath(order.orderId)}>
-              <button
-                type="submit"
-                name="intent"
-                value={ACCOUNT_LINK_INTENT}
-                className="btn btn-primary"
-                disabled={sending}
-              >
-                {sending ? 'Sending…' : 'Create account'}
-              </button>
-            </link.Form>
-          )}
-        </div>
+        <OfferActions offer={offer} orderId={order.orderId} link={link} />
       </div>
       {offer.error && (
         <p role="alert" className="mt-3 text-[13px] text-red-500">
@@ -299,6 +279,47 @@ function KeepThem({ order, accountExists }: { order: GuestOrder; accountExists: 
         Not now — your ticket is already in your email
       </button>
     </section>
+  )
+}
+
+/**
+ * "Sign in", always — the primary button when the address already has an
+ * account — and "Create account" only when it does not, which asks for the
+ * emailed link rather than opening a form.
+ */
+function OfferActions({
+  offer,
+  orderId,
+  link,
+}: {
+  offer: Exclude<AccountOffer, { kind: 'sent' }>
+  orderId: string
+  link: FetcherWithComponents<AccountLinkResult>
+}) {
+  const sending = link.state !== 'idle'
+
+  return (
+    <div className="flex shrink-0 gap-2">
+      <Link
+        to={offer.signInTo}
+        className={offer.kind === 'create' ? 'btn btn-soft' : 'btn btn-primary'}
+      >
+        Sign in
+      </Link>
+      {offer.kind === 'create' && (
+        <link.Form method="post" action={guestOrderPath(orderId)}>
+          <button
+            type="submit"
+            name="intent"
+            value={ACCOUNT_LINK_INTENT}
+            className="btn btn-primary"
+            disabled={sending}
+          >
+            {sending ? 'Sending…' : 'Create account'}
+          </button>
+        </link.Form>
+      )}
+    </div>
   )
 }
 
