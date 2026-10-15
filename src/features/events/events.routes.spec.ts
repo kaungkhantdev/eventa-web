@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   cancelInputOf,
+  categoryDeletionOf,
   categoryInputOf,
   confirmedDeleteOf,
   listQueryOf,
@@ -193,5 +194,19 @@ describe('cancelInputOf', () => {
 
   it('sends no version it does not have', () => {
     expect(cancelInputOf(formOf({ id: 'ev-1', reason: 'Storm' })).version).toBeUndefined()
+  })
+})
+
+/**
+ * US-EVT-11: a category is removed "when I confirm Delete". The row's delete
+ * icon used to post the delete itself, on one click.
+ */
+describe('categoryDeletionOf', () => {
+  it('reads the category the organizer confirmed deleting', () => {
+    expect(categoryDeletionOf(formOf({ id: '12', confirm: 'true' }))).toBe(12)
+  })
+
+  it('is nothing at all without the confirmation', () => {
+    expect(categoryDeletionOf(formOf({ id: '12' }))).toBeNull()
   })
 })

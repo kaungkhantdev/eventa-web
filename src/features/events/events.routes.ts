@@ -142,9 +142,17 @@ function withPage(current: string, page: number): string {
  * did. Only the confirmation dialog posts `confirm` (US-EVT-08).
  */
 export function confirmedDeleteOf(form: FormData): { id: string; version: number } | null {
-  if (form.get('confirm') !== 'true') return null
+  if (!deleteConfirmed(form)) return null
   return { id: String(form.get('id') ?? ''), version: Number(form.get('version')) }
 }
+
+/** Only a confirmation dialog posts `confirm`. */
+function deleteConfirmed(form: FormData): boolean {
+  return form.get('confirm') === 'true'
+}
+
+/** Thrown for a delete nothing in the console posts — a bug, not a refusal. */
+const UNCONFIRMED_DELETE = 'This delete was not confirmed.'
 
 /** A cancellation, as `POST /events/:id/cancel` wants it (US-EVT-08). */
 export function cancelInputOf(form: FormData): { id: string; reason: string; version?: number } {
@@ -174,9 +182,8 @@ async function runEventsAction({ request }: LoaderArgs): Promise<void> {
     return
   }
   const deletion = intent === 'delete' ? confirmedDeleteOf(form) : null
-  // Nothing in the console posts this; it would be a bug, and a delete nobody
-  // confirmed must not be the way it shows.
-  if (!deletion) throw new Error('This delete was not confirmed.')
+  // A delete nobody confirmed must not be the way a bug shows itself.
+  if (!deletion) throw new Error(UNCONFIRMED_DELETE)
   await eventsApi.remove(deletion.id, deletion.version)
 }
 
@@ -312,6 +319,14 @@ export function categoryInputOf(form: FormData): CategoryInput {
   }
 }
 
+/**
+ * The category the organizer confirmed deleting, or null when the form does
+ * not say they did (US-EVT-11).
+ */
+export function categoryDeletionOf(form: FormData): number | null {
+  return deleteConfirmed(form) ? Number(form.get('id')) : null
+}
+
 /** Create, rename or remove a category. */
 async function runCategoriesAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
@@ -319,7 +334,9 @@ async function runCategoriesAction({ request }: LoaderArgs): Promise<void> {
   const id = Number(form.get('id'))
 
   if (intent === 'delete') {
-    await categoriesApi.remove(id)
+    const deletion = categoryDeletionOf(form)
+    if (deletion === null) throw new Error(UNCONFIRMED_DELETE)
+    await categoriesApi.remove(deletion)
     return
   }
 
