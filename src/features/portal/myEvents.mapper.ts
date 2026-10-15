@@ -73,7 +73,9 @@ function placeOf(wire: MyRegistrationWire): string {
 export function toTransactionRow(wire: TransactionWire): TransactionRow {
   return {
     id: wire.paymentId,
-    reference: wire.reference,
+    // The invoice number the row promises (US-DISC-10) — an order nobody
+    // invoiced has none, and its reference is what identifies it.
+    number: wire.invoiceNumber ?? wire.reference,
     event: wire.eventName,
     method: wire.method,
     status: wire.status,

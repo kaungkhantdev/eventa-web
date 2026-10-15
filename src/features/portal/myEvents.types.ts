@@ -38,7 +38,10 @@ export interface MyEventsWire {
 
 export interface TransactionWire {
   paymentId: string
+  /** The order's own reference. */
   reference: string
+  /** The tax invoice the organizer issued for the order; null when none was. */
+  invoiceNumber: string | null
   eventName: string
   method: string
   status: string
@@ -84,7 +87,8 @@ export interface MyEventRow {
 
 export interface TransactionRow {
   id: string
-  reference: string
+  /** The invoice number when one was issued, else the order reference. */
+  number: string
   event: string
   method: string
   status: string

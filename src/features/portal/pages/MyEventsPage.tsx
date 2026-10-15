@@ -458,7 +458,7 @@ export default function MyEventsPage() {
                             <tr key={t.id}>
                               <td>
                                 <p className="text-[13px] font-semibold text-ink">{t.event}</p>
-                                <p className="font-mono text-[11px] text-muted">{t.reference}</p>
+                                <p className="font-mono text-[11px] text-muted">{t.number}</p>
                               </td>
                               <td className="whitespace-nowrap text-[12px] text-muted">{t.date}</td>
                               <td className="whitespace-nowrap text-[12px] text-muted">

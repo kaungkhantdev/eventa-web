@@ -34,6 +34,7 @@ const registration = (over: Partial<MyRegistrationWire> = {}): MyRegistrationWir
 const transaction = (over: Partial<TransactionWire> = {}): TransactionWire => ({
   paymentId: 'p-1',
   reference: 'PAY-2026-0009',
+  invoiceNumber: null,
   eventName: 'Tech Summit 2026',
   method: 'Card',
   // `paid`, not Stripe's `succeeded`: the row carries this product's own
@@ -92,6 +93,20 @@ describe('an event the attendee is registered for', () => {
 })
 
 describe('a payment in the attendee’s history', () => {
+  /**
+   * US-DISC-10: "Given a transaction row, when I view it, then I see the
+   * event, invoice number, …". The row showed the order reference even when
+   * the organizer had issued an invoice for the order.
+   */
+  it('shows the number of the invoice the organizer issued', () => {
+    const row = toTransactionRow(transaction({ invoiceNumber: 'INV-2026-0001' }))
+    expect(row.number).toBe('INV-2026-0001')
+  })
+
+  it('shows the order reference when no invoice was issued', () => {
+    expect(toTransactionRow(transaction()).number).toBe('PAY-2026-0009')
+  })
+
   it('shows the amount the API formatted', () => {
     expect(toTransactionRow(transaction()).amount).toBe('฿2,400')
   })
