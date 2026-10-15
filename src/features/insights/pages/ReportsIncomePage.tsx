@@ -38,7 +38,7 @@ export default function ReportsIncomePage() {
         }
       />
 
-      <ReportFilters events={data.events} />
+      <ReportFilters events={data.events} period={data.period} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile icon="hgi-money-bag-02" label="Gross revenue" {...tiles.gross} />

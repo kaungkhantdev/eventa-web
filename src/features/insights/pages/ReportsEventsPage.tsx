@@ -10,6 +10,7 @@ import {
 } from '@/components/ui'
 import { num } from '@/lib/format'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
+import { ReportDateRange } from '../components/ReportDateRange'
 import { ReportEmptyRow } from '../components/ReportEmptyRow'
 import { REPORT_DOWNLOADS } from '../insights.exports'
 import type { EventsReportData } from '../insights.routes'
@@ -87,6 +88,7 @@ export default function ReportsEventsPage() {
             <option value="cancelled">Cancelled</option>
           </select>
         </div>
+        <ReportDateRange period={data.period} />
       </div>
 
       <section className="card p-4">

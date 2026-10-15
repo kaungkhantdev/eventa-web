@@ -47,7 +47,11 @@ export default function ReportsPayoutsPage() {
         }
       />
 
-      <ReportFilters events={data.events} searchLabel="Search reference or event" />
+      <ReportFilters
+        events={data.events}
+        period={data.period}
+        searchLabel="Search reference or event"
+      />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile icon="hgi-bank" label="Paid out" value={tiles.paidOut} />

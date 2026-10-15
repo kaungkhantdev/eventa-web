@@ -45,7 +45,7 @@ export default function ReportsDiscountsPage() {
         }
       />
 
-      <ReportFilters events={data.events} />
+      <ReportFilters events={data.events} period={data.period} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile icon="hgi-discount-tag-01" label="Active codes" value={tiles.activeCodes} />

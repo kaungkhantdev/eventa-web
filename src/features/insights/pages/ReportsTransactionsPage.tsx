@@ -43,7 +43,7 @@ export default function ReportsTransactionsPage() {
         }
       />
 
-      <ReportFilters events={data.events} />
+      <ReportFilters events={data.events} period={data.period} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile icon="hgi-invoice-01" label="Transactions" value={tiles.entries} />
