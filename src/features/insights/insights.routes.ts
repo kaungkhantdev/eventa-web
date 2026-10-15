@@ -1,7 +1,7 @@
 import { redirect } from 'react-router'
 import { pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
-import { api, type Query } from '@/lib/api'
+import { api, withoutForbidden, type Query } from '@/lib/api'
 import { MASKED, num, satangAmount } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { OVERVIEW_RANGES } from './insights.types'
@@ -142,6 +142,17 @@ function exportQuery(query: Record<string, unknown>): Record<string, string> {
   return out
 }
 
+/**
+ * The events the filter offers, on the two reports Staff read.
+ *
+ * Registrations and attendance need `regView`, which Staff hold (US-RPT-08 AC3,
+ * US-RPT-12 AC1); `GET /events` needs `evCreate`, which they do not. That 403
+ * costs them the event dropdown, not the report.
+ */
+function staffEventOptions(): Promise<EventOption[]> {
+  return withoutForbidden(() => eventOptions())
+}
+
 /** A page past the end is a dead view; send the reader to the last real one. */
 function guardPage(request: Request, matchedEvents: number, query: { page: number; limit: number }) {
   const pages = Math.ceil(matchedEvents / query.limit)
@@ -153,7 +164,10 @@ function guardPage(request: Request, matchedEvents: number, query: { page: numbe
 
 async function loadRegistrations({ request }: LoaderArgs): Promise<RegistrationsReportData> {
   const query = reportQuery(request)
-  const [report, events] = await Promise.all([reportsApi.registrations(query), eventOptions()])
+  const [report, events] = await Promise.all([
+    reportsApi.registrations(query),
+    staffEventOptions(),
+  ])
   guardPage(request, report.matchedEvents, query)
 
   return {
@@ -168,7 +182,7 @@ async function loadRegistrations({ request }: LoaderArgs): Promise<Registrations
 
 async function loadAttendance({ request }: LoaderArgs): Promise<AttendanceReportData> {
   const query = reportQuery(request)
-  const [report, events] = await Promise.all([reportsApi.attendance(query), eventOptions()])
+  const [report, events] = await Promise.all([reportsApi.attendance(query), staffEventOptions()])
   guardPage(request, report.matchedEvents, query)
 
   return {
