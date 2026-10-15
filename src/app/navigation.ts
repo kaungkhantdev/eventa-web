@@ -12,7 +12,18 @@ export type NavLeaf = {
   /** Stable page id — matches the static kit's `data-page`, used for active state. */
   page: string
   to: string
+  /**
+   * Offered only to a member granted this permission key. Tidying, not the
+   * control — the API refuses the page itself with a 403 regardless.
+   */
+  permission?: string
 }
+
+/**
+ * The finance reports US-RPT-12 names — income, transactions, payouts,
+ * discounts and event performance — are hidden from a member without it.
+ */
+const FINANCE_REPORT = 'finView'
 
 export type NavGroup = {
   label: string
@@ -134,13 +145,24 @@ export const MODULES: NavModule[] = [
         label: 'Financial',
         icon: 'hgi-wallet-01',
         items: [
-          { label: 'Income', page: 'reports-income', to: '/admin/reports-income' },
+          {
+            label: 'Income',
+            page: 'reports-income',
+            to: '/admin/reports-income',
+            permission: FINANCE_REPORT,
+          },
           {
             label: 'Transactions',
             page: 'reports-transactions',
             to: '/admin/reports-transactions',
+            permission: FINANCE_REPORT,
           },
-          { label: 'Payouts', page: 'reports-payouts', to: '/admin/reports-payouts' },
+          {
+            label: 'Payouts',
+            page: 'reports-payouts',
+            to: '/admin/reports-payouts',
+            permission: FINANCE_REPORT,
+          },
         ],
       },
       {
@@ -158,13 +180,25 @@ export const MODULES: NavModule[] = [
       {
         label: 'Marketing',
         icon: 'hgi-discount-tag-01',
-        items: [{ label: 'Discounts', page: 'reports-discounts', to: '/admin/reports-discounts' }],
+        items: [
+          {
+            label: 'Discounts',
+            page: 'reports-discounts',
+            to: '/admin/reports-discounts',
+            permission: FINANCE_REPORT,
+          },
+        ],
       },
       {
         label: 'Events',
         icon: 'hgi-calendar-03',
         items: [
-          { label: 'Event performance', page: 'reports-events', to: '/admin/reports-events' },
+          {
+            label: 'Event performance',
+            page: 'reports-events',
+            to: '/admin/reports-events',
+            permission: FINANCE_REPORT,
+          },
         ],
       },
     ],
@@ -243,6 +277,22 @@ export const MODULES: NavModule[] = [
     ],
   },
 ]
+
+/**
+ * A module's sub-nav as offered to one member: the links they hold the
+ * permission for, and only the groups that still have a link in them.
+ */
+export function visibleGroups(
+  groups: NavGroup[],
+  granted: (permission: string) => boolean,
+): NavGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((it) => it.permission === undefined || granted(it.permission)),
+    }))
+    .filter((group) => group.items.length > 0)
+}
 
 /** Which rail module owns a page — mirrors shell.js `moduleOfPage`, including
  *  its fallback to 'dashboard' for pages that live outside the nav model. */

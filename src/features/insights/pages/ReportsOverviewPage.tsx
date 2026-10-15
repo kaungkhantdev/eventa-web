@@ -42,7 +42,7 @@ const RANGE_TABS: PillTabItem<OverviewRange>[] = [
 export default function ReportsOverviewPage() {
   const data = useLoaderData() as OverviewData
   const { set } = useFilters()
-  const { tiles } = data
+  const { tiles, bars, topEvents } = data
 
   return (
     <>
@@ -189,109 +189,116 @@ export default function ReportsOverviewPage() {
         </section>
       </div>
 
-      <section className="card mt-3 p-4">
-        <h2 className="text-[15px] font-bold tracking-tight">Registrations by event</h2>
-        <p className="mt-0.5 text-[12px] text-muted">
-          Top {data.bars.length} events, share of total sign-ups
-        </p>
-        {data.bars.length ? (
-          <div className="mt-4 space-y-3.5">
-            {data.bars.map((bar) => (
-              <div key={bar.id} className="flex items-center gap-3">
-                <p className="w-36 shrink-0 truncate text-[13px] font-medium text-ink sm:w-44">
-                  {bar.name}
-                </p>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-line">
-                  <div
-                    className="h-full rounded-full bg-brand"
-                    style={{ width: `${bar.width}%` }}
-                  />
+      {/* The bars and Top events preview event performance, a finance report
+          (US-RPT-12): null for a reader refused it, so both are hidden rather
+          than shown as "no events". */}
+      {bars && (
+        <section className="card mt-3 p-4">
+          <h2 className="text-[15px] font-bold tracking-tight">Registrations by event</h2>
+          <p className="mt-0.5 text-[12px] text-muted">
+            Top {bars.length} events, share of total sign-ups
+          </p>
+          {bars.length ? (
+            <div className="mt-4 space-y-3.5">
+              {bars.map((bar) => (
+                <div key={bar.id} className="flex items-center gap-3">
+                  <p className="w-36 shrink-0 truncate text-[13px] font-medium text-ink sm:w-44">
+                    {bar.name}
+                  </p>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-line">
+                    <div
+                      className="h-full rounded-full bg-brand"
+                      style={{ width: `${bar.width}%` }}
+                    />
+                  </div>
+                  <span className="w-10 shrink-0 text-right text-[13px] font-semibold tnum">
+                    {bar.count}
+                  </span>
                 </div>
-                <span className="w-10 shrink-0 text-right text-[13px] font-semibold tnum">
-                  {bar.count}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <PanelEmptyPreview
-            preview="bars"
-            description="Widen the range, or check back once registrations start coming in."
-          >
-            No sign-ups in this period.
-          </PanelEmptyPreview>
-        )}
-      </section>
+              ))}
+            </div>
+          ) : (
+            <PanelEmptyPreview
+              preview="bars"
+              description="Widen the range, or check back once registrations start coming in."
+            >
+              No sign-ups in this period.
+            </PanelEmptyPreview>
+          )}
+        </section>
+      )}
 
-      <section className="card mt-3 p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-[15px] font-bold tracking-tight">Top events</h2>
-            <p className="mt-0.5 text-[12px] text-muted">Ranked by registrations this period</p>
+      {topEvents && (
+        <section className="card mt-3 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-[15px] font-bold tracking-tight">Top events</h2>
+              <p className="mt-0.5 text-[12px] text-muted">Ranked by registrations this period</p>
+            </div>
+            <Link
+              to="/admin/reports-events"
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
+            >
+              View all
+              <Icon name="hgi-arrow-right-01" size={13} />
+            </Link>
           </div>
-          <Link
-            to="/admin/reports-events"
-            className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
-          >
-            View all
-            <Icon name="hgi-arrow-right-01" size={13} />
-          </Link>
-        </div>
-        <div className="mt-3 overflow-x-auto">
-          <table className="data-table min-w-[720px]">
-            <thead>
-              <tr>
-                <th>Event</th>
-                <th>Registrations</th>
-                <th>Revenue ฿</th>
-                <th>Attendance %</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody className="text-[13px]">
-              {data.topEvents.length ? (
-                data.topEvents.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <div>
-                        <Link
-                          to={row.href}
-                          className="font-semibold text-ink hover:text-brand hover:underline"
-                        >
-                          {row.name}
-                        </Link>
-                        <p className="text-[11px] text-muted">{row.meta}</p>
-                      </div>
-                    </td>
-                    <td className="text-ink tnum">{row.registrations}</td>
-                    <td className="font-semibold text-ink tnum">{row.revenue}</td>
-                    <td className="text-muted tnum">{row.attendanceRate}</td>
-                    <td>
-                      <Badge tone={row.status.tone}>{row.status.label}</Badge>
+          <div className="mt-3 overflow-x-auto">
+            <table className="data-table min-w-[720px]">
+              <thead>
+                <tr>
+                  <th>Event</th>
+                  <th>Registrations</th>
+                  <th>Revenue ฿</th>
+                  <th>Attendance %</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody className="text-[13px]">
+                {topEvents.length ? (
+                  topEvents.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <div>
+                          <Link
+                            to={row.href}
+                            className="font-semibold text-ink hover:text-brand hover:underline"
+                          >
+                            {row.name}
+                          </Link>
+                          <p className="text-[11px] text-muted">{row.meta}</p>
+                        </div>
+                      </td>
+                      <td className="text-ink tnum">{row.registrations}</td>
+                      <td className="font-semibold text-ink tnum">{row.revenue}</td>
+                      <td className="text-muted tnum">{row.attendanceRate}</td>
+                      <td>
+                        <Badge tone={row.status.tone}>{row.status.label}</Badge>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5}>
+                      <PanelEmptyPreview
+                        preview="table"
+                        description="A report describes what has already happened. Widen the range, or start from your events."
+                        action={{
+                          label: 'See your events',
+                          to: '/admin/events',
+                          icon: 'hgi-calendar-03',
+                        }}
+                      >
+                        No events in this period.
+                      </PanelEmptyPreview>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5}>
-                    <PanelEmptyPreview
-                      preview="table"
-                      description="A report describes what has already happened. Widen the range, or start from your events."
-                      action={{
-                        label: 'See your events',
-                        to: '/admin/events',
-                        icon: 'hgi-calendar-03',
-                      }}
-                    >
-                      No events in this period.
-                    </PanelEmptyPreview>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <PageFooter />
     </>

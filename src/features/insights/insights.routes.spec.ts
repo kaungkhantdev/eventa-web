@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { eventsApi } from '@/features/events/events.api'
 import { api, ApiError } from '@/lib/api'
-import { attendanceReportRoute, registrationsReportRoute } from './insights.routes'
+import {
+  attendanceReportRoute,
+  overviewReportRoute,
+  registrationsReportRoute,
+} from './insights.routes'
 import type {
   AttendanceReportWire,
   ChangeWire,
+  EventsReportWire,
+  OverviewWire,
   RegistrationsReportWire,
 } from './insights.types'
 
@@ -56,10 +62,49 @@ const ATTENDANCE: AttendanceReportWire = {
   changes: { checkedIn: FLAT, noShows: FLAT, attendanceRate: FLAT, onTimeRate: FLAT },
 }
 
+const OVERVIEW: OverviewWire = {
+  period: PERIOD,
+  kpis: {
+    registrations: { value: 5, change: FLAT },
+    attendanceRate: { value: null, change: FLAT },
+    revenueSatang: null,
+    averageTicketSatang: null,
+    refundRate: null,
+  },
+  revenue: null,
+  ticketMix: [],
+}
+
+const EVENTS: EventsReportWire = {
+  period: PERIOD,
+  rows: [
+    {
+      eventId: 'e-1',
+      eventName: 'Tech Summit 2026',
+      startAt: '2026-11-02T02:00:00.000Z',
+      venue: 'QSNCC',
+      city: 'Bangkok',
+      lifecycle: 'upcoming',
+      registrations: 5,
+      revenueSatang: 0,
+      attendanceRate: null,
+    },
+  ],
+  matchedEvents: 1,
+}
+
 const REPORTS: Record<string, unknown> = {
   '/reports/registrations': REGISTRATIONS,
   '/reports/attendance': ATTENDANCE,
+  '/reports/overview': OVERVIEW,
+  '/reports/events': EVENTS,
 }
+
+/** The API, answering every report but refusing (or failing) one path. */
+const refusing = (refused: string, cause: Error) =>
+  vi.spyOn(api, 'get').mockImplementation((path: string) =>
+    path === refused ? Promise.reject(cause) : Promise.resolve(REPORTS[path] as never),
+  )
 
 const forbidden = () =>
   new ApiError(403, { message: 'Missing required permission: evCreate.' })
@@ -136,5 +181,42 @@ describe('the registrations report, for a reader who may list events', () => {
 
     expect(data.events.map((event) => event.id)).toEqual(['e-1'])
     expect(data.rows.map((row) => row.total)).toEqual(['5'])
+  })
+})
+
+
+/*
+ * The overview previews event performance — its bars and its Top events table
+ * come from `GET /reports/events`, a finance report (US-RPT-12 AC1) that Staff
+ * are refused. The overview itself is theirs, so that refusal hides the
+ * preview rather than the screen.
+ */
+describe('the overview, for a reader refused event performance', () => {
+  it('still loads its own figures, and hides the event-performance preview', async () => {
+    refusing('/reports/events', new ApiError(403, { message: 'Missing required permission: finView.' }))
+
+    const data = await overviewReportRoute.loader(args('/admin/reports'))
+
+    expect(data.tiles.registrations.value).toBe('5')
+    // Hidden, not empty: "No events in this period" would be untrue.
+    expect(data.bars).toBeNull()
+    expect(data.topEvents).toBeNull()
+  })
+
+  it('still fails on anything that is not a refusal', async () => {
+    refusing('/reports/events', new ApiError(500, {}))
+
+    await expect(overviewReportRoute.loader(args('/admin/reports'))).rejects.toMatchObject({
+      status: 500,
+    })
+  })
+})
+
+describe('the overview, for a reader with finance access', () => {
+  it('previews the top events', async () => {
+    const data = await overviewReportRoute.loader(args('/admin/reports'))
+
+    expect(data.bars?.map((bar) => bar.name)).toEqual(['Tech Summit 2026'])
+    expect(data.topEvents?.map((row) => row.id)).toEqual(['e-1'])
   })
 })

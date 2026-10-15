@@ -1,7 +1,7 @@
 import { redirect } from 'react-router'
 import { pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
-import { api, withoutForbidden, type Query } from '@/lib/api'
+import { api, whenForbidden, withoutForbidden, type Query } from '@/lib/api'
 import { MASKED, num, satangAmount } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { OVERVIEW_RANGES } from './insights.types'
@@ -365,6 +365,11 @@ const TOP_EVENTS = 6
  * There is deliberately no "sales by channel". No source, channel or UTM column
  * exists anywhere in the schema, so the panel could only ever have been
  * invented; it is dropped rather than faked.
+ *
+ * The top events are a preview of event performance, a finance report
+ * (US-RPT-12 AC1). A reader refused it still gets the overview — which is
+ * theirs — with `bars` and `topEvents` null, so the page hides the preview
+ * instead of claiming there were no events.
  */
 export interface OverviewData {
   range: OverviewRange
@@ -380,8 +385,10 @@ export interface OverviewData {
   mix: MixSlice[]
   /** The donut's centre: the registrations the mix accounts for. */
   mixTotal: string
-  bars: { id: string; name: string; count: string; width: number }[]
-  topEvents: EventPerformanceRow[]
+  /** Null when the reader may not see event performance. */
+  bars: { id: string; name: string; count: string; width: number }[] | null
+  /** Null when the reader may not see event performance. */
+  topEvents: EventPerformanceRow[] | null
   period: ReportPeriodWire
 }
 
@@ -390,10 +397,9 @@ async function loadOverview({ request }: LoaderArgs): Promise<OverviewData> {
   const range = enumParam(params, 'range', OVERVIEW_RANGES, 'year')
   const [report, events] = await Promise.all([
     reportsApi.overview({ range }),
-    reportsApi.events({ range, page: 1, limit: TOP_EVENTS }),
+    whenForbidden(() => reportsApi.events({ range, page: 1, limit: TOP_EVENTS }), null),
   ])
 
-  const busiest = events.rows[0]?.registrations ?? 0
   return {
     range,
     tiles: toOverviewTiles(report.kpis),
@@ -408,16 +414,22 @@ async function loadOverview({ request }: LoaderArgs): Promise<OverviewData> {
     },
     mix: toMixSlices(report.ticketMix),
     mixTotal: num(report.ticketMix.reduce((sum, slice) => sum + slice.seats, 0)),
-    bars: events.rows.map((row) => ({
-      id: row.eventId,
-      name: row.eventName,
-      count: num(row.registrations),
-      // Relative to the busiest, so the longest bar fills the track.
-      width: busiest === 0 ? 0 : Math.round((row.registrations / busiest) * 100),
-    })),
-    topEvents: events.rows.map(toEventPerformanceRow),
+    bars: events && toEventBars(events),
+    topEvents: events && events.rows.map(toEventPerformanceRow),
     period: report.period,
   }
+}
+
+/** The "registrations by event" bars, each relative to the busiest. */
+function toEventBars(events: EventsReportWire): NonNullable<OverviewData['bars']> {
+  const busiest = events.rows[0]?.registrations ?? 0
+  return events.rows.map((row) => ({
+    id: row.eventId,
+    name: row.eventName,
+    count: num(row.registrations),
+    // Relative to the busiest, so the longest bar fills the track.
+    width: busiest === 0 ? 0 : Math.round((row.registrations / busiest) * 100),
+  }))
 }
 
 export const overviewReportRoute = { loader: pageData(loadOverview) }

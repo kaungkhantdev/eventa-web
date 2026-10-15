@@ -8,7 +8,7 @@
 export { api, type Query, type ReadOptions } from './client'
 export { ApiError, NetworkError } from './ApiError'
 export { messageOf } from './messageOf'
-export { withoutForbidden } from './withoutForbidden'
+export { whenForbidden, withoutForbidden } from './withoutForbidden'
 export {
   meAccountApi,
   type LoginSessionWire,

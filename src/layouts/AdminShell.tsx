@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react'
-import { Link, Outlet, useLocation, useMatches } from 'react-router'
+import { Link, Outlet, useLocation, useMatches, useRouteLoaderData } from 'react-router'
+import { ADMIN_ROUTE_ID } from '@/app/loaders'
 import {
   MODULES,
   moduleOfPage,
   routeStateOfPath,
+  visibleGroups,
   type NavGroup,
   type NavModule,
 } from '@/app/navigation'
 import { AdminPageSkeleton } from '@/app/pageSkeletons'
+import { can } from '@/features/auth/permissions'
+import type { Me } from '@/features/auth/types'
 import { useTheme } from '@/lib/useTheme'
 import { usePendingPath } from '@/lib/usePendingPath'
 import { cn } from '@/lib/cn'
@@ -120,7 +124,14 @@ export default function AdminShell() {
 
   const selected = useMemo(() => moduleOfPage(page), [page])
   const mod = useMemo(() => MODULES.find((m) => m.id === selected), [selected])
-  const hasPanel = Boolean(mod?.groups?.length) && !focused
+  // Only the links this member may use — the finance reports are hidden from
+  // a member without finance access (US-RPT-12). The API still refuses them.
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
+  const groups = useMemo(
+    () => visibleGroups(mod?.groups ?? [], (permission) => can(me, permission)),
+    [mod, me],
+  )
+  const hasPanel = groups.length > 0 && !focused
 
   // Close the mobile drawer whenever the route changes. Adjusted during render
   // rather than in an effect, so the drawer is already gone on the paint that
@@ -195,7 +206,7 @@ export default function AdminShell() {
               <h2 className="text-[17px] font-bold tracking-tight text-ink">{mod.label}</h2>
             </div>
             <nav className="no-scrollbar mt-2 flex-1 space-y-1.5 overflow-y-auto px-2.5 pb-4">
-              {mod.groups!.map((g) => (
+              {groups.map((g) => (
                 <PanelGroup key={g.label} group={g} page={page} />
               ))}
             </nav>

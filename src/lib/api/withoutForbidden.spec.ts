@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError, NetworkError } from './ApiError'
-import { withoutForbidden } from './withoutForbidden'
+import { whenForbidden, withoutForbidden } from './withoutForbidden'
 
 /*
  * An auxiliary read — the options a filter offers — that the caller may not be
@@ -24,5 +24,24 @@ describe('withoutForbidden', () => {
     ['a network failure', new NetworkError(new TypeError('fetch failed'))],
   ])('still fails on %s', async (_name, cause) => {
     await expect(withoutForbidden(() => Promise.reject(cause))).rejects.toBe(cause)
+  })
+})
+
+/* The same rule for a read whose "nothing" is not an empty list. */
+describe('whenForbidden', () => {
+  it('answers a 403 with the fallback the caller chose', async () => {
+    const refused = () => Promise.reject(new ApiError(403, {}))
+    await expect(whenForbidden(refused, null)).resolves.toBeNull()
+  })
+
+  it('passes the answer through when the read is allowed', async () => {
+    await expect(whenForbidden(() => Promise.resolve({ rows: 1 }), null)).resolves.toEqual({
+      rows: 1,
+    })
+  })
+
+  it('still fails on anything that is not a refusal', async () => {
+    const cause = new ApiError(500, {})
+    await expect(whenForbidden(() => Promise.reject(cause), null)).rejects.toBe(cause)
   })
 })
