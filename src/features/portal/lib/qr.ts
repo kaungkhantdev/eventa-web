@@ -26,6 +26,9 @@ export function makeQR(text: string): QRCode | null {
 const CELL_SIZE = 4
 const MARGIN = 2
 
+/** What `qrDataUrl` writes: qrcode-generator encodes its data URLs as GIF. */
+export const QR_FILE_EXTENSION = '.gif'
+
 /** A payload → a `data:` image an `<img>` can show. `null` if it cannot encode. */
 export function qrDataUrl(payload: string): string | null {
   return makeQR(payload)?.createDataURL(CELL_SIZE, MARGIN) ?? null
