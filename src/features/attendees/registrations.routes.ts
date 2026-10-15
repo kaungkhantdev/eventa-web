@@ -1,6 +1,6 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { ApiError } from '@/lib/api'
+import { withoutForbidden } from '@/lib/api'
 import { satang } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
@@ -187,16 +187,6 @@ function toTierOption(tier: TierWire): TierOption {
     eventId: tier.eventId,
     name: tier.name,
     label: `${tier.name} · ${satang(tier.isFree ? 0 : tier.priceSatang)}`,
-  }
-}
-
-/** Run an auxiliary fetch, treating "you may not" as "you get no options". */
-async function withoutForbidden<T>(load: () => Promise<T[]>): Promise<T[]> {
-  try {
-    return await load()
-  } catch (cause) {
-    if (cause instanceof ApiError && cause.isForbidden) return []
-    throw cause
   }
 }
 

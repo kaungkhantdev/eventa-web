@@ -1,9 +1,12 @@
 import { EventPicker } from '@/components/ui'
 import type { EventOption } from '@/features/events/eventOptions'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
+import type { ReportPeriodWire } from '../insights.types'
+import { ReportDateRange } from './ReportDateRange'
 
 /**
- * The filter bar every report shares: a search and an event (US-RPT-02).
+ * The filter bar every report shares: a search, an event and a date range
+ * (US-RPT-02).
  *
  * Both write to the URL, because the API does the filtering. Typing is debounced
  * so a request is made once the organizer pauses rather than per keystroke, and
@@ -15,9 +18,12 @@ import { useFilters, useSearchBox } from '@/lib/useFilters'
  */
 export function ReportFilters({
   events,
+  period,
   searchLabel = 'Search events',
 }: {
   events: EventOption[]
+  /** The window the report covered, as the API resolved it. */
+  period: ReportPeriodWire
   searchLabel?: string
 }) {
   const { params, set } = useFilters()
@@ -47,6 +53,7 @@ export function ReportFilters({
           className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
         />
       </div>
+      <ReportDateRange period={period} />
     </div>
   )
 }

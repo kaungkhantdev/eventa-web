@@ -38,7 +38,7 @@ export default function ReportsRegistrationsPage() {
         }
       />
 
-      <ReportFilters events={data.events} />
+      <ReportFilters events={data.events} period={data.period} />
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatTile icon="hgi-user-add-01" label="Total registrations" {...tiles.total} />
