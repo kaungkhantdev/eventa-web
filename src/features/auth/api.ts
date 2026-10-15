@@ -190,10 +190,16 @@ export const authApi = {
    * asked to be signed out of THIS browser, and a network problem must not
    * leave them looking at a console they thought they had left. The refresh
    * token is revoked server-side when the request does land.
+   *
+   * It never rejects: both callers navigate to sign-in once it resolves, and a
+   * failure here (offline, or a refresh token already revoked or expired) used
+   * to strand the person on the page they had just signed out of (US-ACC-10).
    */
   async logout(): Promise<void> {
     try {
       await api.post('/auth/logout')
+    } catch {
+      // Signed out of this browser regardless — see above.
     } finally {
       session.end()
     }

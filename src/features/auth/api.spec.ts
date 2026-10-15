@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { session } from '@/lib/api'
 import { authApi } from './api'
 
 /**
@@ -81,5 +82,57 @@ describe('authApi.checkResetLink', () => {
       persona: 'attendee',
       workspaceName: null,
     })
+  })
+})
+
+/**
+ * Sign out is best-effort at the wire and certain in this browser (US-ACC-10).
+ *
+ * Both callers navigate to sign-in after `logout` resolves, so a rejection here
+ * left the person on the page they asked to leave — signed out locally, but
+ * still looking at it. A network failure and a refused refresh token are the
+ * everyday causes.
+ */
+describe('authApi.logout', () => {
+  function signedIn() {
+    const entries = new Map<string, string>()
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => entries.get(key) ?? null,
+        setItem: (key: string, value: string) => void entries.set(key, value),
+        removeItem: (key: string) => void entries.delete(key),
+      },
+    })
+    session.start({ accessToken: 'access', refreshToken: 'refresh', persona: 'attendee' })
+  }
+
+  it('resolves and ends the session when the request cannot be sent', async () => {
+    signedIn()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    await expect(authApi.logout()).resolves.toBeUndefined()
+    expect(session.isSignedIn()).toBe(false)
+  })
+
+  it('resolves and ends the session when the API refuses it', async () => {
+    signedIn()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ success: false, statusCode: 500, message: 'Something went wrong' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } },
+          ),
+      ),
+    )
+
+    await expect(authApi.logout()).resolves.toBeUndefined()
+    expect(session.isSignedIn()).toBe(false)
   })
 })
