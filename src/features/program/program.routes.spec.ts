@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { speakerInputOf } from './program.routes'
+import { removalConfirmed, speakerInputOf } from './program.routes'
 
 const form = (fields: Record<string, string>) => {
   const data = new FormData()
@@ -16,5 +16,15 @@ describe('speakerInputOf', () => {
 
   it('sends no version for a new speaker', () => {
     expect(speakerInputOf(form({ name: 'Anong Prasert' })).version).toBeUndefined()
+  })
+})
+
+describe('removalConfirmed', () => {
+  // Only the confirmation dialog posts this. Anything else asking to remove is
+  // passed on unconfirmed, and the API refuses it.
+  it('is true only when the form says the organizer confirmed', () => {
+    expect(removalConfirmed(form({ confirm: 'true' }))).toBe(true)
+    expect(removalConfirmed(form({}))).toBe(false)
+    expect(removalConfirmed(form({ confirm: 'yes' }))).toBe(false)
   })
 })

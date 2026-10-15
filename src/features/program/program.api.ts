@@ -69,6 +69,15 @@ export const programApi = {
   updateSpeaker: (eventId: string, id: string, input: SpeakerInput) =>
     api.patch<SpeakerWire>(`/events/${eventId}/speakers/${id}`, input),
 
-  removeSpeaker: (eventId: string, id: string) =>
-    api.delete<void>(`/events/${eventId}/speakers/${id}`),
+  /**
+   * `confirm` says the organizer accepted the warning that the speaker comes
+   * off every session; the API refuses the removal without it.
+   */
+  removeSpeaker: (eventId: string, id: string, confirmed: boolean) =>
+    api.delete<void>(`/events/${eventId}/speakers/${id}`, { query: confirmation(confirmed) }),
+}
+
+/** `?confirm=true` when the organizer confirmed, and nothing claimed otherwise. */
+function confirmation(confirmed: boolean): Query {
+  return confirmed ? { confirm: true } : {}
 }
