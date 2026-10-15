@@ -46,6 +46,13 @@ function ok(data: unknown, meta?: unknown, status = 200): Response {
   })
 }
 
+function refused(status: number, message: string): Response {
+  return new Response(JSON.stringify({ success: false, statusCode: status, message }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 /** Newest first, as the API orders a shortlist. */
 function savedPage(url: URL, saved: readonly string[]): Response {
   const page = Number(url.searchParams.get('page') ?? 1)
@@ -114,5 +121,57 @@ describe('discoverRoute.loader — a signed-in attendee’s hearts', () => {
     const data = await discoverRoute.loader(loaderArgs())
 
     expect(data.saved).toEqual(saved)
+  })
+})
+
+describe('discoverRoute.action — a heart that cannot be recorded', () => {
+  function pressing(save: boolean) {
+    const body = new FormData()
+    body.set('eventId', idOf(1))
+    body.set('save', String(save))
+    return {
+      request: new Request('http://localhost/portal/discover', { method: 'POST', body }),
+      params: {},
+    }
+  }
+
+  // The criterion names the message, so the API's own sentence ("This event
+  // isn't available.") is not what the card shows.
+  it('says it couldn’t save right now when the API refuses the save', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => refused(404, "This event isn't available.")),
+    )
+
+    expect(await discoverRoute.action(pressing(true))).toEqual({
+      ok: false,
+      error: "Couldn't save right now.",
+    })
+  })
+
+  it('says it couldn’t save right now when the API cannot be reached', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+
+    expect(await discoverRoute.action(pressing(true))).toEqual({
+      ok: false,
+      error: "Couldn't save right now.",
+    })
+  })
+
+  it('says it couldn’t remove the save right now when an unsave fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => refused(500, 'Something went wrong')),
+    )
+
+    expect(await discoverRoute.action(pressing(false))).toEqual({
+      ok: false,
+      error: "Couldn't remove it from saved right now.",
+    })
   })
 })
