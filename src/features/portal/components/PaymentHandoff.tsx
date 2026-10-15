@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Icon } from '@/components/ui'
-import { qrDataUrl } from '../lib/qr'
+import { qrDataUrl } from '@/lib/qr'
 import type { PaymentStep } from '../checkout.types'
 
 /**

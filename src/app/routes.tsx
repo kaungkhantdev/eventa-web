@@ -511,6 +511,17 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // Where an email change's confirmation link lands — the API builds it
+        // as `${PUBLIC_WEB_URL}/confirm-email?token=…`, so this path is fixed by
+        // that. Serves both personas, and is not `guestOnly`: the person who
+        // changed their email is usually still signed in on this device.
+        path: '/confirm-email',
+        ...livePage(
+          () => import('@/features/auth/pages/ConfirmEmailPage'),
+          () => import('@/features/auth/confirmEmail.routes').then((m) => m.confirmEmailRoute),
+        ),
+      },
+      {
         // Where a teammate's invitation link lands — the API builds it as
         // `${PUBLIC_WEB_URL}/accept-invite?token=…`, so this path is fixed by
         // that and sits beside `/reset-password` rather than under /auth. Not

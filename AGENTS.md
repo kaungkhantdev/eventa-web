@@ -170,7 +170,7 @@ TS 7 drops it). Never use long relative chains.
   `useMemo` for search/filter. Keep filtering/sorting semantics and empty-state copy identical to the source.
 - A few features use **real libraries** where the static kit did: `quill` powers the rich-text editor on
   the create-event page (instantiated imperatively in `useEffect` with a StrictMode re-init guard);
-  `qrcode-generator` (via `features/portal/lib/qr.ts`) draws the 2FA QR, the PromptPay payment QR and the
+  `qrcode-generator` (via `@/lib/qr`) draws the 2FA QR, the PromptPay payment QR and the
   ticket pass. **This app renders no documents itself** — the API renders an invoice and serves it as an
   **SVG** (`/invoices/:id/invoice.svg`, fetched by `<DownloadButton>`), and report exports (CSV/XLSX/PDF)
   are API routes too; see `@/lib/exportFormats`.

@@ -22,6 +22,7 @@ import { SettingsHeader } from '../components/SettingsHeader'
 import { auditLook } from '../settings.presentation'
 import type { SecurityData } from '../settings.routes'
 import type { AuditRow, SessionRow } from '../settings.types'
+import { twoFactorSetupStep } from '../twoFactorSetup'
 
 /**
  * Password, two-factor and sessions (US-ACC-04..07), ported from
@@ -317,10 +318,9 @@ function TwoFactorPanel({
     }
   >()
   const error = act.data?.ok === false ? act.data.error : null
-  const secret = act.data && 'secret' in act.data ? act.data.secret : undefined
   const codes =
     act.data && 'recoveryCodes' in act.data ? act.data.recoveryCodes : undefined
-  const enrolling = Boolean(secret) || twoFactor.pending
+  const step = twoFactorSetupStep(twoFactor, act.data?.ok ? act.data : undefined)
   useFailureToast(act.state === 'idle' ? error : null)
   // Neither toast nor close while the codes are up. They are shown exactly
   // once — the API keeps only their hashes — so closing the panel on success
@@ -367,35 +367,54 @@ function TwoFactorPanel({
       ) : (
         <div className="space-y-4">
           <p className="text-[12.5px] leading-relaxed text-muted">
-            Add the key below to an authenticator app —{' '}
+            Scan the code below with an authenticator app —{' '}
             <span className="font-medium text-ink">Google Authenticator, 1Password or Authy</span>{' '}
-            — then enter the 6-digit code to finish.
+            — then enter the 6-digit code it shows to finish.
           </p>
 
-          {!enrolling && (
-            <act.Form method="post">
+          {step.startLabel && (
+            <act.Form method="post" className="space-y-2">
               <input type="hidden" name="intent" value="start-2fa" />
-              <Button variant="primary" type="submit" disabled={act.state !== 'idle'}>
-                Start setup
+              {twoFactor.pending && (
+                <Hint>
+                  Setup was started but not finished. Enter the code from your app, or start over
+                  for a new key.
+                </Hint>
+              )}
+              <Button
+                variant={twoFactor.pending ? 'soft' : 'primary'}
+                type="submit"
+                disabled={act.state !== 'idle'}
+              >
+                {step.startLabel}
               </Button>
             </act.Form>
           )}
 
-          {secret && (
-            <div>
-              <Label htmlFor="twofa-key">Can&rsquo;t scan? Enter this key</Label>
-              <div className="flex items-center gap-2 rounded-lg border border-hair bg-canvas px-3 py-2">
-                <code
-                  id="twofa-key"
-                  className="flex-1 select-all break-all font-mono text-[13px] tracking-wider text-ink"
-                >
-                  {secret}
-                </code>
+          {step.seed && (
+            <>
+              {step.seed.qr ? (
+                <div className="flex justify-center rounded-xl border border-hair bg-white p-4">
+                  <img src={step.seed.qr} alt="" width={160} height={160} className="h-40 w-40" />
+                </div>
+              ) : (
+                <Hint>This code could not be drawn. Enter the key below in your app instead.</Hint>
+              )}
+              <div>
+                <Label htmlFor="twofa-key">Can&rsquo;t scan? Enter this key</Label>
+                <div className="flex items-center gap-2 rounded-lg border border-hair bg-canvas px-3 py-2">
+                  <code
+                    id="twofa-key"
+                    className="flex-1 select-all break-all font-mono text-[13px] tracking-wider text-ink"
+                  >
+                    {step.seed.key}
+                  </code>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
-          {enrolling && (
+          {step.canConfirm && (
             <act.Form method="post" className="space-y-4">
               <input type="hidden" name="intent" value="confirm-2fa" />
               <CodeField id="confirm-code" label="Enter the 6-digit code" />
