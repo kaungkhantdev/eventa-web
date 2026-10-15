@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cancelInputOf,
   categoryInputOf,
   confirmedDeleteOf,
   listQueryOf,
@@ -179,5 +180,18 @@ describe('confirmedDeleteOf', () => {
   it('is nothing at all without the confirmation', () => {
     expect(confirmedDeleteOf(formOf({ id: 'ev-1', version: '3' }))).toBeNull()
     expect(confirmedDeleteOf(formOf({ id: 'ev-1', version: '3', confirm: 'on' }))).toBeNull()
+  })
+})
+
+/** US-EVT-08: a cancellation carries the reason the attendees are given. */
+describe('cancelInputOf', () => {
+  it('reads the event, the version on screen and the reason, trimmed', () => {
+    expect(
+      cancelInputOf(formOf({ id: 'ev-1', version: '5', reason: '  Venue became unavailable ' })),
+    ).toEqual({ id: 'ev-1', reason: 'Venue became unavailable', version: 5 })
+  })
+
+  it('sends no version it does not have', () => {
+    expect(cancelInputOf(formOf({ id: 'ev-1', reason: 'Storm' })).version).toBeUndefined()
   })
 })

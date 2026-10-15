@@ -146,15 +146,31 @@ export function confirmedDeleteOf(form: FormData): { id: string; version: number
   return { id: String(form.get('id') ?? ''), version: Number(form.get('version')) }
 }
 
+/** A cancellation, as `POST /events/:id/cancel` wants it (US-EVT-08). */
+export function cancelInputOf(form: FormData): { id: string; reason: string; version?: number } {
+  const version = Number(form.get('version'))
+  return {
+    id: String(form.get('id') ?? ''),
+    reason: String(form.get('reason') ?? '').trim(),
+    version: Number.isInteger(version) && version > 0 ? version : undefined,
+  }
+}
+
 /**
- * What the row menu can do: duplicate an event, or delete a draft once that is
- * confirmed. Anything else the API refuses, and says why.
+ * What the list can do: duplicate an event, delete a draft once that is
+ * confirmed, or cancel an event that cannot be deleted. Anything else the API
+ * refuses, and says why.
  */
 async function runEventsAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
   const intent = form.get('intent')
   if (intent === 'duplicate') {
     await eventsApi.duplicate(String(form.get('id') ?? ''))
+    return
+  }
+  if (intent === 'cancel') {
+    const { id, ...body } = cancelInputOf(form)
+    await eventsApi.cancel(id, body)
     return
   }
   const deletion = intent === 'delete' ? confirmedDeleteOf(form) : null

@@ -79,6 +79,14 @@ export const eventsApi = {
   remove: (id: string, version: number) => api.delete<void>(`/events/${id}`, { body: { version } }),
 
   /**
+   * Cancel an event that can no longer be deleted (US-EVT-08). The reason is
+   * required and is what attendees are told; `version` is the row on screen,
+   * so a stale view is refused rather than acted on.
+   */
+  cancel: (id: string, body: { reason: string; version?: number }) =>
+    api.post<EventWire>(`/events/${id}/cancel`, body),
+
+  /**
    * Copy an event into a fresh draft (US-EVT-01). The API decides what carries
    * over — tickets and agenda, not registrations — so there is nothing to pass.
    */

@@ -157,6 +157,17 @@ export interface EventRow {
   version: number
 }
 
+/**
+ * A dialog about one row of the events list — deleting it, or cancelling it
+ * instead. The row is kept after closing so the dialog still reads correctly
+ * as it fades out; `attempt` counts openings, so each starts afresh.
+ */
+export interface EventDialog {
+  row: EventRow | null
+  open: boolean
+  attempt: number
+}
+
 /** A card in the upcoming grid. */
 export interface UpcomingCard {
   id: string

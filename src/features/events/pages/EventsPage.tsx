@@ -20,6 +20,7 @@ import { PAGE_SIZES, type PageWindow } from '@/lib/paging'
 import type { ListEmptyReason } from '@/lib/urlFilters'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
+import { CancelEventModal } from '../components/CancelEventModal'
 import { DeleteEventModal } from '../components/DeleteEventModal'
 import { EventCalendar } from '../components/EventCalendar'
 import { COVER, STATUS_PILL, eventDetailPath as detailPath } from '../events.presentation'
@@ -331,12 +332,21 @@ function EventsTable({
   const menu = useRowMenu()
   // Delete in the menu only asks; the dialog is what deletes (US-EVT-08). It
   // lives here rather than in the menu, which closes on any click outside it.
-  const [deleting, setDeleting] = useState<EventRow | null>(null)
+  const [subject, setSubject] = useState<{ row: EventRow | null; attempt: number }>({
+    row: null,
+    attempt: 0,
+  })
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
   const askDelete = (row: EventRow) => {
     menu.close()
-    setDeleting(row)
+    setSubject((prev) => ({ row, attempt: prev.attempt + 1 }))
     setDeleteOpen(true)
+  }
+  // The API refused the delete and said to cancel instead (US-EVT-08).
+  const cancelInstead = () => {
+    setDeleteOpen(false)
+    setCancelOpen(true)
   }
 
   return (
@@ -380,7 +390,15 @@ function EventsTable({
         />
       )}
 
-      <DeleteEventModal row={deleting} open={deleteOpen} onClose={() => setDeleteOpen(false)} />
+      <DeleteEventModal
+        dialog={{ ...subject, open: deleteOpen }}
+        onClose={() => setDeleteOpen(false)}
+        onCancelInstead={cancelInstead}
+      />
+      <CancelEventModal
+        dialog={{ ...subject, open: cancelOpen }}
+        onClose={() => setCancelOpen(false)}
+      />
     </section>
   )
 }

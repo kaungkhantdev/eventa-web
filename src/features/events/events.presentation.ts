@@ -180,3 +180,33 @@ export function copyLabel(state: CopyState): string {
 export function eventDetailPath(id: string): string {
   return `/admin/event-detail?id=${encodeURIComponent(id)}`
 }
+
+/* ------------------------------ cancelling -------------------------------- */
+
+/**
+ * The API's answer to a delete it will not do because the event has to be
+ * cancelled instead — published, or holding registrations or payments.
+ */
+const CANCEL_INSTEAD = /cancel it instead/i
+
+/**
+ * Whether a refused delete should offer Cancel (US-EVT-08). Only the refusal
+ * that says so: a stale view, say, is no reason to cancel somebody's event.
+ */
+export function offersCancel(refusal: string | null): boolean {
+  return refusal !== null && CANCEL_INSTEAD.test(refusal)
+}
+
+/** The longest reason `CancelEventDto` accepts. */
+export const CANCEL_REASON_MAX = 500
+
+/** A cancellation needs a reason — it is what the attendees are told. */
+export function cancelReasonGiven(reason: string): boolean {
+  return reason.trim().length > 0
+}
+
+/**
+ * What the organizer is told once it is done. The API's own words: the
+ * refunds and notices go out after the request returns (US-EVT-08 AC4).
+ */
+export const CANCELLED_MESSAGE = 'Event cancelled. Refunds and attendee notices are being processed.'
