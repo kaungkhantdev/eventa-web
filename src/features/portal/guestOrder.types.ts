@@ -127,6 +127,13 @@ export interface GuestOrder {
    */
   holdExpiresAt: string | null
   /**
+   * Confirmed, with a ticket that still admits — so there is a ticket to keep,
+   * and the confirmation email carried it. The account offer is made for this
+   * order and no other (US-DISC-15): an unpaid, waiting or turned-down one has
+   * no ticket, and no ticket email went out.
+   */
+  ticketed: boolean
+  /**
    * True while a payment can still be started.
    *
    * Deliberately not just "unpaid": once the hold lapses the seats are back on
@@ -149,7 +156,8 @@ export interface AccountLinkResult {
 /**
  * What the offer says and offers. `create` and `sign-in` are the offer itself,
  * either of which can be dismissed; `sent` replaces it once the link is on its
- * way, because the next step happens in an inbox.
+ * way, because the next step happens in an inbox. An order with no ticket to
+ * keep gets no offer at all — `accountOfferFor` answers `null`.
  */
 export type AccountOffer =
   | {
@@ -157,6 +165,8 @@ export type AccountOffer =
       prompt: string
       /** The portal's sign-in, returning here afterwards. */
       signInTo: string
+      /** Saying no, and why it costs nothing: the ticket is already in their inbox. */
+      dismiss: string
       error: string | null
     }
   | { kind: 'sent'; message: string }

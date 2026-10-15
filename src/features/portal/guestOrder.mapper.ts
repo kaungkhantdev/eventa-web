@@ -107,13 +107,28 @@ export function receiptHeading({ canPay, paid }: { canPay: boolean; paid: boolea
   return paid ? RECEIPT_HEADING.paid : RECEIPT_HEADING.neither
 }
 
+/** Settled: paid or free, approved, and still standing. */
+const CONFIRMED_STATE: OrderState = {
+  label: 'Confirmed',
+  tone: 'green',
+  detail: 'Show the code below at the door.',
+}
+
+/** How the offer is turned down — true only because it is made only for a ticketed order. */
+const NOT_NOW = 'Not now — your ticket is already in your email'
+
 /** Where this order lives — the link in the confirmation email. */
 export function guestOrderPath(orderId: string): string {
   return `/my/tickets/orders/${orderId}`
 }
 
 /**
- * The account offer under the order (US-DISC-15).
+ * The account offer under the order (US-DISC-15), or `null` for none.
+ *
+ * Made only for an order with a ticket to keep — "I have just confirmed a
+ * registration", "alongside my ticket" — because its dismiss line says the
+ * ticket is already in their email, which is false for an order still unpaid,
+ * waiting or turned down: no ticket exists and no ticket email went out.
  *
  * Opening this page proves nothing about who reads the buyer's inbox — its
  * link is shown to whoever booked, before anybody reads that inbox — so no
@@ -125,10 +140,11 @@ export function guestOrderPath(orderId: string): string {
  * `link` is what the request for the link reported, when one was made.
  */
 export function accountOfferFor(
-  order: Pick<GuestOrder, 'orderId' | 'buyerEmail'>,
+  order: Pick<GuestOrder, 'orderId' | 'buyerEmail' | 'ticketed'>,
   accountExists: boolean,
   link?: AccountLinkResult,
-): AccountOffer {
+): AccountOffer | null {
+  if (!order.ticketed) return null
   if (link?.sentTo) {
     return {
       kind: 'sent',
@@ -141,12 +157,15 @@ export function accountOfferFor(
       ? `You already have an account for ${order.buyerEmail}. Sign in to see every booking in one place.`
       : `Create an account for ${order.buyerEmail} and every booking is in one place.`,
     signInTo: `/portal/login?from=${encodeURIComponent(guestOrderPath(order.orderId))}`,
+    dismiss: NOT_NOW,
     error: link?.error ?? null,
   }
 }
 
 export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
   const holdLive = isHoldLive(wire, now)
+  const state = stateOf(wire, holdLive)
+  const tickets = wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName))
   return {
     orderId: wire.orderId,
     reference: wire.reference,
@@ -154,19 +173,22 @@ export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
     buyerName: wire.buyerName,
     buyerEmail: wire.buyerEmail,
     placedOn: bangkokDate(wire.placedAt),
-    state: stateOf(wire, holdLive),
+    state,
     lines: wire.lines.map(toLine),
     subtotal: satang(wire.subtotalSatang),
     // Nothing taken off is not a discount of zero: the row is simply absent.
     discount: wire.discountSatang > 0 ? satang(wire.discountSatang) : null,
     vat: satang(wire.vatSatang),
     total: satang(wire.totalSatang),
-    tickets: wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName)),
+    tickets,
     awaitingPayment: isOwed(wire),
     paid: MONEY_CHANGED_HANDS.has(wire.paymentStatus),
     onWaitlist: wire.status === WAITLISTED,
     awaitingApproval: wire.awaitingApproval,
     ticketsExplained: ticketsExplained(wire),
+    // The state decides first: a stray ticket row on a cancelled or refunded
+    // order is not a ticket to keep.
+    ticketed: state === CONFIRMED_STATE && tickets.some((ticket) => ticket.valid),
     holdExpiresAt: wire.holdExpiresAt,
     payable: isOwed(wire) && wire.status === 'pending' && holdLive,
   }
@@ -284,5 +306,5 @@ function stateOf(wire: GuestOrderWire, holdLive: boolean): OrderState {
       detail: 'Your seats are held until the countdown ends.',
     }
   }
-  return { label: 'Confirmed', tone: 'green', detail: 'Show the code below at the door.' }
+  return CONFIRMED_STATE
 }

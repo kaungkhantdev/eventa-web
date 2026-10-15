@@ -30,7 +30,7 @@ import { useCountdown } from '../lib/countdown'
  *
  * The account offer sits at the bottom rather than in the way: they have their
  * tickets either way, and this is the one moment when keeping them is worth
- * asking about.
+ * asking about. Only once there is a ticket to keep — see `accountOfferFor`.
  */
 
 const TONES: Record<OrderState['tone'], string> = {
@@ -177,9 +177,8 @@ function TicketQr({ ticket }: { ticket: GuestTicket }) {
  * The shared empty block, not a hand-rolled copy of it.
  *
  * No action: the state banner at the top of the page has already said why an
- * order has no tickets — cancelled, refunded — and the account offer below is
- * the page's own way forward. Repeating one here would be a third answer to a
- * question already answered twice.
+ * order has no tickets — cancelled, refunded — and repeating it here would be
+ * a second answer to a question already answered.
  */
 function NothingToShow() {
   return (
@@ -247,14 +246,15 @@ function Receipt({ order, heading }: { order: GuestOrder; heading: string }) {
  * who books can type any address, and this page's link is in the booker's
  * own browser before anybody reads that inbox — so it proves nothing about
  * whose address it is. The button asks the API to email the booking's
- * address a one-time link, and the account is made only from that link. Which
- * offer to show, and what the card says after, is `accountOfferFor`'s call.
+ * address a one-time link, and the account is made only from that link.
+ * Whether to make an offer at all, which one, and what the card says after,
+ * is `accountOfferFor`'s call.
  */
 function KeepThem({ order, accountExists }: { order: GuestOrder; accountExists: boolean }) {
   const [dismissed, setDismissed] = useState(false)
   const link = useFetcher<AccountLinkResult>()
-  if (dismissed) return null
   const offer = accountOfferFor(order, accountExists, link.data)
+  if (dismissed || !offer) return null
   if (offer.kind === 'sent') return <LinkSent message={offer.message} />
 
   return (
@@ -276,7 +276,7 @@ function KeepThem({ order, accountExists }: { order: GuestOrder; accountExists: 
         onClick={() => setDismissed(true)}
         className="mt-3 text-[12px] font-medium text-muted hover:text-ink"
       >
-        Not now — your ticket is already in your email
+        {offer.dismiss}
       </button>
     </section>
   )

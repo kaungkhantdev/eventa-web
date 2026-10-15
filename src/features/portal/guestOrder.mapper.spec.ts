@@ -441,6 +441,53 @@ describe('toGuestOrder', () => {
       expect(order({ tickets: [], paymentRequired: true }).tickets).toEqual([])
     })
   })
+
+  /**
+   * Whether there is a ticket to keep — the only order the account offer is
+   * about (US-DISC-15: "Given I have just confirmed a registration … alongside
+   * my ticket").
+   */
+  describe('ticketed', () => {
+    const ISSUED = WIRE.tickets[0]
+
+    it('is true for a confirmed order holding a ticket that admits', () => {
+      expect(order().ticketed).toBe(true)
+      expect(order({ tickets: [{ ...ISSUED, status: 'checked_in' }] }).ticketed).toBe(true)
+    })
+
+    it('is false while the money is owed, in line, or waiting for the organizer', () => {
+      expect(order(UNPAID).ticketed).toBe(false)
+      expect(order({ status: 'waitlisted', paymentStatus: 'pending', tickets: [] }).ticketed).toBe(
+        false,
+      )
+      expect(
+        order({ status: 'pending', awaitingApproval: true, paymentStatus: 'paid', tickets: [] })
+          .ticketed,
+      ).toBe(false)
+    })
+
+    it('is false once the order lapsed, was cancelled, refunded or turned down', () => {
+      expect(order({ ...UNPAID, status: 'expired', holdExpiresAt: null }).ticketed).toBe(false)
+      expect(order({ status: 'cancelled', tickets: [] }).ticketed).toBe(false)
+      expect(
+        order({ paymentStatus: 'refunded', tickets: [{ ...ISSUED, status: 'refunded' }] }).ticketed,
+      ).toBe(false)
+      expect(order({ status: 'rejected', paymentStatus: 'refunded', tickets: [] }).ticketed).toBe(
+        false,
+      )
+    })
+
+    // Belt and braces: the state decides, whatever a stray ticket row says.
+    it('is false for an order that is not confirmed even if a ticket still reads as issued', () => {
+      expect(order({ status: 'cancelled' }).ticketed).toBe(false)
+      expect(order({ paymentStatus: 'refunded' }).ticketed).toBe(false)
+    })
+
+    it('is false for a confirmed order with no ticket that admits', () => {
+      expect(order({ tickets: [] }).ticketed).toBe(false)
+      expect(order({ tickets: [{ ...ISSUED, status: 'void' }] }).ticketed).toBe(false)
+    })
+  })
 })
 
 /**
@@ -452,17 +499,44 @@ describe('toGuestOrder', () => {
  * address a link, and the account is made from that.
  */
 describe('accountOfferFor', () => {
-  const ORDER = { orderId: '0b9c6a52-3f43-4f7e-9d1e-5a0c1f2b7e11', buyerEmail: 'anan@example.test' }
+  const ORDER = {
+    orderId: '0b9c6a52-3f43-4f7e-9d1e-5a0c1f2b7e11',
+    buyerEmail: 'anan@example.test',
+    ticketed: true,
+  }
   const SIGN_IN_HERE =
     '/portal/login?from=%2Fmy%2Ftickets%2Forders%2F0b9c6a52-3f43-4f7e-9d1e-5a0c1f2b7e11'
+  const NOT_NOW = 'Not now — your ticket is already in your email'
 
-  it('offers to create an account for the booking’s address', () => {
+  // "… a way to dismiss it that says the ticket is already in my email."
+  it('offers to create an account for the booking’s address, dismissable', () => {
     expect(accountOfferFor(ORDER, false)).toEqual({
       kind: 'create',
       prompt: 'Create an account for anan@example.test and every booking is in one place.',
       signInTo: SIGN_IN_HERE,
+      dismiss: NOT_NOW,
       error: null,
     })
+  })
+
+  // An unpaid, waiting or turned-down order has no ticket, and no ticket
+  // email went out — so there is nothing to keep, and the dismiss line would
+  // be false. No offer at all, rather than an offer that lies.
+  it('makes no offer, and so no ticket-in-your-email claim, for an order with no ticket', () => {
+    const noTicketYet = [
+      order(UNPAID),
+      order({ status: 'waitlisted', paymentStatus: 'pending', tickets: [] }),
+      order({ status: 'pending', awaitingApproval: true, paymentStatus: 'paid', tickets: [] }),
+      order({ status: 'pending', awaitingApproval: true, paymentStatus: 'pending', tickets: [] }),
+    ]
+    for (const waiting of noTicketYet) {
+      expect(accountOfferFor(waiting, false)).toBeNull()
+      expect(accountOfferFor(waiting, true)).toBeNull()
+    }
+  })
+
+  it('makes it for a confirmed order straight from the mapper', () => {
+    expect(accountOfferFor(order(), false)).toMatchObject({ kind: 'create', dismiss: NOT_NOW })
   })
 
   // "Given I registered with an email that already has an account, when I
@@ -474,6 +548,7 @@ describe('accountOfferFor', () => {
       prompt:
         'You already have an account for anan@example.test. Sign in to see every booking in one place.',
       signInTo: SIGN_IN_HERE,
+      dismiss: NOT_NOW,
       error: null,
     })
   })
