@@ -16,9 +16,9 @@ import type { IncomeReportData } from '../insights.routes'
 /**
  * Income and reconciliation (US-RPT-05). Layout ported from the kit.
  *
- * Net is gross less VAT and refunds — the same figure the overview calls
- * revenue, from the same expression in Payments. Fees come off separately,
- * because what reaches the bank is what reconciliation compares against.
+ * Net is Gross less Refunds less Fees — the three columns beside it, as
+ * US-RPT-05 requires of every row and every tile — and the same figure the
+ * overview calls revenue, from the same expression in Payments.
  */
 export default function ReportsIncomePage() {
   const data = useLoaderData() as IncomeReportData

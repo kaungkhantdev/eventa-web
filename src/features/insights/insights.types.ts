@@ -89,9 +89,9 @@ export interface MoneyWire {
   vatSatang: number
   refundsSatang: number
   feesSatang: number
-  /** gross − VAT − refunds: the revenue figure, matching the overview. */
+  /** gross − refunds − fees (US-RPT-05): the revenue figure, matching the overview. */
   netSatang: number
-  /** net − fees: what reaches the bank. */
+  /** gross − VAT − refunds − fees. */
   settledSatang: number
 }
 
@@ -116,7 +116,7 @@ export interface EventPerformanceRowWire extends RowEvent {
   lifecycle: EventLifecycle
   /** Confirmed seats — what the ranking is by. */
   registrations: number
-  /** Net of VAT and refunds, all time. Null when the reader may not see money. */
+  /** The Income report's net, all time. Null when the reader may not see money. */
   revenueSatang: number | null
   /** Null for an event that has not started, and for one that issued nothing. */
   attendanceRate: number | null
