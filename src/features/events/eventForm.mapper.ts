@@ -229,11 +229,19 @@ function capacityOf(typed: string): { capacity?: number } {
   return { capacity }
 }
 
+/** What the Review step's checklist says a reserved event still needs (US-EVT-05). */
+export const SEAT_ROWS_REQUIREMENT = 'a ticket type for every seat row'
+
+/** Only an in-person, reserved event has seat rows to give ticket types. */
+export function seatRowsApply(values: EventFormValues): boolean {
+  return values.seatingMode === 'reserved' && !values.isOnline
+}
+
 /**
  * The API's own publish requirements, checked here first.
  *
  * `events.service.ts` refuses a publish with a 422 listing what is missing.
- * The same four rules are applied to the loaded event so the wizard can say so
+ * The same rules are applied to the loaded event so the wizard can say so
  * on the Review step instead of letting someone click a button that cannot
  * work. The server still decides — this only saves a doomed request.
  */
@@ -245,5 +253,6 @@ export function publishGaps(values: EventFormValues): string[] {
   // Only tiers the API has stored count — an unsaved row would turn the button
   // green and the request would still be refused.
   if (!values.tickets.some((ticket) => ticket.id !== null)) gaps.push('at least one ticket type')
+  if (seatRowsApply(values) && values.rowTicketTypes.includes(null)) gaps.push(SEAT_ROWS_REQUIREMENT)
   return gaps
 }

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  SEAT_ROWS_REQUIREMENT,
   bahtOf,
   categoryIdOf,
   publishGaps,
+  seatRowsApply,
   satangOf,
   toCreateBody,
   toEventFormValues,
@@ -389,5 +391,41 @@ describe('whether the event may be published yet', () => {
   it('reports every gap at once, so the checklist is complete', () => {
     const v = toEventFormValues(event({ description: null, venueName: null }), [], [])
     expect(publishGaps(v)).toHaveLength(3)
+  })
+
+  /**
+   * US-EVT-05: a reserved event publishes only once every seat row has a
+   * ticket type. A map from before rows had types counts as untyped too.
+   */
+  describe('seat rows', () => {
+    const reserved = (rowTicketTypes: (string | null)[], over: Partial<EventFormValues> = {}) => ({
+      ...toEventFormValues(event(), [ticket()], []),
+      seatingMode: 'reserved' as const,
+      rowTicketTypes,
+      ...over,
+    })
+
+    it('lists a seat row with no ticket type', () => {
+      expect(publishGaps(reserved(['tkt-1', null]))).toEqual([SEAT_ROWS_REQUIREMENT])
+    })
+
+    it('lists a map none of whose rows has a type yet', () => {
+      expect(publishGaps(reserved([null, null]))).toContain(SEAT_ROWS_REQUIREMENT)
+    })
+
+    it('is satisfied once every row has a type', () => {
+      expect(publishGaps(reserved(['tkt-1', 'tkt-1']))).toEqual([])
+    })
+
+    it('does not apply to general admission or an online event', () => {
+      expect(publishGaps(reserved([null], { seatingMode: 'ga' }))).toEqual([])
+      expect(publishGaps(reserved([null], { isOnline: true }))).toEqual([])
+    })
+
+    it('says when the checklist should list it at all', () => {
+      expect(seatRowsApply(reserved([]))).toBe(true)
+      expect(seatRowsApply(reserved([], { seatingMode: 'ga' }))).toBe(false)
+      expect(seatRowsApply(reserved([], { isOnline: true }))).toBe(false)
+    })
   })
 })

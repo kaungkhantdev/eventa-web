@@ -9,8 +9,10 @@ import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
 import { toast } from '@/lib/toast'
 import {
+  SEAT_ROWS_REQUIREMENT,
   categoryIdOf,
   publishGaps,
+  seatRowsApply,
   type EventFormValues,
   type TicketDraft,
 } from '../eventForm.mapper'
@@ -60,12 +62,16 @@ type LandingTpl = (typeof LANDING_TEMPLATES)[number]['id']
  */
 const DESC_MAX = 5000
 
-/** The API's publish requirements, in its own words — see events.service.ts. */
+/**
+ * The API's publish requirements, in its own words — see events.service.ts.
+ * The last is reserved seating's (US-EVT-05), listed only for such an event.
+ */
 const PUBLISH_REQUIREMENTS = [
   'a title',
   'a description',
   'a venue or an online link',
   'at least one ticket type',
+  SEAT_ROWS_REQUIREMENT,
 ] as const
 
 /** How each reads once it is satisfied. */
@@ -74,6 +80,7 @@ const REQUIREMENT_MET: Record<(typeof PUBLISH_REQUIREMENTS)[number], string> = {
   'a description': 'Description added',
   'a venue or an online link': 'Location added',
   'at least one ticket type': 'At least one ticket type',
+  [SEAT_ROWS_REQUIREMENT]: 'Every seat row has a ticket type',
 }
 
 /** The longest address and colour `UpdatePageDto` accepts. */
@@ -357,7 +364,11 @@ export default function EventFormPage() {
     )
 
   /** What the API still needs before it will publish this one. */
-  const gaps = publishGaps(collect())
+  const current = collect()
+  const gaps = publishGaps(current)
+  const requirements = PUBLISH_REQUIREMENTS.filter(
+    (requirement) => requirement !== SEAT_ROWS_REQUIREMENT || seatRowsApply(current),
+  )
   const isDraft = initial.status === null || initial.status === 'draft'
   const pct = Math.round(((cur + 1) / STEPS.length) * 100)
   const last = cur === STEPS.length - 1
@@ -1333,10 +1344,10 @@ export default function EventFormPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
                   Publish checklist
                 </p>
-                {/* The same four rules the API applies, so the checklist and
-                    the Publish button agree with the server before it is asked. */}
+                {/* The same rules the API applies, so the checklist and the
+                    Publish button agree with the server before it is asked. */}
                 <ul className="mt-2.5 space-y-2">
-                  {PUBLISH_REQUIREMENTS.map((requirement) => {
+                  {requirements.map((requirement) => {
                     const missing = gaps.includes(requirement)
                     return (
                       <li
