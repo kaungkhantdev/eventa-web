@@ -62,6 +62,8 @@ export interface EventFormValues {
   seatMapName: string
   seatRows: string
   seatsPerRow: string
+  /** Each seat row's ticket type, index 0 = row 1; `null` for none (US-EVT-05). */
+  rowTicketTypes: (string | null)[]
   coverImage: string
   tickets: TicketDraft[]
   highlights: HighlightDraft[]
@@ -99,6 +101,7 @@ function emptyValues(): EventFormValues {
     seatMapName: '',
     seatRows: '',
     seatsPerRow: '',
+    rowTicketTypes: [],
     coverImage: '',
     tickets: [],
     highlights: [],

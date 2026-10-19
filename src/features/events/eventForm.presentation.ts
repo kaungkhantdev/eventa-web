@@ -1,4 +1,4 @@
-/** The wizard's own vocabulary: its steps, its icon set and the seat-row letters. */
+/** The wizard's own vocabulary: its steps, its icon set and the seat-row colours. */
 
 export type Highlight = {
   icon: string
@@ -53,8 +53,26 @@ export const STEPS: WizardStep[] = [
   },
 ]
 
-/** Row labels for the reserved-seating preview. */
-export const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+/**
+ * Seat colours for ticket types on the reserved-seating preview (US-EVT-05).
+ *
+ * The hues of the app's existing per-tier tints (`ICON_TINTS` in the ticketing
+ * feature), at their dark-mode strength because the preview panel is always
+ * dark. Important (`!`): the preview's seat class is unlayered CSS, which a
+ * plain utility cannot override.
+ */
+export const ROW_TYPE_SWATCHES = [
+  '!bg-brand',
+  '!bg-amber-300',
+  '!bg-blue-300',
+  '!bg-purple-300',
+  '!bg-red-300',
+] as const
+
+/** A type's place in the list → its colour; none keeps the plain, neutral seat. */
+export function swatchClassOf(swatch: number | null): string {
+  return swatch === null ? '' : ROW_TYPE_SWATCHES[swatch % ROW_TYPE_SWATCHES.length]!
+}
 
 /**
  * What the waitlist switch says under it (US-REG-04). Reserved seating has no

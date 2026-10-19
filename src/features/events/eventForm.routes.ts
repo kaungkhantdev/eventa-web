@@ -14,6 +14,7 @@ import {
   toUpdateBody,
   type EventFormValues,
 } from './eventForm.mapper'
+import { rowTicketTypesOf, toReservedSeatingBody } from './eventSeating.mapper'
 import { isTemplateId, type TemplateId } from './landingTemplates'
 import type { CategoryWire } from './types'
 
@@ -113,6 +114,7 @@ async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
       seatMapName: seating.seatMap?.name ?? '',
       seatRows: seating.seatMap ? String(seating.seatMap.rows) : '',
       seatsPerRow: seating.seatMap ? String(seating.seatMap.seatsPerRow) : '',
+      rowTicketTypes: rowTicketTypesOf(seating.rows, seating.seatMap?.rows ?? 0),
     },
     template: templateOf(params, event.landingTemplateId),
     categories,
@@ -250,16 +252,12 @@ async function saveTickets(eventId: string, values: EventFormValues): Promise<vo
 }
 
 /**
- * The room. General admission is a headcount; reserved is a named grid, and the
- * API requires that name — the venue is the sensible default for it.
+ * The room. General admission is a headcount; reserved is a named grid with a
+ * ticket type for each row (US-EVT-05).
  */
 async function saveSeating(eventId: string, values: EventFormValues): Promise<void> {
   if (values.seatingMode === 'reserved') {
-    await eventContentApi.setReservedSeating(eventId, {
-      name: values.seatMapName.trim() || values.venueName.trim() || 'Main hall',
-      rows: Number(values.seatRows) || 1,
-      seatsPerRow: Number(values.seatsPerRow) || 1,
-    })
+    await eventContentApi.setReservedSeating(eventId, toReservedSeatingBody(values))
     return
   }
   await eventContentApi.setGeneralSeating(eventId, Number(values.capacity) || 0)

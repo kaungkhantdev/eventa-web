@@ -21,7 +21,6 @@ import { eventDetailPath } from '../events.presentation'
 import type { EventType } from '../types'
 import {
   HL_ICONS,
-  LETTERS,
   STEPS,
   WAITLIST_HINT,
   finalLabel,
@@ -30,9 +29,19 @@ import {
   landingPreviewHref,
   openPreviewTab,
   summaryCapacity,
+  swatchClassOf,
   type Highlight,
 } from '../eventForm.presentation'
+import {
+  rowSwatchesOf,
+  rowTicketTypesFor,
+  seatLegend,
+  seatRowCount,
+  ticketTypeChoices,
+  withRowType,
+} from '../eventSeating.mapper'
 import { CoverImageField } from '../components/CoverImageField'
+import { RowTicketTypes } from '../components/RowTicketTypes'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
    A five-step flow (Basics · Date & location · Seating · Tickets · Review)
@@ -107,31 +116,37 @@ const SCOPED_CSS = `
 #desc-editor-wrap .ql-snow .ql-tooltip input[type=text]{ background:rgb(var(--canvas)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); border-radius:6px; }
 `
 
-/* ---------- Reserved-seating live preview ---------- */
-function SeatPreview({ rows, cols }: { rows: number; cols: number }) {
+/* ---------- Reserved-seating live preview ----------
+   Rows are numbered as the API numbers them, and each row takes its ticket
+   type's colour (US-EVT-05); a row with no type keeps the plain seat. The kit's
+   decorative selected/booked seats are gone: here a colour means a type. */
+function SeatPreview({
+  rows,
+  cols,
+  swatches,
+}: {
+  rows: number
+  cols: number
+  /** Each row's colour, index 0 = row 1; null for none. */
+  swatches: readonly (number | null)[]
+}) {
   const r = Math.max(1, Math.min(26, rows || 0))
   const c = Math.max(1, Math.min(40, cols || 0))
-  const selRow = Math.floor((r - 1) / 2)
-  const isSel = (rr: number, cc: number) => rr === selRow && cc >= 3 && cc <= Math.min(5, c)
-  const isBooked = (rr: number, cc: number) =>
-    (rr === 0 && (cc === 2 || cc === c - 1)) ||
-    (rr === r - 1 && cc === 4) ||
-    (rr === selRow - 1 && cc === c - 2)
 
   const rowEls = []
   for (let rr = 0; rr < r; rr++) {
+    const cls = cn('efseat', swatchClassOf(swatches[rr] ?? null))
     const seats = []
     for (let cc = 1; cc <= c; cc++) {
-      const cls = isBooked(rr, cc) ? 'efseat efseat-booked' : isSel(rr, cc) ? 'efseat efseat-sel' : 'efseat'
       seats.push(<span key={`s${cc}`} className={cls} />)
       if (c > 8 && cc === Math.ceil(c / 2))
         seats.push(<span key={`g${cc}`} className="inline-block w-2 shrink-0" />)
     }
     rowEls.push(
       <div key={rr} className="flex items-center gap-1">
-        <span className="efrowlab">{LETTERS[rr]}</span>
+        <span className="efrowlab">{rr + 1}</span>
         {seats}
-        <span className="efrowlab">{LETTERS[rr]}</span>
+        <span className="efrowlab">{rr + 1}</span>
       </div>,
     )
   }
@@ -290,6 +305,20 @@ export default function EventFormPage() {
     setTickets(initial.tickets.map((t) => ({ ...t })))
   }
 
+  // Each seat row's ticket type (US-EVT-05), re-seeded the same way: only when
+  // a save changes what the API stored, never while a row is being picked.
+  const [rowTypes, setRowTypes] = useState(initial.rowTicketTypes)
+  const savedRowTypes = JSON.stringify(initial.rowTicketTypes)
+  const [seenRowTypes, setSeenRowTypes] = useState(savedRowTypes)
+  if (savedRowTypes !== seenRowTypes) {
+    setSeenRowTypes(savedRowTypes)
+    setRowTypes(initial.rowTicketTypes)
+  }
+  const typeChoices = ticketTypeChoices(tickets)
+  const rowTicketTypes = rowTicketTypesFor(rowTypes, seatRowCount(rows), typeChoices)
+  const pickRowType = (row: number, ticketTypeId: string | null) =>
+    setRowTypes((prev) => withRowType(prev, row, ticketTypeId))
+
   const online = loc === 'online'
 
   /** Everything the action needs, gathered from the fields on screen. */
@@ -314,6 +343,7 @@ export default function EventFormPage() {
     requiresApproval: approval,
     seatRows: rows,
     seatsPerRow: cols,
+    rowTicketTypes,
     coverImage,
     highlights: highlights.map((h) => ({ text: h.label, icon: h.icon })),
     tickets,
@@ -956,6 +986,9 @@ export default function EventFormPage() {
                     </div>
                   </div>
                 </div>
+                <div className={cn(seating !== 'reserved' && 'hidden')}>
+                  <RowTicketTypes rows={rowTicketTypes} choices={typeChoices} onPick={pickRowType} />
+                </div>
                 {/* live seat-map preview */}
                 <div className={cn('mt-3', seating !== 'reserved' && 'hidden')}>
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -981,20 +1014,18 @@ export default function EventFormPage() {
                         Stage
                       </span>
                     </div>
-                    <SeatPreview rows={rowsNum} cols={colsNum} />
+                    <SeatPreview
+                      rows={rowsNum}
+                      cols={colsNum}
+                      swatches={rowSwatchesOf(rowTicketTypes, typeChoices)}
+                    />
                     <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/10 pt-4 text-[11px] text-white/55">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="efseat efseat-sel !h-3.5 !w-3.5" />
-                        Selected
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="efseat !h-3.5 !w-3.5" />
-                        Available
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="efseat efseat-booked !h-3.5 !w-3.5" />
-                        Booked
-                      </span>
+                      {seatLegend(rowTicketTypes, typeChoices, colsNum).map((entry) => (
+                        <span key={entry.ticketTypeId ?? 'none'} className="inline-flex items-center gap-1.5">
+                          <span className={cn('efseat !h-3.5 !w-3.5', swatchClassOf(entry.swatch))} />
+                          {entry.label}
+                        </span>
+                      ))}
                     </div>
                   </div>
                   <p className="hint mt-2">The same green seat picker runs on the attendee ticket page.</p>

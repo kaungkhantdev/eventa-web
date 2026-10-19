@@ -1,0 +1,138 @@
+import { num } from '@/lib/format'
+import type { ReservedSeatingBody, SeatRowWire } from './eventContent.api'
+import type { EventFormValues, TicketDraft } from './eventForm.mapper'
+
+/**
+ * The wizard's Seating step rules for a reserved map split between ticket
+ * types by whole rows (US-EVT-05).
+ *
+ * A row's type is held as one list, one entry per row with index 0 = row 1,
+ * because that is the shape `PUT /seating/reserved` takes as `rowTicketTypes`.
+ * `null` is a row with no type yet.
+ */
+
+/** Each row's ticket type, index 0 = row 1; `null` for a row with none. */
+export type RowTicketTypes = (string | null)[]
+
+/** A ticket type a row can be given. */
+export interface TicketTypeChoice {
+  id: string
+  name: string
+}
+
+/** One entry in the preview's key. `swatch` is null for the neutral, untyped seat. */
+export interface SeatLegendEntry {
+  ticketTypeId: string | null
+  label: string
+  swatch: number | null
+}
+
+/** `ConfigureReservedDto`'s own ceiling: past it the API refuses the map. */
+const SEAT_ROWS_MAX = 100
+const NO_TICKET_TYPE = 'No ticket type'
+/** The API requires a map name; the venue is the sensible default, then this. */
+const DEFAULT_MAP_NAME = 'Main hall'
+
+/** GET /seating's rows → each row's type at its row number. */
+export function rowTicketTypesOf(rows: readonly SeatRowWire[], rowCount: number): RowTicketTypes {
+  const types: RowTicketTypes = Array.from({ length: rowCount }, () => null)
+  for (const row of rows) {
+    const index = Number(row.rowLabel) - 1
+    if (Number.isInteger(index) && index >= 0 && index < rowCount) types[index] = row.ticketTypeId
+  }
+  return types
+}
+
+/**
+ * How many rows the save sends — the same `|| 1` the save itself applies to a
+ * blank box — so the list always has one entry per row the API will get.
+ */
+export function seatRowCount(typed: string): number {
+  const rows = Math.trunc(Number(typed)) || 1
+  return Math.min(Math.max(rows, 1), SEAT_ROWS_MAX)
+}
+
+/** Only ticket types the API has stored: a row can only point at one of those. */
+export function ticketTypeChoices(tickets: readonly TicketDraft[]): TicketTypeChoice[] {
+  return tickets.flatMap((ticket) => (ticket.id === null ? [] : [{ id: ticket.id, name: ticket.name }]))
+}
+
+/** The row select's value → a type, or none for its "No ticket type" option. */
+export function rowTypeOf(value: string): string | null {
+  return value === '' ? null : value
+}
+
+/**
+ * One row given a type. The list may be longer than the map — rows kept from
+ * before the organizer shortened it — so a row past the end is filled up to.
+ */
+export function withRowType(types: readonly (string | null)[], row: number, ticketTypeId: string | null): RowTicketTypes {
+  const next: RowTicketTypes = [...types]
+  while (next.length <= row) next.push(null)
+  next[row] = ticketTypeId
+  return next
+}
+
+/**
+ * What the list shows and the save sends: exactly one entry per row, and no
+ * row pointing at a type that is not among the event's own — the API would
+ * refuse that save.
+ */
+export function rowTicketTypesFor(
+  types: readonly (string | null)[],
+  rowCount: number,
+  choices: readonly TicketTypeChoice[],
+): RowTicketTypes {
+  const known = new Set(choices.map((choice) => choice.id))
+  return Array.from({ length: rowCount }, (_, row) => {
+    const type = types[row] ?? null
+    return type !== null && known.has(type) ? type : null
+  })
+}
+
+/** Each row's colour: its type's place among the choices, or null for none. */
+export function rowSwatchesOf(types: readonly (string | null)[], choices: readonly TicketTypeChoice[]): (number | null)[] {
+  return types.map((type) => {
+    const index = choices.findIndex((choice) => choice.id === type)
+    return index === -1 ? null : index
+  })
+}
+
+/**
+ * The preview's key: every ticket type with the seats its rows hold — a type
+ * with none is listed too, since publishing needs every type to have a row —
+ * then the rows still without a type, when there are any.
+ */
+export function seatLegend(
+  types: readonly (string | null)[],
+  choices: readonly TicketTypeChoice[],
+  seatsPerRow: number,
+): SeatLegendEntry[] {
+  const seatsOf = (type: string | null) => types.filter((t) => t === type).length * seatsPerRow
+  const legend = choices.map((choice, swatch) => ({
+    ticketTypeId: choice.id,
+    label: `${choice.name} · ${seatsLabel(seatsOf(choice.id))}`,
+    swatch,
+  }))
+  const untyped = seatsOf(null)
+  if (untyped === 0) return legend
+  return [...legend, { ticketTypeId: null, label: `${NO_TICKET_TYPE} · ${seatsLabel(untyped)}`, swatch: null }]
+}
+
+/**
+ * The room as `PUT /seating/reserved` takes it. `rowTicketTypes` is always
+ * sent: the wizard holds every row's type, and leaving it out would tell the
+ * API to keep whatever the rows had.
+ */
+export function toReservedSeatingBody(values: EventFormValues): ReservedSeatingBody {
+  return {
+    name: values.seatMapName.trim() || values.venueName.trim() || DEFAULT_MAP_NAME,
+    rows: Number(values.seatRows) || 1,
+    seatsPerRow: Number(values.seatsPerRow) || 1,
+    rowTicketTypes: values.rowTicketTypes,
+  }
+}
+
+function seatsLabel(seats: number): string {
+  return `${num(seats)} ${seats === 1 ? 'seat' : 'seats'}`
+}
