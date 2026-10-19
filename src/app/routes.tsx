@@ -184,6 +184,14 @@ const adminChildren = [
     }),
   },
   {
+    // A resource route: whether one event's seat map sets its ticket
+    // quantities, asked when the new-tier panel chooses that event.
+    path: 'tickets/seat-set',
+    lazy: async () => ({
+      loader: (await import('@/features/ticketing/tickets.routes')).ticketSeatSetRoute.loader,
+    }),
+  },
+  {
     // A resource route: the station's manual search, asked only once somebody
     // types into it.
     path: 'check-in/search',

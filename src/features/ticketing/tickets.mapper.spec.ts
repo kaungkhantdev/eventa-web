@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toTicketCard } from './tickets.mapper'
+import { readOnlyQuantityOf, seatSetFor, toTicketCard } from './tickets.mapper'
 import type { TicketWire } from './tickets.types'
 
 const BAHT = 100
@@ -141,5 +141,49 @@ describe('toTicketCard — the edit draft', () => {
 
     expect(card.edit.maxPerOrder).toBe(6)
     expect(card.edit.version).toBe(12)
+  })
+})
+
+/**
+ * US-EVT-05 / US-TKT-02: where the seat map sets an event's quantities, the
+ * panel's quantity box is read-only — for a tier being edited and for a new
+ * one alike. A new tier has no rows yet, so it has no seats.
+ */
+describe('readOnlyQuantityOf — the quantity the panel shows and cannot change', () => {
+  it("is an edited tier's seats when the seat map sets them", () => {
+    const editing = toTicketCard(wire({ quantityFromSeats: true, total: 32 })).edit
+
+    expect(readOnlyQuantityOf(editing, false)).toBe(32)
+  })
+
+  it('is nothing — a typed quantity — for a tier the seat map does not set', () => {
+    const editing = toTicketCard(wire({ total: 250 })).edit
+
+    expect(readOnlyQuantityOf(editing, true)).toBeNull()
+  })
+
+  it('is 0 for a new tier on an event whose seat map sets quantities', () => {
+    expect(readOnlyQuantityOf(null, true)).toBe(0)
+  })
+
+  it('is nothing for a new tier on any other event', () => {
+    expect(readOnlyQuantityOf(null, false)).toBeNull()
+  })
+})
+
+describe('seatSetFor — whether the chosen event takes quantities from its seat map', () => {
+  it('is what the lookup answered for that event', () => {
+    expect(seatSetFor('e-1', { eventId: 'e-1', quantityFromSeats: true })).toBe(true)
+    expect(seatSetFor('e-1', { eventId: 'e-1', quantityFromSeats: false })).toBe(false)
+  })
+
+  // The panel keeps the last answer while the next event's is on its way.
+  it("never takes another event's answer", () => {
+    expect(seatSetFor('e-2', { eventId: 'e-1', quantityFromSeats: true })).toBe(false)
+  })
+
+  it('is false before any answer, or with no event chosen', () => {
+    expect(seatSetFor('e-1', undefined)).toBe(false)
+    expect(seatSetFor('', undefined)).toBe(false)
   })
 })

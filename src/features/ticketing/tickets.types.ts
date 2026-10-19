@@ -30,6 +30,15 @@ export interface TicketWire {
   quantityFromSeats: boolean
 }
 
+/**
+ * Whether one event's seat map sets its tiers' quantities (US-EVT-05), asked
+ * when the "New ticket type" panel chooses that event.
+ */
+export interface SeatSetWire {
+  eventId: string
+  quantityFromSeats: boolean
+}
+
 /** How many tiers sit in each status, across the whole workspace. */
 export type TicketCountsWire = Record<TicketStatus, number>
 

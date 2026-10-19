@@ -1,7 +1,7 @@
 import type { BadgeTone } from '@/components/ui'
 import { bangkokDayKey, baht, num } from '@/lib/format'
 import { hashIndex } from '@/lib/palette'
-import type { TicketCard, TicketDraft, TicketWire } from './tickets.types'
+import type { SeatSetWire, TicketCard, TicketDraft, TicketWire } from './tickets.types'
 import type { TicketStatus } from './types'
 
 /** The rules behind the ticket inventory (US-TKT-03/04). */
@@ -86,6 +86,25 @@ function toTicketDraft(wire: TicketWire): TicketDraft {
     salesStartAt: wire.salesStartAt ?? '',
     salesEndAt: wire.salesEndAt ?? '',
   }
+}
+
+/**
+ * The quantity the ticket panel shows read-only, or null when it is typed
+ * (US-EVT-05, US-TKT-02). A tier being edited says for itself whether the seat
+ * map sets it; a new tier takes its event's answer, and starts at 0 there
+ * because it has no rows yet.
+ */
+export function readOnlyQuantityOf(
+  editing: TicketDraft | null,
+  newTierSeatSet: boolean,
+): number | null {
+  if (editing) return editing.quantityFromSeats ? editing.total : null
+  return newTierSeatSet ? 0 : null
+}
+
+/** The seat-map lookup's answer, only if it is about the event now chosen. */
+export function seatSetFor(eventId: string, answer: SeatSetWire | undefined): boolean {
+  return Boolean(eventId) && answer?.eventId === eventId && answer.quantityFromSeats
 }
 
 /**

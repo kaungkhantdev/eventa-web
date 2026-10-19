@@ -4,9 +4,9 @@ import { Button, EventPicker, Hint, Input, Label, Panel } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
-import { SEAT_SET_QUANTITY } from '../tickets.mapper'
+import { SEAT_SET_QUANTITY, readOnlyQuantityOf, seatSetFor } from '../tickets.mapper'
 import type { EventOption } from '../tickets.routes'
-import type { TicketDraft } from '../tickets.types'
+import type { SeatSetWire, TicketDraft } from '../tickets.types'
 
 /**
  * Create or edit a ticket type (US-TKT-01/02).
@@ -64,6 +64,16 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
   const saving = fetcher.state !== 'idle'
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
+
+  // Whether the chosen event's seat map sets its quantities (US-EVT-05). Only
+  // a new tier asks: its event is chosen here, while a tier being edited
+  // carries its own answer and cannot change event.
+  const seatSet = useFetcher<SeatSetWire>()
+  const chooseEvent = (id: string) => {
+    setEventId(id)
+    if (id) seatSet.load(`/admin/tickets/seat-set?${new URLSearchParams({ eventId: id })}`)
+  }
+  const seatQuantity = readOnlyQuantityOf(editing, seatSetFor(eventId, seatSet.data))
 
   // The save succeeded and the loader has already revalidated; close.
   useEffect(() => {
@@ -131,7 +141,7 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
             id="ticket-event"
             name="eventId"
             value={eventId}
-            onChange={setEventId}
+            onChange={chooseEvent}
             options={events}
             allLabel={false}
             placeholder="Choose an event"
@@ -190,13 +200,14 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
         <div>
           <Label htmlFor="ticket-total">Quantity available</Label>
           {/* The seat map sets it (US-EVT-05): shown, never posted — the box has
-              no name, so the save leaves the quantity as the API derived it. */}
-          {editing?.quantityFromSeats ? (
+              no name, so the save leaves the quantity as the API derived it. A
+              new tier there has no rows yet, so it shows 0. */}
+          {seatQuantity !== null ? (
             <>
               <Input
                 id="ticket-total"
                 type="number"
-                value={editing.total}
+                value={seatQuantity}
                 readOnly
                 className="bg-canvas text-muted"
               />
