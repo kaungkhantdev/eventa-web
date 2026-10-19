@@ -473,8 +473,8 @@ describe('what a ticket row is saved with', () => {
   })
 
   /*
-   * US-EVT-05: on a reserved, in-person event a type's quantity is the seats in
-   * its rows, never typed — even before any row has a type, when the API does
+   * US-EVT-05: on a reserved, in-person event a type's quantity is the seats it
+   * holds, never typed — even before any seat has a type, when the API does
    * not say so yet.
    */
   it('sends no quantity for an in-person reserved event', () => {

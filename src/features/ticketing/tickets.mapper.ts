@@ -123,7 +123,7 @@ function dayOrBlank(instant: string | null): string {
  * is no denominator to take a share of.
  *
  * Except where the seat map sets the quantity (US-EVT-05): there `0` is the
- * seats a type's rows hold, and a type with no rows has none to sell.
+ * seats a type holds, and a type with no seats has none to sell.
  */
 function soldLabel(sold: number, total: number, fromSeats: boolean): string {
   return unlimited(total, fromSeats) ? `${num(sold)} sold` : `${num(sold)} / ${num(total)} sold`
