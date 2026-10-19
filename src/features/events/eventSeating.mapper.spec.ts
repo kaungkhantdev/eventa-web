@@ -8,6 +8,8 @@ import {
   seatLegend,
   seatQuantityOf,
   seatRowCount,
+  seatingWaitsForRowTypes,
+  seatsOfType,
   ticketTypeChoices,
   toReservedSeatingBody,
   withRowType,
@@ -193,6 +195,49 @@ describe('toReservedSeatingBody — what PUT /seating/reserved is sent', () => {
 })
 
 /**
+ * US-EVT-05: once a published event's rows have ticket types, the API refuses
+ * a seat map with any row left untyped. A row added on Seating has none until
+ * Assign seats, two steps on, so Seating must not be the one to send it.
+ */
+describe('seatingWaitsForRowTypes — whether the seat map must wait for Assign seats', () => {
+  const values = (over: Partial<EventFormValues> = {}): EventFormValues => ({
+    ...toEventFormValues(null, [], []),
+    status: 'upcoming',
+    seatingMode: 'reserved',
+    seatRows: '3',
+    seatsPerRow: '16',
+    rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga'],
+    ...over,
+  })
+
+  it('waits on a published, typed map with a row added on Seating', () => {
+    const grown = values({ seatRows: '4', rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', null] })
+    expect(seatingWaitsForRowTypes(grown)).toBe(true)
+  })
+
+  it('does not wait once every row has a type', () => {
+    expect(seatingWaitsForRowTypes(values())).toBe(false)
+  })
+
+  // A draft may leave rows open until it publishes.
+  it('does not wait on a draft', () => {
+    const draftMap = values({ status: 'draft', rowTicketTypes: ['tier-vip', null, null] })
+    expect(seatingWaitsForRowTypes(draftMap)).toBe(false)
+  })
+
+  // Laid out before rows had types: it still sells as it always has.
+  it('does not wait on a published map none of whose rows has a type', () => {
+    expect(seatingWaitsForRowTypes(values({ rowTicketTypes: [null, null, null] }))).toBe(false)
+  })
+
+  it('does not wait for general admission or an online event', () => {
+    const untyped = { rowTicketTypes: ['tier-vip', null, null] }
+    expect(seatingWaitsForRowTypes(values({ ...untyped, seatingMode: 'ga' }))).toBe(false)
+    expect(seatingWaitsForRowTypes(values({ ...untyped, isOnline: true }))).toBe(false)
+  })
+})
+
+/**
  * US-EVT-05: once a reserved event's rows have ticket types, each type's
  * quantity is the seats its rows hold. The API says so on every ticket of
  * such an event as `quantityFromSeats`.
@@ -208,23 +253,85 @@ describe('quantityFromSeatsOf — whether the seat map sets the quantities', () 
   })
 })
 
+/**
+ * The seats a type's rows hold — the one count behind both the preview's key
+ * and the Tickets step's read-only quantity, so the two can never disagree.
+ */
+describe('seatsOfType — the seats a type’s rows hold', () => {
+  it('is the rows given that type times the seats in a row', () => {
+    expect(seatsOfType(['tier-vip', 'tier-ga', 'tier-vip'], 'tier-vip', 16)).toBe(32)
+  })
+
+  it('is 0 for a type with no rows', () => {
+    expect(seatsOfType(['tier-vip'], 'tier-ga', 16)).toBe(0)
+  })
+
+  it('counts the rows with no type when asked about none', () => {
+    expect(seatsOfType(['tier-vip', null, null], null, 10)).toBe(20)
+  })
+})
+
+/**
+ * US-EVT-05: on a reserved, in-person event the Tickets step never asks for a
+ * quantity. Each type's is the seats its rows hold, worked out from the rows as
+ * they are picked on Assign seats — saved or not.
+ */
 describe('seatQuantityOf — the read-only quantity a ticket row shows', () => {
-  const saved = (quantityFromSeats: boolean): EventFormValues => ({
+  const values = (over: Partial<EventFormValues> = {}): EventFormValues => ({
     ...toEventFormValues(null, [], []),
-    quantityFromSeats,
-    tickets: [draft({ id: 'tier-vip', quantity: '32' })],
+    seatingMode: 'reserved',
+    seatRows: '3',
+    seatsPerRow: '16',
+    rowTicketTypes: ['tier-vip', 'tier-vip', 'tier-ga'],
+    tickets: [draft({ id: 'tier-vip', quantity: '999' }), draft({ id: 'tier-ga', name: 'General' })],
+    ...over,
   })
 
-  it('is nothing — a typed quantity — when the seat map does not set it', () => {
-    expect(seatQuantityOf(saved(false), 'tier-vip')).toBeNull()
+  // The wizard as it stands is also what was saved, unless a case says otherwise.
+  const quantity = (now: EventFormValues, ticketId: string | null) => seatQuantityOf(now, now, ticketId)
+
+  it('is the seats the type’s rows hold on a reserved event', () => {
+    expect(quantity(values(), 'tier-vip')).toBe('32')
+    expect(quantity(values(), 'tier-ga')).toBe('16')
   })
 
-  it('is the seats the saved type’s rows hold', () => {
-    expect(seatQuantityOf(saved(true), 'tier-vip')).toBe('32')
+  // The rows decide it, not whatever number was stored before they had types.
+  it('follows the rows as they are picked, not what was stored', () => {
+    expect(quantity(values({ rowTicketTypes: ['tier-vip', 'tier-vip', 'tier-vip'] }), 'tier-vip')).toBe(
+      '48',
+    )
   })
 
-  // A new type starts with no rows, so no seats.
+  it('is 0 for a type with no rows yet', () => {
+    expect(quantity(values({ rowTicketTypes: [null, null, null] }), 'tier-vip')).toBe('0')
+  })
+
+  // A new type cannot have rows: the untyped rows are not its seats.
   it('is 0 for a type that has not been saved yet', () => {
-    expect(seatQuantityOf(saved(true), null)).toBe('0')
+    expect(quantity(values({ rowTicketTypes: [null, null, null] }), null)).toBe('0')
+  })
+
+  it('is 0 seats while the seats-per-row box is blank', () => {
+    expect(quantity(values({ seatsPerRow: '' }), 'tier-vip')).toBe('0')
+  })
+
+  it('is nothing — a typed quantity — for general admission', () => {
+    expect(quantity(values({ seatingMode: 'ga' }), 'tier-vip')).toBeNull()
+  })
+
+  it('is nothing — a typed quantity — for an online event', () => {
+    expect(quantity(values({ isOnline: true }), 'tier-vip')).toBeNull()
+  })
+
+  /*
+   * Switched to general admission but not saved yet: the API still sets the
+   * quantities from the old map, and would refuse a typed one, so the box keeps
+   * showing what it stored — as it always has.
+   */
+  it('shows what the API stored while its saved map still sets the quantity', () => {
+    const saved = values({ quantityFromSeats: true, tickets: [draft({ id: 'tier-vip', quantity: '32' })] })
+    const switched = { ...saved, seatingMode: 'ga' as const, tickets: [draft({ id: 'tier-vip', quantity: '999' })] }
+    expect(seatQuantityOf(switched, saved, 'tier-vip')).toBe('32')
+    expect(seatQuantityOf(switched, saved, null)).toBe('0')
   })
 })

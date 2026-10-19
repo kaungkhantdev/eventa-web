@@ -19,7 +19,7 @@ export interface SeatRowWire {
   seats: number
 }
 
-/** `SeatingResponseDto` — the fields the wizard's Seating step reads. */
+/** `SeatingResponseDto` — the fields the wizard's Seating and Assign seats steps read. */
 export interface SeatingWire {
   seatingMode: 'ga' | 'reserved'
   isOnline: boolean
