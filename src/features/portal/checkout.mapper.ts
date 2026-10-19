@@ -256,6 +256,16 @@ export function seatLegendOf(rows: readonly SeatRow[], tierId: string): SeatStat
   return showsOther ? [...EVERYDAY_STATES, 'other'] : [...EVERYDAY_STATES]
 }
 
+/**
+ * The order summary to show: the last quote, but only while something is
+ * picked. With nothing picked — every seat let go, or dropped by a change of
+ * ticket type — no quote is asked for, and the last one would still price
+ * seats the buyer no longer has (US-DISC-04).
+ */
+export function summaryShown(summary: SummaryLines | null, count: number): SummaryLines | null {
+  return count >= 1 ? summary : null
+}
+
 export function toSummaryLines(summary: OrderSummaryWire): SummaryLines {
   return {
     ticketsLabel: `${summary.quantity} × ${summary.ticketTypeName}`,

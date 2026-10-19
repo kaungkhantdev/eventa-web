@@ -6,6 +6,7 @@ import {
   seatLegendOf,
   seatStateOf,
   seatsKeptForTier,
+  summaryShown,
   toBuyerDefaults,
   toCheckoutView,
   toPaymentStep,
@@ -363,6 +364,24 @@ describe('toCheckoutView', () => {
 
       it('drops a seat that is no longer on the map', () => {
         expect(seatsKeptForTier([99], ROWS, 'tier-vip')).toEqual([])
+      })
+    })
+
+    describe('summaryShown', () => {
+      const lines = toSummaryLines(SUMMARY)
+
+      it('shows the last quote while seats are picked', () => {
+        expect(summaryShown(lines, 2)).toBe(lines)
+      })
+
+      it('shows none once a change of type has dropped every picked seat', () => {
+        // No quote is asked for with nothing picked, so the last one would
+        // still price the seats that were dropped.
+        expect(summaryShown(lines, 0)).toBeNull()
+      })
+
+      it('shows none before any quote has come back', () => {
+        expect(summaryShown(null, 2)).toBeNull()
       })
     })
 

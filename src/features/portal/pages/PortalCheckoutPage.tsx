@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
 import { PaymentHandoff } from '../components/PaymentHandoff'
 import { WaitlistBar, WaitlistNote, WaitlistOverlay } from '../components/WaitlistPanel'
 import type { CheckoutData, CheckoutResult } from '../checkout.routes'
-import { canPick, seatLegendOf, seatStateOf, seatsKeptForTier } from '../checkout.mapper'
+import { canPick, seatLegendOf, seatStateOf, seatsKeptForTier, summaryShown } from '../checkout.mapper'
 import type {
   BuyerDefaults,
   CheckoutView,
@@ -94,7 +94,7 @@ export default function PortalCheckoutPage() {
   const booking = useFetcher<CheckoutResult>()
   const joining = useFetcher<CheckoutResult>()
 
-  const summary = quote.data?.ok && quote.data.intent === 'quote' ? quote.data.summary : null
+  const summary = summaryShown(quote.data?.ok && quote.data.intent === 'quote' ? quote.data.summary : null, count)
   const booked = booking.data?.ok && booking.data.intent === 'book' ? booking.data : null
   const joined = joining.data?.ok && joining.data.intent === 'waitlist' ? joining.data.place : null
   const error = errorOf(joining.data) ?? errorOf(booking.data) ?? errorOf(quote.data)
