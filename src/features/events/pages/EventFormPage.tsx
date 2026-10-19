@@ -1090,15 +1090,15 @@ export default function EventFormPage() {
                   <p className="hint mt-1">The same green seat picker runs on the attendee ticket page.</p>
                 </div>
               </div>
-              <p
-                className={cn(
-                  'mt-3 inline-flex items-center gap-1.5 text-[12px] text-muted',
-                  !online && 'hidden',
-                )}
-              >
-                <i className="hgi-stroke hgi-video-01 text-[14px]" />
-                Online event — no seating. A join link is emailed after registration.
-              </p>
+              {/* Rendered only when online, not hidden with `hidden`: that and
+                  `inline-flex` both set display, and `inline-flex` won, so
+                  every in-person event was told it had no seating. */}
+              {online && (
+                <p className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-muted">
+                  <i className="hgi-stroke hgi-video-01 text-[14px]" />
+                  Online event — no seating. A join link is emailed after registration.
+                </p>
+              )}
             </section>
           </section>
 
