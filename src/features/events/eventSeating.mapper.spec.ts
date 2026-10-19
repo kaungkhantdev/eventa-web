@@ -8,6 +8,7 @@ import {
   seatLegend,
   seatQuantityOf,
   seatRowCount,
+  seatingWaitsForRowTypes,
   seatsOfType,
   ticketTypeChoices,
   toReservedSeatingBody,
@@ -190,6 +191,49 @@ describe('toReservedSeatingBody — what PUT /seating/reserved is sent', () => {
     const body = toReservedSeatingBody(values({ seatRows: '', rowTicketTypes: [null] }))
     expect(body.rows).toBe(1)
     expect(body.rowTicketTypes).toHaveLength(1)
+  })
+})
+
+/**
+ * US-EVT-05: once a published event's rows have ticket types, the API refuses
+ * a seat map with any row left untyped. A row added on Seating has none until
+ * Assign seats, two steps on, so Seating must not be the one to send it.
+ */
+describe('seatingWaitsForRowTypes — whether the seat map must wait for Assign seats', () => {
+  const values = (over: Partial<EventFormValues> = {}): EventFormValues => ({
+    ...toEventFormValues(null, [], []),
+    status: 'upcoming',
+    seatingMode: 'reserved',
+    seatRows: '3',
+    seatsPerRow: '16',
+    rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga'],
+    ...over,
+  })
+
+  it('waits on a published, typed map with a row added on Seating', () => {
+    const grown = values({ seatRows: '4', rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', null] })
+    expect(seatingWaitsForRowTypes(grown)).toBe(true)
+  })
+
+  it('does not wait once every row has a type', () => {
+    expect(seatingWaitsForRowTypes(values())).toBe(false)
+  })
+
+  // A draft may leave rows open until it publishes.
+  it('does not wait on a draft', () => {
+    const draftMap = values({ status: 'draft', rowTicketTypes: ['tier-vip', null, null] })
+    expect(seatingWaitsForRowTypes(draftMap)).toBe(false)
+  })
+
+  // Laid out before rows had types: it still sells as it always has.
+  it('does not wait on a published map none of whose rows has a type', () => {
+    expect(seatingWaitsForRowTypes(values({ rowTicketTypes: [null, null, null] }))).toBe(false)
+  })
+
+  it('does not wait for general admission or an online event', () => {
+    const untyped = { rowTicketTypes: ['tier-vip', null, null] }
+    expect(seatingWaitsForRowTypes(values({ ...untyped, seatingMode: 'ga' }))).toBe(false)
+    expect(seatingWaitsForRowTypes(values({ ...untyped, isOnline: true }))).toBe(false)
   })
 })
 

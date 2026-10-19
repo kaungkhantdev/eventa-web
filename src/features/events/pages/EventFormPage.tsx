@@ -467,7 +467,7 @@ export default function EventFormPage() {
       if (canCreate) submit({ intent: 'create', ...extra })
       return
     }
-    submit({ intent: saveIntentOf(step.key), ...extra })
+    submit({ intent: saveIntentOf(step.key, current), ...extra })
   }
 
   /**

@@ -143,6 +143,23 @@ export function toReservedSeatingBody(values: EventFormValues): ReservedSeatingB
   }
 }
 
+/** What decides whether the seat map can be saved with its rows as they are. */
+export type SeatMapState = Pick<EventFormValues, 'status' | 'seatingMode' | 'isOnline' | 'rowTicketTypes'>
+
+/**
+ * Whether the seat map must wait for Assign seats before it is saved. Once a
+ * published event's rows have ticket types, the API refuses a map with any row
+ * left untyped (its `assertEveryRowTyped`) — and a row added on Seating has no
+ * type until Assign seats, which comes after Tickets and sends the whole grid.
+ * A draft may leave rows open, and a map none of whose rows has a type sells
+ * as it always has.
+ */
+export function seatingWaitsForRowTypes(event: SeatMapState): boolean {
+  if (event.status === null || event.status === 'draft' || !seatRowsApply(event)) return false
+  const types = event.rowTicketTypes
+  return types.some((type) => type !== null) && types.includes(null)
+}
+
 /**
  * Whether the seat map sets this event's ticket quantities. The API marks
  * every ticket of such an event, so any one of them answers for the event.

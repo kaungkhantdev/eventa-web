@@ -12,6 +12,7 @@ import {
   swatchClassOf,
   wizardStepsOf,
 } from './eventForm.presentation'
+import { toEventFormValues, type EventFormValues } from './eventForm.mapper'
 
 /**
  * The wizard's summary rail showed `0` for an event whose capacity was never
@@ -295,19 +296,57 @@ describe('wizardStepsOf', () => {
  * the seat map, exactly as Seating does: the rows' types travel with the grid.
  */
 describe('saveIntentOf', () => {
+  // A draft's map may have untyped rows, so nothing holds its seat map back.
+  const event = (over: Partial<EventFormValues> = {}): EventFormValues => ({
+    ...toEventFormValues(null, [], []),
+    status: 'draft',
+    seatingMode: 'reserved',
+    seatRows: '3',
+    seatsPerRow: '16',
+    rowTicketTypes: ['tier-vip', null, null],
+    ...over,
+  })
+
   it('saves the seat map from Seating and from Assign seats', () => {
-    expect(saveIntentOf('seating')).toBe('seating')
-    expect(saveIntentOf('seats')).toBe('seating')
+    expect(saveIntentOf('seating', event())).toBe('seating')
+    expect(saveIntentOf('seats', event())).toBe('seating')
   })
 
   it('saves the ticket types from Tickets', () => {
-    expect(saveIntentOf('tickets')).toBe('tickets')
+    expect(saveIntentOf('tickets', event())).toBe('tickets')
   })
 
   it('saves the event itself from every other step', () => {
-    expect(saveIntentOf('basics')).toBe('save')
-    expect(saveIntentOf('when')).toBe('save')
-    expect(saveIntentOf('review')).toBe('save')
+    expect(saveIntentOf('basics', event())).toBe('save')
+    expect(saveIntentOf('when', event())).toBe('save')
+    expect(saveIntentOf('review', event())).toBe('save')
+  })
+
+  /*
+   * US-EVT-05: a published event whose rows have types, with a row added on
+   * Seating. The API refuses a map with that row untyped, and the row can only
+   * be given a type on Assign seats — so Seating saves the rest of the event
+   * and leaves the grid to Assign seats, which sends it whole.
+   */
+  describe('on a published, typed map with a row added on Seating', () => {
+    const grown = event({
+      status: 'upcoming',
+      seatRows: '4',
+      rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', null],
+    })
+
+    it('leaves the seat map to Assign seats when leaving Seating', () => {
+      expect(saveIntentOf('seating', grown)).toBe('save')
+    })
+
+    it('still saves the seat map from Assign seats', () => {
+      expect(saveIntentOf('seats', grown)).toBe('seating')
+    })
+
+    it('saves the seat map from Seating once every row has a type', () => {
+      const typed = { ...grown, rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', 'tier-ga'] }
+      expect(saveIntentOf('seating', typed)).toBe('seating')
+    })
   })
 })
 

@@ -1,4 +1,5 @@
 import { seatRowsApply, type SeatingFacts } from './eventForm.mapper'
+import { seatingWaitsForRowTypes, type SeatMapState } from './eventSeating.mapper'
 
 /** The wizard's own vocabulary: its steps, its icon set and the seat-row colours. */
 
@@ -93,7 +94,14 @@ const SAVE_INTENT: Record<StepKey, SaveIntent> = {
   review: 'save',
 }
 
-export function saveIntentOf(step: StepKey): SaveIntent {
+/**
+ * The write a step's save sends. Seating saves the rest of the event instead
+ * of the seat map while the map has a row the API would refuse untyped — on a
+ * published, typed map, a row just added there: Assign seats gives it a type
+ * and sends the grid whole (US-EVT-05).
+ */
+export function saveIntentOf(step: StepKey, event: SeatMapState): SaveIntent {
+  if (step === 'seating' && seatingWaitsForRowTypes(event)) return 'save'
   return SAVE_INTENT[step]
 }
 
