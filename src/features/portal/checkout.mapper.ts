@@ -204,16 +204,17 @@ function numerically(a: string, b: string): number {
 
 /* ── seats of the chosen ticket type (US-DISC-04) ─────────────────────── */
 
-/** Whether any row of the map has a ticket type (US-EVT-05). */
+/** Whether any seat of the map has a ticket type (US-EVT-05). */
 export function mapHasTypes(rows: readonly SeatRow[]): boolean {
   return rows.some((row) => row.seats.some((seat) => seat.ticketTypeId !== null))
 }
 
 /**
- * Whether a seat can be bought under this ticket type: one of its own rows, or
- * — only on a map laid out before rows had types — a seat with no type, which
- * the API sells under any type. Once any row has a type the API refuses an
- * untyped seat. Mirrors `CheckoutPolicy.resolveSeats`, so the map never offers
+ * Whether a seat can be bought under this ticket type: a seat of that type —
+ * each seat carries its own, so a row can be split between types — or, only
+ * on a map laid out before seats had types, a seat with no type, which the API
+ * sells under any type. Once any seat has a type the API refuses an untyped
+ * seat. Mirrors `CheckoutPolicy.resolveSeats`, so the map never offers
  * a seat the API would refuse.
  */
 function sellsUnder(seat: SeatOption, tierId: string, typedMap: boolean): boolean {

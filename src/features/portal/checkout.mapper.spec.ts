@@ -264,6 +264,47 @@ describe('toCheckoutView', () => {
       expect(rows[0]!.seats[0]!.ticketTypeId).toBe('tier-vip')
     })
 
+    /*
+     * US-DISC-04, US-EVT-05: a row can be split between ticket types — row 7
+     * seats 1–5 Free, 6–16 Normal. Each seat keeps its own type, so under Free
+     * only seats 1–5 can be picked and under Normal only seats 6–16; the rest
+     * of the row is greyed as another type's.
+     */
+    describe('a row split between ticket types', () => {
+      const row7 = seated({
+        seats: Array.from({ length: 16 }, (_, i) => ({
+          id: 700 + i + 1,
+          section: null,
+          rowLabel: '7',
+          seatNumber: String(i + 1),
+          ticketTypeId: i < 5 ? 'tier-free' : 'tier-normal',
+          available: true,
+        })),
+      }).rows
+      const statesUnder = (tierId: string) => row7[0]!.seats.map((seat) => seatStateOf(seat, tierId, [], true))
+
+      it('keeps each seat’s own type within the row', () => {
+        expect(row7).toHaveLength(1)
+        expect(row7[0]!.seats.map((seat) => seat.ticketTypeId)).toEqual([
+          ...Array(5).fill('tier-free'),
+          ...Array(11).fill('tier-normal'),
+        ])
+      })
+
+      it('offers only seats 1–5 under Free', () => {
+        expect(statesUnder('tier-free')).toEqual([...Array(5).fill('available'), ...Array(11).fill('other')])
+      })
+
+      it('offers only seats 6–16 under Normal', () => {
+        expect(statesUnder('tier-normal')).toEqual([...Array(5).fill('other'), ...Array(11).fill('available')])
+      })
+
+      it('drops the picked seats of the other part of the row when the type changes', () => {
+        expect(seatsKeptForTier([701, 706, 716], row7, 'tier-normal')).toEqual([706, 716])
+        expect(seatsKeptForTier([701, 706, 716], row7, 'tier-free')).toEqual([701])
+      })
+    })
+
     // 2, 10, 11 — not 10, 11, 2, which is what a plain string sort gives.
     it('orders seats within a row numerically', () => {
       const rows = seated({
@@ -295,9 +336,9 @@ describe('toCheckoutView', () => {
   })
 
   /**
-   * US-DISC-04: a seat row belongs to one ticket type, so only the chosen
-   * type's seats can be picked. A seat with no type is a map from before rows
-   * had types, and sells under whichever type is chosen — the API's
+   * US-DISC-04: a seat belongs to one ticket type, so only the chosen type's
+   * seats can be picked. A seat with no type is a map from before seats had
+   * types, and sells under whichever type is chosen — the API's
    * `CheckoutPolicy.resolveSeats` draws the same line.
    */
   describe('seats of the chosen ticket type', () => {
