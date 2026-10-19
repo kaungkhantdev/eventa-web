@@ -1,18 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  NO_SEATS_TO_ASSIGN,
   POPUP_BLOCKED_HINT,
   SAVING_TICKET_TYPES,
   SEAT_MAP_DEFERRED_NOTE,
+  STEPS,
   assignSeatsViewOf,
-  clampStep,
   finalLabel,
   headerSaveLabel,
   landingPreviewHref,
   openPreviewTab,
   saveIntentOf,
   seatMapDeferredOn,
+  stepProgress,
   summaryCapacity,
-  wizardStepsOf,
 } from './eventForm.presentation'
 import { toEventFormValues, type EventFormValues } from './eventForm.mapper'
 
@@ -216,16 +217,14 @@ describe('openPreviewTab', () => {
 })
 
 /**
- * US-EVT-02 / US-EVT-05: the wizard's steps. A reserved, in-person event gets
- * its own "Assign seats" step after Tickets — the rows can only be given types
- * once the types exist — and every other event keeps the five steps.
+ * US-EVT-02 / US-EVT-05: the wizard's steps — the same six for every event.
+ * Assign seats follows Tickets, since a seat can only be given a type once the
+ * types exist. An event with no seat map keeps the step, and the step says why
+ * there is nothing to assign, rather than the rail changing under the organizer.
  */
-describe('wizardStepsOf', () => {
-  const labels = (seatingMode: 'ga' | 'reserved', isOnline: boolean) =>
-    wizardStepsOf({ seatingMode, isOnline }).map((step) => step.label)
-
-  it('adds Assign seats after Tickets for an in-person reserved event', () => {
-    expect(labels('reserved', false)).toEqual([
+describe('STEPS — the wizard’s steps', () => {
+  it('are the same six for every event, with Assign seats after Tickets', () => {
+    expect(STEPS.map((step) => step.label)).toEqual([
       'Basics',
       'Date & location',
       'Seating',
@@ -235,50 +234,35 @@ describe('wizardStepsOf', () => {
     ])
   })
 
-  it('keeps five steps for general admission', () => {
-    expect(labels('ga', false)).toEqual([
-      'Basics',
-      'Date & location',
-      'Seating',
-      'Tickets',
-      'Review & publish',
-    ])
-  })
-
-  // An online event has no seat rows, whatever the seating switch was left at.
-  it('keeps five steps for an online event', () => {
-    expect(labels('reserved', true)).not.toContain('Assign seats')
-    expect(labels('ga', true)).toHaveLength(5)
-  })
-
   it('names each step by a key the page renders it by', () => {
-    expect(wizardStepsOf({ seatingMode: 'reserved', isOnline: false }).map((step) => step.key)).toEqual([
-      'basics',
-      'when',
-      'seating',
-      'tickets',
-      'seats',
-      'review',
-    ])
+    expect(STEPS.map((step) => step.key)).toEqual(['basics', 'when', 'seating', 'tickets', 'seats', 'review'])
   })
 
   // US-EVT-05: on a reserved event the seat rows set each type's quantity.
   it('tells the organizer a quantity is only asked for when the seat rows do not set it', () => {
-    const tickets = wizardStepsOf({ seatingMode: 'reserved', isOnline: false }).find(
-      (step) => step.key === 'tickets',
-    )
+    const tickets = STEPS.find((step) => step.key === 'tickets')
     expect(tickets?.tip).toBe(
       'Add at least one ticket type with a price — and a quantity, unless your seat rows set it — then set your total capacity.',
     )
   })
 
   it('tells the organizer what Assign seats is for', () => {
-    const seats = wizardStepsOf({ seatingMode: 'reserved', isOnline: false }).find(
-      (step) => step.key === 'seats',
-    )
+    const seats = STEPS.find((step) => step.key === 'seats')
     expect(seats?.tip).toBe(
       'Give each row of the seat map a ticket type — say VIP up front, Normal behind. Each type sells only its own rows.',
     )
+  })
+})
+
+/** The rail's "% completed": the open step's place among the six, whatever the event. */
+describe('stepProgress', () => {
+  it('counts the open step as done', () => {
+    expect(stepProgress(0)).toBe(17)
+    expect(stepProgress(4)).toBe(83)
+  })
+
+  it('reaches 100% on the last step', () => {
+    expect(stepProgress(STEPS.length - 1)).toBe(100)
   })
 })
 
@@ -311,6 +295,17 @@ describe('saveIntentOf', () => {
     expect(saveIntentOf('basics', event())).toBe('save')
     expect(saveIntentOf('when', event())).toBe('save')
     expect(saveIntentOf('review', event())).toBe('save')
+  })
+
+  // US-EVT-02: general admission and online events keep Assign seats, with
+  // nothing on it to write — its Next saves the event, never a seat map.
+  it('saves the event itself from Assign seats when there is no seat map to assign', () => {
+    expect(saveIntentOf('seats', event({ seatingMode: 'ga' }))).toBe('save')
+    expect(saveIntentOf('seats', event({ isOnline: true }))).toBe('save')
+  })
+
+  it('still saves general admission’s headcount from Seating', () => {
+    expect(saveIntentOf('seating', event({ seatingMode: 'ga' }))).toBe('seating')
   })
 
   /*
@@ -392,37 +387,39 @@ describe('seatMapDeferredOn — whether this step’s save leaves the seat map t
  * on Tickets saves the new types and opens Assign seats at once, so for the
  * moment the save is in flight there are none yet — and the step must not
  * flash "add your ticket types first" at someone who just did.
+ *
+ * US-EVT-02: the step is on every event's rail, so one with no seat map is
+ * told why there is nothing to assign.
  */
 describe('assignSeatsViewOf — what Assign seats shows', () => {
+  const reserved = { seatingMode: 'reserved', isOnline: false } as const
+
   it('shows the rows once a saved ticket type is known, saving or not', () => {
-    expect(assignSeatsViewOf(2, false)).toBe('rows')
-    expect(assignSeatsViewOf(1, true)).toBe('rows')
+    expect(assignSeatsViewOf(reserved, 2, false)).toBe('rows')
+    expect(assignSeatsViewOf(reserved, 1, true)).toBe('rows')
   })
 
   it('says the ticket types are saving while a save is in flight and none is known yet', () => {
-    expect(assignSeatsViewOf(0, true)).toBe('saving')
+    expect(assignSeatsViewOf(reserved, 0, true)).toBe('saving')
     expect(SAVING_TICKET_TYPES).toBe('Saving your ticket types…')
   })
 
   it('sends the organizer to Tickets when there are none and nothing is saving', () => {
-    expect(assignSeatsViewOf(0, false)).toBe('empty')
-  })
-})
-
-/**
- * The open step, kept on the rail. Switching Reserved to General admission
- * drops Assign seats, and the step that was open must still be one that exists.
- */
-describe('clampStep', () => {
-  it('keeps a step that is on the rail', () => {
-    expect(clampStep(3, 6)).toBe(3)
+    expect(assignSeatsViewOf(reserved, 0, false)).toBe('empty')
   })
 
-  it('falls back to the last step when the rail gets shorter', () => {
-    expect(clampStep(5, 5)).toBe(4)
+  // An online event has no seats, whatever the seating switch was left at.
+  it('tells an online event it has no seats to assign', () => {
+    expect(assignSeatsViewOf({ seatingMode: 'reserved', isOnline: true }, 2, false)).toBe('online')
+    expect(assignSeatsViewOf({ seatingMode: 'ga', isOnline: true }, 0, true)).toBe('online')
+    expect(NO_SEATS_TO_ASSIGN.online).toBe('Online events have no seats to assign.')
   })
 
-  it('never goes before the first step', () => {
-    expect(clampStep(-1, 5)).toBe(0)
+  it('tells general admission it has no seats to assign, and where reserved seating is chosen', () => {
+    expect(assignSeatsViewOf({ seatingMode: 'ga', isOnline: false }, 2, false)).toBe('ga')
+    expect(assignSeatsViewOf({ seatingMode: 'ga', isOnline: false }, 0, true)).toBe('ga')
+    expect(NO_SEATS_TO_ASSIGN.ga).toBe(
+      'General admission has no seats to assign. To sell seats by ticket type, choose Reserved seating on the Seating step.',
+    )
   })
 })

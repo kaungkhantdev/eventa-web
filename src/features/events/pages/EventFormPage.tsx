@@ -25,9 +25,10 @@ import { eventDetailPath } from '../events.presentation'
 import type { EventType } from '../types'
 import {
   HL_ICONS,
+  NO_SEATS_TO_ASSIGN,
+  STEPS,
   WAITLIST_HINT,
   assignSeatsViewOf,
-  clampStep,
   finalLabel,
   headerSaveLabel,
   POPUP_BLOCKED_HINT,
@@ -37,8 +38,8 @@ import {
   openPreviewTab,
   saveIntentOf,
   seatMapDeferredOn,
+  stepProgress,
   summaryCapacity,
-  wizardStepsOf,
   type Highlight,
   type StepKey,
 } from '../eventForm.presentation'
@@ -58,11 +59,10 @@ import { CoverImageField } from '../components/CoverImageField'
 import { RowTicketTypes } from '../components/RowTicketTypes'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
-   Basics · Date & location · Seating · Tickets · Review & publish, with an
-   Assign seats step after Tickets for an in-person reserved event
-   (`wizardStepsOf`). A clickable step rail, live progress, a reserved-seating
-   seat-map preview, ticket/highlight repeaters, toggles and a live summary
-   panel. */
+   Basics · Date & location · Seating · Tickets · Assign seats · Review &
+   publish — the same six steps for every event (`STEPS`). A clickable step
+   rail, live progress, a reserved-seating seat-map preview, ticket/highlight
+   repeaters, toggles and a live summary panel. */
 
 type LocMode = 'inperson' | 'online'
 type Seating = 'ga' | 'reserved'
@@ -324,7 +324,7 @@ export default function EventFormPage() {
   const fetcher = useFetcher<ActionResult>()
   const saving = fetcher.state !== 'idle'
 
-  const [cur, setCur] = useState(0)
+  const [at, setAt] = useState(0)
   const [loc, setLoc] = useState<LocMode>(initial.isOnline ? 'online' : 'inperson')
   const [seating, setSeating] = useState<Seating>(initial.seatingMode)
   const [rows, setRows] = useState(initial.seatRows || '7')
@@ -437,16 +437,12 @@ export default function EventFormPage() {
     (requirement) => requirement !== SEAT_ROWS_REQUIREMENT || seatRowsApply(current),
   )
   const isDraft = initial.status === null || initial.status === 'draft'
-  // The rail follows the seating on screen, so `cur` can point past its end
-  // for a moment after Assign seats drops out.
-  const steps = wizardStepsOf(current)
-  const at = clampStep(cur, steps.length)
-  const step = steps[at]
+  const step = STEPS[at]
   // Seating's save leaves a published map's new, untyped rows to Assign seats
   // (US-EVT-05): the step says so, and so does the header Save's toast.
   const seatMapDeferred = seatMapDeferredOn(step.key, current)
-  const pct = Math.round(((at + 1) / steps.length) * 100)
-  const last = at === steps.length - 1
+  const pct = stepProgress(at)
+  const last = at === STEPS.length - 1
   // An event that already exists is being edited, whatever the wizard is
   // called. Saying "Create event" over someone's published conference is the
   // kind of small lie that makes people doubt whether Save did anything.
@@ -457,7 +453,7 @@ export default function EventFormPage() {
   const seatRowsOn = seatRowsApply(current)
   const quantityColumn = quantityColumnOf(current)
   const ticketSpans = TICKET_SPANS[quantityColumn]
-  const assignSeatsView = assignSeatsViewOf(typeChoices.length, saving)
+  const assignSeatsView = assignSeatsViewOf(current, typeChoices.length, saving)
   const seatMapPreview = (
     <SeatMapPreview
       rows={rowsNum}
@@ -514,10 +510,10 @@ export default function EventFormPage() {
   const saveAndFinish = () => submit({ intent: 'save', notify: 'on', finish: 'on' })
 
   const goTo = (i: number) => {
-    setCur(clampStep(i, steps.length))
+    setAt(i)
     document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
   }
-  const goToStep = (key: StepKey) => goTo(steps.findIndex((s) => s.key === key))
+  const goToStep = (key: StepKey) => goTo(STEPS.findIndex((s) => s.key === key))
 
   const summarySeating = online
     ? 'Online'
@@ -664,7 +660,7 @@ export default function EventFormPage() {
             />
           </div>
           <div className="card mt-4 space-y-1 p-2.5">
-            {steps.map((s, i) => {
+            {STEPS.map((s, i) => {
               const done = i < at
               const active = i === at
               return (
@@ -1250,16 +1246,38 @@ export default function EventFormPage() {
             </section>
           </section>
 
-          {/* ===== ASSIGN SEATS — in-person reserved events only (US-EVT-05) ===== */}
+          {/* ===== ASSIGN SEATS — every event; only an in-person reserved one
+               has seats to assign (US-EVT-02, US-EVT-05) ===== */}
           <section className={cn('space-y-3', step.key !== 'seats' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Assign seats</h2>
-              <p className="mt-1 text-[13px] text-muted">
-                Give each seat row a ticket type. A type's quantity is the seats in its rows.
-              </p>
+              {seatRowsOn && (
+                <p className="mt-1 text-[13px] text-muted">
+                  Give each seat row a ticket type. A type's quantity is the seats in its rows.
+                </p>
+              )}
             </div>
 
             <section className="card p-4">
+              {assignSeatsView === 'online' && (
+                <p className="inline-flex items-center gap-1.5 text-[13px] text-muted">
+                  <i className="hgi-stroke hgi-video-01 text-[14px]" />
+                  {NO_SEATS_TO_ASSIGN.online}
+                </p>
+              )}
+              {assignSeatsView === 'ga' && (
+                <div>
+                  <p className="text-[13px] text-muted">{NO_SEATS_TO_ASSIGN.ga}</p>
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm mt-3"
+                    onClick={() => goToStep('seating')}
+                  >
+                    <i className="hgi-stroke hgi-arrow-left-01 text-[14px]" />
+                    Go to Seating
+                  </button>
+                </div>
+              )}
               {/* A row can only be given a type the API has stored. */}
               {assignSeatsView === 'saving' && (
                 <p role="status" className="text-[13px] text-muted">

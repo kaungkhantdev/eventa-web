@@ -37,7 +37,12 @@ export type WizardStep = {
   tip: string
 }
 
-/** Every step there can be, in order. `wizardStepsOf` says which an event shows. */
+/**
+ * The wizard's steps, in order — the same six for every event (US-EVT-02).
+ * Assign seats follows Tickets because a seat can only be given a type that
+ * has been saved; an event with no seat map keeps the step, and it says why
+ * there is nothing to assign (`assignSeatsViewOf`).
+ */
 export const STEPS: readonly WizardStep[] = [
   {
     key: 'basics',
@@ -71,14 +76,9 @@ export const STEPS: readonly WizardStep[] = [
   },
 ]
 
-/**
- * The steps this event's wizard shows (US-EVT-02). Assign seats is only for an
- * in-person reserved event — the one kind with seat rows to give ticket types
- * (US-EVT-05) — and it follows Tickets because a row can only be given a type
- * that has been saved.
- */
-export function wizardStepsOf(event: SeatingFacts): WizardStep[] {
-  return seatRowsApply(event) ? [...STEPS] : STEPS.filter((step) => step.key !== 'seats')
+/** The rail's "% completed": the open step counts as done. */
+export function stepProgress(index: number): number {
+  return Math.round(((index + 1) / STEPS.length) * 100)
 }
 
 /** What a step's save asks the route action to write. */
@@ -110,36 +110,47 @@ export const SEAT_MAP_DEFERRED_NOTE =
 
 /**
  * The write a step's save sends. Seating saves the rest of the event instead
- * of the seat map while the map must wait for Assign seats (`seatMapDeferredOn`).
+ * of the seat map while the map must wait for Assign seats (`seatMapDeferredOn`),
+ * and Assign seats saves only the event when there is no seat map to assign.
  */
 export function saveIntentOf(step: StepKey, event: SeatMapState): SaveIntent {
   if (seatMapDeferredOn(step, event)) return 'save'
+  if (step === 'seats' && !seatRowsApply(event)) return 'save'
   return SAVE_INTENT[step]
 }
 
-/** What Assign seats shows: the rows to give types, a save still landing, or the way to Tickets. */
-export type AssignSeatsView = 'rows' | 'saving' | 'empty'
+/**
+ * What Assign seats shows: the rows to give types, a save still landing, the
+ * way to Tickets — or, for an event with no seat map, why there is nothing to
+ * assign.
+ */
+export type AssignSeatsView = 'rows' | 'saving' | 'empty' | NoSeatsToAssign
+
+/** The events with no seats to give ticket types. */
+type NoSeatsToAssign = 'online' | 'ga'
+
+/** What Assign seats says on an event with no seat map (US-EVT-02). */
+export const NO_SEATS_TO_ASSIGN: Record<NoSeatsToAssign, string> = {
+  online: 'Online events have no seats to assign.',
+  ga: 'General admission has no seats to assign. To sell seats by ticket type, choose Reserved seating on the Seating step.',
+}
 
 /** What Assign seats says while the types saved from Tickets are still landing. */
 export const SAVING_TICKET_TYPES = 'Saving your ticket types…'
 
 /**
- * What Assign seats shows (US-EVT-05). A row can only be given a type the API
- * has stored, and Next on Tickets opens this step while those types are still
- * being saved — so until one is known, a save in flight reads as saving, not
- * as "add your ticket types first".
+ * What Assign seats shows (US-EVT-05). Only an in-person reserved event has
+ * seats to assign; an online event has no seating at all, so it is told that
+ * first. A row can only be given a type the API has stored, and Next on
+ * Tickets opens this step while those types are still being saved — so until
+ * one is known, a save in flight reads as saving, not as "add your ticket
+ * types first".
  */
-export function assignSeatsViewOf(savedTypes: number, saving: boolean): AssignSeatsView {
+export function assignSeatsViewOf(event: SeatingFacts, savedTypes: number, saving: boolean): AssignSeatsView {
+  if (event.isOnline) return 'online'
+  if (!seatRowsApply(event)) return 'ga'
   if (savedTypes > 0) return 'rows'
   return saving ? 'saving' : 'empty'
-}
-
-/**
- * The open step's place, kept on the rail. Switching Reserved to General
- * admission drops Assign seats, and the step that was open must still exist.
- */
-export function clampStep(index: number, stepCount: number): number {
-  return Math.max(0, Math.min(stepCount - 1, index))
 }
 
 /**
