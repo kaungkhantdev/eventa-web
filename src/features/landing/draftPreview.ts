@@ -48,6 +48,7 @@ const BLANK: LandingEvent = {
   speakers: [],
   ticketsTitle: '',
   tickets: [],
+  seatMap: null,
   faqs: [],
   online: false,
   onlineNote: '',

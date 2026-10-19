@@ -79,6 +79,20 @@ export interface PublicFaqWire {
   answer: string
 }
 
+/**
+ * A reserved event's seat rows and the ticket type each one sells (US-EVT-05:
+ * whole rows share a type). Nothing about any seat's sale is published.
+ */
+export interface PublicSeatMapWire {
+  seatsPerRow: number
+  /** Front to back, by row number; labels are `"1"`, `"2"`, … */
+  rows: {
+    label: string
+    /** A `tickets[].id`, or null for a row with no type. */
+    ticketTypeId: string | null
+  }[]
+}
+
 export interface PublicPageWire {
   event: PublicEventWire
   highlights: PublicHighlightWire[]
@@ -86,6 +100,11 @@ export interface PublicPageWire {
   speakers: PublicSpeakerWire[]
   tickets: PublicTicketWire[]
   faqs: PublicFaqWire[]
+  /**
+   * Null unless the event is in person, reserved, and gives at least one row a
+   * ticket type — general admission, online and untyped maps send none.
+   */
+  seatMap: PublicSeatMapWire | null
   registration: { open: boolean; reason: string | null }
   sections: { agenda: string; speakers: string }
   share: {

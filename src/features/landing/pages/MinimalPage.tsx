@@ -4,6 +4,7 @@ import { Icon,
   VenueMap,
   RichText,
 } from '@/components/ui'
+import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
 
 /* Port of landing/minimal.html — a centered, editorial single-column event page.
@@ -279,6 +280,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
                           {t.note}
                         </span>
                       )}
+                      {t.rowsLabel && <span className="basis-full text-[12px] text-muted">{t.rowsLabel}</span>}
                     </div>
                     <div className="mt-3 text-[24px] font-extrabold tracking-tight tnum text-ink">
                       {t.price}
@@ -307,6 +309,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
                 )
               })}
             </div>
+            {ev.seatMap && <SeatMapBlock seatMap={ev.seatMap} className="mt-3 rounded-2xl bg-surface p-5" />}
           </section>
         )}
 
