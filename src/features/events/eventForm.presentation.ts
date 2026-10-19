@@ -117,6 +117,23 @@ export function saveIntentOf(step: StepKey, event: SeatMapState): SaveIntent {
   return SAVE_INTENT[step]
 }
 
+/** What Assign seats shows: the rows to give types, a save still landing, or the way to Tickets. */
+export type AssignSeatsView = 'rows' | 'saving' | 'empty'
+
+/** What Assign seats says while the types saved from Tickets are still landing. */
+export const SAVING_TICKET_TYPES = 'Saving your ticket types…'
+
+/**
+ * What Assign seats shows (US-EVT-05). A row can only be given a type the API
+ * has stored, and Next on Tickets opens this step while those types are still
+ * being saved — so until one is known, a save in flight reads as saving, not
+ * as "add your ticket types first".
+ */
+export function assignSeatsViewOf(savedTypes: number, saving: boolean): AssignSeatsView {
+  if (savedTypes > 0) return 'rows'
+  return saving ? 'saving' : 'empty'
+}
+
 /**
  * The open step's place, kept on the rail. Switching Reserved to General
  * admission drops Assign seats, and the step that was open must still exist.

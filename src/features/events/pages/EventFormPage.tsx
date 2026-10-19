@@ -26,10 +26,12 @@ import type { EventType } from '../types'
 import {
   HL_ICONS,
   WAITLIST_HINT,
+  assignSeatsViewOf,
   clampStep,
   finalLabel,
   headerSaveLabel,
   POPUP_BLOCKED_HINT,
+  SAVING_TICKET_TYPES,
   SEAT_MAP_DEFERRED_NOTE,
   landingPreviewHref,
   openPreviewTab,
@@ -441,6 +443,7 @@ export default function EventFormPage() {
   const colsNum = Number(cols) || 0
   const seatTotal = rowsNum * colsNum
   const seatRowsOn = seatRowsApply(current)
+  const assignSeatsView = assignSeatsViewOf(typeChoices.length, saving)
   const seatMapPreview = (
     <SeatMapPreview
       rows={rowsNum}
@@ -1248,7 +1251,12 @@ export default function EventFormPage() {
 
             <section className="card p-4">
               {/* A row can only be given a type the API has stored. */}
-              {typeChoices.length === 0 ? (
+              {assignSeatsView === 'saving' && (
+                <p role="status" className="text-[13px] text-muted">
+                  {SAVING_TICKET_TYPES}
+                </p>
+              )}
+              {assignSeatsView === 'empty' && (
                 <div>
                   <p className="text-[13px] text-muted">
                     Add your ticket types in the Tickets step first, then give each row one here.
@@ -1262,7 +1270,8 @@ export default function EventFormPage() {
                     Go to Tickets
                   </button>
                 </div>
-              ) : (
+              )}
+              {assignSeatsView === 'rows' && (
                 <>
                   <RowTicketTypes rows={rowTicketTypes} choices={typeChoices} onPick={pickRowType} />
                   <div className="mt-3">

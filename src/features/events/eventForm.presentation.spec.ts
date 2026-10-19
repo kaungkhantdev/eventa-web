@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   POPUP_BLOCKED_HINT,
+  SAVING_TICKET_TYPES,
   SEAT_MAP_DEFERRED_NOTE,
+  assignSeatsViewOf,
   clampStep,
   finalLabel,
   headerSaveLabel,
@@ -382,6 +384,28 @@ describe('seatMapDeferredOn — whether this step’s save leaves the seat map t
     expect(SEAT_MAP_DEFERRED_NOTE).toBe(
       'New rows need a ticket type. The seat map is saved when you give them one in Assign seats.',
     )
+  })
+})
+
+/**
+ * US-EVT-05: Assign seats can only offer ticket types the API has stored. Next
+ * on Tickets saves the new types and opens Assign seats at once, so for the
+ * moment the save is in flight there are none yet — and the step must not
+ * flash "add your ticket types first" at someone who just did.
+ */
+describe('assignSeatsViewOf — what Assign seats shows', () => {
+  it('shows the rows once a saved ticket type is known, saving or not', () => {
+    expect(assignSeatsViewOf(2, false)).toBe('rows')
+    expect(assignSeatsViewOf(1, true)).toBe('rows')
+  })
+
+  it('says the ticket types are saving while a save is in flight and none is known yet', () => {
+    expect(assignSeatsViewOf(0, true)).toBe('saving')
+    expect(SAVING_TICKET_TYPES).toBe('Saving your ticket types…')
+  })
+
+  it('sends the organizer to Tickets when there are none and nothing is saving', () => {
+    expect(assignSeatsViewOf(0, false)).toBe('empty')
   })
 })
 
