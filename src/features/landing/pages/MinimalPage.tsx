@@ -266,13 +266,13 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
                     key={i}
                     className={`flex h-full flex-col rounded-2xl p-5 ${feat ? 'bg-brand-soft' : 'bg-surface'}`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-[12.5px] font-bold uppercase tracking-wide text-ink">
+                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                      <h3 className="min-w-0 break-words text-[12.5px] font-bold uppercase tracking-wide text-ink">
                         {t.name}
                       </h3>
                       {t.note && (
                         <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide ${
+                          className={`max-w-full rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase leading-snug tracking-wide ${
                             feat ? 'bg-brand text-white' : 'bg-brand-soft text-brand'
                           }`}
                         >

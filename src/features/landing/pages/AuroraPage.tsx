@@ -295,7 +295,7 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
                       feat ? 'bg-brand text-white md:-translate-y-2' : 'bg-surface',
                     )}
                   >
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                       <span
                         className={cn(
                           'text-[12px] font-semibold uppercase tracking-[0.08em]',
@@ -306,11 +306,11 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
                       </span>
                       {t.note ? (
                         feat ? (
-                          <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                          <span className="max-w-full rounded-full bg-white/20 leading-snug px-2.5 py-0.5 text-[11px] font-semibold text-white">
                             {t.note}
                           </span>
                         ) : (
-                          <span className="badge badge-green">{t.note}</span>
+                          <span className="badge badge-green max-w-full whitespace-normal leading-snug">{t.note}</span>
                         )
                       ) : null}
                     </div>

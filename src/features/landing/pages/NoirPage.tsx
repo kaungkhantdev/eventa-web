@@ -322,7 +322,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                         : 'flex flex-col gap-5 rounded-2xl bg-surface p-6'
                     }
                   >
-                    <div className="flex min-h-[24px] items-center justify-between gap-3">
+                    <div className="flex min-h-[24px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                       <span
                         className={
                           feat
@@ -334,11 +334,11 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                       </span>
                       {t.note &&
                         (feat ? (
-                          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-medium text-white">
+                          <span className="max-w-full rounded-full bg-white/20 leading-snug px-2 py-0.5 text-[11px] font-medium text-white">
                             {t.note}
                           </span>
                         ) : (
-                          <span className="badge badge-green">{t.note}</span>
+                          <span className="badge badge-green max-w-full whitespace-normal leading-snug">{t.note}</span>
                         ))}
                     </div>
                     <div
