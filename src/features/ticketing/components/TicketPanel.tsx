@@ -201,10 +201,14 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
           <Label htmlFor="ticket-total">Quantity available</Label>
           {/* The seat map sets it (US-EVT-05): shown, never posted — the box has
               no name, so the save leaves the quantity as the API derived it. A
-              new tier there has no rows yet, so it shows 0. */}
+              new tier there has no rows yet, so it shows 0. The two boxes are
+              keyed apart: choosing another event can swap one for the other,
+              and a reused box would carry the seat map's 0 into the typed one,
+              where 0 means unlimited. */}
           {seatQuantity !== null ? (
             <>
               <Input
+                key="seat-set"
                 id="ticket-total"
                 type="number"
                 value={seatQuantity}
@@ -216,6 +220,7 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
           ) : (
             <>
               <Input
+                key="typed"
                 id="ticket-total"
                 name="total"
                 type="number"
