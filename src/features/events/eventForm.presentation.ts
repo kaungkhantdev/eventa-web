@@ -1,5 +1,5 @@
 import { seatRowsApply, type SeatingFacts } from './eventForm.mapper'
-import { seatingWaitsForRowTypes, type SeatMapState } from './eventSeating.mapper'
+import { seatingWaitsForSeatTypes, type SeatMapState } from './eventSeating.mapper'
 
 /** The wizard's own vocabulary: its steps and its icon set. */
 
@@ -62,12 +62,12 @@ export const STEPS: readonly WizardStep[] = [
   {
     key: 'tickets',
     label: 'Tickets',
-    tip: 'Add at least one ticket type with a price — and a quantity, unless your seat rows set it — then set your total capacity.',
+    tip: 'Add at least one ticket type with a price — and a quantity, unless your seat map sets it — then set your total capacity.',
   },
   {
     key: 'seats',
     label: 'Assign seats',
-    tip: 'Give each row of the seat map a ticket type — say VIP up front, Normal behind. Each type sells only its own rows.',
+    tip: 'Give each row of the seat map a ticket type — say VIP up front, Normal behind — or pick a type and click or drag across seats to give just those seats it. Each type sells only its own seats.',
   },
   {
     key: 'review',
@@ -84,7 +84,7 @@ export function stepProgress(index: number): number {
 /** What a step's save asks the route action to write. */
 export type SaveIntent = 'save' | 'seating' | 'tickets'
 
-/** Assign seats writes the seat map too: each row's type travels with the grid. */
+/** Assign seats writes the seat map too: each seat's type travels with the grid. */
 const SAVE_INTENT: Record<StepKey, SaveIntent> = {
   basics: 'save',
   when: 'save',
@@ -96,17 +96,17 @@ const SAVE_INTENT: Record<StepKey, SaveIntent> = {
 
 /**
  * Whether this step's save leaves the seat map to Assign seats: Seating, while
- * the map has a row the API would refuse untyped — on a published, typed map,
- * a row just added there. Assign seats gives it a type and sends the grid
+ * the map has a seat the API would refuse untyped — on a published, typed map,
+ * a seat just added there. Assign seats gives it a type and sends the grid
  * whole (US-EVT-05).
  */
 export function seatMapDeferredOn(step: StepKey, event: SeatMapState): boolean {
-  return step === 'seating' && seatingWaitsForRowTypes(event)
+  return step === 'seating' && seatingWaitsForSeatTypes(event)
 }
 
 /** What the Seating step says, under its hint, while its save leaves the seat map to Assign seats. */
 export const SEAT_MAP_DEFERRED_NOTE =
-  'New rows need a ticket type. The seat map is saved when you give them one in Assign seats.'
+  'New seats need a ticket type. The seat map is saved when you give them one in Assign seats.'
 
 /**
  * The write a step's save sends. Seating saves the rest of the event instead
@@ -120,7 +120,7 @@ export function saveIntentOf(step: StepKey, event: SeatMapState): SaveIntent {
 }
 
 /**
- * What Assign seats shows: the rows to give types, a save still landing, the
+ * What Assign seats shows: the seats to give types, a save still landing, the
  * way to Tickets — or, for an event with no seat map, why there is nothing to
  * assign.
  */
@@ -141,7 +141,7 @@ export const SAVING_TICKET_TYPES = 'Saving your ticket types…'
 /**
  * What Assign seats shows (US-EVT-05). Only an in-person reserved event has
  * seats to assign; an online event has no seating at all, so it is told that
- * first. A row can only be given a type the API has stored, and Next on
+ * first. A seat can only be given a type the API has stored, and Next on
  * Tickets opens this step while those types are still being saved — so until
  * one is known, a save in flight reads as saving, not as "add your ticket
  * types first".

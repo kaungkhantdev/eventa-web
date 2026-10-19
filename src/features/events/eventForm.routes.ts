@@ -14,7 +14,7 @@ import {
   toUpdateBody,
   type EventFormValues,
 } from './eventForm.mapper'
-import { quantityFromSeatsOf, rowTicketTypesOf, toReservedSeatingBody } from './eventSeating.mapper'
+import { quantityFromSeatsOf, seatTicketTypesOf, toReservedSeatingBody } from './eventSeating.mapper'
 import { isTemplateId, type TemplateId } from './landingTemplates'
 import type { CategoryWire } from './types'
 
@@ -114,7 +114,7 @@ async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
       seatMapName: seating.seatMap?.name ?? '',
       seatRows: seating.seatMap ? String(seating.seatMap.rows) : '',
       seatsPerRow: seating.seatMap ? String(seating.seatMap.seatsPerRow) : '',
-      rowTicketTypes: rowTicketTypesOf(seating.rows, seating.seatMap?.rows ?? 0),
+      seatTicketTypes: seatTicketTypesOf(seating.rows, seating.seatMap?.rows ?? 0, seating.seatMap?.seatsPerRow ?? 0),
       quantityFromSeats: quantityFromSeatsOf(tickets),
     },
     template: templateOf(params, event.landingTemplateId),
@@ -148,7 +148,7 @@ async function savePage(id: string, saved: EventFormValues, form: FormData): Pro
 }
 
 const SAVED_TOAST = 'Changes saved.'
-const SEAT_MAP_DEFERRED_TOAST = 'Saved. Give the new rows a ticket type in Assign seats to save the seat map.'
+const SEAT_MAP_DEFERRED_TOAST = 'Saved. Give the new seats a ticket type in Assign seats to save the seat map.'
 
 /**
  * What a save announces once it lands, or null for none.
@@ -261,7 +261,7 @@ async function saveTickets(eventId: string, values: EventFormValues): Promise<vo
 
 /**
  * The room. General admission is a headcount; reserved is a named grid with a
- * ticket type for each row (US-EVT-05).
+ * ticket type for each seat (US-EVT-05).
  */
 async function saveSeating(eventId: string, values: EventFormValues): Promise<void> {
   if (values.seatingMode === 'reserved') {

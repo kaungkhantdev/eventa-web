@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SEAT_ROWS_REQUIREMENT,
+  SEAT_TYPES_REQUIREMENT,
   bahtOf,
   categoryIdOf,
   publishGaps,
@@ -397,32 +397,37 @@ describe('whether the event may be published yet', () => {
   })
 
   /**
-   * US-EVT-05: a reserved event publishes only once every seat row has a
-   * ticket type. A map from before rows had types counts as untyped too.
+   * US-EVT-05: a reserved event publishes only once every seat has a ticket
+   * type — a row split between types counts, a seat left out does not. A map
+   * from before seats had types counts as untyped too.
    */
-  describe('seat rows', () => {
-    const reserved = (rowTicketTypes: (string | null)[], over: Partial<EventFormValues> = {}) => ({
+  describe('seats', () => {
+    const reserved = (seatTicketTypes: (string | null)[][], over: Partial<EventFormValues> = {}) => ({
       ...toEventFormValues(event(), [ticket()], []),
       seatingMode: 'reserved' as const,
-      rowTicketTypes,
+      seatTicketTypes,
       ...over,
     })
 
-    it('lists a seat row with no ticket type', () => {
-      expect(publishGaps(reserved(['tkt-1', null]))).toEqual([SEAT_ROWS_REQUIREMENT])
+    it('lists a seat with no ticket type, even in a row whose other seats have one', () => {
+      expect(publishGaps(reserved([['tkt-1', 'tkt-1'], ['tkt-1', null]]))).toEqual([SEAT_TYPES_REQUIREMENT])
     })
 
-    it('lists a map none of whose rows has a type yet', () => {
-      expect(publishGaps(reserved([null, null]))).toContain(SEAT_ROWS_REQUIREMENT)
+    it('lists a map none of whose seats has a type yet', () => {
+      expect(publishGaps(reserved([[null, null]]))).toContain(SEAT_TYPES_REQUIREMENT)
     })
 
-    it('is satisfied once every row has a type', () => {
-      expect(publishGaps(reserved(['tkt-1', 'tkt-1']))).toEqual([])
+    it('is satisfied once every seat has a type, however a row is split', () => {
+      expect(publishGaps(reserved([['tkt-1', 'tkt-2'], ['tkt-2', 'tkt-2']]))).toEqual([])
+    })
+
+    it('is worded per seat', () => {
+      expect(SEAT_TYPES_REQUIREMENT).toBe('a ticket type for every seat')
     })
 
     it('does not apply to general admission or an online event', () => {
-      expect(publishGaps(reserved([null], { seatingMode: 'ga' }))).toEqual([])
-      expect(publishGaps(reserved([null], { isOnline: true }))).toEqual([])
+      expect(publishGaps(reserved([[null]], { seatingMode: 'ga' }))).toEqual([])
+      expect(publishGaps(reserved([[null]], { isOnline: true }))).toEqual([])
     })
 
     it('says when the checklist should list it at all', () => {
@@ -476,7 +481,7 @@ describe('what a ticket row is saved with', () => {
     expect(toTicketBody(row(), reserved)).not.toHaveProperty('total')
   })
 
-  it('sends the typed quantity for an online event, which has no seat rows', () => {
+  it('sends the typed quantity for an online event, which has no seat map', () => {
     expect(toTicketBody(row(), { ...reserved, isOnline: true }).total).toBe(40)
   })
 })

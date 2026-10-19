@@ -1,4 +1,4 @@
-import { num } from '@/lib/format'
+import { seatCountLabel, seatKeyLabelOf, seatsOfType, type SeatRowTypes } from '@/lib/seatPlaces'
 import { swatchOf } from '@/lib/seatSwatches'
 import type { ReservedSeatingBody, SeatRowWire } from './eventContent.api'
 import {
@@ -10,164 +10,241 @@ import {
 } from './eventForm.mapper'
 
 /**
- * The wizard's rules for a reserved map split between ticket types by whole
- * rows (US-EVT-05): the grid is laid out on the Seating step, each row is given
- * a type on Assign seats, and each type's quantity is the seats its rows hold —
- * so the Tickets step asks for none.
+ * The wizard's rules for a reserved map split between ticket types seat by
+ * seat (US-EVT-05): the grid is laid out on the Seating step, and on Assign
+ * seats each row's dropdown gives the whole row a type while the paint picker
+ * and the map give just the seats clicked or dragged across one. Each type's
+ * quantity is the seats it holds — so the Tickets step asks for none.
  *
- * A row's type is held as one list, one entry per row with index 0 = row 1,
- * because that is the shape `PUT /seating/reserved` takes as `rowTicketTypes`.
- * `null` is a row with no type yet.
+ * The types are held as a matrix, `[row][seat]` with index 0 = row 1 and seat
+ * 1, because that is the shape `PUT /seating/reserved` takes as
+ * `seatTicketTypes`. `null` is a seat with no type yet.
  */
 
-/** Each row's ticket type, index 0 = row 1; `null` for a row with none. */
-export type RowTicketTypes = (string | null)[]
+/** Each seat's ticket type, `[row][seat]`; `null` for a seat with none. */
+export type SeatTicketTypes = (string | null)[][]
 
-/** A ticket type a row can be given. */
+/** A ticket type a seat can be given. */
 export interface TicketTypeChoice {
   id: string
   name: string
 }
 
-/** One entry in the preview's key. `swatch` is null for the neutral, untyped seat. */
+/** One entry in the map's key. `swatch` is null for the neutral, untyped seat. */
 export interface SeatLegendEntry {
   ticketTypeId: string | null
   label: string
   swatch: number | null
 }
 
-/** `ConfigureReservedDto`'s own ceiling: past it the API refuses the map. */
+/** One choice in the paint picker: a type's id, or `''` for "No ticket type". */
+export interface PaintOption {
+  value: string
+  label: string
+  swatch: number | null
+}
+
+/** `ConfigureReservedDto`'s own ceilings: past them the API refuses the map. */
 const SEAT_ROWS_MAX = 100
+const SEATS_PER_ROW_MAX = 100
 const NO_TICKET_TYPE = 'No ticket type'
+/** The "No ticket type" option's value, in a row's dropdown and the paint picker. */
+const NO_TYPE_VALUE = ''
+/**
+ * A row dropdown's value while the row's seats differ: a disabled "Mixed"
+ * placeholder, until a type is picked for the whole row. Never a ticket id,
+ * which the API makes a UUID.
+ */
+export const MIXED_ROW = 'mixed'
 /** The API requires a map name; the venue is the sensible default, then this. */
 const DEFAULT_MAP_NAME = 'Main hall'
 
-/** GET /seating's rows → each row's type at its row number. */
-export function rowTicketTypesOf(rows: readonly SeatRowWire[], rowCount: number): RowTicketTypes {
-  const types: RowTicketTypes = Array.from({ length: rowCount }, () => null)
-  for (const row of rows) {
-    const index = Number(row.rowLabel) - 1
-    if (Number.isInteger(index) && index >= 0 && index < rowCount) types[index] = row.ticketTypeId
-  }
-  return types
+/** GET /seating's rows → each seat's type at its row and seat number. */
+export function seatTicketTypesOf(
+  rows: readonly SeatRowWire[],
+  rowCount: number,
+  seatsPerRow: number,
+): SeatTicketTypes {
+  const byRow = new Map(rows.map((row) => [Number(row.rowLabel) - 1, row.seatTicketTypes]))
+  return Array.from({ length: rowCount }, (_, row) => seatsOf(byRow.get(row) ?? [], seatsPerRow))
 }
 
 /**
  * How many rows the save sends — the same `|| 1` the save itself applies to a
- * blank box — so the list always has one entry per row the API will get.
+ * blank box — so the map always has one entry per row the API will get.
  */
 export function seatRowCount(typed: string): number {
-  const rows = Math.trunc(Number(typed)) || 1
-  return Math.min(Math.max(rows, 1), SEAT_ROWS_MAX)
+  return boxCount(typed, SEAT_ROWS_MAX)
 }
 
-/** Only ticket types the API has stored: a row can only point at one of those. */
+/** How many seats each row the save sends has, by the same rule. */
+export function seatsPerRowCount(typed: string): number {
+  return boxCount(typed, SEATS_PER_ROW_MAX)
+}
+
+/** Only ticket types the API has stored: a seat can only point at one of those. */
 export function ticketTypeChoices(tickets: readonly TicketDraft[]): TicketTypeChoice[] {
   return tickets.flatMap((ticket) => (ticket.id === null ? [] : [{ id: ticket.id, name: ticket.name }]))
 }
 
-/** The row select's value → a type, or none for its "No ticket type" option. */
-export function rowTypeOf(value: string): string | null {
-  return value === '' ? null : value
+/** A row dropdown's or the paint picker's value → a type, or none for "No ticket type". */
+export function typeOfChoice(value: string): string | null {
+  return value === NO_TYPE_VALUE ? null : value
 }
 
 /**
- * One row given a type. The list may be longer than the map — rows kept from
- * before the organizer shortened it — so a row past the end is filled up to.
+ * One seat given a type. The map may be larger than the grid — seats kept from
+ * before the organizer shrank it — or smaller, so a seat past the end is
+ * filled up to. A seat that already has the type hands back the same map, so
+ * a drag over seats already painted changes nothing.
  */
-export function withRowType(types: readonly (string | null)[], row: number, ticketTypeId: string | null): RowTicketTypes {
-  const next: RowTicketTypes = [...types]
-  while (next.length <= row) next.push(null)
-  next[row] = ticketTypeId
+export function withSeatType(
+  types: SeatTicketTypes,
+  row: number,
+  seat: number,
+  ticketTypeId: string | null,
+): SeatTicketTypes {
+  const seats = types[row]
+  if (seats !== undefined && seat < seats.length && seats[seat] === ticketTypeId) return types
+  const next = rowsUpTo(types, row)
+  const painted = next[row]!
+  while (painted.length <= seat) painted.push(null)
+  painted[seat] = ticketTypeId
+  return next
+}
+
+/** A row's dropdown: every seat of the row given one type, or none. */
+export function withRowType(
+  types: readonly (readonly (string | null)[])[],
+  row: number,
+  seatsPerRow: number,
+  ticketTypeId: string | null,
+): SeatTicketTypes {
+  const next = rowsUpTo(types, row)
+  next[row] = Array.from({ length: seatsPerRow }, () => ticketTypeId)
   return next
 }
 
 /**
- * What the list shows and the save sends: exactly one entry per row, and no
- * row pointing at a type that is not among the event's own — the API would
- * refuse that save.
+ * What the map shows and the save sends: exactly one entry per seat of every
+ * row, each surviving seat keeping its type and a new one starting with none,
+ * and no seat pointing at a type that is not among the event's own — the API
+ * would refuse that save.
  */
-export function rowTicketTypesFor(
-  types: readonly (string | null)[],
+export function seatTicketTypesFor(
+  types: readonly (readonly (string | null)[])[],
   rowCount: number,
+  seatsPerRow: number,
   choices: readonly TicketTypeChoice[],
-): RowTicketTypes {
+): SeatTicketTypes {
   const known = new Set(choices.map((choice) => choice.id))
-  return Array.from({ length: rowCount }, (_, row) => {
-    const type = types[row] ?? null
-    return type !== null && known.has(type) ? type : null
-  })
+  return Array.from({ length: rowCount }, (_, row) =>
+    seatsOf(types[row] ?? [], seatsPerRow).map((type) => (type !== null && known.has(type) ? type : null)),
+  )
+}
+
+/** A row dropdown's value: the type all its seats share, none, or `MIXED_ROW` when they differ. */
+export function rowChoiceOf(seats: readonly (string | null)[]): string {
+  const first = seats[0] ?? null
+  if (seats.some((seat) => seat !== first)) return MIXED_ROW
+  return first ?? NO_TYPE_VALUE
 }
 
 /**
- * Each row's colour, by the shared rule (`swatchOf`) the public page colours
+ * Each seat's colour, by the shared rule (`swatchOf`) the public page colours
  * by too (US-PAGE-05): its type's place among the choices — the event's saved
  * types, listed in the order they were created — or null for none.
  */
-export function rowSwatchesOf(types: readonly (string | null)[], choices: readonly TicketTypeChoice[]): (number | null)[] {
+export function seatSwatchesOf(
+  types: readonly (readonly (string | null)[])[],
+  choices: readonly TicketTypeChoice[],
+): (number | null)[][] {
   const byCreation = idsOf(choices)
-  return types.map((type) => swatchOf(type, byCreation))
-}
-
-/** The seats in the rows given this ticket type — or, for null, in the rows with none. */
-export function seatsOfType(
-  types: readonly (string | null)[],
-  ticketTypeId: string | null,
-  seatsPerRow: number,
-): number {
-  return types.filter((type) => type === ticketTypeId).length * seatsPerRow
+  return types.map((seats) => seats.map((type) => swatchOf(type, byCreation)))
 }
 
 /**
- * The preview's key: every ticket type with the seats its rows hold — a type
- * with none is listed too, since publishing needs every type to have a row —
- * then the rows still without a type, when there are any.
+ * The map's key: every ticket type, in ticket order, with where its seats are
+ * and how many (`seatKeyLabelOf`, the public page's rule too) — a type with
+ * none is listed as well, since publishing needs every type to have a seat —
+ * then the seats still without a type, when there are any.
  */
 export function seatLegend(
-  types: readonly (string | null)[],
+  types: readonly (readonly (string | null)[])[],
   choices: readonly TicketTypeChoice[],
-  seatsPerRow: number,
 ): SeatLegendEntry[] {
+  const map = seatMapOf(types)
   const byCreation = idsOf(choices)
   const legend = choices.map((choice) => ({
     ticketTypeId: choice.id,
-    label: `${choice.name} · ${seatsLabel(seatsOfType(types, choice.id, seatsPerRow))}`,
+    label: seatKeyLabelOf(choice.name, map, choice.id),
     swatch: swatchOf(choice.id, byCreation),
   }))
-  const untyped = seatsOfType(types, null, seatsPerRow)
+  const untyped = seatsOfType(map, null)
   if (untyped === 0) return legend
-  return [...legend, { ticketTypeId: null, label: `${NO_TICKET_TYPE} · ${seatsLabel(untyped)}`, swatch: null }]
+  return [...legend, { ticketTypeId: null, label: `${NO_TICKET_TYPE} · ${seatCountLabel(untyped)}`, swatch: null }]
+}
+
+/** The paint picker's choices: every saved type in its colour, then "No ticket type". */
+export function paintOptionsOf(choices: readonly TicketTypeChoice[]): PaintOption[] {
+  const byCreation = idsOf(choices)
+  return [
+    ...choices.map((choice) => ({ value: choice.id, label: choice.name, swatch: swatchOf(choice.id, byCreation) })),
+    { value: NO_TYPE_VALUE, label: NO_TICKET_TYPE, swatch: null },
+  ]
 }
 
 /**
- * The room as `PUT /seating/reserved` takes it. `rowTicketTypes` is always
- * sent: the wizard holds every row's type, and leaving it out would tell the
- * API to keep whatever the rows had.
+ * What the paint picker has picked: the organizer's pick while it is still
+ * offered, else the first ticket type — "No ticket type" when there is none.
+ * `picked` is null until the organizer picks.
+ */
+export function paintChoiceOf(picked: string | null, choices: readonly TicketTypeChoice[]): string {
+  const offered = picked === NO_TYPE_VALUE || choices.some((choice) => choice.id === picked)
+  if (picked !== null && offered) return picked
+  return choices[0]?.id ?? NO_TYPE_VALUE
+}
+
+/** A seat button's name for a screen reader: `Row 7, seat 3: Free`. Both indexes are 0-based. */
+export function seatAriaLabel(
+  row: number,
+  seat: number,
+  ticketTypeId: string | null,
+  choices: readonly TicketTypeChoice[],
+): string {
+  const type = choices.find((choice) => choice.id === ticketTypeId)?.name ?? NO_TICKET_TYPE
+  return `Row ${row + 1}, seat ${seat + 1}: ${type}`
+}
+
+/**
+ * The room as `PUT /seating/reserved` takes it. `seatTicketTypes` is always
+ * sent: the wizard holds every seat's type, and leaving it out would tell the
+ * API to keep whatever the seats had.
  */
 export function toReservedSeatingBody(values: EventFormValues): ReservedSeatingBody {
   return {
     name: values.seatMapName.trim() || values.venueName.trim() || DEFAULT_MAP_NAME,
     rows: Number(values.seatRows) || 1,
     seatsPerRow: Number(values.seatsPerRow) || 1,
-    rowTicketTypes: values.rowTicketTypes,
+    seatTicketTypes: values.seatTicketTypes,
   }
 }
 
-/** What decides whether the seat map can be saved with its rows as they are. */
-export type SeatMapState = Pick<EventFormValues, 'status' | 'seatingMode' | 'isOnline' | 'rowTicketTypes'>
+/** What decides whether the seat map can be saved with its seats as they are. */
+export type SeatMapState = Pick<EventFormValues, 'status' | 'seatingMode' | 'isOnline' | 'seatTicketTypes'>
 
 /**
  * Whether the seat map must wait for Assign seats before it is saved. Once a
- * published event's rows have ticket types, the API refuses a map with any row
- * left untyped (its `assertEveryRowTyped`) — and a row added on Seating has no
- * type until Assign seats, which comes after Tickets and sends the whole grid.
- * A draft may leave rows open, and a map none of whose rows has a type sells
- * as it always has.
+ * published event's map has typed seats, the API refuses a map with any seat
+ * left untyped — and a seat added on Seating, by a new row or a wider one, has
+ * no type until Assign seats, which comes after Tickets and sends the whole
+ * grid. A draft may leave seats open, and a map none of whose seats has a type
+ * sells as it always has.
  */
-export function seatingWaitsForRowTypes(event: SeatMapState): boolean {
+export function seatingWaitsForSeatTypes(event: SeatMapState): boolean {
   if (event.status === null || event.status === 'draft' || !seatRowsApply(event)) return false
-  const types = event.rowTicketTypes
-  return types.some((type) => type !== null) && types.includes(null)
+  const seats = event.seatTicketTypes.flat()
+  return seats.some((type) => type !== null) && seats.includes(null)
 }
 
 /**
@@ -187,8 +264,8 @@ export type QuantityColumn = 'none' | 'typed' | 'readOnly'
 
 /**
  * Whether the Tickets step has a Quantity column, and whether it is typed. An
- * in-person reserved event has none: each type's quantity is the seats its rows
- * hold, given on Assign seats, and a note under the list says so. Anywhere else
+ * in-person reserved event has none: each type's quantity is the seats it
+ * holds, given on Assign seats, and a note under the list says so. Anywhere else
  * the organizer types it — unless the API still sets it from a seat map the
  * form has switched away from but not saved, which the save leaves in charge
  * (`toTicketBody` drops a typed number), so its stored number shows read-only.
@@ -207,6 +284,25 @@ function idsOf(choices: readonly TicketTypeChoice[]): string[] {
   return choices.map((choice) => choice.id)
 }
 
-function seatsLabel(seats: number): string {
-  return `${num(seats)} ${seats === 1 ? 'seat' : 'seats'}`
+/** A typed box → a count from 1 to `max`; blank or not a number is 1. */
+function boxCount(typed: string, max: number): number {
+  const count = Math.trunc(Number(typed)) || 1
+  return Math.min(Math.max(count, 1), max)
+}
+
+/** A row's seats, exactly `seatsPerRow` of them: seats past the end have no type. */
+function seatsOf(seats: readonly (string | null)[], seatsPerRow: number): (string | null)[] {
+  return Array.from({ length: seatsPerRow }, (_, seat) => seats[seat] ?? null)
+}
+
+/** A copy of the map, every row copied too, with rows up to `row` — the new ones empty. */
+function rowsUpTo(types: readonly (readonly (string | null)[])[], row: number): SeatTicketTypes {
+  const next = types.map((seats) => [...seats])
+  while (next.length <= row) next.push([])
+  return next
+}
+
+/** The matrix as the shared seat-places rule reads it, rows numbered 1..N. */
+function seatMapOf(types: readonly (readonly (string | null)[])[]): SeatRowTypes[] {
+  return types.map((seats, row) => ({ label: String(row + 1), seats }))
 }

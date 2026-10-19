@@ -238,18 +238,18 @@ describe('STEPS — the wizard’s steps', () => {
     expect(STEPS.map((step) => step.key)).toEqual(['basics', 'when', 'seating', 'tickets', 'seats', 'review'])
   })
 
-  // US-EVT-05: on a reserved event the seat rows set each type's quantity.
-  it('tells the organizer a quantity is only asked for when the seat rows do not set it', () => {
+  // US-EVT-05: on a reserved event the seat map sets each type's quantity.
+  it('tells the organizer a quantity is only asked for when the seat map does not set it', () => {
     const tickets = STEPS.find((step) => step.key === 'tickets')
     expect(tickets?.tip).toBe(
-      'Add at least one ticket type with a price — and a quantity, unless your seat rows set it — then set your total capacity.',
+      'Add at least one ticket type with a price — and a quantity, unless your seat map sets it — then set your total capacity.',
     )
   })
 
-  it('tells the organizer what Assign seats is for', () => {
+  it('tells the organizer what Assign seats is for — whole rows, or just some seats', () => {
     const seats = STEPS.find((step) => step.key === 'seats')
     expect(seats?.tip).toBe(
-      'Give each row of the seat map a ticket type — say VIP up front, Normal behind. Each type sells only its own rows.',
+      'Give each row of the seat map a ticket type — say VIP up front, Normal behind — or pick a type and click or drag across seats to give just those seats it. Each type sells only its own seats.',
     )
   })
 })
@@ -277,8 +277,8 @@ describe('saveIntentOf', () => {
     status: 'draft',
     seatingMode: 'reserved',
     seatRows: '3',
-    seatsPerRow: '16',
-    rowTicketTypes: ['tier-vip', null, null],
+    seatsPerRow: '2',
+    seatTicketTypes: [['tier-vip', 'tier-vip'], [null, null], [null, null]],
     ...over,
   })
 
@@ -309,8 +309,8 @@ describe('saveIntentOf', () => {
   })
 
   /*
-   * US-EVT-05: a published event whose rows have types, with a row added on
-   * Seating. The API refuses a map with that row untyped, and the row can only
+   * US-EVT-05: a published event whose seats have types, with a row added on
+   * Seating. The API refuses a map with those seats untyped, and they can only
    * be given a type on Assign seats — so Seating saves the rest of the event
    * and leaves the grid to Assign seats, which sends it whole.
    */
@@ -318,7 +318,7 @@ describe('saveIntentOf', () => {
     const grown = event({
       status: 'upcoming',
       seatRows: '4',
-      rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', null],
+      seatTicketTypes: [['tier-vip', 'tier-vip'], ['tier-ga', 'tier-free'], ['tier-ga', 'tier-ga'], [null, null]],
     })
 
     it('leaves the seat map to Assign seats when leaving Seating', () => {
@@ -329,15 +329,15 @@ describe('saveIntentOf', () => {
       expect(saveIntentOf('seats', grown)).toBe('seating')
     })
 
-    it('saves the seat map from Seating once every row has a type', () => {
-      const typed = { ...grown, rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', 'tier-ga'] }
+    it('saves the seat map from Seating once every seat has a type', () => {
+      const typed = { ...grown, seatTicketTypes: [...grown.seatTicketTypes.slice(0, 3), ['tier-free', 'tier-ga']] }
       expect(saveIntentOf('seating', typed)).toBe('seating')
     })
   })
 })
 
 /**
- * US-EVT-05: when Seating leaves a published, typed map's new rows to Assign
+ * US-EVT-05: when Seating leaves a published, typed map's new seats to Assign
  * seats, the step says so — under its hint, and in the header Save's toast —
  * rather than letting "saved" read as if the seat map had been.
  */
@@ -346,16 +346,16 @@ describe('seatMapDeferredOn — whether this step’s save leaves the seat map t
     ...toEventFormValues(null, [], []),
     status: 'upcoming',
     seatingMode: 'reserved',
-    seatRows: '4',
-    seatsPerRow: '16',
-    rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', null],
+    seatRows: '2',
+    seatsPerRow: '3',
+    seatTicketTypes: [['tier-vip', 'tier-vip', null], ['tier-ga', 'tier-ga', null]],
   }
 
-  it('is true on Seating for a published, typed map with a new, untyped row', () => {
+  it('is true on Seating for a published, typed map with new, untyped seats', () => {
     expect(seatMapDeferredOn('seating', grown)).toBe(true)
   })
 
-  // Assign seats is where the new rows get their type, and it sends the grid whole.
+  // Assign seats is where the new seats get their type, and it sends the grid whole.
   it('is false on Assign seats, which saves the seat map', () => {
     expect(seatMapDeferredOn('seats', grown)).toBe(false)
   })
@@ -365,8 +365,8 @@ describe('seatMapDeferredOn — whether this step’s save leaves the seat map t
     expect(seatMapDeferredOn('tickets', grown)).toBe(false)
   })
 
-  it('is false once every row has a type, or on a draft', () => {
-    const typed = { ...grown, rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', 'tier-ga'] }
+  it('is false once every seat has a type, or on a draft', () => {
+    const typed = { ...grown, seatTicketTypes: [['tier-vip', 'tier-vip', 'tier-free'], ['tier-ga', 'tier-ga', 'tier-ga']] }
     expect(seatMapDeferredOn('seating', typed)).toBe(false)
     expect(seatMapDeferredOn('seating', { ...grown, status: 'draft' })).toBe(false)
   })
@@ -377,7 +377,7 @@ describe('seatMapDeferredOn — whether this step’s save leaves the seat map t
 
   it('is explained on the Seating step', () => {
     expect(SEAT_MAP_DEFERRED_NOTE).toBe(
-      'New rows need a ticket type. The seat map is saved when you give them one in Assign seats.',
+      'New seats need a ticket type. The seat map is saved when you give them one in Assign seats.',
     )
   })
 })

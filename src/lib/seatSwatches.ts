@@ -1,7 +1,7 @@
 /**
  * Seat colours for ticket types on a reserved seat map (US-EVT-05): the
  * create-event wizard's preview and key (Seating and Assign seats) and the
- * public event page's seat map (US-PAGE-05) all take a row's colour from this
+ * public event page's seat map (US-PAGE-05) all take a seat's colour from this
  * one list, in the order `swatchOf` sets, so a type is the same colour in each.
  *
  * The hues of the app's existing per-tier tints (`ICON_TINTS` in the ticketing
@@ -24,13 +24,13 @@ export function swatchClassOf(swatch: number | null): string {
 
 /**
  * A ticket type's place in the colour list: where it falls among the event's
- * types in the order they were created, or null — the neutral seat — for a row
+ * types in the order they were created, or null — the neutral seat — for a seat
  * with no type or a type that is not the event's.
  *
  * Creation order because both sides hold it: the wizard lists the types that
- * way (its `rowSwatchesOf` colours by that list), and the public page reads
+ * way (its `seatSwatchesOf` colours by that list), and the public page reads
  * the order `GET /public/events/:slug` sends its tickets in. Not price, not
- * rows: a type keeps its colour while the organizer changes either.
+ * seats: a type keeps its colour while the organizer changes either.
  */
 export function swatchOf(typeId: string | null, typeIdsByCreation: readonly string[]): number | null {
   const place = typeId === null ? -1 : typeIdsByCreation.indexOf(typeId)

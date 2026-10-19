@@ -62,8 +62,11 @@ export interface EventFormValues {
   seatMapName: string
   seatRows: string
   seatsPerRow: string
-  /** Each seat row's ticket type, index 0 = row 1; `null` for none (US-EVT-05). */
-  rowTicketTypes: (string | null)[]
+  /**
+   * Each seat's ticket type, `[row][seat]` with index 0 = row 1 and seat 1;
+   * `null` for none (US-EVT-05).
+   */
+  seatTicketTypes: (string | null)[][]
   /** The seat map sets each ticket type's quantity, so it is not typed (US-EVT-05). */
   quantityFromSeats: boolean
   coverImage: string
@@ -103,7 +106,7 @@ function emptyValues(): EventFormValues {
     seatMapName: '',
     seatRows: '',
     seatsPerRow: '',
-    rowTicketTypes: [],
+    seatTicketTypes: [],
     quantityFromSeats: false,
     coverImage: '',
     tickets: [],
@@ -252,23 +255,23 @@ function capacityOf(typed: string): { capacity?: number } {
 }
 
 /** What the Review step's checklist says a reserved event still needs (US-EVT-05). */
-export const SEAT_ROWS_REQUIREMENT = 'a ticket type for every seat row'
+export const SEAT_TYPES_REQUIREMENT = 'a ticket type for every seat'
 
-/** What decides whether an event has seat rows at all. */
+/** What decides whether an event has a seat map at all. */
 export type SeatingFacts = Pick<EventFormValues, 'seatingMode' | 'isOnline'>
 
 /** What decides whether its ticket quantities are typed. */
 export type QuantityFacts = SeatingFacts & Pick<EventFormValues, 'quantityFromSeats'>
 
-/** Only an in-person, reserved event has seat rows to give ticket types. */
+/** Only an in-person, reserved event has seats to give ticket types. */
 export function seatRowsApply(values: SeatingFacts): boolean {
   return values.seatingMode === 'reserved' && !values.isOnline
 }
 
 /**
  * Whether the seat map, not the organizer, sets the ticket quantities
- * (US-EVT-05). On an in-person reserved event it always does — its rows get
- * their types on Assign seats — even before any row has one. Elsewhere only
+ * (US-EVT-05). On an in-person reserved event it always does — its seats get
+ * their types on Assign seats — even before any seat has one. Elsewhere only
  * while the API still says so: a switch away from reserved seating that has not
  * been saved yet leaves the old map in charge.
  */
@@ -292,6 +295,8 @@ export function publishGaps(values: EventFormValues): string[] {
   // Only tiers the API has stored count — an unsaved row would turn the button
   // green and the request would still be refused.
   if (!values.tickets.some((ticket) => ticket.id !== null)) gaps.push('at least one ticket type')
-  if (seatRowsApply(values) && values.rowTicketTypes.includes(null)) gaps.push(SEAT_ROWS_REQUIREMENT)
+  if (seatRowsApply(values) && values.seatTicketTypes.some((row) => row.includes(null))) {
+    gaps.push(SEAT_TYPES_REQUIREMENT)
+  }
   return gaps
 }

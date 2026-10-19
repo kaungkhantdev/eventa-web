@@ -123,7 +123,7 @@ describe('pageChangesOf', () => {
 /**
  * What a save announces once it lands. The header's Save asks for a toast; a
  * Next saves as a side effect of moving on, so it says nothing. When Seating
- * left a published map's new rows to Assign seats (US-EVT-05), "Changes saved"
+ * left a published map's new seats to Assign seats (US-EVT-05), "Changes saved"
  * would claim the seat map was saved too — the toast says what is left to do.
  */
 describe('savedToastOf', () => {
@@ -139,7 +139,7 @@ describe('savedToastOf', () => {
 
   it('says the seat map still waits on Assign seats when Seating left it there', () => {
     expect(savedToastOf(sent({ notify: 'on', seatMapDeferred: 'on' }))).toBe(
-      'Saved. Give the new rows a ticket type in Assign seats to save the seat map.',
+      'Saved. Give the new seats a ticket type in Assign seats to save the seat map.',
     )
   })
 

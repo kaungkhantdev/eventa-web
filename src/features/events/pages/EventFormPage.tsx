@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
 import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
@@ -11,7 +11,7 @@ import { swatchClassOf } from '@/lib/seatSwatches'
 import { toast } from '@/lib/toast'
 import { SEAT_SET_QUANTITY } from '@/features/ticketing/tickets.mapper'
 import {
-  SEAT_ROWS_REQUIREMENT,
+  SEAT_TYPES_REQUIREMENT,
   categoryIdOf,
   publishGaps,
   seatRowsApply,
@@ -44,18 +44,25 @@ import {
   type StepKey,
 } from '../eventForm.presentation'
 import {
+  paintChoiceOf,
+  paintOptionsOf,
   quantityColumnOf,
-  rowSwatchesOf,
-  rowTicketTypesFor,
+  seatAriaLabel,
   seatLegend,
   seatRowCount,
+  seatSwatchesOf,
+  seatTicketTypesFor,
+  seatsPerRowCount,
   storedQuantityOf,
   ticketTypeChoices,
+  typeOfChoice,
   withRowType,
+  withSeatType,
   type QuantityColumn,
   type SeatLegendEntry,
 } from '../eventSeating.mapper'
 import { CoverImageField } from '../components/CoverImageField'
+import { PaintPicker } from '../components/PaintPicker'
 import { RowTicketTypes } from '../components/RowTicketTypes'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
@@ -85,7 +92,7 @@ const PUBLISH_REQUIREMENTS = [
   'a description',
   'a venue or an online link',
   'at least one ticket type',
-  SEAT_ROWS_REQUIREMENT,
+  SEAT_TYPES_REQUIREMENT,
 ] as const
 
 /** How each reads once it is satisfied. */
@@ -94,7 +101,7 @@ const REQUIREMENT_MET: Record<(typeof PUBLISH_REQUIREMENTS)[number], string> = {
   'a description': 'Description added',
   'a venue or an online link': 'Location added',
   'at least one ticket type': 'At least one ticket type',
-  [SEAT_ROWS_REQUIREMENT]: 'Every seat row has a ticket type',
+  [SEAT_TYPES_REQUIREMENT]: 'Every seat has a ticket type',
 }
 
 /** The longest address and colour `UpdatePageDto` accepts. */
@@ -148,55 +155,117 @@ const SCOPED_CSS = `
 `
 
 /* ---------- Reserved-seating live preview ----------
-   Rows are numbered as the API numbers them, and each row takes its ticket
-   type's colour (US-EVT-05); a row with no type keeps the plain seat. The kit's
-   decorative selected/booked seats are gone: here a colour means a type. */
-function SeatPreview({
-  rows,
-  cols,
-  swatches,
-}: {
-  rows: number
-  cols: number
-  /** Each row's colour, index 0 = row 1; null for none. */
-  swatches: readonly (number | null)[]
-}) {
-  const r = Math.max(1, Math.min(26, rows || 0))
-  const c = Math.max(1, Math.min(40, cols || 0))
+   Rows are numbered as the API numbers them, and each seat takes its ticket
+   type's colour (US-EVT-05); a seat with no type keeps the plain seat. The
+   kit's decorative selected/booked seats are gone: here a colour means a type.
+   A room wider than the panel scrolls sideways inside it, never the page. */
 
-  const rowEls = []
-  for (let rr = 0; rr < r; rr++) {
-    const cls = cn('efseat', swatchClassOf(swatches[rr] ?? null))
-    const seats = []
-    for (let cc = 1; cc <= c; cc++) {
-      seats.push(<span key={`s${cc}`} className={cls} />)
-      if (c > 8 && cc === Math.ceil(c / 2))
-        seats.push(<span key={`g${cc}`} className="inline-block w-2 shrink-0" />)
-    }
-    rowEls.push(
-      <div key={rr} className="flex items-center gap-1">
-        <span className="efrowlab">{rr + 1}</span>
-        {seats}
-        <span className="efrowlab">{rr + 1}</span>
-      </div>,
-    )
-  }
-  return <div className="flex flex-col items-center gap-1.5 overflow-x-auto">{rowEls}</div>
+/** What makes the preview a map to paint (Assign seats): each seat a button. */
+interface SeatPainter {
+  /** A seat button's name, `Row 7, seat 3: Free`. Indexes are 0-based. */
+  labelOf: (row: number, seat: number) => string
+  /** Give this seat the picked paint type. */
+  onPaint: (row: number, seat: number) => void
 }
 
-/* The stage, the seat rows in their types' colours and the key — the same
+/** A seat to paint: a hit target a thumb can use on a phone, and a visible focus. */
+const PAINTABLE_SEAT =
+  'cursor-pointer hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white pointer-coarse:!h-7 pointer-coarse:!w-7'
+
+function SeatPreview({
+  swatches,
+  painter,
+}: {
+  /** Each seat's colour, `[row][seat]`; null for none. */
+  swatches: readonly (readonly (number | null)[])[]
+  painter?: SeatPainter
+}) {
+  // A drag paints every seat it enters while the button is held; a ref, since
+  // whether a drag is on never changes what is drawn.
+  const paintingRef = useRef(false)
+  const stop = () => {
+    paintingRef.current = false
+  }
+  return (
+    <div className="overflow-x-auto" onPointerUp={stop} onPointerLeave={stop} onPointerCancel={stop}>
+      <div className="mx-auto flex w-max select-none flex-col items-center gap-1.5">
+        {swatches.map((row, r) => (
+          <div key={r} className="flex items-center gap-1">
+            <span className="efrowlab">{r + 1}</span>
+            {row.map((swatch, c) => (
+              <SeatCell
+                key={c}
+                row={r}
+                seat={c}
+                swatch={swatch}
+                aisleAfter={row.length > 8 && c + 1 === Math.ceil(row.length / 2)}
+                painter={painter}
+                paintingRef={paintingRef}
+              />
+            ))}
+            <span className="efrowlab">{r + 1}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** One seat — a plain seat to look at, or a button to paint — and the aisle after it, if any. */
+function SeatCell({
+  row,
+  seat,
+  swatch,
+  aisleAfter,
+  painter,
+  paintingRef,
+}: {
+  row: number
+  seat: number
+  swatch: number | null
+  aisleAfter: boolean
+  painter?: SeatPainter
+  paintingRef: RefObject<boolean>
+}) {
+  const cls = cn('efseat', swatchClassOf(swatch))
+  return (
+    <>
+      {painter ? (
+        <button
+          type="button"
+          className={cn(cls, PAINTABLE_SEAT)}
+          aria-label={painter.labelOf(row, seat)}
+          aria-pressed={false}
+          onPointerDown={(e) => {
+            // A touch may be the start of a sideways scroll; a tap still paints, by click.
+            if (e.pointerType === 'touch' || e.button !== 0) return
+            paintingRef.current = true
+            painter.onPaint(row, seat)
+          }}
+          onPointerEnter={() => {
+            if (paintingRef.current) painter.onPaint(row, seat)
+          }}
+          onClick={() => painter.onPaint(row, seat)}
+        />
+      ) : (
+        <span className={cls} />
+      )}
+      {aisleAfter && <span className="inline-block w-2 shrink-0" />}
+    </>
+  )
+}
+
+/* The stage, the seats in their types' colours and the key — the same
    picture on Seating, where the grid is laid out, and on Assign seats, where
-   its rows are given types. */
+   its seats are given types by painting them (`painter`). */
 function SeatMapPreview({
-  rows,
-  cols,
   swatches,
   legend,
+  painter,
 }: {
-  rows: number
-  cols: number
-  swatches: readonly (number | null)[]
+  swatches: readonly (readonly (number | null)[])[]
   legend: readonly SeatLegendEntry[]
+  painter?: SeatPainter
 }) {
   return (
     <div className="efhouse mt-2 overflow-hidden rounded-2xl p-5">
@@ -214,7 +283,7 @@ function SeatMapPreview({
           Stage
         </span>
       </div>
-      <SeatPreview rows={rows} cols={cols} swatches={swatches} />
+      <SeatPreview swatches={swatches} painter={painter} />
       <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/10 pt-4 text-[11px] text-white/55">
         {legend.map((entry) => (
           <span key={entry.ticketTypeId ?? 'none'} className="inline-flex items-center gap-1.5">
@@ -379,19 +448,29 @@ export default function EventFormPage() {
     setTickets(initial.tickets.map((t) => ({ ...t })))
   }
 
-  // Each seat row's ticket type (US-EVT-05), re-seeded the same way: only when
-  // a save changes what the API stored, never while a row is being picked.
-  const [rowTypes, setRowTypes] = useState(initial.rowTicketTypes)
-  const savedRowTypes = JSON.stringify(initial.rowTicketTypes)
-  const [seenRowTypes, setSeenRowTypes] = useState(savedRowTypes)
-  if (savedRowTypes !== seenRowTypes) {
-    setSeenRowTypes(savedRowTypes)
-    setRowTypes(initial.rowTicketTypes)
+  // Each seat's ticket type (US-EVT-05), re-seeded the same way: only when a
+  // save changes what the API stored, never while seats are being painted.
+  // Held at whatever size it was last given, so a seat survives the map being
+  // shrunk and grown again before a save; `seatTicketTypes` is the grid on screen.
+  const [seatTypes, setSeatTypes] = useState(initial.seatTicketTypes)
+  const savedSeatTypes = JSON.stringify(initial.seatTicketTypes)
+  const [seenSeatTypes, setSeenSeatTypes] = useState(savedSeatTypes)
+  if (savedSeatTypes !== seenSeatTypes) {
+    setSeenSeatTypes(savedSeatTypes)
+    setSeatTypes(initial.seatTicketTypes)
   }
   const typeChoices = ticketTypeChoices(tickets)
-  const rowTicketTypes = rowTicketTypesFor(rowTypes, seatRowCount(rows), typeChoices)
+  const seatsInRow = seatsPerRowCount(cols)
+  const seatTicketTypes = seatTicketTypesFor(seatTypes, seatRowCount(rows), seatsInRow, typeChoices)
   const pickRowType = (row: number, ticketTypeId: string | null) =>
-    setRowTypes((prev) => withRowType(prev, row, ticketTypeId))
+    setSeatTypes((prev) => withRowType(prev, row, seatsInRow, ticketTypeId))
+  // The paint picker: null until the organizer picks, which reads as the first type.
+  const [paintPick, setPaintPick] = useState<string | null>(null)
+  const paint = paintChoiceOf(paintPick, typeChoices)
+  const seatPainter: SeatPainter = {
+    labelOf: (row, seat) => seatAriaLabel(row, seat, seatTicketTypes[row]?.[seat] ?? null, typeChoices),
+    onPaint: (row, seat) => setSeatTypes((prev) => withSeatType(prev, row, seat, typeOfChoice(paint))),
+  }
 
   const online = loc === 'online'
 
@@ -417,7 +496,7 @@ export default function EventFormPage() {
     requiresApproval: approval,
     seatRows: rows,
     seatsPerRow: cols,
-    rowTicketTypes,
+    seatTicketTypes,
     coverImage,
     highlights: highlights.map((h) => ({ text: h.label, icon: h.icon })),
     tickets,
@@ -434,11 +513,11 @@ export default function EventFormPage() {
   const current = collect()
   const gaps = publishGaps(current)
   const requirements = PUBLISH_REQUIREMENTS.filter(
-    (requirement) => requirement !== SEAT_ROWS_REQUIREMENT || seatRowsApply(current),
+    (requirement) => requirement !== SEAT_TYPES_REQUIREMENT || seatRowsApply(current),
   )
   const isDraft = initial.status === null || initial.status === 'draft'
   const step = STEPS[at]
-  // Seating's save leaves a published map's new, untyped rows to Assign seats
+  // Seating's save leaves a published map's new, untyped seats to Assign seats
   // (US-EVT-05): the step says so, and so does the header Save's toast.
   const seatMapDeferred = seatMapDeferredOn(step.key, current)
   const pct = stepProgress(at)
@@ -454,14 +533,8 @@ export default function EventFormPage() {
   const quantityColumn = quantityColumnOf(current)
   const ticketSpans = TICKET_SPANS[quantityColumn]
   const assignSeatsView = assignSeatsViewOf(current, typeChoices.length, saving)
-  const seatMapPreview = (
-    <SeatMapPreview
-      rows={rowsNum}
-      cols={colsNum}
-      swatches={rowSwatchesOf(rowTicketTypes, typeChoices)}
-      legend={seatLegend(rowTicketTypes, typeChoices, colsNum)}
-    />
-  )
+  const seatSwatches = seatSwatchesOf(seatTicketTypes, typeChoices)
+  const legend = seatLegend(seatTicketTypes, typeChoices)
 
   /**
    * `POST /events` needs a name, a type and a start — and the start is asked
@@ -1086,8 +1159,8 @@ export default function EventFormPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
                     Preview — what attendees see
                   </p>
-                  {seatMapPreview}
-                  <p className="hint mt-2">After Tickets, give each row a ticket type in Assign seats.</p>
+                  <SeatMapPreview swatches={seatSwatches} legend={legend} />
+                  <p className="hint mt-2">After Tickets, give the seats ticket types in Assign seats.</p>
                   {seatMapDeferred && (
                     <p role="status" className="mt-1 flex items-start gap-1.5 text-[12px] text-ink">
                       <i
@@ -1184,7 +1257,7 @@ export default function EventFormPage() {
               </div>
               {seatRowsOn && (
                 <p className="hint mt-2">
-                  Each type's quantity is the seats in its rows — give rows a type in the next
+                  Each type's quantity is the seats it holds — give seats a type in the next
                   step, Assign seats.
                 </p>
               )}
@@ -1253,7 +1326,8 @@ export default function EventFormPage() {
               <h2 className="text-[20px] font-bold tracking-tight">Assign seats</h2>
               {seatRowsOn && (
                 <p className="mt-1 text-[13px] text-muted">
-                  Give each seat row a ticket type. A type's quantity is the seats in its rows.
+                  Give each seat a ticket type — a whole row from its dropdown, or just the seats
+                  you click. A type's quantity is the seats it holds.
                 </p>
               )}
             </div>
@@ -1278,7 +1352,7 @@ export default function EventFormPage() {
                   </button>
                 </div>
               )}
-              {/* A row can only be given a type the API has stored. */}
+              {/* A seat can only be given a type the API has stored. */}
               {assignSeatsView === 'saving' && (
                 <p role="status" className="text-[13px] text-muted">
                   {SAVING_TICKET_TYPES}
@@ -1287,7 +1361,7 @@ export default function EventFormPage() {
               {assignSeatsView === 'empty' && (
                 <div>
                   <p className="text-[13px] text-muted">
-                    Add your ticket types in the Tickets step first, then give each row one here.
+                    Add your ticket types in the Tickets step first, then give the seats one here.
                   </p>
                   <button
                     type="button"
@@ -1301,12 +1375,14 @@ export default function EventFormPage() {
               )}
               {assignSeatsView === 'rows' && (
                 <>
-                  <RowTicketTypes rows={rowTicketTypes} choices={typeChoices} onPick={pickRowType} />
+                  <RowTicketTypes rows={seatTicketTypes} choices={typeChoices} onPick={pickRowType} />
                   <div className="mt-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-                      Preview — what attendees see
+                    <PaintPicker options={paintOptionsOf(typeChoices)} value={paint} onPick={setPaintPick} />
+                    <SeatMapPreview swatches={seatSwatches} legend={legend} painter={seatPainter} />
+                    <p className="hint mt-2">
+                      Pick a ticket type, then click or drag across seats to give just those seats
+                      that type.
                     </p>
-                    {seatMapPreview}
                   </div>
                 </>
               )}
