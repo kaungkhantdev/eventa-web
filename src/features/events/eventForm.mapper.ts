@@ -28,7 +28,7 @@ export interface HighlightDraft {
   icon?: string | null
 }
 
-/** Everything the five steps hold. */
+/** Everything the wizard's steps hold. */
 export interface EventFormValues {
   id: string | null
   status: EventWireStatus | null
@@ -175,7 +175,7 @@ export function toEventFormValues(
  * it (US-EVT-05), the API derives it and refuses a different one, so it is
  * left out; a blank one is left out too, since 0 would mean unlimited.
  */
-export function toTicketBody(row: TicketDraft, quantityFromSeats: boolean) {
+export function toTicketBody(row: TicketDraft, event: QuantityFacts) {
   const total = Number(row.quantity) || undefined
   return {
     name: row.name.trim(),
@@ -183,7 +183,7 @@ export function toTicketBody(row: TicketDraft, quantityFromSeats: boolean) {
     // A free tier carries no price at all — 0 would describe a paid tier that
     // happens to cost nothing, which the API stores differently.
     priceSatang: row.isFree ? undefined : satangOf(row.price),
-    ...(quantityFromSeats ? {} : { total }),
+    ...(quantitySetBySeats(event) ? {} : { total }),
   }
 }
 
@@ -254,9 +254,26 @@ function capacityOf(typed: string): { capacity?: number } {
 /** What the Review step's checklist says a reserved event still needs (US-EVT-05). */
 export const SEAT_ROWS_REQUIREMENT = 'a ticket type for every seat row'
 
+/** What decides whether an event has seat rows at all. */
+export type SeatingFacts = Pick<EventFormValues, 'seatingMode' | 'isOnline'>
+
+/** What decides whether its ticket quantities are typed. */
+export type QuantityFacts = SeatingFacts & Pick<EventFormValues, 'quantityFromSeats'>
+
 /** Only an in-person, reserved event has seat rows to give ticket types. */
-export function seatRowsApply(values: EventFormValues): boolean {
+export function seatRowsApply(values: SeatingFacts): boolean {
   return values.seatingMode === 'reserved' && !values.isOnline
+}
+
+/**
+ * Whether the seat map, not the organizer, sets the ticket quantities
+ * (US-EVT-05). On an in-person reserved event it always does — its rows get
+ * their types on Assign seats — even before any row has one. Elsewhere only
+ * while the API still says so: a switch away from reserved seating that has not
+ * been saved yet leaves the old map in charge.
+ */
+export function quantitySetBySeats(event: QuantityFacts): boolean {
+  return seatRowsApply(event) || event.quantityFromSeats
 }
 
 /**

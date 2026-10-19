@@ -24,16 +24,19 @@ import { eventDetailPath } from '../events.presentation'
 import type { EventType } from '../types'
 import {
   HL_ICONS,
-  STEPS,
   WAITLIST_HINT,
+  clampStep,
   finalLabel,
   headerSaveLabel,
   POPUP_BLOCKED_HINT,
   landingPreviewHref,
   openPreviewTab,
+  saveIntentOf,
   summaryCapacity,
   swatchClassOf,
+  wizardStepsOf,
   type Highlight,
+  type StepKey,
 } from '../eventForm.presentation'
 import {
   rowSwatchesOf,
@@ -43,14 +46,17 @@ import {
   seatRowCount,
   ticketTypeChoices,
   withRowType,
+  type SeatLegendEntry,
 } from '../eventSeating.mapper'
 import { CoverImageField } from '../components/CoverImageField'
 import { RowTicketTypes } from '../components/RowTicketTypes'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
-   A five-step flow (Basics · Date & location · Seating · Tickets · Review)
-   with a clickable step rail, live progress, a reserved-seating seat-map
-   preview, ticket/highlight repeaters, toggles and a live summary panel. */
+   Basics · Date & location · Seating · Tickets · Review & publish, with an
+   Assign seats step after Tickets for an in-person reserved event
+   (`wizardStepsOf`). A clickable step rail, live progress, a reserved-seating
+   seat-map preview, ticket/highlight repeaters, toggles and a live summary
+   panel. */
 
 type LocMode = 'inperson' | 'online'
 type Seating = 'ga' | 'reserved'
@@ -160,6 +166,49 @@ function SeatPreview({
     )
   }
   return <div className="flex flex-col items-center gap-1.5 overflow-x-auto">{rowEls}</div>
+}
+
+/* The stage, the seat rows in their types' colours and the key — the same
+   picture on Seating, where the grid is laid out, and on Assign seats, where
+   its rows are given types. */
+function SeatMapPreview({
+  rows,
+  cols,
+  swatches,
+  legend,
+}: {
+  rows: number
+  cols: number
+  swatches: readonly (number | null)[]
+  legend: readonly SeatLegendEntry[]
+}) {
+  return (
+    <div className="efhouse mt-2 overflow-hidden rounded-2xl p-5">
+      <div className="mb-4 flex flex-col items-center">
+        <svg viewBox="0 0 400 28" className="w-full max-w-sm" preserveAspectRatio="none" aria-hidden="true">
+          <path
+            d="M8 24 Q200 2 392 24"
+            fill="none"
+            stroke="rgba(27,167,112,.7)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
+          Stage
+        </span>
+      </div>
+      <SeatPreview rows={rows} cols={cols} swatches={swatches} />
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/10 pt-4 text-[11px] text-white/55">
+        {legend.map((entry) => (
+          <span key={entry.ticketTypeId ?? 'none'} className="inline-flex items-center gap-1.5">
+            <span className={cn('efseat !h-3.5 !w-3.5', swatchClassOf(entry.swatch))} />
+            {entry.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 /** An emptied editor still holds one empty paragraph; that is not a description. */
@@ -372,8 +421,13 @@ export default function EventFormPage() {
     (requirement) => requirement !== SEAT_ROWS_REQUIREMENT || seatRowsApply(current),
   )
   const isDraft = initial.status === null || initial.status === 'draft'
-  const pct = Math.round(((cur + 1) / STEPS.length) * 100)
-  const last = cur === STEPS.length - 1
+  // The rail follows the seating on screen, so `cur` can point past its end
+  // for a moment after Assign seats drops out.
+  const steps = wizardStepsOf(current)
+  const at = clampStep(cur, steps.length)
+  const step = steps[at]
+  const pct = Math.round(((at + 1) / steps.length) * 100)
+  const last = at === steps.length - 1
   // An event that already exists is being edited, whatever the wizard is
   // called. Saying "Create event" over someone's published conference is the
   // kind of small lie that makes people doubt whether Save did anything.
@@ -381,6 +435,15 @@ export default function EventFormPage() {
   const rowsNum = Number(rows) || 0
   const colsNum = Number(cols) || 0
   const seatTotal = rowsNum * colsNum
+  const seatRowsOn = seatRowsApply(current)
+  const seatMapPreview = (
+    <SeatMapPreview
+      rows={rowsNum}
+      cols={colsNum}
+      swatches={rowSwatchesOf(rowTicketTypes, typeChoices)}
+      legend={seatLegend(rowTicketTypes, typeChoices, colsNum)}
+    />
+  )
 
   /**
    * `POST /events` needs a name, a type and a start — and the start is asked
@@ -404,9 +467,7 @@ export default function EventFormPage() {
       if (canCreate) submit({ intent: 'create', ...extra })
       return
     }
-    if (cur === 2) submit({ intent: 'seating', ...extra })
-    else if (cur === 3) submit({ intent: 'tickets', ...extra })
-    else submit({ intent: 'save', ...extra })
+    submit({ intent: saveIntentOf(step.key), ...extra })
   }
 
   /**
@@ -431,9 +492,10 @@ export default function EventFormPage() {
   const saveAndFinish = () => submit({ intent: 'save', notify: 'on', finish: 'on' })
 
   const goTo = (i: number) => {
-    setCur(Math.max(0, Math.min(STEPS.length - 1, i)))
+    setCur(clampStep(i, steps.length))
     document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
   }
+  const goToStep = (key: StepKey) => goTo(steps.findIndex((s) => s.key === key))
 
   const summarySeating = online
     ? 'Online'
@@ -580,12 +642,12 @@ export default function EventFormPage() {
             />
           </div>
           <div className="card mt-4 space-y-1 p-2.5">
-            {STEPS.map((s, i) => {
-              const done = i < cur
-              const active = i === cur
+            {steps.map((s, i) => {
+              const done = i < at
+              const active = i === at
               return (
                 <button
-                  key={i}
+                  key={s.key}
                   type="button"
                   onClick={() => goTo(i)}
                   className={cn(
@@ -623,8 +685,10 @@ export default function EventFormPage() {
 
         {/* ============ STEP CONTENT ============ */}
         <div className="min-w-0">
-          {/* ===== STEP 0 · DETAILS ===== */}
-          <section className={cn('space-y-3', cur !== 0 && 'hidden')}>
+          {/* Every step stays mounted and only the open one shows: the
+              description editor is imperative and would lose its text. */}
+          {/* ===== BASICS ===== */}
+          <section className={cn('space-y-3', step.key !== 'basics' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Basics</h2>
               <p className="mt-1 text-[13px] text-muted">Tell attendees what your event is about.</p>
@@ -751,8 +815,8 @@ export default function EventFormPage() {
             </section>
           </section>
 
-          {/* ===== STEP 1 · DATE & LOCATION ===== */}
-          <section className={cn('space-y-3', cur !== 1 && 'hidden')}>
+          {/* ===== DATE & LOCATION ===== */}
+          <section className={cn('space-y-3', step.key !== 'when' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Date &amp; location</h2>
               <p className="mt-1 text-[13px] text-muted">When and where your event happens.</p>
@@ -899,8 +963,8 @@ export default function EventFormPage() {
             </section>
           </section>
 
-          {/* ===== STEP 2 · SEATING ===== */}
-          <section className={cn('space-y-3', cur !== 2 && 'hidden')}>
+          {/* ===== SEATING ===== */}
+          <section className={cn('space-y-3', step.key !== 'seating' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Seating</h2>
               <p className="mt-1 text-[13px] text-muted">
@@ -999,49 +1063,14 @@ export default function EventFormPage() {
                     </div>
                   </div>
                 </div>
-                <div className={cn(seating !== 'reserved' && 'hidden')}>
-                  <RowTicketTypes rows={rowTicketTypes} choices={typeChoices} onPick={pickRowType} />
-                </div>
                 {/* live seat-map preview */}
                 <div className={cn('mt-3', seating !== 'reserved' && 'hidden')}>
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
                     Preview — what attendees see
                   </p>
-                  <div className="efhouse mt-2 overflow-hidden rounded-2xl p-5">
-                    <div className="mb-4 flex flex-col items-center">
-                      <svg
-                        viewBox="0 0 400 28"
-                        className="w-full max-w-sm"
-                        preserveAspectRatio="none"
-                        aria-hidden="true"
-                      >
-                        <path
-                          d="M8 24 Q200 2 392 24"
-                          fill="none"
-                          stroke="rgba(27,167,112,.7)"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      <span className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
-                        Stage
-                      </span>
-                    </div>
-                    <SeatPreview
-                      rows={rowsNum}
-                      cols={colsNum}
-                      swatches={rowSwatchesOf(rowTicketTypes, typeChoices)}
-                    />
-                    <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/10 pt-4 text-[11px] text-white/55">
-                      {seatLegend(rowTicketTypes, typeChoices, colsNum).map((entry) => (
-                        <span key={entry.ticketTypeId ?? 'none'} className="inline-flex items-center gap-1.5">
-                          <span className={cn('efseat !h-3.5 !w-3.5', swatchClassOf(entry.swatch))} />
-                          {entry.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="hint mt-2">The same green seat picker runs on the attendee ticket page.</p>
+                  {seatMapPreview}
+                  <p className="hint mt-2">After Tickets, give each row a ticket type in Assign seats.</p>
+                  <p className="hint mt-1">The same green seat picker runs on the attendee ticket page.</p>
                 </div>
               </div>
               <p
@@ -1056,8 +1085,8 @@ export default function EventFormPage() {
             </section>
           </section>
 
-          {/* ===== STEP 3 · TICKETS ===== */}
-          <section className={cn('space-y-3', cur !== 3 && 'hidden')}>
+          {/* ===== TICKETS ===== */}
+          <section className={cn('space-y-3', step.key !== 'tickets' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Tickets &amp; registration</h2>
               <p className="mt-1 text-[13px] text-muted">
@@ -1079,9 +1108,9 @@ export default function EventFormPage() {
               </div>
               <div className="mt-2 space-y-2">
                 {tickets.map((t, i) => {
-                  // The seat map sets it on a reserved event whose rows have
-                  // ticket types (US-EVT-05): shown as stored, never typed.
-                  const seatQuantity = seatQuantityOf(initial, t.id)
+                  // On a reserved event the seat map sets it (US-EVT-05): the
+                  // seats in the type's rows as picked now, never typed.
+                  const seatQuantity = seatQuantityOf(current, initial, t.id)
                   return (
                     <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-12 sm:items-center">
                       <input
@@ -1130,6 +1159,12 @@ export default function EventFormPage() {
                   )
                 })}
               </div>
+              {seatRowsOn && (
+                <p className="hint mt-2">
+                  Each type's quantity is the seats in its rows — give rows a type in the next
+                  step, Assign seats.
+                </p>
+              )}
               <button type="button" className="btn btn-soft btn-sm mt-3" onClick={addTicket}>
                 <i className="hgi-stroke hgi-add-01 text-[14px]" />
                 Add ticket type
@@ -1188,8 +1223,47 @@ export default function EventFormPage() {
             </section>
           </section>
 
-          {/* ===== STEP 4 · REVIEW & PUBLISH ===== */}
-          <section className={cn('space-y-3', cur !== 4 && 'hidden')}>
+          {/* ===== ASSIGN SEATS — in-person reserved events only (US-EVT-05) ===== */}
+          <section className={cn('space-y-3', step.key !== 'seats' && 'hidden')}>
+            <div>
+              <h2 className="text-[20px] font-bold tracking-tight">Assign seats</h2>
+              <p className="mt-1 text-[13px] text-muted">
+                Give each seat row a ticket type. A type's quantity is the seats in its rows.
+              </p>
+            </div>
+
+            <section className="card p-4">
+              {/* A row can only be given a type the API has stored. */}
+              {typeChoices.length === 0 ? (
+                <div>
+                  <p className="text-[13px] text-muted">
+                    Add your ticket types in the Tickets step first, then give each row one here.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm mt-3"
+                    onClick={() => goToStep('tickets')}
+                  >
+                    <i className="hgi-stroke hgi-arrow-left-01 text-[14px]" />
+                    Go to Tickets
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <RowTicketTypes rows={rowTicketTypes} choices={typeChoices} onPick={pickRowType} />
+                  <div className="mt-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+                      Preview — what attendees see
+                    </p>
+                    {seatMapPreview}
+                  </div>
+                </>
+              )}
+            </section>
+          </section>
+
+          {/* ===== REVIEW & PUBLISH ===== */}
+          <section className={cn('space-y-3', step.key !== 'review' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Review &amp; publish</h2>
               <p className="mt-1 text-[13px] text-muted">
@@ -1398,8 +1472,8 @@ export default function EventFormPage() {
           <div className="mt-4 flex items-center justify-between gap-3">
             <button
               type="button"
-              onClick={() => cur > 0 && goTo(cur - 1)}
-              className={cn('btn btn-soft', cur === 0 && 'pointer-events-none opacity-40')}
+              onClick={() => at > 0 && goTo(at - 1)}
+              className={cn('btn btn-soft', at === 0 && 'pointer-events-none opacity-40')}
             >
               <i className="hgi-stroke hgi-arrow-left-01 text-[15px]" />
               Back
@@ -1407,7 +1481,7 @@ export default function EventFormPage() {
             <button
               type="button"
               disabled={
-                saving || (last ? isDraft && gaps.length > 0 : cur === 1 && !canCreate)
+                saving || (last ? isDraft && gaps.length > 0 : step.key === 'when' && !canCreate)
               }
               title={last && isDraft && gaps.length ? `Still needs ${gaps.join(', ')}` : undefined}
               onClick={() => {
@@ -1424,7 +1498,7 @@ export default function EventFormPage() {
                   else saveAndFinish()
                 } else {
                   saveStep()
-                  goTo(cur + 1)
+                  goTo(at + 1)
                 }
               }}
               className="btn btn-primary min-w-[132px] justify-center disabled:opacity-60"
@@ -1449,7 +1523,7 @@ export default function EventFormPage() {
           <div className="sticky top-4 space-y-3">
             <div className="rounded-2xl bg-neutral-900 p-4 text-white">
               <p className="flex items-center gap-2 text-[13px] font-bold">💡 Tips</p>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-white/75">{STEPS[cur].tip}</p>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-white/75">{step.tip}</p>
             </div>
             <div className="card p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Summary</p>

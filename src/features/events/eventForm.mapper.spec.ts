@@ -442,9 +442,11 @@ describe('what a ticket row is saved with', () => {
     isFree: false,
     ...over,
   })
+  const general = { seatingMode: 'ga', isOnline: false, quantityFromSeats: false } as const
+  const reserved = { ...general, seatingMode: 'reserved' } as const
 
   it('sends the name, the price in satang and the quantity typed', () => {
-    expect(toTicketBody(row(), false)).toEqual({
+    expect(toTicketBody(row(), general)).toEqual({
       name: 'VIP',
       isFree: false,
       priceSatang: 350_000,
@@ -453,15 +455,28 @@ describe('what a ticket row is saved with', () => {
   })
 
   it('leaves a blank quantity out rather than sending 0, which means unlimited', () => {
-    expect(toTicketBody(row({ quantity: '' }), false).total).toBeUndefined()
+    expect(toTicketBody(row({ quantity: '' }), general).total).toBeUndefined()
   })
 
   it('sends no price for a free tier', () => {
-    expect(toTicketBody(row({ isFree: true }), false).priceSatang).toBeUndefined()
+    expect(toTicketBody(row({ isFree: true }), general).priceSatang).toBeUndefined()
   })
 
   // US-EVT-05: the seat map sets the quantity, and the API refuses a different one.
-  it('sends no quantity when the seat map sets it', () => {
-    expect(toTicketBody(row(), true)).not.toHaveProperty('total')
+  it('sends no quantity when the API says the seat map sets it', () => {
+    expect(toTicketBody(row(), { ...general, quantityFromSeats: true })).not.toHaveProperty('total')
+  })
+
+  /*
+   * US-EVT-05: on a reserved, in-person event a type's quantity is the seats in
+   * its rows, never typed — even before any row has a type, when the API does
+   * not say so yet.
+   */
+  it('sends no quantity for an in-person reserved event', () => {
+    expect(toTicketBody(row(), reserved)).not.toHaveProperty('total')
+  })
+
+  it('sends the typed quantity for an online event, which has no seat rows', () => {
+    expect(toTicketBody(row(), { ...reserved, isOnline: true }).total).toBe(40)
   })
 })

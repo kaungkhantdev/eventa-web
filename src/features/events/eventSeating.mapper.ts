@@ -1,10 +1,12 @@
 import { num } from '@/lib/format'
 import type { ReservedSeatingBody, SeatRowWire } from './eventContent.api'
-import type { EventFormValues, TicketDraft } from './eventForm.mapper'
+import { quantitySetBySeats, seatRowsApply, type EventFormValues, type TicketDraft } from './eventForm.mapper'
 
 /**
- * The wizard's Seating step rules for a reserved map split between ticket
- * types by whole rows (US-EVT-05).
+ * The wizard's rules for a reserved map split between ticket types by whole
+ * rows (US-EVT-05): the grid is laid out on the Seating step, each row is given
+ * a type on Assign seats, and the Tickets step shows each type's quantity as
+ * the seats its rows hold.
  *
  * A row's type is held as one list, one entry per row with index 0 = row 1,
  * because that is the shape `PUT /seating/reserved` takes as `rowTicketTypes`.
@@ -98,6 +100,15 @@ export function rowSwatchesOf(types: readonly (string | null)[], choices: readon
   })
 }
 
+/** The seats in the rows given this ticket type — or, for null, in the rows with none. */
+export function seatsOfType(
+  types: readonly (string | null)[],
+  ticketTypeId: string | null,
+  seatsPerRow: number,
+): number {
+  return types.filter((type) => type === ticketTypeId).length * seatsPerRow
+}
+
 /**
  * The preview's key: every ticket type with the seats its rows hold — a type
  * with none is listed too, since publishing needs every type to have a row —
@@ -108,13 +119,12 @@ export function seatLegend(
   choices: readonly TicketTypeChoice[],
   seatsPerRow: number,
 ): SeatLegendEntry[] {
-  const seatsOf = (type: string | null) => types.filter((t) => t === type).length * seatsPerRow
   const legend = choices.map((choice, swatch) => ({
     ticketTypeId: choice.id,
-    label: `${choice.name} · ${seatsLabel(seatsOf(choice.id))}`,
+    label: `${choice.name} · ${seatsLabel(seatsOfType(types, choice.id, seatsPerRow))}`,
     swatch,
   }))
-  const untyped = seatsOf(null)
+  const untyped = seatsOfType(types, null, seatsPerRow)
   if (untyped === 0) return legend
   return [...legend, { ticketTypeId: null, label: `${NO_TICKET_TYPE} · ${seatsLabel(untyped)}`, swatch: null }]
 }
@@ -142,13 +152,28 @@ export function quantityFromSeatsOf(tickets: readonly { quantityFromSeats: boole
 }
 
 /**
- * The quantity a ticket row shows read-only, or null when it is typed. It is
- * what the API stored — the seats the type's rows hold — and 0 for a type not
- * saved yet, which has no rows.
+ * The quantity a ticket row shows read-only, or null when it is typed. `now` is
+ * the wizard as it stands; `saved` is what the API last returned.
+ *
+ * On an in-person reserved event it is the seats the type's rows hold, worked
+ * out from the rows as they are picked right now, so it moves the moment a row
+ * changes hands. A type not saved yet has no rows, so it is 0 — never the rows
+ * still without a type. Anywhere else the seat map sets it only while the API
+ * still says so, and then it is the number the API stored.
  */
-export function seatQuantityOf(saved: EventFormValues, ticketId: string | null): string | null {
-  if (!saved.quantityFromSeats) return null
-  return saved.tickets.find((ticket) => ticket.id !== null && ticket.id === ticketId)?.quantity ?? '0'
+export function seatQuantityOf(
+  now: EventFormValues,
+  saved: EventFormValues,
+  ticketId: string | null,
+): string | null {
+  if (!quantitySetBySeats({ ...now, quantityFromSeats: saved.quantityFromSeats })) return null
+  if (!seatRowsApply(now)) return storedQuantityOf(saved.tickets, ticketId)
+  if (ticketId === null) return '0'
+  return String(seatsOfType(now.rowTicketTypes, ticketId, Number(now.seatsPerRow) || 0))
+}
+
+function storedQuantityOf(tickets: readonly TicketDraft[], ticketId: string | null): string {
+  return tickets.find((ticket) => ticket.id !== null && ticket.id === ticketId)?.quantity ?? '0'
 }
 
 function seatsLabel(seats: number): string {

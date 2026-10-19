@@ -237,7 +237,7 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
  */
 async function saveTickets(eventId: string, values: EventFormValues): Promise<void> {
   for (const row of values.tickets) {
-    const body = toTicketBody(row, values.quantityFromSeats)
+    const body = toTicketBody(row, values)
     if (!body.name) continue
     if (row.id) await ticketingApi.update(eventId, row.id, body)
     else await ticketingApi.add(eventId, body)

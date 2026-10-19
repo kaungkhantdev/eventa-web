@@ -1,3 +1,5 @@
+import { seatRowsApply, type SeatingFacts } from './eventForm.mapper'
+
 /** The wizard's own vocabulary: its steps, its icon set and the seat-row colours. */
 
 export type Highlight = {
@@ -25,33 +27,83 @@ export const HL_ICONS: { slug: string; label: string }[] = [
   { slug: 'hgi-medal-first-place', label: 'Medal' },
 ]
 
+/** Each wizard step, named so the page renders it by name rather than by position. */
+export type StepKey = 'basics' | 'when' | 'seating' | 'tickets' | 'seats' | 'review'
+
 export type WizardStep = {
+  key: StepKey
   label: string
   tip: string
 }
 
-export const STEPS: WizardStep[] = [
+/** Every step there can be, in order. `wizardStepsOf` says which an event shows. */
+export const STEPS: readonly WizardStep[] = [
   {
+    key: 'basics',
     label: 'Basics',
     tip: 'Give your event a clear title and description, a cover image and a few highlights for the landing page.',
   },
   {
+    key: 'when',
     label: 'Date & location',
     tip: 'Set exactly when your event runs, and whether it is in-person (with a venue) or online.',
   },
   {
+    key: 'seating',
     label: 'Seating',
     tip: 'General admission needs no seats. Reserved seating lets attendees pick their spot — preview the seat map here.',
   },
   {
+    key: 'tickets',
     label: 'Tickets',
     tip: 'Add at least one ticket type with a price and quantity, then set your total capacity.',
   },
   {
+    key: 'seats',
+    label: 'Assign seats',
+    tip: 'Give each row of the seat map a ticket type — say VIP up front, Normal behind. Each type sells only its own rows.',
+  },
+  {
+    key: 'review',
     label: 'Review & publish',
     tip: 'Pick a landing-page template and review your setup. Publishing lets attendees register right away.',
   },
 ]
+
+/**
+ * The steps this event's wizard shows (US-EVT-02). Assign seats is only for an
+ * in-person reserved event — the one kind with seat rows to give ticket types
+ * (US-EVT-05) — and it follows Tickets because a row can only be given a type
+ * that has been saved.
+ */
+export function wizardStepsOf(event: SeatingFacts): WizardStep[] {
+  return seatRowsApply(event) ? [...STEPS] : STEPS.filter((step) => step.key !== 'seats')
+}
+
+/** What a step's save asks the route action to write. */
+export type SaveIntent = 'save' | 'seating' | 'tickets'
+
+/** Assign seats writes the seat map too: each row's type travels with the grid. */
+const SAVE_INTENT: Record<StepKey, SaveIntent> = {
+  basics: 'save',
+  when: 'save',
+  seating: 'seating',
+  tickets: 'tickets',
+  seats: 'seating',
+  review: 'save',
+}
+
+export function saveIntentOf(step: StepKey): SaveIntent {
+  return SAVE_INTENT[step]
+}
+
+/**
+ * The open step's place, kept on the rail. Switching Reserved to General
+ * admission drops Assign seats, and the step that was open must still exist.
+ */
+export function clampStep(index: number, stepCount: number): number {
+  return Math.max(0, Math.min(stepCount - 1, index))
+}
 
 /**
  * Seat colours for ticket types on the reserved-seating preview (US-EVT-05).
