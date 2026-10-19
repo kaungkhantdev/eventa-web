@@ -1,7 +1,7 @@
 import { seatRowsApply, type SeatingFacts } from './eventForm.mapper'
 import { seatingWaitsForRowTypes, type SeatMapState } from './eventSeating.mapper'
 
-/** The wizard's own vocabulary: its steps, its icon set and the seat-row colours. */
+/** The wizard's own vocabulary: its steps and its icon set. */
 
 export type Highlight = {
   icon: string
@@ -112,14 +112,6 @@ export function saveIntentOf(step: StepKey, event: SeatMapState): SaveIntent {
 export function clampStep(index: number, stepCount: number): number {
   return Math.max(0, Math.min(stepCount - 1, index))
 }
-
-/**
- * Seat colours for ticket types on the reserved-seating preview (US-EVT-05).
- *
- * Kept in `@/lib/seatSwatches` and shared with the public event page's seat
- * map (US-PAGE-05), so this preview and the page attendees see match.
- */
-export { ROW_TYPE_SWATCHES, swatchClassOf } from '@/lib/seatSwatches'
 
 /**
  * What the waitlist switch says under it (US-REG-04). Reserved seating has no

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   POPUP_BLOCKED_HINT,
-  ROW_TYPE_SWATCHES,
   clampStep,
   finalLabel,
   headerSaveLabel,
@@ -9,7 +8,6 @@ import {
   openPreviewTab,
   saveIntentOf,
   summaryCapacity,
-  swatchClassOf,
   wizardStepsOf,
 } from './eventForm.presentation'
 import { toEventFormValues, type EventFormValues } from './eventForm.mapper'
@@ -210,27 +208,6 @@ describe('openPreviewTab', () => {
 
   it('has a hint that says what to do about it', () => {
     expect(POPUP_BLOCKED_HINT).toMatch(/allow pop-ups/i)
-  })
-})
-
-/**
- * Each ticket type's seat colour on the Seating preview (US-EVT-05), by the
- * type's place in the event's list, so two types of one event never share a
- * colour until there are more types than colours.
- */
-describe('swatchClassOf', () => {
-  it('gives each type its own colour, in list order', () => {
-    expect(swatchClassOf(0)).toBe(ROW_TYPE_SWATCHES[0])
-    expect(swatchClassOf(1)).toBe(ROW_TYPE_SWATCHES[1])
-    expect(swatchClassOf(0)).not.toBe(swatchClassOf(1))
-  })
-
-  it('starts the colours again past the last one', () => {
-    expect(swatchClassOf(ROW_TYPE_SWATCHES.length)).toBe(ROW_TYPE_SWATCHES[0])
-  })
-
-  it('leaves a row with no type its plain, neutral seat', () => {
-    expect(swatchClassOf(null)).toBe('')
   })
 })
 

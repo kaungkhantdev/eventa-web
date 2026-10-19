@@ -1,4 +1,5 @@
 import { num } from '@/lib/format'
+import { swatchOf } from '@/lib/seatSwatches'
 import type { ReservedSeatingBody, SeatRowWire } from './eventContent.api'
 import { quantitySetBySeats, seatRowsApply, type EventFormValues, type TicketDraft } from './eventForm.mapper'
 
@@ -92,12 +93,14 @@ export function rowTicketTypesFor(
   })
 }
 
-/** Each row's colour: its type's place among the choices, or null for none. */
+/**
+ * Each row's colour, by the shared rule (`swatchOf`) the public page colours
+ * by too (US-PAGE-05): its type's place among the choices — the event's saved
+ * types, listed in the order they were created — or null for none.
+ */
 export function rowSwatchesOf(types: readonly (string | null)[], choices: readonly TicketTypeChoice[]): (number | null)[] {
-  return types.map((type) => {
-    const index = choices.findIndex((choice) => choice.id === type)
-    return index === -1 ? null : index
-  })
+  const byCreation = idsOf(choices)
+  return types.map((type) => swatchOf(type, byCreation))
 }
 
 /** The seats in the rows given this ticket type — or, for null, in the rows with none. */
@@ -119,10 +122,11 @@ export function seatLegend(
   choices: readonly TicketTypeChoice[],
   seatsPerRow: number,
 ): SeatLegendEntry[] {
-  const legend = choices.map((choice, swatch) => ({
+  const byCreation = idsOf(choices)
+  const legend = choices.map((choice) => ({
     ticketTypeId: choice.id,
     label: `${choice.name} · ${seatsLabel(seatsOfType(types, choice.id, seatsPerRow))}`,
-    swatch,
+    swatch: swatchOf(choice.id, byCreation),
   }))
   const untyped = seatsOfType(types, null, seatsPerRow)
   if (untyped === 0) return legend
@@ -191,6 +195,10 @@ export function seatQuantityOf(
 
 function storedQuantityOf(tickets: readonly TicketDraft[], ticketId: string | null): string {
   return tickets.find((ticket) => ticket.id !== null && ticket.id === ticketId)?.quantity ?? '0'
+}
+
+function idsOf(choices: readonly TicketTypeChoice[]): string[] {
+  return choices.map((choice) => choice.id)
 }
 
 function seatsLabel(seats: number): string {

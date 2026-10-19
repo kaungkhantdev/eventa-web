@@ -1,8 +1,8 @@
 /**
  * Seat colours for ticket types on a reserved seat map (US-EVT-05): the
- * create-event wizard's Seating preview and the public event page's seat map
- * (US-PAGE-05) both take a row's colour from this one list, in the order
- * `swatchOf` sets, so a type is the same colour in both.
+ * create-event wizard's preview and key (Seating and Assign seats) and the
+ * public event page's seat map (US-PAGE-05) all take a row's colour from this
+ * one list, in the order `swatchOf` sets, so a type is the same colour in each.
  *
  * The hues of the app's existing per-tier tints (`ICON_TINTS` in the ticketing
  * feature), at their dark-mode strength because the preview panel is always

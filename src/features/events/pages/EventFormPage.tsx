@@ -7,6 +7,7 @@ import type { ActionResult } from '@/app/loaders'
 import { NotificationBell, SignedInChip, Toggle, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
+import { swatchClassOf } from '@/lib/seatSwatches'
 import { toast } from '@/lib/toast'
 import { SEAT_SET_QUANTITY } from '@/features/ticketing/tickets.mapper'
 import {
@@ -33,7 +34,6 @@ import {
   openPreviewTab,
   saveIntentOf,
   summaryCapacity,
-  swatchClassOf,
   wizardStepsOf,
   type Highlight,
   type StepKey,

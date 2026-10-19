@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { swatchOf } from '@/lib/seatSwatches'
 import {
   quantityFromSeatsOf,
   rowTicketTypesFor,
@@ -132,6 +133,17 @@ describe('rowSwatchesOf — each row’s colour in the preview', () => {
   it('colours a row by its type’s place in the list, and an untyped row not at all', () => {
     expect(rowSwatchesOf(['tier-ga', null, 'tier-vip'], [VIP, GA])).toEqual([1, null, 0])
   })
+
+  /*
+   * US-PAGE-05: the public page colours a type by the shared rule, `swatchOf`,
+   * over the event's types in the order they were created — the order the
+   * wizard lists them in — so a type is one colour in both places.
+   */
+  it('colours each row as the public page does', () => {
+    const rows = ['tier-ga', null, 'tier-vip', 'tier-gone']
+    const byCreation = [VIP.id, GA.id]
+    expect(rowSwatchesOf(rows, [VIP, GA])).toEqual(rows.map((row) => swatchOf(row, byCreation)))
+  })
 })
 
 describe('seatLegend — the preview’s key', () => {
@@ -158,6 +170,17 @@ describe('seatLegend — the preview’s key', () => {
 
   it('formats a large count for reading', () => {
     expect(seatLegend(Array(100).fill(null), [], 100)[0]!.label).toBe('No ticket type · 10,000 seats')
+  })
+
+  // The key's colours are the rows' colours, and the public page's (US-PAGE-05).
+  it('keys each type in the colour the public page gives it', () => {
+    const legend = seatLegend(['tier-vip', 'tier-ga', null], [VIP, GA], 16)
+    const byCreation = [VIP.id, GA.id]
+    expect(legend.map((entry) => entry.swatch)).toEqual([
+      swatchOf(VIP.id, byCreation),
+      swatchOf(GA.id, byCreation),
+      swatchOf(null, byCreation),
+    ])
   })
 })
 
