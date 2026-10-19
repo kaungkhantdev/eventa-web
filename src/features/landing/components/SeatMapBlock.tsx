@@ -2,13 +2,14 @@ import { cn } from '@/lib/cn'
 import { swatchClassOf } from '@/lib/seatSwatches'
 import type { LandingSeatMap, LandingSeatRow } from '@/features/landing/types'
 
-/** A seat; a row's swatch overrides the neutral fill (the palette is `!important`). */
+/** A seat; its ticket's swatch overrides the neutral fill (the palette is `!important`). */
 const SEAT = 'shrink-0 rounded-[3px] bg-muted/30'
 
 /**
- * The tickets section's seat map (US-PAGE-05): the stage, every seat row in
- * the colour of the ticket that sells it, and a key naming each ticket with its
- * rows and seats. Nothing is picked here — seats are chosen at checkout.
+ * The tickets section's seat map (US-PAGE-05): the stage, every seat in the
+ * colour of the ticket that sells it — a row can be split between tickets —
+ * and a key naming each ticket with where its seats are and how many. Nothing
+ * is picked here — seats are chosen at checkout.
  *
  * Semantic tokens only, so it sits in any of the four templates in either
  * theme; `className` carries the template's own card styling. A room wider than
@@ -23,7 +24,7 @@ export function SeatMapBlock({ seatMap, className }: { seatMap: LandingSeatMap; 
         <div className="mt-3 overflow-x-auto pb-1">
           <div className="mx-auto flex w-max flex-col gap-[3px] sm:gap-1">
             {seatMap.rows.map((row) => (
-              <SeatRow key={row.label} row={row} seats={seatMap.seatsPerRow} />
+              <SeatRow key={row.label} row={row} />
             ))}
           </div>
         </div>
@@ -59,14 +60,13 @@ function Stage() {
   )
 }
 
-/** One row, numbered on both sides as the venue numbers it. */
-function SeatRow({ row, seats }: { row: LandingSeatRow; seats: number }) {
-  const seat = cn(SEAT, 'h-2.5 w-2.5 sm:h-3 sm:w-3', swatchClassOf(row.swatch))
+/** One row, numbered on both sides as the venue numbers it, each seat in its ticket's colour. */
+function SeatRow({ row }: { row: LandingSeatRow }) {
   return (
     <div className="flex items-center gap-[3px] sm:gap-1">
       <RowNumber label={row.label} />
-      {Array.from({ length: seats }, (_, i) => (
-        <span key={i} className={seat} />
+      {row.swatches.map((swatch, i) => (
+        <span key={i} className={cn(SEAT, 'h-2.5 w-2.5 sm:h-3 sm:w-3', swatchClassOf(swatch))} />
       ))}
       <RowNumber label={row.label} />
     </div>

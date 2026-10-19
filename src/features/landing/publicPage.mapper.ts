@@ -1,4 +1,5 @@
-import { MASKED, bangkokDate, bangkokTime, initials, num } from '@/lib/format'
+import { MASKED, bangkokDate, bangkokTime, initials } from '@/lib/format'
+import { seatKeyLabelOf, seatsOfType, seatsWhereOf, seatsWherePhraseOf, type SeatRowTypes } from '@/lib/seatPlaces'
 import { swatchOf } from '@/lib/seatSwatches'
 import type { LandingEvent, LandingSeatMap, LandingSpeaker, LandingTicket } from './types'
 import type {
@@ -44,7 +45,7 @@ export function toLandingEvent(page: PublicPageWire): LandingEvent {
   // tickets were created, as the wizard's list is; the cards go cheapest first.
   const byCreation = page.tickets.map((ticket) => ticket.id)
   const tickets = [...page.tickets].sort((a, b) => a.priceSatang - b.priceSatang)
-  const rowsByTicket = rowsByTicketOf(page.seatMap)
+  const seats = seatTypesOf(page.seatMap)
 
   return {
     ...NOT_HELD,
@@ -78,8 +79,8 @@ export function toLandingEvent(page: PublicPageWire): LandingEvent {
     speakersTitle: page.sections.speakers,
     speakers: page.speakers.map(toSpeaker),
     ticketsTitle: TICKETS_TITLE,
-    tickets: tickets.map(toTicket(tickets, rowsByTicket)),
-    seatMap: seatMapOf(page.seatMap, tickets, rowsByTicket, byCreation),
+    tickets: tickets.map(toTicket(tickets, seats)),
+    seatMap: seatMapOf(seats, tickets, byCreation),
     faqs: page.faqs.map((f) => ({ q: f.question, a: f.answer })),
     online: event.isOnline,
     onlineNote: event.onlineNote ?? '',
@@ -154,7 +155,7 @@ function toSpeaker(speaker: PublicSpeakerWire): LandingSpeaker {
 }
 
 /** Only the first recommended tier is lifted; two would break the grid. */
-function toTicket(ordered: PublicTicketWire[], rowsByTicket: RowsByTicket) {
+function toTicket(ordered: PublicTicketWire[], seats: readonly SeatRowTypes[]) {
   const featured = ordered.find((t) => t.isRecommended)
   return (ticket: PublicTicketWire): LandingTicket => ({
     name: ticket.name,
@@ -164,7 +165,7 @@ function toTicket(ordered: PublicTicketWire[], rowsByTicket: RowsByTicket) {
     note: noteOf(ticket),
     featured: ticket.id === featured?.id,
     features: ticket.includes,
-    rowsLabel: rowsLabelOf(rowsByTicket.get(ticket.id) ?? []),
+    rowsLabel: seatsWhereOf(seats, ticket.id),
   })
 }
 
@@ -174,19 +175,12 @@ function noteOf(ticket: PublicTicketWire): string {
   return ticket.badge ?? ticket.urgency ?? ''
 }
 
-/** Each ticket's seat row labels, front to back, keyed by ticket id. */
-type RowsByTicket = ReadonlyMap<string, readonly string[]>
+/** A ticket on the page that sells seats, with its colour. */
+type KeyedTicket = { ticket: PublicTicketWire; swatch: number }
 
-/** A ticket on the page that sells seat rows, with those rows and their colour. */
-type TicketRows = { ticket: PublicTicketWire; rows: readonly string[]; swatch: number }
-
-/** No map, or no typed row, is no rows for any ticket. */
-function rowsByTicketOf(seatMap: PublicSeatMapWire | null): RowsByTicket {
-  const rows = new Map<string, string[]>()
-  for (const { label, ticketTypeId } of seatMap?.rows ?? []) {
-    if (ticketTypeId !== null) rows.set(ticketTypeId, [...(rows.get(ticketTypeId) ?? []), label])
-  }
-  return rows
+/** Each row's seats and their types, as the shared seat-places rule reads them; none without a map. */
+function seatTypesOf(seatMap: PublicSeatMapWire | null): SeatRowTypes[] {
+  return (seatMap?.rows ?? []).map((row) => ({ label: row.label, seats: row.seatTicketTypes }))
 }
 
 /**
@@ -194,59 +188,32 @@ function rowsByTicketOf(seatMap: PublicSeatMapWire | null): RowsByTicket {
  *
  * Only the tickets on the page are keyed, in the page's order, each in its
  * colour by the order the tickets were created (`swatchOf`), so a type matches
- * the organizer's preview. A row whose type is not among them — none at all,
+ * the organizer's preview. A seat whose type is not among them — none at all,
  * or one the page does not offer — stays neutral: it names nothing a reader
- * can buy. A map where every row is neutral shows no split, so there is no map.
+ * can buy. A map where every seat is neutral shows no split, so there is no map.
  */
 function seatMapOf(
-  seatMap: PublicSeatMapWire | null,
+  seats: readonly SeatRowTypes[],
   tickets: readonly PublicTicketWire[],
-  rowsByTicket: RowsByTicket,
   byCreation: readonly string[],
 ): LandingSeatMap | null {
-  const keyed = tickets.flatMap((ticket): TicketRows[] => {
-    const rows = rowsByTicket.get(ticket.id)
+  const keyed = tickets.flatMap((ticket): KeyedTicket[] => {
     const swatch = swatchOf(ticket.id, byCreation)
-    return rows && swatch !== null ? [{ ticket, rows, swatch }] : []
+    return seatsOfType(seats, ticket.id) > 0 && swatch !== null ? [{ ticket, swatch }] : []
   })
-  if (!seatMap || keyed.length === 0) return null
+  if (keyed.length === 0) return null
   return {
-    seatsPerRow: seatMap.seatsPerRow,
-    rows: seatMap.rows.map((row) => ({ label: row.label, swatch: swatchOf(row.ticketTypeId, byCreation) })),
-    legend: keyed.map((entry) => ({ label: legendLabelOf(entry, seatMap.seatsPerRow), swatch: entry.swatch })),
-    summary: summaryOf(keyed),
+    rows: seats.map((row) => ({ label: row.label, swatches: row.seats.map((type) => swatchOf(type, byCreation)) })),
+    legend: keyed.map(({ ticket, swatch }) => ({ label: seatKeyLabelOf(ticket.name, seats, ticket.id), swatch })),
+    summary: summaryOf(keyed, seats),
   }
 }
 
-/** `Seat map: VIP rows 1–2, Normal rows 3–6` — the key, read aloud. */
-function summaryOf(keyed: readonly TicketRows[]): string {
-  return `Seat map: ${keyed.map(({ ticket, rows }) => `${ticket.name} ${rowsPhraseOf(rows)}`).join(', ')}`
-}
-
-/** `VIP · Rows 1–2 · 32 seats` — whole rows, so every row holds the same seats. */
-function legendLabelOf({ ticket, rows }: TicketRows, seatsPerRow: number): string {
-  const seats = rows.length * seatsPerRow
-  return `${ticket.name} · ${rowsLabelOf(rows)} · ${num(seats)} ${seats === 1 ? 'seat' : 'seats'}`
-}
-
-/** `Rows 1–2`, `Row 7`, `Rows 1, 3–4`; null for a ticket that sells no rows. */
-function rowsLabelOf(rows: readonly string[]): string | null {
-  if (rows.length === 0) return null
-  return `${rows.length === 1 ? 'Row' : 'Rows'} ${rowRangesOf(rows)}`
-}
-
-/** The same mid-sentence: `rows 1–2`, `row 7`. */
-function rowsPhraseOf(rows: readonly string[]): string {
-  return `${rows.length === 1 ? 'row' : 'rows'} ${rowRangesOf(rows)}`
-}
-
-/** `1, 2, 4` → `1–2, 4`: consecutive row numbers collapse into a range. */
-function rowRangesOf(rows: readonly string[]): string {
-  const runs: string[][] = []
-  for (const row of rows) {
-    const run = runs.at(-1)
-    if (run && Number(run.at(-1)) + 1 === Number(row)) run.push(row)
-    else runs.push([row])
-  }
-  return runs.map((run) => (run.length === 1 ? run[0] : `${run[0]}–${run.at(-1)}`)).join(', ')
+/**
+ * `Seat map: Free row 7 seats 1–5; Normal rows 3–6, row 7 seats 6–16` — the
+ * key, read aloud. Tickets are parted by "; " since one ticket's seats can
+ * already take a ", ".
+ */
+function summaryOf(keyed: readonly KeyedTicket[], seats: readonly SeatRowTypes[]): string {
+  return `Seat map: ${keyed.map(({ ticket }) => `${ticket.name} ${seatsWherePhraseOf(seats, ticket.id)}`).join('; ')}`
 }

@@ -334,30 +334,53 @@ describe('the rest of the page', () => {
 })
 
 /**
- * US-PAGE-05: a reserved event whose seat rows have ticket types shows how the
- * room is split — a seat map coloured by type with a key, and each ticket
- * naming the rows it sells (US-EVT-05 gives whole rows a type).
+ * US-PAGE-05: a reserved event whose seats have ticket types shows how the
+ * room is split — a seat map coloured seat by seat with a key, and each ticket
+ * naming where its seats are (US-EVT-05 gives rows, or single seats, a type).
  */
 describe('the seat map', () => {
-  /** Rows 1–2 VIP, 3–6 Normal, 7 Free: the API's map, front to back. */
-  const rowsOf = (types: (string | null)[]): PublicSeatMapWire['rows'] =>
-    types.map((ticketTypeId, i) => ({ label: String(i + 1), ticketTypeId }))
+  type WireRow = PublicSeatMapWire['rows'][number]
 
-  const split = (types: (string | null)[], seatsPerRow = 16): Partial<PublicPageWire> => ({
-    tickets: [
-      ticket({ id: 'vip', name: 'VIP', priceSatang: 300_000, priceLabel: '฿3,000' }),
-      ticket({ id: 'normal', name: 'Normal', priceSatang: 50_000, priceLabel: '฿500' }),
-      ticket({ id: 'free', name: 'Free', priceSatang: 0, priceLabel: 'Free', isFree: true }),
-    ],
-    seatMap: { seatsPerRow, rows: rowsOf(types) },
+  /** A row whose every seat has one type, as the API sends it. */
+  const wholeRow = (label: string, ticketTypeId: string | null, seats: number): WireRow => ({
+    label,
+    ticketTypeId,
+    seatTicketTypes: Array(seats).fill(ticketTypeId),
   })
 
+  /** Rows front to back, each given one type for all its seats. */
+  const rowsOf = (types: (string | null)[], seatsPerRow = 16): WireRow[] =>
+    types.map((type, i) => wholeRow(String(i + 1), type, seatsPerRow))
+
+  const TICKETS = [
+    ticket({ id: 'vip', name: 'VIP', priceSatang: 300_000, priceLabel: '฿3,000' }),
+    ticket({ id: 'normal', name: 'Normal', priceSatang: 50_000, priceLabel: '฿500' }),
+    ticket({ id: 'free', name: 'Free', priceSatang: 0, priceLabel: 'Free', isFree: true }),
+  ]
+
+  const withRows = (rows: WireRow[], seatsPerRow = 16): Partial<PublicPageWire> => ({
+    tickets: TICKETS,
+    seatMap: { seatsPerRow, rows },
+  })
+
+  const split = (types: (string | null)[], seatsPerRow = 16) => withRows(rowsOf(types, seatsPerRow), seatsPerRow)
+
+  /** Row 7 split: seats 1–5 Free, 6–16 Normal — the API sends the row no single type. */
+  const splitRow: WireRow = {
+    label: '7',
+    ticketTypeId: null,
+    seatTicketTypes: [...Array(5).fill('free'), ...Array(11).fill('normal')],
+  }
+
   const theatre = split(['vip', 'vip', 'normal', 'normal', 'normal', 'normal', 'free'])
+
+  /** The owner's mock-up: rows 1–2 VIP, 3–6 Normal, row 7 seats 1–5 Free and 6–16 Normal. */
+  const mixed = withRows([...rowsOf(['vip', 'vip', 'normal', 'normal', 'normal', 'normal']), splitRow])
 
   const rowsLabels = (over: Partial<PublicPageWire>) =>
     Object.fromEntries(toLandingEvent(page(over)).tickets.map((t) => [t.name, t.rowsLabel]))
 
-  describe('each ticket’s rows', () => {
+  describe('where each ticket’s seats are', () => {
     it('names a run of rows as one range, and a single row on its own', () => {
       expect(rowsLabels(theatre)).toEqual({ Free: 'Row 7', Normal: 'Rows 3–6', VIP: 'Rows 1–2' })
     })
@@ -366,7 +389,15 @@ describe('the seat map', () => {
       expect(rowsLabels(split(['vip', 'normal', 'vip', 'vip'])).VIP).toBe('Rows 1, 3–4')
     })
 
-    it('says nothing for a ticket that sells no rows', () => {
+    it('names the seats a ticket holds of a row split between tickets', () => {
+      expect(rowsLabels(mixed)).toEqual({
+        Free: 'Row 7 seats 1–5',
+        Normal: 'Rows 3–6, row 7 seats 6–16',
+        VIP: 'Rows 1–2',
+      })
+    })
+
+    it('says nothing for a ticket that sells no seats', () => {
       expect(rowsLabels(split(['vip', 'vip'])).Normal).toBeNull()
     })
 
@@ -380,16 +411,24 @@ describe('the seat map', () => {
       expect(toLandingEvent(page()).seatMap).toBeNull()
     })
 
-    it('keeps every row, front to back, at the API’s seats per row', () => {
+    it('keeps every row, front to back, with every seat', () => {
       const map = toLandingEvent(page(theatre)).seatMap
       expect(map?.rows.map((row) => row.label)).toEqual(['1', '2', '3', '4', '5', '6', '7'])
-      expect(map?.seatsPerRow).toBe(16)
+      expect(map?.rows.every((row) => row.swatches.length === 16)).toBe(true)
     })
 
-    it('keys each ticket that sells rows, in the page’s ticket order, with its rows and seats', () => {
+    it('keys each ticket that sells seats, in the page’s ticket order, with where they are and how many', () => {
       expect(toLandingEvent(page(theatre)).seatMap?.legend.map((entry) => entry.label)).toEqual([
         'Free · Row 7 · 16 seats',
         'Normal · Rows 3–6 · 64 seats',
+        'VIP · Rows 1–2 · 32 seats',
+      ])
+    })
+
+    it('keys a row split between tickets seat by seat', () => {
+      expect(toLandingEvent(page(mixed)).seatMap?.legend.map((entry) => entry.label)).toEqual([
+        'Free · Row 7 seats 1–5 · 5 seats',
+        'Normal · Rows 3–6, row 7 seats 6–16 · 75 seats',
         'VIP · Rows 1–2 · 32 seats',
       ])
     })
@@ -403,7 +442,7 @@ describe('the seat map', () => {
       expect(toLandingEvent(page(split(rows, 40))).seatMap?.legend[0].label).toBe('VIP · Rows 1–100 · 4,000 seats')
     })
 
-    it('leaves a ticket that sells no rows out of the key', () => {
+    it('leaves a ticket that sells no seats out of the key', () => {
       const labels = toLandingEvent(page(split(['vip', 'vip']))).seatMap?.legend.map((entry) => entry.label)
       expect(labels).toEqual(['VIP · Rows 1–2 · 32 seats'])
     })
@@ -412,48 +451,64 @@ describe('the seat map', () => {
     // the order the types were created; the API sends tickets in that order.
     // Colouring by the page's price order instead swapped VIP's and Free's
     // colours between the organizer's preview and this page.
-    it('colours each ticket’s rows by the order the tickets were created, not by price', () => {
+    it('colours each ticket’s seats by the order the tickets were created, not by price', () => {
       const map = toLandingEvent(page(theatre)).seatMap
-      expect(map?.rows.map((row) => row.swatch)).toEqual([0, 0, 1, 1, 1, 1, 2])
+      expect(map?.rows.map((row) => row.swatches[0])).toEqual([0, 0, 1, 1, 1, 1, 2])
       expect(map?.legend.map((entry) => entry.swatch)).toEqual([2, 1, 0])
     })
 
-    it('keeps a ticket’s colour when one created before it sells no rows', () => {
-      // Normal sells no rows but still holds the second colour, as in the wizard.
+    it('colours a row split between tickets seat by seat', () => {
+      const row7 = toLandingEvent(page(mixed)).seatMap?.rows[6]
+      expect(row7?.swatches).toEqual([...Array(5).fill(2), ...Array(11).fill(1)])
+    })
+
+    it('keeps a ticket’s colour when one created before it sells no seats', () => {
+      // Normal sells no seats but still holds the second colour, as in the wizard.
       const map = toLandingEvent(page(split(['vip', 'free']))).seatMap
-      expect(map?.rows.map((row) => row.swatch)).toEqual([0, 2])
+      expect(map?.rows.map((row) => row.swatches[0])).toEqual([0, 2])
       expect(map?.legend.map((entry) => entry.swatch)).toEqual([2, 0])
     })
 
     it('starts the colours again once every colour is used', () => {
       const tickets = Array.from({ length: 6 }, (_, i) => ticket({ id: `t${i}`, name: `Tier ${i}`, priceSatang: i }))
       const map = toLandingEvent(
-        page({ tickets, seatMap: { seatsPerRow: 4, rows: rowsOf(tickets.map((t) => t.id)) } }),
+        page({ tickets, seatMap: { seatsPerRow: 4, rows: rowsOf(tickets.map((t) => t.id), 4) } }),
       ).seatMap
-      expect(swatchClassOf(map?.rows[5].swatch ?? null)).toBe(swatchClassOf(map?.rows[0].swatch ?? null))
-      expect(swatchClassOf(map?.rows[1].swatch ?? null)).not.toBe(swatchClassOf(map?.rows[0].swatch ?? null))
+      const first = (row: number) => swatchClassOf(map?.rows[row].swatches[0] ?? null)
+      expect(first(5)).toBe(first(0))
+      expect(first(1)).not.toBe(first(0))
     })
 
-    it('leaves a row with no ticket type neutral, and out of the key', () => {
+    it('leaves a seat with no ticket type neutral, and out of the key', () => {
       const map = toLandingEvent(page(split(['vip', null]))).seatMap
-      expect(map?.rows[1].swatch).toBeNull()
+      expect(map?.rows[1].swatches.every((swatch) => swatch === null)).toBe(true)
       expect(map?.legend).toHaveLength(1)
     })
 
     // A type the page does not show — not public — names nothing a reader can buy.
-    it('leaves a row whose ticket is not on the page neutral, and out of the key', () => {
+    it('leaves a seat whose ticket is not on the page neutral, and out of the key', () => {
       const map = toLandingEvent(page(split(['vip', 'staff-only']))).seatMap
-      expect(map?.rows[1].swatch).toBeNull()
+      expect(map?.rows[1].swatches.every((swatch) => swatch === null)).toBe(true)
       expect(map?.legend.map((entry) => entry.label)).toEqual(['VIP · Row 1 · 16 seats'])
     })
 
-    it('is absent when no ticket on the page sells a row — it would show no split', () => {
+    it('is shown when only part of a row has a ticket type', () => {
+      const partly: WireRow = { label: '1', ticketTypeId: null, seatTicketTypes: ['vip', 'vip', null, null] }
+      const map = toLandingEvent(page(withRows([partly, wholeRow('2', null, 4)], 4))).seatMap
+      expect(map?.rows[0].swatches).toEqual([0, 0, null, null])
+      expect(map?.legend.map((entry) => entry.label)).toEqual(['VIP · Row 1 seats 1–2 · 2 seats'])
+    })
+
+    it('is absent when no ticket on the page sells a seat — it would show no split', () => {
       expect(toLandingEvent(page(split(['staff-only', null]))).seatMap).toBeNull()
     })
 
-    it('sums up the split for a screen reader', () => {
+    it('sums up the split for a screen reader, one ticket at a time', () => {
       expect(toLandingEvent(page(theatre)).seatMap?.summary).toBe(
-        'Seat map: Free row 7, Normal rows 3–6, VIP rows 1–2',
+        'Seat map: Free row 7; Normal rows 3–6; VIP rows 1–2',
+      )
+      expect(toLandingEvent(page(mixed)).seatMap?.summary).toBe(
+        'Seat map: Free row 7 seats 1–5; Normal rows 3–6, row 7 seats 6–16; VIP rows 1–2',
       )
     })
   })
