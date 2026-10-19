@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canPick,
   placeInLine,
   prefillsFromProfile,
+  seatLegendOf,
+  seatStateOf,
+  seatsKeptForTier,
   toBuyerDefaults,
   toCheckoutView,
   toPaymentStep,
@@ -16,6 +20,8 @@ import type {
   OrderPlacedWire,
   OrderSummaryWire,
   PaymentIntentWire,
+  SeatOption,
+  SeatRow,
 } from './checkout.types'
 import type { ProfileWire } from './profile.types'
 
@@ -228,9 +234,33 @@ describe('toCheckoutView', () => {
       }).rows
       expect(rows.map((row) => row.label)).toEqual(['A', 'B'])
       expect(rows[0]!.seats).toEqual([
-        { id: 1, label: '1', available: false },
-        { id: 2, label: '2', available: true },
+        { id: 1, label: '1', available: false, ticketTypeId: null },
+        { id: 2, label: '2', available: true, ticketTypeId: null },
       ])
+    })
+
+    // The API names rows 1..N. A string sort put row 10 between 1 and 2.
+    it('orders rows numerically', () => {
+      const rows = seated({
+        seats: ['10', '2', '1'].map((rowLabel, index) => ({
+          id: index,
+          section: null,
+          rowLabel,
+          seatNumber: '1',
+          ticketTypeId: null,
+          available: true,
+        })),
+      }).rows
+      expect(rows.map((row) => row.label)).toEqual(['1', '2', '10'])
+    })
+
+    it('keeps the ticket type each seat sells under', () => {
+      const rows = seated({
+        seats: [
+          { id: 1, section: null, rowLabel: '1', seatNumber: '1', ticketTypeId: 'tier-vip', available: true },
+        ],
+      }).rows
+      expect(rows[0]!.seats[0]!.ticketTypeId).toBe('tier-vip')
     })
 
     // 2, 10, 11 — not 10, 11, 2, which is what a plain string sort gives.
@@ -260,6 +290,93 @@ describe('toCheckoutView', () => {
 
     it('has no rows at all when the event does not seat people', () => {
       expect(view().rows).toEqual([])
+    })
+  })
+
+  /**
+   * US-DISC-04: a seat row belongs to one ticket type, so only the chosen
+   * type's seats can be picked. A seat with no type is a map from before rows
+   * had types, and sells under whichever type is chosen — the API's
+   * `CheckoutPolicy.resolveSeats` draws the same line.
+   */
+  describe('seats of the chosen ticket type', () => {
+    const seat = (over: Partial<SeatOption> = {}): SeatOption => ({
+      id: 1,
+      label: '1',
+      available: true,
+      ticketTypeId: 'tier-vip',
+      ...over,
+    })
+    const ROWS: SeatRow[] = [
+      { label: '1', seats: [seat({ id: 1 }), seat({ id: 2 })] },
+      { label: '2', seats: [seat({ id: 3, ticketTypeId: 'tier-ga' })] },
+      { label: '3', seats: [seat({ id: 4, ticketTypeId: null })] },
+    ]
+
+    describe('seatStateOf', () => {
+      it('offers a free seat of the chosen type', () => {
+        expect(seatStateOf(seat(), 'tier-vip', [])).toBe('available')
+      })
+
+      it('marks a seat already picked', () => {
+        expect(seatStateOf(seat(), 'tier-vip', [1])).toBe('selected')
+      })
+
+      it('shows a taken seat as booked', () => {
+        expect(seatStateOf(seat({ available: false }), 'tier-vip', [])).toBe('booked')
+      })
+
+      it('shows a seat of another type as another type’s, taken or not', () => {
+        expect(seatStateOf(seat(), 'tier-ga', [])).toBe('other')
+        expect(seatStateOf(seat({ available: false }), 'tier-ga', [])).toBe('other')
+      })
+
+      it('offers a seat with no type under any type', () => {
+        expect(seatStateOf(seat({ ticketTypeId: null }), 'tier-ga', [])).toBe('available')
+      })
+    })
+
+    describe('canPick', () => {
+      it('lets a buyer pick a free seat or let go of a picked one', () => {
+        expect(canPick('available')).toBe(true)
+        expect(canPick('selected')).toBe(true)
+      })
+
+      it('refuses a booked seat and another type’s seat', () => {
+        expect(canPick('booked')).toBe(false)
+        expect(canPick('other')).toBe(false)
+      })
+    })
+
+    describe('seatsKeptForTier', () => {
+      it('drops picked seats of another type when the type changes', () => {
+        expect(seatsKeptForTier([1, 2], ROWS, 'tier-ga')).toEqual([])
+      })
+
+      it('keeps picked seats of the new type, in the order they were picked', () => {
+        expect(seatsKeptForTier([3, 1], ROWS, 'tier-ga')).toEqual([3])
+      })
+
+      it('keeps a picked seat with no type, which sells under any type', () => {
+        expect(seatsKeptForTier([4, 1], ROWS, 'tier-ga')).toEqual([4])
+      })
+
+      it('drops a seat that is no longer on the map', () => {
+        expect(seatsKeptForTier([99], ROWS, 'tier-vip')).toEqual([])
+      })
+    })
+
+    describe('seatLegendOf', () => {
+      it('explains the three everyday states', () => {
+        const legacy: SeatRow[] = [{ label: '1', seats: [seat({ ticketTypeId: null })] }]
+        expect(seatLegendOf(legacy, 'tier-vip')).toEqual(['selected', 'available', 'booked'])
+      })
+
+      it('adds another type’s seats only when the map shows some', () => {
+        expect(seatLegendOf(ROWS, 'tier-vip')).toEqual(['selected', 'available', 'booked', 'other'])
+        const vipOnly: SeatRow[] = [ROWS[0]!]
+        expect(seatLegendOf(vipOnly, 'tier-vip')).toEqual(['selected', 'available', 'booked'])
+      })
     })
   })
 

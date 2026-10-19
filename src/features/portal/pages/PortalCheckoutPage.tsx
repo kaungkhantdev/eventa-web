@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn'
 import { PaymentHandoff } from '../components/PaymentHandoff'
 import { WaitlistBar, WaitlistNote, WaitlistOverlay } from '../components/WaitlistPanel'
 import type { CheckoutData, CheckoutResult } from '../checkout.routes'
+import { canPick, seatLegendOf, seatStateOf, seatsKeptForTier } from '../checkout.mapper'
 import type {
   BuyerDefaults,
   CheckoutView,
@@ -13,6 +14,7 @@ import type {
   PayMethod,
   PlacedOrder,
   SeatRow,
+  SeatState,
   SummaryLines,
   TierOption,
 } from '../checkout.types'
@@ -45,6 +47,25 @@ const SEAT_CSS = `
 .rowlab { color: rgba(255,255,255,.4); font-size: 12px; font-weight: 600; width: 18px; text-align: center; }
 `
 
+/**
+ * Each seat state's look and its legend wording. The kit draws three; another
+ * ticket type's seat (US-DISC-04) is booked's dim seat with an outline, so it
+ * reads as "not for this ticket" rather than "taken".
+ */
+const SEAT_CLASS: Record<SeatState, string> = {
+  selected: 'seat-sel',
+  available: 'seat-avail',
+  booked: 'seat-booked',
+  other: 'seat-booked ring-1 ring-inset ring-white/20',
+}
+
+const SEAT_LEGEND: Record<SeatState, string> = {
+  selected: 'Selected',
+  available: 'Available',
+  booked: 'Booked',
+  other: 'Other ticket type',
+}
+
 export default function PortalCheckoutPage() {
   const { checkout, buyer } = useLoaderData() as CheckoutData
   const [tierId, setTierId] = useState(() => firstSellable(checkout.tiers))
@@ -57,6 +78,12 @@ export default function PortalCheckoutPage() {
 
   const { eventId, mode } = checkout
   const tier = checkout.tiers.find((option) => option.id === tierId) ?? null
+
+  // A seat of another type cannot be bought under this one, so it goes.
+  const chooseTier = (id: string) => {
+    setTierId(id)
+    setSeatIds((picked) => seatsKeptForTier(picked, checkout.rows, id))
+  }
   const count = mode === 'reserved' ? seatIds.length : quantity
 
   // A sold-out ticket with its waitlist open is chosen to JOIN the line, not
@@ -107,7 +134,7 @@ export default function PortalCheckoutPage() {
                 key={option.id}
                 tier={option}
                 selected={option.id === tierId}
-                onSelect={() => setTierId(option.id)}
+                onSelect={() => chooseTier(option.id)}
               />
             ))}
           </div>
@@ -121,6 +148,7 @@ export default function PortalCheckoutPage() {
           {checkout.mode === 'reserved' ? (
             <SeatPicker
               rows={checkout.rows}
+              tierId={tierId}
               backTo={checkout.header.backTo}
               selected={seatIds}
               max={tier?.maxPerOrder ?? checkout.maxPerBooking}
@@ -396,12 +424,15 @@ function QuantityPicker({
 
 function SeatPicker({
   rows,
+  tierId,
   backTo,
   selected,
   max,
   onToggle,
 }: {
   rows: SeatRow[]
+  /** The chosen ticket type: only its seats can be picked. */
+  tierId: string
   /** The event's own page — the only thing left to do when there is no map. */
   backTo: string
   selected: number[]
@@ -448,44 +479,34 @@ function SeatPicker({
           {rows.map((row) => (
             <div key={row.label} className="flex items-center gap-1.5 sm:gap-2">
               <span className="rowlab">{row.label}</span>
-              {row.seats.map((seat) => (
-                <button
-                  key={seat.id}
-                  type="button"
-                  disabled={!seat.available}
-                  aria-pressed={selected.includes(seat.id)}
-                  aria-label={`Seat ${row.label}${seat.label}`}
-                  className={cn(
-                    'seat',
-                    !seat.available
-                      ? 'seat-booked'
-                      : selected.includes(seat.id)
-                        ? 'seat-sel'
-                        : 'seat-avail',
-                  )}
-                  onClick={() => onToggle(seat.id)}
-                >
-                  {seat.label}
-                </button>
-              ))}
+              {row.seats.map((seat) => {
+                const state = seatStateOf(seat, tierId, selected)
+                return (
+                  <button
+                    key={seat.id}
+                    type="button"
+                    disabled={!canPick(state)}
+                    aria-pressed={state === 'selected'}
+                    aria-label={`Seat ${row.label}${seat.label}${state === 'other' ? `, ${SEAT_LEGEND.other}` : ''}`}
+                    className={cn('seat', SEAT_CLASS[state])}
+                    onClick={() => onToggle(seat.id)}
+                  >
+                    {seat.label}
+                  </button>
+                )
+              })}
               <span className="rowlab">{row.label}</span>
             </div>
           ))}
         </div>
 
         <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-white/10 pt-5 text-[12px] text-white/60">
-          <span className="inline-flex items-center gap-2">
-            <span className="seat seat-sel !h-4 !w-4 !rounded-[4px]" />
-            Selected
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="seat seat-avail !h-4 !w-4 !rounded-[4px]" />
-            Available
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="seat seat-booked !h-4 !w-4 !rounded-[4px]" />
-            Booked
-          </span>
+          {seatLegendOf(rows, tierId).map((state) => (
+            <span key={state} className="inline-flex items-center gap-2">
+              <span className={cn('seat !h-4 !w-4 !rounded-[4px]', SEAT_CLASS[state])} />
+              {SEAT_LEGEND[state]}
+            </span>
+          ))}
         </div>
       </div>
       <p className="mt-2 text-center text-[12px] text-muted">

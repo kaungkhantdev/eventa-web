@@ -16,7 +16,9 @@ import type {
   PaymentStep,
   PayMethod,
   PlacedOrder,
+  SeatOption,
   SeatRow,
+  SeatState,
   SummaryLines,
   TierOption,
   WaitlistJoinedWire,
@@ -176,20 +178,82 @@ function toSeatRows(wire: CheckoutViewWire): SeatRow[] {
   for (const seat of wire.seatMap.seats) {
     const label = seat.rowLabel ?? ''
     const row = byRow.get(label) ?? { label, seats: [] }
-    row.seats.push({ id: seat.id, label: seat.seatNumber, available: seat.available })
+    row.seats.push({
+      id: seat.id,
+      label: seat.seatNumber,
+      available: seat.available,
+      ticketTypeId: seat.ticketTypeId,
+    })
     byRow.set(label, row)
   }
   const rows = [...byRow.values()]
-  for (const row of rows) row.seats.sort((a, b) => bySeatNumber(a.label, b.label))
-  return rows.sort((a, b) => a.label.localeCompare(b.label))
+  for (const row of rows) row.seats.sort((a, b) => numerically(a.label, b.label))
+  return rows.sort((a, b) => numerically(a.label, b.label))
 }
 
-/** `2` before `10`: seat numbers are numbers, and a string sort reverses them. */
-function bySeatNumber(a: string, b: string): number {
+/**
+ * `2` before `10`. The API numbers both rows and seats, and a string sort puts
+ * row 10 between rows 1 and 2.
+ */
+function numerically(a: string, b: string): number {
   const left = Number(a)
   const right = Number(b)
   if (Number.isNaN(left) || Number.isNaN(right)) return a.localeCompare(b)
   return left - right
+}
+
+/* ── seats of the chosen ticket type (US-DISC-04) ─────────────────────── */
+
+/**
+ * Whether a seat can be bought under this ticket type: one of its own rows, or
+ * a seat with no type at all — a map laid out before rows had types, which the
+ * API sells under any type. Mirrors `CheckoutPolicy.resolveSeats`, so the map
+ * never offers a seat the API would refuse.
+ */
+function sellsUnder(seat: SeatOption, tierId: string): boolean {
+  return seat.ticketTypeId === null || seat.ticketTypeId === tierId
+}
+
+/** How a seat looks to a buyer who has chosen `tierId` and picked `selected`. */
+export function seatStateOf(seat: SeatOption, tierId: string, selected: readonly number[]): SeatState {
+  if (!sellsUnder(seat, tierId)) return 'other'
+  if (!seat.available) return 'booked'
+  return selected.includes(seat.id) ? 'selected' : 'available'
+}
+
+/** A seat can be tapped to pick it or to let it go — nothing else can. */
+export function canPick(state: SeatState): boolean {
+  return state === 'available' || state === 'selected'
+}
+
+/**
+ * The picked seats that survive a change of ticket type.
+ *
+ * Another type's seat would only come back from the API as a refusal; dropping
+ * it here keeps the buyer's other picks and asks them to choose again only for
+ * the seats that no longer fit.
+ */
+export function seatsKeptForTier(
+  selected: readonly number[],
+  rows: readonly SeatRow[],
+  tierId: string,
+): number[] {
+  const seats = new Map(rows.flatMap((row) => row.seats).map((seat) => [seat.id, seat]))
+  return selected.filter((id) => {
+    const seat = seats.get(id)
+    return seat !== undefined && sellsUnder(seat, tierId)
+  })
+}
+
+const EVERYDAY_STATES: readonly SeatState[] = ['selected', 'available', 'booked']
+
+/**
+ * What the legend explains. Another type's seats are listed only when the map
+ * shows some — on a map with one type, or none, the entry would explain nothing.
+ */
+export function seatLegendOf(rows: readonly SeatRow[], tierId: string): SeatState[] {
+  const showsOther = rows.some((row) => row.seats.some((seat) => !sellsUnder(seat, tierId)))
+  return showsOther ? [...EVERYDAY_STATES, 'other'] : [...EVERYDAY_STATES]
 }
 
 export function toSummaryLines(summary: OrderSummaryWire): SummaryLines {

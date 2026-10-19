@@ -161,7 +161,15 @@ export interface SeatOption {
   /** What is printed on the seat, e.g. `12`. */
   label: string
   available: boolean
+  /** The ticket type its row sells, or `null` on a map from before rows had types. */
+  ticketTypeId: string | null
 }
+
+/**
+ * How one seat looks to this buyer. `other` is a seat of a ticket type they
+ * have not chosen: on the map, but not theirs to pick (US-DISC-04).
+ */
+export type SeatState = 'selected' | 'available' | 'booked' | 'other'
 
 export interface SeatRow {
   label: string
