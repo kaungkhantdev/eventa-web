@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn'
 import { PaymentHandoff } from '../components/PaymentHandoff'
 import { WaitlistBar, WaitlistNote, WaitlistOverlay } from '../components/WaitlistPanel'
 import type { CheckoutData, CheckoutResult } from '../checkout.routes'
-import { canPick, seatLegendOf, seatStateOf, seatsKeptForTier, summaryShown } from '../checkout.mapper'
+import { canPick, mapHasTypes, seatLegendOf, seatStateOf, seatsKeptForTier, summaryShown } from '../checkout.mapper'
 import type {
   BuyerDefaults,
   CheckoutView,
@@ -456,6 +456,7 @@ function SeatPicker({
     )
   }
 
+  const typedMap = mapHasTypes(rows)
   return (
     <div>
       <div className="house overflow-hidden rounded-2xl p-5 sm:p-7">
@@ -480,14 +481,14 @@ function SeatPicker({
             <div key={row.label} className="flex items-center gap-1.5 sm:gap-2">
               <span className="rowlab">{row.label}</span>
               {row.seats.map((seat) => {
-                const state = seatStateOf(seat, tierId, selected)
+                const state = seatStateOf(seat, tierId, selected, typedMap)
                 return (
                   <button
                     key={seat.id}
                     type="button"
                     disabled={!canPick(state)}
                     aria-pressed={state === 'selected'}
-                    aria-label={`Seat ${row.label}${seat.label}${state === 'other' ? `, ${SEAT_LEGEND.other}` : ''}`}
+                    aria-label={`Row ${row.label}, seat ${seat.label}${state === 'other' ? `, ${SEAT_LEGEND.other}` : ''}`}
                     className={cn('seat', SEAT_CLASS[state])}
                     onClick={() => onToggle(seat.id)}
                   >

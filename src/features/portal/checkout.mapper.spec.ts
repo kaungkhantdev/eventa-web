@@ -316,24 +316,30 @@ describe('toCheckoutView', () => {
 
     describe('seatStateOf', () => {
       it('offers a free seat of the chosen type', () => {
-        expect(seatStateOf(seat(), 'tier-vip', [])).toBe('available')
+        expect(seatStateOf(seat(), 'tier-vip', [], true)).toBe('available')
       })
 
       it('marks a seat already picked', () => {
-        expect(seatStateOf(seat(), 'tier-vip', [1])).toBe('selected')
+        expect(seatStateOf(seat(), 'tier-vip', [1], true)).toBe('selected')
       })
 
       it('shows a taken seat as booked', () => {
-        expect(seatStateOf(seat({ available: false }), 'tier-vip', [])).toBe('booked')
+        expect(seatStateOf(seat({ available: false }), 'tier-vip', [], true)).toBe('booked')
       })
 
       it('shows a seat of another type as another type’s, taken or not', () => {
-        expect(seatStateOf(seat(), 'tier-ga', [])).toBe('other')
-        expect(seatStateOf(seat({ available: false }), 'tier-ga', [])).toBe('other')
+        expect(seatStateOf(seat(), 'tier-ga', [], true)).toBe('other')
+        expect(seatStateOf(seat({ available: false }), 'tier-ga', [], true)).toBe('other')
       })
 
-      it('offers a seat with no type under any type', () => {
-        expect(seatStateOf(seat({ ticketTypeId: null }), 'tier-ga', [])).toBe('available')
+      it('offers a seat with no type under any type on a map laid out before rows had types', () => {
+        expect(seatStateOf(seat({ ticketTypeId: null }), 'tier-ga', [], false)).toBe('available')
+      })
+
+      // The API refuses such a seat once any row has a type ("Those seats
+      // aren't on sale"), so the map must not offer it.
+      it('does not offer a seat with no type on a map whose rows have types', () => {
+        expect(seatStateOf(seat({ ticketTypeId: null }), 'tier-ga', [], true)).toBe('other')
       })
     })
 
@@ -358,8 +364,15 @@ describe('toCheckoutView', () => {
         expect(seatsKeptForTier([3, 1], ROWS, 'tier-ga')).toEqual([3])
       })
 
-      it('keeps a picked seat with no type, which sells under any type', () => {
-        expect(seatsKeptForTier([4, 1], ROWS, 'tier-ga')).toEqual([4])
+      it('drops a picked seat with no type once other rows have types', () => {
+        expect(seatsKeptForTier([4, 1], ROWS, 'tier-ga')).toEqual([])
+      })
+
+      it('keeps a picked seat with no type on a map where no row has a type', () => {
+        const untyped: SeatRow[] = [
+          { label: '1', seats: [seat({ id: 5, ticketTypeId: null }), seat({ id: 6, ticketTypeId: null })] },
+        ]
+        expect(seatsKeptForTier([6, 5], untyped, 'tier-ga')).toEqual([6, 5])
       })
 
       it('drops a seat that is no longer on the map', () => {

@@ -204,19 +204,34 @@ function numerically(a: string, b: string): number {
 
 /* ── seats of the chosen ticket type (US-DISC-04) ─────────────────────── */
 
-/**
- * Whether a seat can be bought under this ticket type: one of its own rows, or
- * a seat with no type at all — a map laid out before rows had types, which the
- * API sells under any type. Mirrors `CheckoutPolicy.resolveSeats`, so the map
- * never offers a seat the API would refuse.
- */
-function sellsUnder(seat: SeatOption, tierId: string): boolean {
-  return seat.ticketTypeId === null || seat.ticketTypeId === tierId
+/** Whether any row of the map has a ticket type (US-EVT-05). */
+export function mapHasTypes(rows: readonly SeatRow[]): boolean {
+  return rows.some((row) => row.seats.some((seat) => seat.ticketTypeId !== null))
 }
 
-/** How a seat looks to a buyer who has chosen `tierId` and picked `selected`. */
-export function seatStateOf(seat: SeatOption, tierId: string, selected: readonly number[]): SeatState {
-  if (!sellsUnder(seat, tierId)) return 'other'
+/**
+ * Whether a seat can be bought under this ticket type: one of its own rows, or
+ * — only on a map laid out before rows had types — a seat with no type, which
+ * the API sells under any type. Once any row has a type the API refuses an
+ * untyped seat. Mirrors `CheckoutPolicy.resolveSeats`, so the map never offers
+ * a seat the API would refuse.
+ */
+function sellsUnder(seat: SeatOption, tierId: string, typedMap: boolean): boolean {
+  if (seat.ticketTypeId === null) return !typedMap
+  return seat.ticketTypeId === tierId
+}
+
+/**
+ * How a seat looks to a buyer who has chosen `tierId` and picked `selected`.
+ * `typedMap` is `mapHasTypes` of the whole map, worked out once per render.
+ */
+export function seatStateOf(
+  seat: SeatOption,
+  tierId: string,
+  selected: readonly number[],
+  typedMap: boolean,
+): SeatState {
+  if (!sellsUnder(seat, tierId, typedMap)) return 'other'
   if (!seat.available) return 'booked'
   return selected.includes(seat.id) ? 'selected' : 'available'
 }
@@ -239,9 +254,10 @@ export function seatsKeptForTier(
   tierId: string,
 ): number[] {
   const seats = new Map(rows.flatMap((row) => row.seats).map((seat) => [seat.id, seat]))
+  const typedMap = mapHasTypes(rows)
   return selected.filter((id) => {
     const seat = seats.get(id)
-    return seat !== undefined && sellsUnder(seat, tierId)
+    return seat !== undefined && sellsUnder(seat, tierId, typedMap)
   })
 }
 
@@ -252,7 +268,8 @@ const EVERYDAY_STATES: readonly SeatState[] = ['selected', 'available', 'booked'
  * shows some — on a map with one type, or none, the entry would explain nothing.
  */
 export function seatLegendOf(rows: readonly SeatRow[], tierId: string): SeatState[] {
-  const showsOther = rows.some((row) => row.seats.some((seat) => !sellsUnder(seat, tierId)))
+  const typedMap = mapHasTypes(rows)
+  const showsOther = rows.some((row) => row.seats.some((seat) => !sellsUnder(seat, tierId, typedMap)))
   return showsOther ? [...EVERYDAY_STATES, 'other'] : [...EVERYDAY_STATES]
 }
 
