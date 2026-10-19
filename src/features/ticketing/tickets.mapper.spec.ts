@@ -53,6 +53,22 @@ describe('toTicketCard', () => {
     expect(card.percent).toBeNull()
   })
 
+  // US-EVT-05: where the seat map sets the quantity, 0 is the seats a type's
+  // rows hold — a type with no rows has none, which is not "unlimited".
+  it('reads a seat-set quantity of 0 as no seats rather than unlimited', () => {
+    const card = toTicketCard(wire({ quantityFromSeats: true, total: 0, sold: 0 }))
+
+    expect(card.soldLabel).toBe('0 / 0 sold')
+    expect(card.percent).toBe(0)
+  })
+
+  it('reads a seat-set quantity against its seats like any allocation', () => {
+    const card = toTicketCard(wire({ quantityFromSeats: true, total: 80, sold: 20 }))
+
+    expect(card.soldLabel).toBe('20 / 80 sold')
+    expect(card.percent).toBe(25)
+  })
+
   it('never claims more than a full bar when a tier oversold', () => {
     expect(toTicketCard(wire({ sold: 260, total: 250 })).percent).toBe(100)
   })

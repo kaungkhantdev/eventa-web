@@ -50,8 +50,8 @@ export function toTicketCard(wire: TicketWire): TicketCard {
     statusLabel: meta.label,
     statusTone: meta.tone,
     statusIcon: meta.icon,
-    soldLabel: soldLabel(wire.sold, wire.total),
-    percent: sharePercent(wire.sold, wire.total),
+    soldLabel: soldLabel(wire.sold, wire.total, wire.quantityFromSeats),
+    percent: sharePercent(wire.sold, wire.total, wire.quantityFromSeats),
     iconTint: ICON_TINTS[hashIndex(wire.id, ICON_TINTS.length)],
     edit: toTicketDraft(wire),
   }
@@ -102,12 +102,20 @@ function dayOrBlank(instant: string | null): string {
  * Both readings print the same two characters, so the difference has to be made
  * here: an unlimited tier reports what it has sold and no share, because there
  * is no denominator to take a share of.
+ *
+ * Except where the seat map sets the quantity (US-EVT-05): there `0` is the
+ * seats a type's rows hold, and a type with no rows has none to sell.
  */
-function soldLabel(sold: number, total: number): string {
-  return total === 0 ? `${num(sold)} sold` : `${num(sold)} / ${num(total)} sold`
+function soldLabel(sold: number, total: number, fromSeats: boolean): string {
+  return unlimited(total, fromSeats) ? `${num(sold)} sold` : `${num(sold)} / ${num(total)} sold`
 }
 
-function sharePercent(sold: number, total: number): number | null {
-  if (total === 0) return null
+function sharePercent(sold: number, total: number, fromSeats: boolean): number | null {
+  if (unlimited(total, fromSeats)) return null
+  if (total === 0) return 0
   return Math.min(FULL, Math.round((sold / total) * FULL))
+}
+
+function unlimited(total: number, fromSeats: boolean): boolean {
+  return total === 0 && !fromSeats
 }
