@@ -16,6 +16,7 @@ import { useTheme } from '@/lib/useTheme'
 import { usePendingPath } from '@/lib/usePendingPath'
 import { cn } from '@/lib/cn'
 import { ROUTE_FRAME, routeFrameKey } from '@/lib/routeTransition'
+import { workspaceMark } from './workspaceMark'
 
 /* Double sidebar: an icon rail of modules plus a labeled panel of grouped
    sub-nav. Faithful port of the markup shell.js injected in the static kit.
@@ -127,6 +128,9 @@ export default function AdminShell() {
   // Only the links this member may use — the finance reports are hidden from
   // a member without finance access (US-RPT-12). The API still refuses them.
   const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
+  const mark = workspaceMark(me?.organization)
+  // A logo that fails to load falls back to the initials, until the URL changes.
+  const [failedLogo, setFailedLogo] = useState<string | null>(null)
   const groups = useMemo(
     () => visibleGroups(mod?.groups ?? [], (permission) => can(me, permission)),
     [mod, me],
@@ -160,11 +164,21 @@ export default function AdminShell() {
           <div className="group relative flex justify-center">
             <Link
               to="/admin/dashboard"
-              className="grid h-9 w-9 place-items-center rounded-full border border-white/40 text-[13px] font-extrabold tracking-tight text-white"
+              aria-label={mark.label || undefined}
+              className="grid h-9 w-9 place-items-center overflow-hidden rounded-full border border-white/40 text-[13px] font-extrabold tracking-tight text-white"
             >
-              EC
+              {mark.logo && mark.logo !== failedLogo ? (
+                <img
+                  src={mark.logo}
+                  alt=""
+                  className="h-full w-full bg-white object-cover"
+                  onError={() => setFailedLogo(mark.logo)}
+                />
+              ) : (
+                mark.initials
+              )}
             </Link>
-            <span className="rail-tip">Eventa Co., Ltd.</span>
+            {mark.label && <span className="rail-tip">{mark.label}</span>}
           </div>
 
           <div className="mt-5 flex flex-col items-center gap-1.5">

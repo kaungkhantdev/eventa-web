@@ -15,6 +15,8 @@ export interface Me {
     currency: string
     timezone: string
     locale: 'en' | 'th'
+    /** The workspace's logo; null (or absent, from an older API) when it has none. */
+    logoUrl?: string | null
   }
   /** Granted permission keys — what the console may show and offer. */
   permissions: string[]
