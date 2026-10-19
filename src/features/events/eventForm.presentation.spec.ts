@@ -258,6 +258,16 @@ describe('wizardStepsOf', () => {
     ])
   })
 
+  // US-EVT-05: on a reserved event the seat rows set each type's quantity.
+  it('tells the organizer a quantity is only asked for when the seat rows do not set it', () => {
+    const tickets = wizardStepsOf({ seatingMode: 'reserved', isOnline: false }).find(
+      (step) => step.key === 'tickets',
+    )
+    expect(tickets?.tip).toBe(
+      'Add at least one ticket type with a price — and a quantity, unless your seat rows set it — then set your total capacity.',
+    )
+  })
+
   it('tells the organizer what Assign seats is for', () => {
     const seats = wizardStepsOf({ seatingMode: 'reserved', isOnline: false }).find(
       (step) => step.key === 'seats',

@@ -57,7 +57,7 @@ export const STEPS: readonly WizardStep[] = [
   {
     key: 'tickets',
     label: 'Tickets',
-    tip: 'Add at least one ticket type with a price and quantity, then set your total capacity.',
+    tip: 'Add at least one ticket type with a price — and a quantity, unless your seat rows set it — then set your total capacity.',
   },
   {
     key: 'seats',
