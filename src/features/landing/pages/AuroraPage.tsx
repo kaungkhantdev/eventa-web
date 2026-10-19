@@ -314,7 +314,7 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
                           <span className="badge badge-green max-w-full whitespace-normal leading-snug">{t.note}</span>
                         )
                       ) : null}
-                      {t.rowsLabel && (
+                      {!isOnline && t.rowsLabel && (
                         <span className={cn('basis-full text-[12px]', feat ? 'text-white/75' : 'text-muted')}>
                           {t.rowsLabel}
                         </span>
@@ -366,7 +366,9 @@ export default function AuroraPage({ event }: { event: LandingEvent }) {
                 )
               })}
             </div>
-            {ev.seatMap && <SeatMapBlock seatMap={ev.seatMap} className="mt-4 rounded-2xl bg-surface p-6" />}
+            {!isOnline && ev.seatMap && (
+              <SeatMapBlock seatMap={ev.seatMap} className="mt-4 rounded-2xl bg-surface p-6" />
+            )}
           </section>
         )}
 

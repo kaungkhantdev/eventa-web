@@ -341,7 +341,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                         ) : (
                           <span className="badge badge-green max-w-full whitespace-normal leading-snug">{t.note}</span>
                         ))}
-                      {t.rowsLabel && (
+                      {!isOnline && t.rowsLabel && (
                         <span className={`basis-full text-[12px] ${feat ? 'text-white/75' : 'text-muted'}`}>
                           {t.rowsLabel}
                         </span>
@@ -387,7 +387,9 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                 )
               })}
             </div>
-            {ev.seatMap && <SeatMapBlock seatMap={ev.seatMap} className="mt-4 rounded-2xl bg-surface p-6" />}
+            {!isOnline && ev.seatMap && (
+              <SeatMapBlock seatMap={ev.seatMap} className="mt-4 rounded-2xl bg-surface p-6" />
+            )}
           </section>
         )}
 
