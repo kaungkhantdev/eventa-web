@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   POPUP_BLOCKED_HINT,
+  SEAT_MAP_DEFERRED_NOTE,
   clampStep,
   finalLabel,
   headerSaveLabel,
   landingPreviewHref,
   openPreviewTab,
   saveIntentOf,
+  seatMapDeferredOn,
   summaryCapacity,
   wizardStepsOf,
 } from './eventForm.presentation'
@@ -334,6 +336,52 @@ describe('saveIntentOf', () => {
       const typed = { ...grown, rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', 'tier-ga'] }
       expect(saveIntentOf('seating', typed)).toBe('seating')
     })
+  })
+})
+
+/**
+ * US-EVT-05: when Seating leaves a published, typed map's new rows to Assign
+ * seats, the step says so — under its hint, and in the header Save's toast —
+ * rather than letting "saved" read as if the seat map had been.
+ */
+describe('seatMapDeferredOn — whether this step’s save leaves the seat map to Assign seats', () => {
+  const grown: EventFormValues = {
+    ...toEventFormValues(null, [], []),
+    status: 'upcoming',
+    seatingMode: 'reserved',
+    seatRows: '4',
+    seatsPerRow: '16',
+    rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', null],
+  }
+
+  it('is true on Seating for a published, typed map with a new, untyped row', () => {
+    expect(seatMapDeferredOn('seating', grown)).toBe(true)
+  })
+
+  // Assign seats is where the new rows get their type, and it sends the grid whole.
+  it('is false on Assign seats, which saves the seat map', () => {
+    expect(seatMapDeferredOn('seats', grown)).toBe(false)
+  })
+
+  it('is false on every other step, which never saves the seat map', () => {
+    expect(seatMapDeferredOn('basics', grown)).toBe(false)
+    expect(seatMapDeferredOn('tickets', grown)).toBe(false)
+  })
+
+  it('is false once every row has a type, or on a draft', () => {
+    const typed = { ...grown, rowTicketTypes: ['tier-vip', 'tier-ga', 'tier-ga', 'tier-ga'] }
+    expect(seatMapDeferredOn('seating', typed)).toBe(false)
+    expect(seatMapDeferredOn('seating', { ...grown, status: 'draft' })).toBe(false)
+  })
+
+  it('agrees with the write Seating sends', () => {
+    expect(saveIntentOf('seating', grown)).toBe('save')
+  })
+
+  it('is explained on the Seating step', () => {
+    expect(SEAT_MAP_DEFERRED_NOTE).toBe(
+      'New rows need a ticket type. The seat map is saved when you give them one in Assign seats.',
+    )
   })
 })
 

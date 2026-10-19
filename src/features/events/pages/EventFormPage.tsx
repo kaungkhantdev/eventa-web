@@ -30,9 +30,11 @@ import {
   finalLabel,
   headerSaveLabel,
   POPUP_BLOCKED_HINT,
+  SEAT_MAP_DEFERRED_NOTE,
   landingPreviewHref,
   openPreviewTab,
   saveIntentOf,
+  seatMapDeferredOn,
   summaryCapacity,
   wizardStepsOf,
   type Highlight,
@@ -426,6 +428,9 @@ export default function EventFormPage() {
   const steps = wizardStepsOf(current)
   const at = clampStep(cur, steps.length)
   const step = steps[at]
+  // Seating's save leaves a published map's new, untyped rows to Assign seats
+  // (US-EVT-05): the step says so, and so does the header Save's toast.
+  const seatMapDeferred = seatMapDeferredOn(step.key, current)
   const pct = Math.round(((at + 1) / steps.length) * 100)
   const last = at === steps.length - 1
   // An event that already exists is being edited, whatever the wizard is
@@ -478,7 +483,7 @@ export default function EventFormPage() {
    * looked like it would save. Same write; it now says what it does and says
    * when it is done.
    */
-  const saveHere = () => saveStep({ notify: 'on' })
+  const saveHere = () => saveStep({ notify: 'on', ...(seatMapDeferred && { seatMapDeferred: 'on' }) })
 
   const publish = () =>
     submit({ intent: 'publish', visibility, template: landingTpl, confirmPastStart: 'on' })
@@ -1070,6 +1075,15 @@ export default function EventFormPage() {
                   </p>
                   {seatMapPreview}
                   <p className="hint mt-2">After Tickets, give each row a ticket type in Assign seats.</p>
+                  {seatMapDeferred && (
+                    <p role="status" className="mt-1 flex items-start gap-1.5 text-[12px] text-ink">
+                      <i
+                        aria-hidden="true"
+                        className="hgi-stroke hgi-alert-circle mt-px text-[14px] text-amber-500 dark:text-amber-300"
+                      />
+                      {SEAT_MAP_DEFERRED_NOTE}
+                    </p>
+                  )}
                   <p className="hint mt-1">The same green seat picker runs on the attendee ticket page.</p>
                 </div>
               </div>

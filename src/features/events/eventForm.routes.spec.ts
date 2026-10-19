@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { toEventFormValues } from './eventForm.mapper'
-import { categoryChoices, pageChangesOf, templateOf } from './eventForm.routes'
+import { categoryChoices, pageChangesOf, savedToastOf, templateOf } from './eventForm.routes'
 import type { CategoryWire } from './types'
 
 /**
@@ -117,5 +117,34 @@ describe('pageChangesOf', () => {
   it('keeps the address or the colour when its box is emptied', () => {
     expect(pageChangesOf(saved, typed({ slug: '  ', accentColor: '#1BA770' }))).toBeNull()
     expect(pageChangesOf(saved, typed({ slug: 'tech-summit-2026', accentColor: '' }))).toBeNull()
+  })
+})
+
+/**
+ * What a save announces once it lands. The header's Save asks for a toast; a
+ * Next saves as a side effect of moving on, so it says nothing. When Seating
+ * left a published map's new rows to Assign seats (US-EVT-05), "Changes saved"
+ * would claim the seat map was saved too — the toast says what is left to do.
+ */
+describe('savedToastOf', () => {
+  const sent = (fields: Record<string, string>) => {
+    const data = new FormData()
+    for (const [key, value] of Object.entries(fields)) data.append(key, value)
+    return data
+  }
+
+  it('confirms the header’s save', () => {
+    expect(savedToastOf(sent({ notify: 'on' }))).toBe('Changes saved.')
+  })
+
+  it('says the seat map still waits on Assign seats when Seating left it there', () => {
+    expect(savedToastOf(sent({ notify: 'on', seatMapDeferred: 'on' }))).toBe(
+      'Saved. Give the new rows a ticket type in Assign seats to save the seat map.',
+    )
+  })
+
+  it('says nothing for a Next, which saves silently', () => {
+    expect(savedToastOf(sent({}))).toBeNull()
+    expect(savedToastOf(sent({ seatMapDeferred: 'on' }))).toBeNull()
   })
 })

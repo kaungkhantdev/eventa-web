@@ -147,6 +147,23 @@ async function savePage(id: string, saved: EventFormValues, form: FormData): Pro
   if (changes) await eventsApi.updatePage(id, changes)
 }
 
+const SAVED_TOAST = 'Changes saved.'
+const SEAT_MAP_DEFERRED_TOAST = 'Saved. Give the new rows a ticket type in Assign seats to save the seat map.'
+
+/**
+ * What a save announces once it lands, or null for none.
+ *
+ * `notify` says the organizer ASKED to save — the header's button — so the save
+ * is announced. A Next saves too, but silently: it is a side effect of moving
+ * on, and a toast on every step would be noise. `seatMapDeferred` says Seating
+ * saved the rest of the event and left the seat map to Assign seats
+ * (US-EVT-05), so a bare "Changes saved." would claim the map was saved too.
+ */
+export function savedToastOf(form: FormData): string | null {
+  if (form.get('notify') !== 'on') return null
+  return form.get('seatMapDeferred') === 'on' ? SEAT_MAP_DEFERRED_TOAST : SAVED_TOAST
+}
+
 /** Everything the wizard's buttons do. */
 async function runEventFormAction({ request }: LoaderArgs): Promise<Response | void> {
   const form = await request.formData()
@@ -158,15 +175,13 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
    * intent — every step can be saved from the header, and each of them writes
    * through a different intent.
    *
-   * `notify` says the organizer ASKED to save, so the save is announced. A Next
-   * saves too, but silently: it is a side effect of moving on, and a toast on
-   * every step would be noise. `finish` additionally hands them back to the
-   * event, which only the last step's button does.
+   * The toast is `savedToastOf`'s to choose. `finish` additionally hands the
+   * organizer back to the event, which only the last step's button does.
    */
-  const notify = form.get('notify') === 'on'
+  const savedToast = savedToastOf(form)
   const finish = form.get('finish') === 'on'
   const done = (eventId: string): Response | void => {
-    if (notify) toast.success('Changes saved.')
+    if (savedToast) toast.success(savedToast)
     if (finish) return redirect(`/admin/event-detail?id=${eventId}`)
   }
 

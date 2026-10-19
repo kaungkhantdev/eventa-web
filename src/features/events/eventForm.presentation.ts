@@ -95,13 +95,25 @@ const SAVE_INTENT: Record<StepKey, SaveIntent> = {
 }
 
 /**
+ * Whether this step's save leaves the seat map to Assign seats: Seating, while
+ * the map has a row the API would refuse untyped — on a published, typed map,
+ * a row just added there. Assign seats gives it a type and sends the grid
+ * whole (US-EVT-05).
+ */
+export function seatMapDeferredOn(step: StepKey, event: SeatMapState): boolean {
+  return step === 'seating' && seatingWaitsForRowTypes(event)
+}
+
+/** What the Seating step says, under its hint, while its save leaves the seat map to Assign seats. */
+export const SEAT_MAP_DEFERRED_NOTE =
+  'New rows need a ticket type. The seat map is saved when you give them one in Assign seats.'
+
+/**
  * The write a step's save sends. Seating saves the rest of the event instead
- * of the seat map while the map has a row the API would refuse untyped — on a
- * published, typed map, a row just added there: Assign seats gives it a type
- * and sends the grid whole (US-EVT-05).
+ * of the seat map while the map must wait for Assign seats (`seatMapDeferredOn`).
  */
 export function saveIntentOf(step: StepKey, event: SeatMapState): SaveIntent {
-  if (step === 'seating' && seatingWaitsForRowTypes(event)) return 'save'
+  if (seatMapDeferredOn(step, event)) return 'save'
   return SAVE_INTENT[step]
 }
 
