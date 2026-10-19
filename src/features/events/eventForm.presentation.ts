@@ -56,23 +56,10 @@ export const STEPS: WizardStep[] = [
 /**
  * Seat colours for ticket types on the reserved-seating preview (US-EVT-05).
  *
- * The hues of the app's existing per-tier tints (`ICON_TINTS` in the ticketing
- * feature), at their dark-mode strength because the preview panel is always
- * dark. Important (`!`): the preview's seat class is unlayered CSS, which a
- * plain utility cannot override.
+ * Kept in `@/lib/seatSwatches` and shared with the public event page's seat
+ * map (US-PAGE-05), so this preview and the page attendees see match.
  */
-export const ROW_TYPE_SWATCHES = [
-  '!bg-brand',
-  '!bg-amber-300',
-  '!bg-blue-300',
-  '!bg-purple-300',
-  '!bg-red-300',
-] as const
-
-/** A type's place in the list → its colour; none keeps the plain, neutral seat. */
-export function swatchClassOf(swatch: number | null): string {
-  return swatch === null ? '' : ROW_TYPE_SWATCHES[swatch % ROW_TYPE_SWATCHES.length]!
-}
+export { ROW_TYPE_SWATCHES, swatchClassOf } from '@/lib/seatSwatches'
 
 /**
  * What the waitlist switch says under it (US-REG-04). Reserved seating has no
