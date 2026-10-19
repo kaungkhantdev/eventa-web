@@ -43,13 +43,15 @@ import {
   type StepKey,
 } from '../eventForm.presentation'
 import {
+  quantityColumnOf,
   rowSwatchesOf,
   rowTicketTypesFor,
   seatLegend,
-  seatQuantityOf,
   seatRowCount,
+  storedQuantityOf,
   ticketTypeChoices,
   withRowType,
+  type QuantityColumn,
   type SeatLegendEntry,
 } from '../eventSeating.mapper'
 import { CoverImageField } from '../components/CoverImageField'
@@ -98,6 +100,16 @@ const REQUIREMENT_MET: Record<(typeof PUBLISH_REQUIREMENTS)[number], string> = {
 /** The longest address and colour `UpdatePageDto` accepts. */
 const PAGE_SLUG_MAX = 80
 const PAGE_ACCENT_MAX = 9
+
+/**
+ * The ticket list's column spans, header and rows alike. With no Quantity
+ * column (an in-person reserved event, US-EVT-05) name and price take its width.
+ */
+const TICKET_SPANS: Record<QuantityColumn, { name: string; price: string }> = {
+  none: { name: 'sm:col-span-7', price: 'sm:col-span-4' },
+  typed: { name: 'sm:col-span-5', price: 'sm:col-span-3' },
+  readOnly: { name: 'sm:col-span-5', price: 'sm:col-span-3' },
+}
 
 /** A stored status → the word the console uses. */
 function statusLabel(status: string): string {
@@ -443,6 +455,8 @@ export default function EventFormPage() {
   const colsNum = Number(cols) || 0
   const seatTotal = rowsNum * colsNum
   const seatRowsOn = seatRowsApply(current)
+  const quantityColumn = quantityColumnOf(current)
+  const ticketSpans = TICKET_SPANS[quantityColumn]
   const assignSeatsView = assignSeatsViewOf(typeChoices.length, saving)
   const seatMapPreview = (
     <SeatMapPreview
@@ -1118,63 +1132,59 @@ export default function EventFormPage() {
                 <span className="text-[11px] text-muted">Add one or more</span>
               </div>
               <div className="mt-3 hidden gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted sm:grid sm:grid-cols-12">
-                <div className="sm:col-span-5">Ticket name</div>
-                <div className="sm:col-span-3">Price (฿)</div>
-                <div className="sm:col-span-3">Quantity</div>
+                <div className={ticketSpans.name}>Ticket name</div>
+                <div className={ticketSpans.price}>Price (฿)</div>
+                {quantityColumn !== 'none' && <div className="sm:col-span-3">Quantity</div>}
                 <div className="sm:col-span-1" />
               </div>
               <div className="mt-2 space-y-2">
-                {tickets.map((t, i) => {
-                  // On a reserved event the seat map sets it (US-EVT-05): the
-                  // seats in the type's rows as picked now, never typed.
-                  const seatQuantity = seatQuantityOf(current, initial, t.id)
-                  return (
-                    <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-12 sm:items-center">
-                      <input
-                        className="input sm:col-span-5"
-                        type="text"
-                        placeholder="Ticket name"
-                        value={t.name}
-                        onChange={(e) => setTicketField(i, 'name', e.target.value)}
-                      />
+                {tickets.map((t, i) => (
+                  <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-12 sm:items-center">
+                    <input
+                      className={cn('input', ticketSpans.name)}
+                      type="text"
+                      placeholder="Ticket name"
+                      value={t.name}
+                      onChange={(e) => setTicketField(i, 'name', e.target.value)}
+                    />
+                    <input
+                      className={cn('input tnum', ticketSpans.price)}
+                      type="number"
+                      placeholder="Price"
+                      value={t.price}
+                      onChange={(e) => setTicketField(i, 'price', e.target.value)}
+                    />
+                    {quantityColumn === 'typed' && (
                       <input
                         className="input tnum sm:col-span-3"
                         type="number"
-                        placeholder="Price"
-                        value={t.price}
-                        onChange={(e) => setTicketField(i, 'price', e.target.value)}
+                        placeholder="Quantity"
+                        value={t.quantity}
+                        onChange={(e) => setTicketField(i, 'quantity', e.target.value)}
                       />
-                      {seatQuantity === null ? (
+                    )}
+                    {quantityColumn === 'readOnly' && (
+                      <div className="sm:col-span-3">
                         <input
-                          className="input tnum sm:col-span-3"
+                          className="input tnum bg-canvas text-muted"
                           type="number"
-                          placeholder="Quantity"
-                          value={t.quantity}
-                          onChange={(e) => setTicketField(i, 'quantity', e.target.value)}
+                          value={storedQuantityOf(initial.tickets, t.id)}
+                          readOnly
+                          aria-label="Quantity"
                         />
-                      ) : (
-                        <div className="sm:col-span-3">
-                          <input
-                            className="input tnum bg-canvas text-muted"
-                            type="number"
-                            value={seatQuantity}
-                            readOnly
-                            aria-label="Quantity"
-                          />
-                          <p className="hint">{SEAT_SET_QUANTITY}</p>
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        className="btn-icon col-span-2 justify-self-end sm:col-span-1 sm:justify-self-center"
-                        title="Remove ticket type"
-                        onClick={() => removeTicket(i)}
-                      >
-                        <i className="hgi-stroke hgi-delete-02 text-[16px]" />
-                      </button>
-                    </div>
-                  )
-                })}
+                        <p className="hint">{SEAT_SET_QUANTITY}</p>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="btn-icon col-span-2 justify-self-end sm:col-span-1 sm:justify-self-center"
+                      title="Remove ticket type"
+                      onClick={() => removeTicket(i)}
+                    >
+                      <i className="hgi-stroke hgi-delete-02 text-[16px]" />
+                    </button>
+                  </div>
+                ))}
               </div>
               {seatRowsOn && (
                 <p className="hint mt-2">

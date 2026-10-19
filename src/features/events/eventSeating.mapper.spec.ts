@@ -1,22 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import { swatchOf } from '@/lib/seatSwatches'
 import {
+  quantityColumnOf,
   quantityFromSeatsOf,
   rowTicketTypesFor,
   rowTicketTypesOf,
   rowTypeOf,
   rowSwatchesOf,
   seatLegend,
-  seatQuantityOf,
   seatRowCount,
   seatingWaitsForRowTypes,
   seatsOfType,
+  storedQuantityOf,
   ticketTypeChoices,
   toReservedSeatingBody,
   withRowType,
   type TicketTypeChoice,
 } from './eventSeating.mapper'
-import { toEventFormValues, type EventFormValues, type TicketDraft } from './eventForm.mapper'
+import {
+  toEventFormValues,
+  toTicketBody,
+  type EventFormValues,
+  type QuantityFacts,
+  type TicketDraft,
+} from './eventForm.mapper'
 
 /**
  * US-EVT-05: a reserved seat map is split between ticket types by whole rows.
@@ -277,8 +284,8 @@ describe('quantityFromSeatsOf — whether the seat map sets the quantities', () 
 })
 
 /**
- * The seats a type's rows hold — the one count behind both the preview's key
- * and the Tickets step's read-only quantity, so the two can never disagree.
+ * The seats a type's rows hold — the count behind the preview's key, which is
+ * where each type's quantity shows while its rows are picked.
  */
 describe('seatsOfType — the seats a type’s rows hold', () => {
   it('is the rows given that type times the seats in a row', () => {
@@ -295,66 +302,67 @@ describe('seatsOfType — the seats a type’s rows hold', () => {
 })
 
 /**
- * US-EVT-05: on a reserved, in-person event the Tickets step never asks for a
- * quantity. Each type's is the seats its rows hold, worked out from the rows as
- * they are picked on Assign seats — saved or not.
+ * US-EVT-05, US-EVT-06: the wizard's Tickets step has a Quantity column only
+ * where the organizer sets the quantity. On an in-person reserved event each
+ * type's is the seats its rows hold, given on Assign seats, so there is no
+ * column at all — the note under the list says so instead.
  */
-describe('seatQuantityOf — the read-only quantity a ticket row shows', () => {
-  const values = (over: Partial<EventFormValues> = {}): EventFormValues => ({
-    ...toEventFormValues(null, [], []),
+describe('quantityColumnOf — whether the Tickets step shows a Quantity column, and how', () => {
+  const event = (over: Partial<QuantityFacts> = {}): QuantityFacts => ({
     seatingMode: 'reserved',
-    seatRows: '3',
-    seatsPerRow: '16',
-    rowTicketTypes: ['tier-vip', 'tier-vip', 'tier-ga'],
-    tickets: [draft({ id: 'tier-vip', quantity: '999' }), draft({ id: 'tier-ga', name: 'General' })],
+    isOnline: false,
+    quantityFromSeats: true,
     ...over,
   })
 
-  // The wizard as it stands is also what was saved, unless a case says otherwise.
-  const quantity = (now: EventFormValues, ticketId: string | null) => seatQuantityOf(now, now, ticketId)
-
-  it('is the seats the type’s rows hold on a reserved event', () => {
-    expect(quantity(values(), 'tier-vip')).toBe('32')
-    expect(quantity(values(), 'tier-ga')).toBe('16')
+  it('is none for an in-person reserved event', () => {
+    expect(quantityColumnOf(event())).toBe('none')
   })
 
-  // The rows decide it, not whatever number was stored before they had types.
-  it('follows the rows as they are picked, not what was stored', () => {
-    expect(quantity(values({ rowTicketTypes: ['tier-vip', 'tier-vip', 'tier-vip'] }), 'tier-vip')).toBe(
-      '48',
-    )
+  // Before any row has a type the API does not mark the tickets yet.
+  it('is none for an in-person reserved event the API does not mark yet', () => {
+    expect(quantityColumnOf(event({ quantityFromSeats: false }))).toBe('none')
   })
 
-  it('is 0 for a type with no rows yet', () => {
-    expect(quantity(values({ rowTicketTypes: [null, null, null] }), 'tier-vip')).toBe('0')
+  it('is typed for general admission', () => {
+    expect(quantityColumnOf(event({ seatingMode: 'ga', quantityFromSeats: false }))).toBe('typed')
   })
 
-  // A new type cannot have rows: the untyped rows are not its seats.
-  it('is 0 for a type that has not been saved yet', () => {
-    expect(quantity(values({ rowTicketTypes: [null, null, null] }), null)).toBe('0')
-  })
-
-  it('is 0 seats while the seats-per-row box is blank', () => {
-    expect(quantity(values({ seatsPerRow: '' }), 'tier-vip')).toBe('0')
-  })
-
-  it('is nothing — a typed quantity — for general admission', () => {
-    expect(quantity(values({ seatingMode: 'ga' }), 'tier-vip')).toBeNull()
-  })
-
-  it('is nothing — a typed quantity — for an online event', () => {
-    expect(quantity(values({ isOnline: true }), 'tier-vip')).toBeNull()
+  it('is typed for an online event, which has no seat rows', () => {
+    expect(quantityColumnOf(event({ isOnline: true, quantityFromSeats: false }))).toBe('typed')
   })
 
   /*
-   * Switched to general admission but not saved yet: the API still sets the
-   * quantities from the old map, and would refuse a typed one, so the box keeps
-   * showing what it stored — as it always has.
+   * Switched away from reserved seating but not saved yet: the API still sets
+   * the quantities from the old map and the save drops a typed one, so the
+   * column shows what it stored, read-only.
    */
-  it('shows what the API stored while its saved map still sets the quantity', () => {
-    const saved = values({ quantityFromSeats: true, tickets: [draft({ id: 'tier-vip', quantity: '32' })] })
-    const switched = { ...saved, seatingMode: 'ga' as const, tickets: [draft({ id: 'tier-vip', quantity: '999' })] }
-    expect(seatQuantityOf(switched, saved, 'tier-vip')).toBe('32')
-    expect(seatQuantityOf(switched, saved, null)).toBe('0')
+  it('is read-only while the API’s saved map still sets the quantity', () => {
+    expect(quantityColumnOf(event({ seatingMode: 'ga' }))).toBe('readOnly')
+    expect(quantityColumnOf(event({ isOnline: true }))).toBe('readOnly')
+  })
+
+  // A typed box the save then left out would throw the organizer's number away.
+  it('is typed exactly when the save sends the quantity', () => {
+    for (const seatingMode of ['ga', 'reserved'] as const)
+      for (const isOnline of [false, true])
+        for (const quantityFromSeats of [false, true]) {
+          const facts = event({ seatingMode, isOnline, quantityFromSeats })
+          expect(quantityColumnOf(facts) === 'typed').toBe('total' in toTicketBody(draft(), facts))
+        }
+  })
+})
+
+describe('storedQuantityOf — the read-only quantity a ticket row shows', () => {
+  const saved = [draft({ id: 'tier-vip', quantity: '32' }), draft({ id: 'tier-ga', quantity: '16' })]
+
+  it('is the number the API stored for that type', () => {
+    expect(storedQuantityOf(saved, 'tier-ga')).toBe('16')
+  })
+
+  // A new type has no rows in the saved map, so no seats.
+  it('is 0 for a type that has not been saved yet', () => {
+    expect(storedQuantityOf(saved, null)).toBe('0')
+    expect(storedQuantityOf([...saved, draft({ id: null, quantity: '999' })], null)).toBe('0')
   })
 })

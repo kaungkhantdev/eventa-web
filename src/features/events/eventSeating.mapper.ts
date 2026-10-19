@@ -1,13 +1,19 @@
 import { num } from '@/lib/format'
 import { swatchOf } from '@/lib/seatSwatches'
 import type { ReservedSeatingBody, SeatRowWire } from './eventContent.api'
-import { quantitySetBySeats, seatRowsApply, type EventFormValues, type TicketDraft } from './eventForm.mapper'
+import {
+  quantitySetBySeats,
+  seatRowsApply,
+  type EventFormValues,
+  type QuantityFacts,
+  type TicketDraft,
+} from './eventForm.mapper'
 
 /**
  * The wizard's rules for a reserved map split between ticket types by whole
  * rows (US-EVT-05): the grid is laid out on the Seating step, each row is given
- * a type on Assign seats, and the Tickets step shows each type's quantity as
- * the seats its rows hold.
+ * a type on Assign seats, and each type's quantity is the seats its rows hold —
+ * so the Tickets step asks for none.
  *
  * A row's type is held as one list, one entry per row with index 0 = row 1,
  * because that is the shape `PUT /seating/reserved` takes as `rowTicketTypes`.
@@ -173,27 +179,27 @@ export function quantityFromSeatsOf(tickets: readonly { quantityFromSeats: boole
 }
 
 /**
- * The quantity a ticket row shows read-only, or null when it is typed. `now` is
- * the wizard as it stands; `saved` is what the API last returned.
- *
- * On an in-person reserved event it is the seats the type's rows hold, worked
- * out from the rows as they are picked right now, so it moves the moment a row
- * changes hands. A type not saved yet has no rows, so it is 0 — never the rows
- * still without a type. Anywhere else the seat map sets it only while the API
- * still says so, and then it is the number the API stored.
+ * How the wizard's Tickets step shows each type's quantity (US-EVT-05,
+ * US-EVT-06): no column at all, a box the organizer types in, or the API's
+ * stored number read-only.
  */
-export function seatQuantityOf(
-  now: EventFormValues,
-  saved: EventFormValues,
-  ticketId: string | null,
-): string | null {
-  if (!quantitySetBySeats({ ...now, quantityFromSeats: saved.quantityFromSeats })) return null
-  if (!seatRowsApply(now)) return storedQuantityOf(saved.tickets, ticketId)
-  if (ticketId === null) return '0'
-  return String(seatsOfType(now.rowTicketTypes, ticketId, Number(now.seatsPerRow) || 0))
+export type QuantityColumn = 'none' | 'typed' | 'readOnly'
+
+/**
+ * Whether the Tickets step has a Quantity column, and whether it is typed. An
+ * in-person reserved event has none: each type's quantity is the seats its rows
+ * hold, given on Assign seats, and a note under the list says so. Anywhere else
+ * the organizer types it — unless the API still sets it from a seat map the
+ * form has switched away from but not saved, which the save leaves in charge
+ * (`toTicketBody` drops a typed number), so its stored number shows read-only.
+ */
+export function quantityColumnOf(event: QuantityFacts): QuantityColumn {
+  if (seatRowsApply(event)) return 'none'
+  return quantitySetBySeats(event) ? 'readOnly' : 'typed'
 }
 
-function storedQuantityOf(tickets: readonly TicketDraft[], ticketId: string | null): string {
+/** The quantity the API stored for a ticket type; 0 for one not saved yet, which has no seats. */
+export function storedQuantityOf(tickets: readonly TicketDraft[], ticketId: string | null): string {
   return tickets.find((ticket) => ticket.id !== null && ticket.id === ticketId)?.quantity ?? '0'
 }
 
