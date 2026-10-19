@@ -6,6 +6,12 @@ import type { TicketStatus } from './types'
 
 /** The rules behind the ticket inventory (US-TKT-03/04). */
 
+/**
+ * What a quantity box says when it is read-only because the seat map sets it
+ * (US-EVT-05). Shared by every place a tier's quantity is edited.
+ */
+export const SEAT_SET_QUANTITY = 'Set by the seat map'
+
 const SATANG_PER_BAHT = 100
 const FULL = 100
 const FREE = 'Free'
@@ -74,6 +80,7 @@ function toTicketDraft(wire: TicketWire): TicketDraft {
     total: wire.total,
     maxPerOrder: wire.maxPerOrder,
     version: wire.version,
+    quantityFromSeats: wire.quantityFromSeats,
     salesStartDay: dayOrBlank(wire.salesStartAt),
     salesEndDay: dayOrBlank(wire.salesEndAt),
     salesStartAt: wire.salesStartAt ?? '',

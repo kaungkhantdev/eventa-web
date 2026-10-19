@@ -157,6 +157,7 @@ describe('the panel round-trip', () => {
     salesStartAt: null,
     salesEndAt: null,
     version: 7,
+    quantityFromSeats: false,
     ...over,
   })
 

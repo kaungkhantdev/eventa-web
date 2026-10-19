@@ -4,6 +4,7 @@ import { Button, EventPicker, Hint, Input, Label, Panel } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
+import { SEAT_SET_QUANTITY } from '../tickets.mapper'
 import type { EventOption } from '../tickets.routes'
 import type { TicketDraft } from '../tickets.types'
 
@@ -188,16 +189,33 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
 
         <div>
           <Label htmlFor="ticket-total">Quantity available</Label>
-          <Input
-            id="ticket-total"
-            name="total"
-            type="number"
-            min={0}
-            step={1}
-            defaultValue={editing?.total ?? ''}
-            placeholder="250"
-          />
-          <Hint>0 means unlimited.</Hint>
+          {/* The seat map sets it (US-EVT-05): shown, never posted — the box has
+              no name, so the save leaves the quantity as the API derived it. */}
+          {editing?.quantityFromSeats ? (
+            <>
+              <Input
+                id="ticket-total"
+                type="number"
+                value={editing.total}
+                readOnly
+                className="bg-canvas text-muted"
+              />
+              <Hint>{SEAT_SET_QUANTITY}</Hint>
+            </>
+          ) : (
+            <>
+              <Input
+                id="ticket-total"
+                name="total"
+                type="number"
+                min={0}
+                step={1}
+                defaultValue={editing?.total ?? ''}
+                placeholder="250"
+              />
+              <Hint>0 means unlimited.</Hint>
+            </>
+          )}
         </div>
 
         {/* The instant behind each box travels with it, hidden, so a save that

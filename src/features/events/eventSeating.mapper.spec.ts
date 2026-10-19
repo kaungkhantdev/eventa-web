@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  quantityFromSeatsOf,
   rowTicketTypesFor,
   rowTicketTypesOf,
   rowTypeOf,
   rowSwatchesOf,
   seatLegend,
+  seatQuantityOf,
   seatRowCount,
   ticketTypeChoices,
   toReservedSeatingBody,
@@ -187,5 +189,42 @@ describe('toReservedSeatingBody — what PUT /seating/reserved is sent', () => {
     const body = toReservedSeatingBody(values({ seatRows: '', rowTicketTypes: [null] }))
     expect(body.rows).toBe(1)
     expect(body.rowTicketTypes).toHaveLength(1)
+  })
+})
+
+/**
+ * US-EVT-05: once a reserved event's rows have ticket types, each type's
+ * quantity is the seats its rows hold. The API says so on every ticket of
+ * such an event as `quantityFromSeats`.
+ */
+describe('quantityFromSeatsOf — whether the seat map sets the quantities', () => {
+  it('is true when the API says a ticket’s quantity comes from seats', () => {
+    expect(quantityFromSeatsOf([{ quantityFromSeats: false }, { quantityFromSeats: true }])).toBe(true)
+  })
+
+  it('is false otherwise, and for an event with no tickets', () => {
+    expect(quantityFromSeatsOf([{ quantityFromSeats: false }])).toBe(false)
+    expect(quantityFromSeatsOf([])).toBe(false)
+  })
+})
+
+describe('seatQuantityOf — the read-only quantity a ticket row shows', () => {
+  const saved = (quantityFromSeats: boolean): EventFormValues => ({
+    ...toEventFormValues(null, [], []),
+    quantityFromSeats,
+    tickets: [draft({ id: 'tier-vip', quantity: '32' })],
+  })
+
+  it('is nothing — a typed quantity — when the seat map does not set it', () => {
+    expect(seatQuantityOf(saved(false), 'tier-vip')).toBeNull()
+  })
+
+  it('is the seats the saved type’s rows hold', () => {
+    expect(seatQuantityOf(saved(true), 'tier-vip')).toBe('32')
+  })
+
+  // A new type starts with no rows, so no seats.
+  it('is 0 for a type that has not been saved yet', () => {
+    expect(seatQuantityOf(saved(true), null)).toBe('0')
   })
 })

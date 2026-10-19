@@ -64,6 +64,8 @@ export interface EventFormValues {
   seatsPerRow: string
   /** Each seat row's ticket type, index 0 = row 1; `null` for none (US-EVT-05). */
   rowTicketTypes: (string | null)[]
+  /** The seat map sets each ticket type's quantity, so it is not typed (US-EVT-05). */
+  quantityFromSeats: boolean
   coverImage: string
   tickets: TicketDraft[]
   highlights: HighlightDraft[]
@@ -102,6 +104,7 @@ function emptyValues(): EventFormValues {
     seatRows: '',
     seatsPerRow: '',
     rowTicketTypes: [],
+    quantityFromSeats: false,
     coverImage: '',
     tickets: [],
     highlights: [],
@@ -162,6 +165,25 @@ export function toEventFormValues(
     })),
     highlights: [...highlights],
     version: event.version,
+  }
+}
+
+/**
+ * A ticket row → what the ticketing API is sent for it.
+ *
+ * The quantity goes only when the organizer types it. Where the seat map sets
+ * it (US-EVT-05), the API derives it and refuses a different one, so it is
+ * left out; a blank one is left out too, since 0 would mean unlimited.
+ */
+export function toTicketBody(row: TicketDraft, quantityFromSeats: boolean) {
+  const total = Number(row.quantity) || undefined
+  return {
+    name: row.name.trim(),
+    isFree: row.isFree,
+    // A free tier carries no price at all — 0 would describe a paid tier that
+    // happens to cost nothing, which the API stores differently.
+    priceSatang: row.isFree ? undefined : satangOf(row.price),
+    ...(quantityFromSeats ? {} : { total }),
   }
 }
 

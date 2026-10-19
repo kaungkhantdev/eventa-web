@@ -26,6 +26,8 @@ export interface TicketWire {
    * somebody else has since changed.
    */
   version: number
+  /** True on a reserved event whose rows have ticket types: `total` is its seats (US-EVT-05). */
+  quantityFromSeats: boolean
 }
 
 /** How many tiers sit in each status, across the whole workspace. */
@@ -104,4 +106,6 @@ export interface TicketDraft {
    * token that goes back is provably the one this panel was opened with.
    */
   version: number
+  /** The seat map sets `total`, so the form shows it read-only and never sends it. */
+  quantityFromSeats: boolean
 }

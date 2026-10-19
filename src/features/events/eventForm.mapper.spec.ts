@@ -8,8 +8,10 @@ import {
   satangOf,
   toCreateBody,
   toEventFormValues,
+  toTicketBody,
   toUpdateBody,
   type EventFormValues,
+  type TicketDraft,
 } from './eventForm.mapper'
 import type { EventWire } from './types'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
@@ -48,6 +50,7 @@ const ticket = (over: Partial<TicketWire> = {}): TicketWire => ({
   salesStartAt: null,
   salesEndAt: null,
   version: 1,
+  quantityFromSeats: false,
   ...over,
 })
 
@@ -427,5 +430,38 @@ describe('whether the event may be published yet', () => {
       expect(seatRowsApply(reserved([], { seatingMode: 'ga' }))).toBe(false)
       expect(seatRowsApply(reserved([], { isOnline: true }))).toBe(false)
     })
+  })
+})
+
+describe('what a ticket row is saved with', () => {
+  const row = (over: Partial<TicketDraft> = {}): TicketDraft => ({
+    id: 'tkt-1',
+    name: ' VIP ',
+    price: '3500',
+    quantity: '40',
+    isFree: false,
+    ...over,
+  })
+
+  it('sends the name, the price in satang and the quantity typed', () => {
+    expect(toTicketBody(row(), false)).toEqual({
+      name: 'VIP',
+      isFree: false,
+      priceSatang: 350_000,
+      total: 40,
+    })
+  })
+
+  it('leaves a blank quantity out rather than sending 0, which means unlimited', () => {
+    expect(toTicketBody(row({ quantity: '' }), false).total).toBeUndefined()
+  })
+
+  it('sends no price for a free tier', () => {
+    expect(toTicketBody(row({ isFree: true }), false).priceSatang).toBeUndefined()
+  })
+
+  // US-EVT-05: the seat map sets the quantity, and the API refuses a different one.
+  it('sends no quantity when the seat map sets it', () => {
+    expect(toTicketBody(row(), true)).not.toHaveProperty('total')
   })
 })

@@ -133,6 +133,24 @@ export function toReservedSeatingBody(values: EventFormValues): ReservedSeatingB
   }
 }
 
+/**
+ * Whether the seat map sets this event's ticket quantities. The API marks
+ * every ticket of such an event, so any one of them answers for the event.
+ */
+export function quantityFromSeatsOf(tickets: readonly { quantityFromSeats: boolean }[]): boolean {
+  return tickets.some((ticket) => ticket.quantityFromSeats)
+}
+
+/**
+ * The quantity a ticket row shows read-only, or null when it is typed. It is
+ * what the API stored — the seats the type's rows hold — and 0 for a type not
+ * saved yet, which has no rows.
+ */
+export function seatQuantityOf(saved: EventFormValues, ticketId: string | null): string | null {
+  if (!saved.quantityFromSeats) return null
+  return saved.tickets.find((ticket) => ticket.id !== null && ticket.id === ticketId)?.quantity ?? '0'
+}
+
 function seatsLabel(seats: number): string {
   return `${num(seats)} ${seats === 1 ? 'seat' : 'seats'}`
 }

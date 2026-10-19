@@ -19,6 +19,7 @@ const wire = (over: Partial<TicketWire> = {}): TicketWire => ({
   salesStartAt: null,
   salesEndAt: null,
   version: 7,
+  quantityFromSeats: false,
   ...over,
 })
 
@@ -67,6 +68,13 @@ describe('toTicketCard', () => {
 })
 
 describe('toTicketCard — the edit draft', () => {
+  // US-EVT-05: on a reserved event whose rows have ticket types, a tier's
+  // quantity is the seats its rows hold, so the form shows it read-only.
+  it('says when the quantity is set by the seat map', () => {
+    expect(toTicketCard(wire({ quantityFromSeats: true })).edit.quantityFromSeats).toBe(true)
+    expect(toTicketCard(wire()).edit.quantityFromSeats).toBe(false)
+  })
+
   // The card's strings are for reading; the form needs figures it can put in a
   // number box and send back. Keeping them apart is what stops the panel from
   // parsing '฿2,900' back into a price.

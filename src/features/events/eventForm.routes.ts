@@ -8,13 +8,13 @@ import { eventContentApi } from './eventContent.api'
 import { eventsApi, type PageSettingsBody } from './events.api'
 import { CATEGORIES_LIMIT } from './events.routes'
 import {
-  satangOf,
   toCreateBody,
   toEventFormValues,
+  toTicketBody,
   toUpdateBody,
   type EventFormValues,
 } from './eventForm.mapper'
-import { rowTicketTypesOf, toReservedSeatingBody } from './eventSeating.mapper'
+import { quantityFromSeatsOf, rowTicketTypesOf, toReservedSeatingBody } from './eventSeating.mapper'
 import { isTemplateId, type TemplateId } from './landingTemplates'
 import type { CategoryWire } from './types'
 
@@ -115,6 +115,7 @@ async function loadEventForm({ request }: LoaderArgs): Promise<EventFormData> {
       seatRows: seating.seatMap ? String(seating.seatMap.rows) : '',
       seatsPerRow: seating.seatMap ? String(seating.seatMap.seatsPerRow) : '',
       rowTicketTypes: rowTicketTypesOf(seating.rows, seating.seatMap?.rows ?? 0),
+      quantityFromSeats: quantityFromSeatsOf(tickets),
     },
     template: templateOf(params, event.landingTemplateId),
     categories,
@@ -236,16 +237,8 @@ async function runEventFormAction({ request }: LoaderArgs): Promise<Response | v
  */
 async function saveTickets(eventId: string, values: EventFormValues): Promise<void> {
   for (const row of values.tickets) {
-    const name = row.name.trim()
-    if (!name) continue
-    const body = {
-      name,
-      isFree: row.isFree,
-      // A free tier carries no price at all — 0 would describe a paid tier that
-      // happens to cost nothing, which the API stores differently.
-      priceSatang: row.isFree ? undefined : satangOf(row.price),
-      total: Number(row.quantity) || undefined,
-    }
+    const body = toTicketBody(row, values.quantityFromSeats)
+    if (!body.name) continue
     if (row.id) await ticketingApi.update(eventId, row.id, body)
     else await ticketingApi.add(eventId, body)
   }

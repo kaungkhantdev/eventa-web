@@ -41,6 +41,7 @@ import {
 import { LANDING_TEMPLATES } from '../landingTemplates'
 import { STATUS_PILL, copyLabel, type CopyState } from '../events.presentation'
 import { RemoveSessionModal } from '@/features/program/components/RemoveSessionModal'
+import { SEAT_SET_QUANTITY } from '@/features/ticketing/tickets.mapper'
 
 /* ---------- Event detail — admin/event-detail.html ----------
    Pill tabs switch between Overview, Registrations (filter + paging),
@@ -292,6 +293,7 @@ export default function EventDetailPage() {
       <TicketPanel
         open={ticketOpen}
         onClose={() => setTicketOpen(false)}
+        quantityFromSeats={data.tab === 'tickets' && data.quantityFromSeats}
         onAdd={(values) => fetcher.submit({ intent: 'add-ticket', ...values }, { method: 'post' })}
       />
       <ShareModal
@@ -1337,10 +1339,13 @@ function SessionPanel({
 function TicketPanel({
   open,
   onClose,
+  quantityFromSeats,
   onAdd,
 }: {
   open: boolean
   onClose: () => void
+  /** The seat map sets the quantity (US-EVT-05): a new tier starts with no seats. */
+  quantityFromSeats: boolean
   onAdd: (values: Record<string, string>) => void
 }) {
   useEsc(open, onClose)
@@ -1354,7 +1359,7 @@ function TicketPanel({
     onAdd({
       name: name.trim(),
       price,
-      total: qty,
+      ...(quantityFromSeats ? {} : { total: qty }),
       // A free tier is priced differently by the API, not priced at zero.
       ...(isFree ? { isFree: 'on' } : {}),
     })
@@ -1402,15 +1407,28 @@ function TicketPanel({
             </div>
             <div>
               <label className="label">Quantity</label>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                className="input"
-                placeholder="200"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-              />
+              {quantityFromSeats ? (
+                <>
+                  <input
+                    type="number"
+                    className="input bg-canvas text-muted"
+                    value={0}
+                    readOnly
+                    aria-label="Quantity"
+                  />
+                  <p className="hint">{SEAT_SET_QUANTITY}</p>
+                </>
+              ) : (
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="input"
+                  placeholder="200"
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                />
+              )}
             </div>
           </div>
           <div>

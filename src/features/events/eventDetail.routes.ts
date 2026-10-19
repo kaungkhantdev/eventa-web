@@ -7,6 +7,7 @@ import { sessionTypeOf } from '@/features/program/program.mapper'
 import { removalConfirmed } from '@/features/program/program.routes'
 import { ticketingApi } from '@/features/ticketing/ticketing.api'
 import { eventDetailApi } from './eventDetail.api'
+import { quantityFromSeatsOf } from './eventSeating.mapper'
 import {
   toAttendeeRow,
   toEventHeader,
@@ -77,7 +78,12 @@ export type TabData =
   | { tab: 'attendees'; attendees: AttendeeRow[]; window: PageWindow }
   | { tab: 'speakers'; speakers: SpeakerCard[] }
   | { tab: 'agenda'; days: AgendaDay[] }
-  | { tab: 'tickets'; tickets: TicketRow[] }
+  | {
+      tab: 'tickets'
+      tickets: TicketRow[]
+      /** The seat map sets each tier's quantity, so a new one is not typed (US-EVT-05). */
+      quantityFromSeats: boolean
+    }
 
 export type EventDetailData = EventShell & TabData
 
@@ -143,7 +149,8 @@ async function loadTab(
   }
 
   if (tab === 'tickets') {
-    return { tab, tickets: (await ticketingApi.forEvent(id)).map(toTicketRow) }
+    const tickets = await ticketingApi.forEvent(id)
+    return { tab, tickets: tickets.map(toTicketRow), quantityFromSeats: quantityFromSeatsOf(tickets) }
   }
 
   return { tab: 'overview' }

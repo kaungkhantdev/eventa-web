@@ -8,6 +8,7 @@ import { NotificationBell, SignedInChip, Toggle, VenueMap } from '@/components/u
 import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
 import { toast } from '@/lib/toast'
+import { SEAT_SET_QUANTITY } from '@/features/ticketing/tickets.mapper'
 import {
   SEAT_ROWS_REQUIREMENT,
   categoryIdOf,
@@ -38,6 +39,7 @@ import {
   rowSwatchesOf,
   rowTicketTypesFor,
   seatLegend,
+  seatQuantityOf,
   seatRowCount,
   ticketTypeChoices,
   withRowType,
@@ -1076,39 +1078,57 @@ export default function EventFormPage() {
                 <div className="sm:col-span-1" />
               </div>
               <div className="mt-2 space-y-2">
-                {tickets.map((t, i) => (
-                  <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-12 sm:items-center">
-                    <input
-                      className="input sm:col-span-5"
-                      type="text"
-                      placeholder="Ticket name"
-                      value={t.name}
-                      onChange={(e) => setTicketField(i, 'name', e.target.value)}
-                    />
-                    <input
-                      className="input tnum sm:col-span-3"
-                      type="number"
-                      placeholder="Price"
-                      value={t.price}
-                      onChange={(e) => setTicketField(i, 'price', e.target.value)}
-                    />
-                    <input
-                      className="input tnum sm:col-span-3"
-                      type="number"
-                      placeholder="Quantity"
-                      value={t.quantity}
-                      onChange={(e) => setTicketField(i, 'quantity', e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn-icon col-span-2 justify-self-end sm:col-span-1 sm:justify-self-center"
-                      title="Remove ticket type"
-                      onClick={() => removeTicket(i)}
-                    >
-                      <i className="hgi-stroke hgi-delete-02 text-[16px]" />
-                    </button>
-                  </div>
-                ))}
+                {tickets.map((t, i) => {
+                  // The seat map sets it on a reserved event whose rows have
+                  // ticket types (US-EVT-05): shown as stored, never typed.
+                  const seatQuantity = seatQuantityOf(initial, t.id)
+                  return (
+                    <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-12 sm:items-center">
+                      <input
+                        className="input sm:col-span-5"
+                        type="text"
+                        placeholder="Ticket name"
+                        value={t.name}
+                        onChange={(e) => setTicketField(i, 'name', e.target.value)}
+                      />
+                      <input
+                        className="input tnum sm:col-span-3"
+                        type="number"
+                        placeholder="Price"
+                        value={t.price}
+                        onChange={(e) => setTicketField(i, 'price', e.target.value)}
+                      />
+                      {seatQuantity === null ? (
+                        <input
+                          className="input tnum sm:col-span-3"
+                          type="number"
+                          placeholder="Quantity"
+                          value={t.quantity}
+                          onChange={(e) => setTicketField(i, 'quantity', e.target.value)}
+                        />
+                      ) : (
+                        <div className="sm:col-span-3">
+                          <input
+                            className="input tnum bg-canvas text-muted"
+                            type="number"
+                            value={seatQuantity}
+                            readOnly
+                            aria-label="Quantity"
+                          />
+                          <p className="hint">{SEAT_SET_QUANTITY}</p>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className="btn-icon col-span-2 justify-self-end sm:col-span-1 sm:justify-self-center"
+                        title="Remove ticket type"
+                        onClick={() => removeTicket(i)}
+                      >
+                        <i className="hgi-stroke hgi-delete-02 text-[16px]" />
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
               <button type="button" className="btn btn-soft btn-sm mt-3" onClick={addTicket}>
                 <i className="hgi-stroke hgi-add-01 text-[14px]" />
