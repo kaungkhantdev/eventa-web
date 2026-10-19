@@ -46,14 +46,15 @@ describe('toDraftPreview', () => {
     expect(preview('').online).toBe(false)
   })
 
-  // A draft has no agenda, speakers, tickets or FAQs until it is saved. Empty
-  // is the honest answer; the templates leave those sections out entirely.
+  // A draft has no agenda, speakers, tickets, FAQs or seat map until it is
+  // saved. Empty is the honest answer; the templates leave those sections out.
   it('carries no content the wizard cannot know yet', () => {
     const draft = preview('title=Tech Summit')
     expect(draft.agenda).toEqual([])
     expect(draft.speakers).toEqual([])
     expect(draft.tickets).toEqual([])
     expect(draft.faqs).toEqual([])
+    expect(draft.seatMap).toBeNull()
   })
 
   // Nothing has been published, so there is nowhere to send anybody.

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { RichText, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
 
 /* Atlas — full-bleed poster landing template. Ported from landing/atlas.html.
@@ -405,6 +406,11 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                           <span className="badge badge-green max-w-full whitespace-normal leading-snug">{t.note}</span>
                         )
                       ) : null}
+                      {!isOnline && t.rowsLabel && (
+                        <span className={cn('basis-full text-[12px]', feat ? 'text-white/75' : 'text-muted')}>
+                          {t.rowsLabel}
+                        </span>
+                      )}
                     </div>
                     <div
                       className={cn(
@@ -452,6 +458,9 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                 )
               })}
             </div>
+            {!isOnline && ev.seatMap && (
+              <SeatMapBlock seatMap={ev.seatMap} className="mt-4 rounded-2xl bg-canvas p-6 ring-1 ring-line" />
+            )}
           </div>
         </section>
       )}

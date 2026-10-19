@@ -4,6 +4,7 @@ import { Icon,
   VenueMap,
   RichText,
 } from '@/components/ui'
+import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
 
 /* Port of landing/noir.html — a wide "spotlight split" event page: a cover
@@ -340,6 +341,11 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                         ) : (
                           <span className="badge badge-green max-w-full whitespace-normal leading-snug">{t.note}</span>
                         ))}
+                      {!isOnline && t.rowsLabel && (
+                        <span className={`basis-full text-[12px] ${feat ? 'text-white/75' : 'text-muted'}`}>
+                          {t.rowsLabel}
+                        </span>
+                      )}
                     </div>
                     <div
                       className={
@@ -381,6 +387,9 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                 )
               })}
             </div>
+            {!isOnline && ev.seatMap && (
+              <SeatMapBlock seatMap={ev.seatMap} className="mt-4 rounded-2xl bg-surface p-6" />
+            )}
           </section>
         )}
 
