@@ -408,11 +408,21 @@ describe('the seat map', () => {
       expect(labels).toEqual(['VIP · Rows 1–2 · 32 seats'])
     })
 
-    it('colours each row by its ticket’s place among the tickets that sell rows', () => {
-      // Normal sells no rows, so Free and VIP take the first two colours.
+    // The wizard colours a type by its place in its ticket list, which is in
+    // the order the types were created; the API sends tickets in that order.
+    // Colouring by the page's price order instead swapped VIP's and Free's
+    // colours between the organizer's preview and this page.
+    it('colours each ticket’s rows by the order the tickets were created, not by price', () => {
+      const map = toLandingEvent(page(theatre)).seatMap
+      expect(map?.rows.map((row) => row.swatch)).toEqual([0, 0, 1, 1, 1, 1, 2])
+      expect(map?.legend.map((entry) => entry.swatch)).toEqual([2, 1, 0])
+    })
+
+    it('keeps a ticket’s colour when one created before it sells no rows', () => {
+      // Normal sells no rows but still holds the second colour, as in the wizard.
       const map = toLandingEvent(page(split(['vip', 'free']))).seatMap
-      expect(map?.rows.map((row) => row.swatch)).toEqual([1, 0])
-      expect(map?.legend.map((entry) => entry.swatch)).toEqual([0, 1])
+      expect(map?.rows.map((row) => row.swatch)).toEqual([0, 2])
+      expect(map?.legend.map((entry) => entry.swatch)).toEqual([2, 0])
     })
 
     it('starts the colours again once every colour is used', () => {

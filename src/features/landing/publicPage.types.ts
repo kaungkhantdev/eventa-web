@@ -98,6 +98,10 @@ export interface PublicPageWire {
   highlights: PublicHighlightWire[]
   agenda: PublicSessionWire[]
   speakers: PublicSpeakerWire[]
+  /**
+   * Expected in the order the organizer created them — the wizard's order —
+   * because the seat map colours each type by its place here (`swatchOf`).
+   */
   tickets: PublicTicketWire[]
   faqs: PublicFaqWire[]
   /**

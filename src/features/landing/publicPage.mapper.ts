@@ -1,4 +1,5 @@
 import { MASKED, bangkokDate, bangkokTime, initials, num } from '@/lib/format'
+import { swatchOf } from '@/lib/seatSwatches'
 import type { LandingEvent, LandingSeatMap, LandingSpeaker, LandingTicket } from './types'
 import type {
   PublicPageWire,
@@ -39,6 +40,9 @@ const DEFAULT_HIGHLIGHT_ICON = 'hgi-sparkles'
 
 export function toLandingEvent(page: PublicPageWire): LandingEvent {
   const { event } = page
+  // Seat colours follow the API's ticket order, expected to be the order the
+  // tickets were created, as the wizard's list is; the cards go cheapest first.
+  const byCreation = page.tickets.map((ticket) => ticket.id)
   const tickets = [...page.tickets].sort((a, b) => a.priceSatang - b.priceSatang)
   const rowsByTicket = rowsByTicketOf(page.seatMap)
 
@@ -75,7 +79,7 @@ export function toLandingEvent(page: PublicPageWire): LandingEvent {
     speakers: page.speakers.map(toSpeaker),
     ticketsTitle: TICKETS_TITLE,
     tickets: tickets.map(toTicket(tickets, rowsByTicket)),
-    seatMap: seatMapOf(page.seatMap, tickets, rowsByTicket),
+    seatMap: seatMapOf(page.seatMap, tickets, rowsByTicket, byCreation),
     faqs: page.faqs.map((f) => ({ q: f.question, a: f.answer })),
     online: event.isOnline,
     onlineNote: event.onlineNote ?? '',
@@ -173,8 +177,8 @@ function noteOf(ticket: PublicTicketWire): string {
 /** Each ticket's seat row labels, front to back, keyed by ticket id. */
 type RowsByTicket = ReadonlyMap<string, readonly string[]>
 
-/** A ticket on the page that sells seat rows, with those rows. */
-type TicketRows = { ticket: PublicTicketWire; rows: readonly string[] }
+/** A ticket on the page that sells seat rows, with those rows and their colour. */
+type TicketRows = { ticket: PublicTicketWire; rows: readonly string[]; swatch: number }
 
 /** No map, or no typed row, is no rows for any ticket. */
 function rowsByTicketOf(seatMap: PublicSeatMapWire | null): RowsByTicket {
@@ -188,26 +192,28 @@ function rowsByTicketOf(seatMap: PublicSeatMapWire | null): RowsByTicket {
 /**
  * The seat map the tickets section shows (US-PAGE-05), or none.
  *
- * Only the tickets on the page are keyed, in the page's order, and each takes
- * the next colour. A row whose type is not among them — none at all, or one
- * the page does not offer — stays neutral: it names nothing a reader can buy.
- * A map where every row is neutral shows no split, so there is no map.
+ * Only the tickets on the page are keyed, in the page's order, each in its
+ * colour by the order the tickets were created (`swatchOf`), so a type matches
+ * the organizer's preview. A row whose type is not among them — none at all,
+ * or one the page does not offer — stays neutral: it names nothing a reader
+ * can buy. A map where every row is neutral shows no split, so there is no map.
  */
 function seatMapOf(
   seatMap: PublicSeatMapWire | null,
   tickets: readonly PublicTicketWire[],
   rowsByTicket: RowsByTicket,
+  byCreation: readonly string[],
 ): LandingSeatMap | null {
   const keyed = tickets.flatMap((ticket): TicketRows[] => {
     const rows = rowsByTicket.get(ticket.id)
-    return rows ? [{ ticket, rows }] : []
+    const swatch = swatchOf(ticket.id, byCreation)
+    return rows && swatch !== null ? [{ ticket, rows, swatch }] : []
   })
   if (!seatMap || keyed.length === 0) return null
-  const swatchOf = new Map<string | null, number>(keyed.map(({ ticket }, swatch) => [ticket.id, swatch]))
   return {
     seatsPerRow: seatMap.seatsPerRow,
-    rows: seatMap.rows.map((row) => ({ label: row.label, swatch: swatchOf.get(row.ticketTypeId) ?? null })),
-    legend: keyed.map((entry, swatch) => ({ label: legendLabelOf(entry, seatMap.seatsPerRow), swatch })),
+    rows: seatMap.rows.map((row) => ({ label: row.label, swatch: swatchOf(row.ticketTypeId, byCreation) })),
+    legend: keyed.map((entry) => ({ label: legendLabelOf(entry, seatMap.seatsPerRow), swatch: entry.swatch })),
     summary: summaryOf(keyed),
   }
 }
