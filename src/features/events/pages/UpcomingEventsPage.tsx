@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useLoaderData } from 'react-router'
 import { ButtonLink, EmptyState, HeaderUser, Icon, PageFooter, PageHeader } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -84,6 +85,7 @@ export default function UpcomingEventsPage() {
 
 function UpcomingEventCard({ e }: { e: UpcomingCard }) {
   const t = UP_TONE[e.tone]
+  const [coverFailed, setCoverFailed] = useState(false)
   return (
     <Link
       to={`/admin/event-detail?id=${e.id}`}
@@ -92,11 +94,21 @@ function UpcomingEventCard({ e }: { e: UpcomingCard }) {
         t.bg,
       )}
     >
-      {/* The type's gradient, with no photograph over it: `UpcomingEventDto`
-          carries no cover, and the slug-seeded stock image this replaced was
-          never this event's. */}
+      {/* The event's own cover over the type's gradient, as the kit draws it;
+          the gradient is what shows when there is no cover or it fails. */}
       <div className={cn('relative h-24 bg-gradient-to-br', t.grad)}>
-        <span className="absolute right-2.5 top-2.5 rounded-full bg-white/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-sm">
+        {e.cover && !coverFailed && (
+          <img
+            src={e.cover}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setCoverFailed(true)}
+          />
+        )}
+        {/* Surface, not white: the kit's white pill took the theme's ink, which
+            is light in dark mode — white on white, an empty pill. */}
+        <span className="absolute right-2.5 top-2.5 rounded-full bg-surface/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-sm">
           {e.daysLeft === 0 ? 'Today' : `${e.daysLeft} ${e.daysLeft === 1 ? 'day' : 'days'} left`}
         </span>
         <span

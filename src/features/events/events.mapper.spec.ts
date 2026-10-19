@@ -107,6 +107,7 @@ const upcoming = (over: Partial<UpcomingEventWire> = {}): UpcomingEventWire => (
   sold: 72,
   capacity: 90,
   fillPercent: 80,
+  coverImage: null,
   ...over,
 })
 
@@ -131,6 +132,16 @@ describe('an event on the upcoming grid', () => {
 
   it('dresses the card by its type', () => {
     expect(toUpcomingCard(upcoming()).tone).toBe('indigo')
+  })
+
+  // The kit's card carries a photograph; the event's own cover is that photo.
+  it('shows the event’s own cover photo', () => {
+    const cover = 'http://localhost:9000/eventa-uploads/org/1/event-covers/a.jpg'
+    expect(toUpcomingCard(upcoming({ coverImage: cover })).cover).toBe(cover)
+  })
+
+  it('keeps the type’s gradient when the event has no cover', () => {
+    expect(toUpcomingCard(upcoming({ coverImage: null })).cover).toBeNull()
   })
 })
 

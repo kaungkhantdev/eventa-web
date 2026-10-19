@@ -118,6 +118,8 @@ export interface UpcomingEventWire {
   sold: number
   capacity: number
   fillPercent: number
+  /** The event's cover photo, or null when it has none. */
+  coverImage: string | null
 }
 
 /** `CalendarResponseDto` — one Bangkok month of events. */
@@ -184,6 +186,8 @@ export interface UpcomingCard {
   registrations: string
   sold: number
   fillPercent: number
+  /** The event's own cover photo; null leaves the type's gradient showing. */
+  cover: string | null
   icon: string
   tone: Tone
 }
