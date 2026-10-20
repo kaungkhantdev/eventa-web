@@ -4,6 +4,7 @@ import {
   NO_MODE,
   initialMeetingMode,
   makesMeetLink,
+  meetingInviteNote,
   meetingModeChoice,
   meetingSaveLabel,
 } from './meetings.presentation'
@@ -87,4 +88,27 @@ describe('makesMeetLink', () => {
   it('promises none before a mode has been chosen', () => {
     expect(makesMeetLink(NO_MODE)).toBe(false)
   })
+})
+
+/**
+ * The note above Schedule promised every guest a Google Meet link, whatever the
+ * mode — so an organizer who had just chosen In person was told the guest would
+ * get a video call. Only a video meeting gets a Meet link (US-MTG-04), and the
+ * panel names one only once Video call is chosen (US-MTG-03).
+ */
+describe('meetingInviteNote', () => {
+  it('promises a Meet link with the invite for a video call', () => {
+    expect(meetingInviteNote('Video')).toBe(
+      'A Google Meet link and Google Calendar invite are emailed to each guest, with a reminder 15 minutes before.',
+    )
+  })
+
+  it.each(['In person', 'Phone', NO_MODE] as const)(
+    'promises only the invite and reminder for %j',
+    (mode) => {
+      expect(meetingInviteNote(mode)).toBe(
+        'A Google Calendar invite is emailed to each guest, with a reminder 15 minutes before.',
+      )
+    },
+  )
 })

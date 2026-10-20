@@ -53,3 +53,15 @@ export function initialMeetingMode(
 export function makesMeetLink(mode: MeetingModeChoice): boolean {
   return mode === 'Video'
 }
+
+/**
+ * What scheduling emails the guest, said above the Schedule button. Every
+ * meeting gets a calendar invite and the reminder; only a video call gets a
+ * Meet link (US-MTG-04), so the note names one only once Video is chosen.
+ */
+export function meetingInviteNote(mode: MeetingModeChoice): string {
+  const sent = makesMeetLink(mode)
+    ? 'A Google Meet link and Google Calendar invite are'
+    : 'A Google Calendar invite is'
+  return `${sent} emailed to each guest, with a reminder 15 minutes before.`
+}

@@ -20,6 +20,7 @@ import {
   NO_MODE,
   initialMeetingMode,
   makesMeetLink,
+  meetingInviteNote,
   meetingModeChoice,
   meetingSaveLabel,
   type MeetingModeChoice,
@@ -169,39 +170,40 @@ export function MeetingPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label htmlFor="meeting-type">Type</Label>
-            <Select id="meeting-type" name="type" defaultValue={editing?.type ?? 'Internal'}>
-              {MEETING_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="meeting-mode">Mode</Label>
-            {/* Required, with nothing chosen for a new meeting (US-MTG-03): a
-                preselected Video scheduled video calls nobody had picked. */}
-            <Select
-              id="meeting-mode"
-              name="mode"
-              required
-              value={mode}
-              onChange={(event) => setMode(event.target.value as MeetingModeChoice)}
-            >
-              <option value={NO_MODE} disabled>
-                {MEETING_MODE_PROMPT}
+        {/* Type and Mode each take a full row: half a row clipped "Choose how
+            you'll meet" and "Video call (Google Meet)" on a phone, and a native
+            select cuts its text off without an ellipsis. */}
+        <div>
+          <Label htmlFor="meeting-type">Type</Label>
+          <Select id="meeting-type" name="type" defaultValue={editing?.type ?? 'Internal'}>
+            {MEETING_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
               </option>
-              {MEETING_MODES.map((choice) => (
-                <option key={choice} value={choice}>
-                  {meetingModeChoice(choice)}
-                </option>
-              ))}
-            </Select>
-            {makesMeetLink(mode) && <Hint>A Meet link is generated automatically.</Hint>}
-          </div>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="meeting-mode">Mode</Label>
+          {/* Required, with nothing chosen for a new meeting (US-MTG-03): a
+              preselected Video scheduled video calls nobody had picked. */}
+          <Select
+            id="meeting-mode"
+            name="mode"
+            required
+            value={mode}
+            onChange={(event) => setMode(event.target.value as MeetingModeChoice)}
+          >
+            <option value={NO_MODE} disabled>
+              {MEETING_MODE_PROMPT}
+            </option>
+            {MEETING_MODES.map((choice) => (
+              <option key={choice} value={choice}>
+                {meetingModeChoice(choice)}
+              </option>
+            ))}
+          </Select>
+          {makesMeetLink(mode) && <Hint>A Meet link is generated automatically.</Hint>}
         </div>
 
         <div>
@@ -260,15 +262,12 @@ export function MeetingPanel({
         {/* What scheduling actually does, from the kit — the guests are emailed
             without the organizer sending anything, which is worth saying before
             the button rather than after. Only on a new meeting: rescheduling
-            does not re-invite anybody. */}
+            does not re-invite anybody. It follows the chosen mode, so In person
+            or Phone call never promises a Meet link (US-MTG-04). */}
         {!editing && (
           <div className="flex items-start gap-2 rounded-lg border border-hair bg-canvas p-3">
             <Icon name="hgi-calendar-check-in-01" size={16} className="mt-0.5 text-muted" />
-            <p className="text-[12px] text-muted">
-              A <span className="font-medium text-ink">Google Meet</span> link and{' '}
-              <span className="font-medium text-ink">Google Calendar</span> invite are emailed to
-              each guest, with a reminder 15 minutes before.
-            </p>
+            <p className="text-[12px] text-muted">{meetingInviteNote(mode)}</p>
           </div>
         )}
       </fetcher.Form>
