@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/cn'
 import { bangkokDate, MASKED } from '@/lib/format'
 import { useDisclosure } from '@/lib/useDisclosure'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useFilters } from '@/lib/useFilters'
 import { nextStatus, type NpsSplit, type NpsView, type SurveyCard } from '../surveys.mapper'
 import type { SurveyQuestionType } from '../surveys.types'
@@ -480,8 +481,10 @@ function SurveyEditor({
   }
 
   // The panel stays open until the API accepts it, so a refusal lands beside
-  // the field it is about rather than behind a closed panel.
-  if (save.state === 'idle' && save.data?.ok === true && open) onClose()
+  // the field it is about rather than behind a closed panel. Closed once per
+  // save: read off the fetcher, its last `ok` shut the editor again the
+  // moment it was next opened.
+  const { refusal } = useSaveSettled(save, { open, onSaved: onClose })
 
   return (
     <Panel
@@ -501,9 +504,9 @@ function SurveyEditor({
       }
     >
       <div className="space-y-4">
-        {save.data?.ok === false && (
+        {refusal && (
           <p role="alert" className="text-[13px] text-red-500">
-            {save.data.error}
+            {refusal}
           </p>
         )}
 
