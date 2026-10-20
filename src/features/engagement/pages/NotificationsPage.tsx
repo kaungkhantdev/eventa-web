@@ -28,12 +28,9 @@ import type { NotificationTab, NotificationsData } from '../notifications.routes
 
 function NotificationRow({ item }: { item: NotificationView }) {
   return (
-    <div
-      className={cn(
-        'flex items-start gap-3 rounded-xl px-3 py-3 transition hover:bg-line',
-        item.unread && 'bg-brand-soft/50',
-      )}
-    >
+    // Unread is marked by the green dot beside the title alone: a tinted row
+    // as well said the same thing twice and made the list read as selected.
+    <div className="flex items-start gap-3 rounded-xl px-3 py-3 transition hover:bg-line">
       <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', NOTIFICATION_TINT[item.kind])}>
         <i className={cn('hgi-stroke', item.icon, 'text-[18px]')} aria-hidden="true" />
       </span>
