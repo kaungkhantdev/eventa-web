@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher } from 'react-router'
 import {
   Button,
@@ -12,6 +12,7 @@ import {
   Textarea,
 } from '@/components/ui'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import { MEETING_MODES, MEETING_TYPES } from '../meetings.routes'
 import { meetingSaveLabel } from '../meetings.presentation'
@@ -40,8 +41,18 @@ export function MeetingPanel({
 }: MeetingPanelProps) {
   const fetcher = useFetcher<ActionResult>()
   const saving = fetcher.state !== 'idle'
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
+  // Reported once, as the save comes back — not read off the fetcher, which
+  // keeps the answer: "idle and ok" stayed true after a schedule, and closed
+  // the panel again the instant Edit opened it.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      // Matches the button that was pressed: scheduling sent the invites out,
+      // rescheduling only moved a meeting that already existed.
+      toast.success(editing ? 'Meeting saved.' : 'Meeting scheduled.')
+      onClose()
+    },
+  })
 
   // Re-seeded from the meeting being edited each time the panel opens, so a
   // reschedule does not inherit the previous one's event. Adjusted during
@@ -52,18 +63,6 @@ export function MeetingPanel({
     setWasOpen(open)
     if (open) setEventId(editing?.eventId ?? '')
   }
-
-  // A boolean rather than `editing` itself in the dependencies: the draft is an
-  // object, and depending on it would re-run this on any identity change.
-  const isNew = editing === null
-
-  useEffect(() => {
-    if (!saved || !open) return
-    // Matches the button that was pressed: scheduling sent the invites out,
-    // rescheduling only moved a meeting that already existed.
-    toast.success(isNew ? 'Meeting scheduled.' : 'Meeting saved.')
-    onClose()
-  }, [saved, open, onClose, isNew])
 
   return (
     <Panel
@@ -88,7 +87,10 @@ export function MeetingPanel({
         </>
       }
     >
-      <fetcher.Form id={FORM_ID} key={editing?.id ?? 'new'} method="post" className="space-y-4">
+      {/* Rebuilt on every opening: the boxes are uncontrolled, and once typed
+          into they ignore `defaultValue` — a second Schedule would otherwise
+          open on the last meeting's title and guest. */}
+      <fetcher.Form id={FORM_ID} key={opening} method="post" className="space-y-4">
         <input type="hidden" name="intent" value={editing ? 'reschedule' : 'schedule'} />
         {editing && (
           <>

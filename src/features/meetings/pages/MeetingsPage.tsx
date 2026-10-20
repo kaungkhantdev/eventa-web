@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
 import type { ActionResult } from '@/app/loaders'
@@ -314,20 +315,22 @@ function CancelModal({
   target: MeetingDraft | null
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Meeting cancelled.')
-    onClose()
-  }, [done, open, onClose])
+  // Once per cancellation: the dialog stays mounted, and its fetcher's last
+  // `ok` would otherwise close the next meeting's dialog as it opened.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Meeting cancelled.')
+      onClose()
+    },
+  })
 
   return (
     <>
       <div className={cn('panel-overlay', open && 'open')} onClick={onClose} />
       <div className={cn('modal', open && 'open')} role="dialog" aria-modal="true">
-        <fetcher.Form method="post" className="p-5">
+        {/* Rebuilt per opening, so one guest's reason is not sent to the next. */}
+        <fetcher.Form key={opening} method="post" className="p-5">
           <input type="hidden" name="intent" value="cancel" />
           <input type="hidden" name="meetingId" value={target?.id ?? ''} />
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-red-50 text-red-500 dark:bg-red-500/15 dark:text-red-300">
