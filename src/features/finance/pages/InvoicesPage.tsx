@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Badge,
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -299,20 +300,22 @@ function VoidModal({
   target: InvoiceRow | null
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Invoice voided.')
-    onClose()
-  }, [done, open, onClose])
+  // Once per void: the dialog stays mounted, and the fetcher's last `ok` would
+  // otherwise close the next invoice's dialog as it opened.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Invoice voided.')
+      onClose()
+    },
+  })
 
   return (
     <>
       <div className={cn('panel-overlay', open && 'open')} onClick={onClose} />
       <div className={cn('modal', open && 'open')} role="dialog" aria-modal="true">
-        <fetcher.Form method="post" className="p-5">
+        {/* Rebuilt per opening, so one invoice's reason is not filed on the next. */}
+        <fetcher.Form key={opening} method="post" className="p-5">
           <input type="hidden" name="invoiceId" value={target?.id ?? ''} />
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-red-50 text-red-500 dark:bg-red-500/15 dark:text-red-300">
             <Icon name="hgi-cancel-circle" size={18} />

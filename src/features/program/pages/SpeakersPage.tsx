@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -349,18 +350,18 @@ function DeleteSpeakerModal({
   target: SpeakerCard | null
   eventId: string
 }) {
-  // Keyed by speaker. The dialog stays mounted, so an unkeyed fetcher would
-  // still hold the last removal's success when the next speaker's opens — and
-  // the effect below would close it and announce a removal never sent.
+  // Keyed by speaker, so one speaker's answer is never shown on another's. The
+  // key holds while the SAME speaker's dialog is closed and opened again, so
+  // the refusal comes from what was answered since it opened: read off the
+  // fetcher, the last refusal greeted a dialog in which nothing had been sent.
   const fetcher = useFetcher<ActionResult>({ key: `remove-speaker-${target?.id ?? ''}` })
-  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Speaker removed.')
-    onClose()
-  }, [done, open, onClose])
+  const { refusal: refused } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Speaker removed.')
+      onClose()
+    },
+  })
 
   return (
     <ConfirmDeleteModal

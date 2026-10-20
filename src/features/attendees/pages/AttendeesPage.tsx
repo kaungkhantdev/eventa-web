@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Button,
@@ -25,6 +25,7 @@ import { can } from '@/features/auth/permissions'
 import type { Me } from '@/features/auth/types'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -436,14 +437,15 @@ function InvitePanel({
   // hidden input a custom picker submits through).
   const [inviteEvent, setInviteEvent] = useState(events[0]?.id ?? '')
   const sending = fetcher.state !== 'idle'
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const sent = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!sent || !open) return
-    toast.success('Invitation sent.')
-    onClose()
-  }, [sent, open, onClose])
+  // Once per invitation: the panel stays mounted, and the fetcher's last `ok`
+  // would otherwise close the next invite as it opened.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Invitation sent.')
+      onClose()
+    },
+  })
 
   return (
     <Panel
@@ -467,7 +469,9 @@ function InvitePanel({
         </>
       }
     >
-      <fetcher.Form id="invite-form" method="post" className="space-y-4">
+      {/* Rebuilt per opening, so the next invite does not open on the last
+          recipient's name and address. */}
+      <fetcher.Form key={opening} id="invite-form" method="post" className="space-y-4">
         {error && (
           <p
             role="alert"

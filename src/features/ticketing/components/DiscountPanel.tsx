@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, EventPicker, Hint, Icon, Input, Label, Panel } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import type { EventOption } from '../tickets.routes'
 import type { DiscountType } from '../types'
@@ -33,8 +34,15 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
   const [code, setCode] = useState('')
   const [eventId, setEventId] = useState('')
   const saving = fetcher.state !== 'idle'
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
+  // Once per save: the panel stays mounted, and the fetcher's last `ok` would
+  // otherwise close the next code's panel as it opened.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Discount code saved.')
+      onClose()
+    },
+  })
 
   // Adjusted during render rather than in an effect: the panel should already
   // show an empty form on the paint that opens it, not fill in and then clear.
@@ -47,12 +55,6 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
       setEventId('')
     }
   }
-
-  useEffect(() => {
-    if (!saved || !open) return
-    toast.success('Discount code saved.')
-    onClose()
-  }, [saved, open, onClose])
 
   return (
     <Panel
@@ -76,7 +78,9 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
         </>
       }
     >
-      <fetcher.Form id={FORM_ID} method="post" className="space-y-4">
+      {/* Rebuilt per opening as well: the boxes not reset above are
+          uncontrolled, and would open on the last code's amount, limits and dates. */}
+      <fetcher.Form key={opening} id={FORM_ID} method="post" className="space-y-4">
         <input type="hidden" name="intent" value="create" />
         <input type="hidden" name="type" value={type} />
 

@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, Hint, Input, Label, Panel, Select, Textarea } from '@/components/ui'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import type { AgendaDay, SessionDraft, SessionType } from '../program.types'
 
@@ -40,16 +40,17 @@ export function SessionPanel({
 }: SessionPanelProps) {
   const fetcher = useFetcher<ActionResult>()
   const saving = fetcher.state !== 'idle'
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
+  // Once per save: the panel stays mounted, and the fetcher's last `ok` would
+  // otherwise close the next session's panel as it opened.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Session saved.')
+      onClose()
+    },
+  })
   // The one refusal an organizer can wave through, rather than a rejection.
   const clash = Boolean(error && /clash|already/i.test(error))
-
-  useEffect(() => {
-    if (!saved || !open) return
-    toast.success('Session saved.')
-    onClose()
-  }, [saved, open, onClose])
 
   return (
     <Panel
@@ -73,9 +74,11 @@ export function SessionPanel({
         </>
       }
     >
+      {/* Rebuilt per opening, so a second New session does not open on the
+          last one's title and times. */}
       <fetcher.Form
         id={FORM_ID}
-        key={editing?.id ?? 'new'}
+        key={opening}
         method="post"
         className="space-y-4"
       >

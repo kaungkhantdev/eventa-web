@@ -18,6 +18,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -352,14 +353,15 @@ function DeleteDiscountModal({
   target: DiscountRow | null
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Discount code deleted.')
-    onClose()
-  }, [done, open, onClose])
+  // Once per deletion: the dialog stays mounted, and the fetcher's last `ok`
+  // would otherwise close the next code's dialog as it opened.
+  const { refusal: refused } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Discount code deleted.')
+      onClose()
+    },
+  })
 
   return (
     <ConfirmDeleteModal

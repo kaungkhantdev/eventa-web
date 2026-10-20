@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Badge,
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -318,8 +319,15 @@ function RefundModal({
   target: PaymentRow | null
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
+  // Once per refund: the dialog stays mounted, and the fetcher's last `ok`
+  // would otherwise close the next payment's dialog as it opened.
+  const { refusal: error } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Refund started.')
+      onClose()
+    },
+  })
   // One key per payment: re-opening the dialog for a DIFFERENT payment must
   // not reuse the previous key and be deduped into it. The id is part of the
   // key rather than only a dependency, so what it is scoped to is visible in
@@ -328,12 +336,6 @@ function RefundModal({
     () => `${target?.id ?? 'none'}:${crypto.randomUUID()}`,
     [target?.id],
   )
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Refund started.')
-    onClose()
-  }, [done, open, onClose])
 
   return (
     <>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Badge,
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -368,14 +369,15 @@ function DeleteTicketModal({
   target: TicketCard | null
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Ticket type deleted.')
-    onClose()
-  }, [done, open, onClose])
+  // Once per deletion: the dialog stays mounted, and the fetcher's last `ok`
+  // would otherwise close the next tier's dialog as it opened.
+  const { refusal: refused } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Ticket type deleted.')
+      onClose()
+    },
+  })
 
   return (
     <ConfirmDeleteModal
