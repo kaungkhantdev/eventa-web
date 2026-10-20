@@ -189,9 +189,19 @@ const FOLLOWABLE_PROTOCOLS = new Set(['https:', 'http:'])
  * The consent page the connect action answered with, if it is one the browser
  * may be sent to. Only a web address: `location.assign('javascript:…')` would
  * run in this console's origin, so anything else is refused here.
+ *
+ * Parsed with `new URL` in a try, not `URL.canParse`: the build still targets
+ * Chrome 111 and Safari/iOS 16.4, which lack it, and this runs while
+ * rendering, so a throw would replace the page with the route error screen.
  */
 export function authorizeUrlOf(result: { ok: boolean; [field: string]: unknown } | undefined) {
   const url = result?.ok === true ? result.authorizeUrl : undefined
-  if (typeof url !== 'string' || !URL.canParse(url)) return null
-  return FOLLOWABLE_PROTOCOLS.has(new URL(url).protocol) ? url : null
+  if (typeof url !== 'string') return null
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  return FOLLOWABLE_PROTOCOLS.has(parsed.protocol) ? url : null
 }

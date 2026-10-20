@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CalendarConnectionStatus, CalendarConnectionWire } from './calendarConnection.api'
 import {
   INTEGRATIONS_PATH,
@@ -279,5 +279,43 @@ describe('authorizeUrlOf', () => {
 
   it('follows nothing before the action has answered', () => {
     expect(authorizeUrlOf(undefined)).toBeNull()
+  })
+
+  /*
+   * The build still targets Chrome 111 and Safari/iOS 16.4 (Vite's default,
+   * and Tailwind 4's floor), which have no `URL.canParse` — it arrived in
+   * Chrome 120 and Safari 17. ConnectButton calls this while rendering, so a
+   * throw there would swap Settings → Integrations for the error screen and
+   * the Admin would never reach Google. Node has `canParse`; take it away.
+   */
+  describe('on a browser without URL.canParse', () => {
+    beforeEach(() => {
+      class UrlBeforeCanParse extends URL {}
+      Object.defineProperty(UrlBeforeCanParse, 'canParse', { value: undefined })
+      vi.stubGlobal('URL', UrlBeforeCanParse)
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('still follows the address the API answered with', () => {
+      const url = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=x&state=1.abc'
+
+      expect(authorizeUrlOf({ ok: true, authorizeUrl: url })).toBe(url)
+    })
+
+    it('still follows a plain http address', () => {
+      const url = 'http://localhost:3190/api/v1/public/calendar-connection/google/callback?code=x'
+
+      expect(authorizeUrlOf({ ok: true, authorizeUrl: url })).toBe(url)
+    })
+
+    it.each(['', 'not a url', 'javascript:alert(1)', 'data:text/html,hi'])(
+      'still follows nothing for %j',
+      (authorizeUrl) => {
+        expect(authorizeUrlOf({ ok: true, authorizeUrl })).toBeNull()
+      },
+    )
   })
 })
