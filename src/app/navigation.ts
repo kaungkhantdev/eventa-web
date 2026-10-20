@@ -7,6 +7,8 @@
    becomes `/admin/events-upcoming`.
    ============================================================ */
 
+import { MANAGE_INTEGRATIONS } from '@/features/settings/integrationsAccess'
+
 export type NavLeaf = {
   label: string
   /** Stable page id — matches the static kit's `data-page`, used for active state. */
@@ -264,6 +266,12 @@ export const MODULES: NavModule[] = [
             to: '/admin/settings-organization',
           },
           { label: 'Payments', page: 'settings-payments', to: '/admin/settings-payments' },
+          {
+            label: 'Integrations',
+            page: 'settings-integrations',
+            to: '/admin/settings-integrations',
+            permission: MANAGE_INTEGRATIONS,
+          },
         ],
       },
       {

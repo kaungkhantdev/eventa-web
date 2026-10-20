@@ -47,9 +47,57 @@ describe('the Insights sub-nav', () => {
   })
 })
 
+/*
+ * US-MTG-08: Settings → Integrations is where an Admin connects Google
+ * Calendar. Its two buttons need `setIntegrations`, so a member without it is
+ * not offered the link — the page itself still answers anyone who opens it,
+ * read-only, because the status is not a secret.
+ */
+const settings = MODULES.find((module) => module.id === 'settings')!.groups!
+
+describe('the Settings sub-nav', () => {
+  it('hides Integrations from a member without the integrations permission', () => {
+    const staff = visibleGroups(settings, holding('regView', 'setSettings'))
+
+    expect(pagesOf(staff)).not.toContain('settings-integrations')
+  })
+
+  it('offers Integrations to a member with it, right after Payments', () => {
+    const admin = visibleGroups(settings, holding('setIntegrations'))
+    const workspace = admin.find((group) => group.label === 'Workspace')!
+
+    expect(workspace.items).toContainEqual({
+      label: 'Integrations',
+      page: 'settings-integrations',
+      to: '/admin/settings-integrations',
+      permission: 'setIntegrations',
+    })
+    expect(workspace.items.map((it) => it.page)).toEqual([
+      'settings-organization',
+      'settings-payments',
+      'settings-integrations',
+    ])
+  })
+
+  it('leaves every other Settings link where it was', () => {
+    const staff = visibleGroups(settings, holding())
+
+    expect(pagesOf(staff)).toEqual([
+      'settings-profile',
+      'settings-security',
+      'settings-notifications',
+      'settings-organization',
+      'settings-payments',
+      'users',
+      'roles',
+    ])
+  })
+})
+
 describe('every other module', () => {
   it('is left exactly as it is, whatever the member holds', () => {
-    for (const module of MODULES.filter((m) => m.id !== 'reports')) {
+    const gated = new Set(['reports', 'settings'])
+    for (const module of MODULES.filter((m) => !gated.has(m.id))) {
       expect(visibleGroups(module.groups ?? [], holding())).toEqual(module.groups ?? [])
     }
   })

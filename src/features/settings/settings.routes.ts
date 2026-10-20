@@ -9,6 +9,7 @@ import {
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import type { IssuedUpload } from '@/lib/signedUpload'
 import { intParam } from '@/lib/urlFilters'
+import { calendarConnectionApi, type CalendarConnectionWire } from './calendarConnection.api'
 import {
   toOrganizationForm,
   toPaymentSettingsCard,
@@ -500,6 +501,38 @@ export const paymentsRoute = {
       saveCards: form.get('saveCards') === 'true',
       emailReceipts: form.get('emailReceipts') === 'true',
     })
+  }),
+}
+
+/* ── integrations ─────────────────────────────────────────────────────── */
+
+export interface IntegrationsData {
+  connection: CalendarConnectionWire
+}
+
+/** The Integrations page's two submissions (US-MTG-08). */
+export const CONNECT_CALENDAR_INTENT = 'connect'
+export const DISCONNECT_CALENDAR_INTENT = 'disconnect'
+
+export const integrationsRoute = {
+  loader: pageData(
+    async (): Promise<IntegrationsData> => ({ connection: await calendarConnectionApi.get() }),
+  ),
+
+  action: pageAction(async ({ request }: LoaderArgs) => {
+    const intent = (await request.formData()).get('intent')
+    // Returned, not dropped: the consent page's address exists only in this
+    // answer, and the page sends the browser there (see `actionSuccess`).
+    if (intent === CONNECT_CALENDAR_INTENT) return calendarConnectionApi.connect()
+    if (intent === DISCONNECT_CALENDAR_INTENT) {
+      // The status it answers with is left to the loader's revalidation,
+      // rather than kept as a second copy here.
+      await calendarConnectionApi.disconnect()
+      return null
+    }
+    // Never a default: a form that lost its intent must not disconnect the
+    // workspace by falling through to the destructive branch.
+    throw new Error('Unknown integrations intent')
   }),
 }
 

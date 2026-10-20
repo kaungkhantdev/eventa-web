@@ -30,6 +30,7 @@ import {
   ReportSubPageSkeleton,
   ReportsOverviewSkeleton,
   RolesSkeleton,
+  SettingsIntegrationsSkeleton,
   SettingsNotificationsSkeleton,
   SettingsPaymentsSkeleton,
   SettingsProfileSkeleton,
@@ -184,6 +185,7 @@ const ADMIN: Record<string, () => ReactNode> = {
   'settings-notifications': () => <SettingsNotificationsSkeleton />,
   'settings-organization': () => <SettingsProfileSkeleton fields={5} />,
   'settings-payments': () => <SettingsPaymentsSkeleton />,
+  'settings-integrations': () => <SettingsIntegrationsSkeleton />,
   users: () => (
     <ListPageSkeleton tabs={4} selects={['sm:w-52']} cols={5} minWidth="min-w-[820px]" />
   ),

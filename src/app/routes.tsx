@@ -461,6 +461,14 @@ const adminChildren = [
     handle: { page: 'settings-payments' },
   },
   {
+    path: 'settings-integrations',
+    ...livePage(
+      () => import('@/features/settings/pages/SettingsIntegrationsPage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.integrationsRoute),
+    ),
+    handle: { page: 'settings-integrations' },
+  },
+  {
     path: 'users',
     ...livePage(
       () => import('@/features/settings/pages/UsersPage'),

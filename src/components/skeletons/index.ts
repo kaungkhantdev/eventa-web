@@ -41,6 +41,7 @@ export {
   ReportSubPageSkeleton,
   ReportsOverviewSkeleton,
   RolesSkeleton,
+  SettingsIntegrationsSkeleton,
   SettingsNotificationsSkeleton,
   SettingsPaymentsSkeleton,
   SettingsProfileSkeleton,
