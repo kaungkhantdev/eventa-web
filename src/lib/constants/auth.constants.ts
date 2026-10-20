@@ -20,7 +20,7 @@ export const INCOMPLETE_CONFIRM_LINK =
   'This confirmation link is incomplete. Open the most recent link in your email, or change your email again.'
 
 /**
- * Must equal `PASSWORD_MIN_LENGTH` in eventa-api's `auth-password.policy.ts`,
+ * Must equal `PASSWORD_MIN_LENGTH` in eventa-api's `src/common/constants/auth-password.constants.ts`,
  * which is what `RegisterDto`, `ResetPasswordDto` and `ChangePasswordDto` all
  * enforce. Two repos, one number — change both together or the meter starts
  * lying again.
