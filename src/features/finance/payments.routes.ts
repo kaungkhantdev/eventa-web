@@ -12,7 +12,7 @@ import type {
   PaymentRow,
 } from './payments.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
-import { LEDGER_TABS, MAX_SEARCH } from '@/lib/constants/finance.constants'
+import { LEDGER_TABS, MAX_SEARCH_LENGTH } from '@/lib/constants/finance.constants'
 
 /**
  * The payments ledger (US-FIN-01/02).
@@ -62,7 +62,7 @@ export function listQueryOf(params: URLSearchParams): LedgerQuery {
     status: tab === 'all' ? undefined : (tab as LedgerStatus),
     method: METHODS.includes(method as PaymentMethod) ? (method as PaymentMethod) : undefined,
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 }
 

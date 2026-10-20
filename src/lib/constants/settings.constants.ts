@@ -29,7 +29,7 @@ export const FOLLOWABLE_PROTOCOLS = new Set(['https:', 'http:'])
 export const LOGO_ACCEPT = acceptAttribute(UPLOADABLE_IMAGE_TYPES)
 
 /**
- * This card's own wording. A total lookup, so a reason added to the shared
+ * The logo card's own wording. A total lookup, so a reason added to the shared
  * type must be worded here before this file compiles — no refusal can reach
  * somebody as a blank message.
  */
@@ -75,9 +75,10 @@ export const FALLBACK_GROUP_ICON = 'hgi-shield-user'
  * They are the common case: 21 of 32 roles have no row for at least one catalog
  * key, and a Staff role is missing 12 of the 15. What makes a count in a banner
  * the wrong shape is that the state is transitional and self-clearing — not one
- * role carries a recorded refusal, and the first save from this panel answers
- * every switch, after which the marks are gone for good. A form with unanswered
- * questions in it is not a fault to announce above itself.
+ * role carries a recorded refusal, and the first save from the role panel
+ * (`RolePanel` in `RolesPage.tsx`) answers every switch, after which the marks
+ * are gone for good. A form with unanswered questions in it is not a fault to
+ * announce above itself.
  *
  * Those three numbers are a SNAPSHOT of one database, taken 2026-10-09, and not
  * a property of the product — re-run them before relying on them:
@@ -162,29 +163,8 @@ export const TIMEZONES = ['Asia/Bangkok', 'Asia/Singapore', 'Asia/Tokyo', 'Europ
 export const STRIPE_PURPLE = 'bg-[#635BFF]'
 
 /**
- * The API keys card (US-SET-08).
- *
- * The mode segmented control is part of this card's own form rather than page
- * chrome, because mode and keys are submitted together: they have to agree, and
- * the API refuses a pair that disagrees with the toggle above it. A live pair
- * saved under Test takes real money from real people while the banner says
- * nothing is charged.
- *
- * The secret field is empty on load rather than pre-filled. There is nothing to
- * pre-fill it with — the API answers with a masked tail — and a box that looked
- * populated would invite an organizer to "save" a value the browser never held.
- */
-/**
- * What the toast says when the keys are refused.
- *
- * A refusal must never be quieter than a success — the Save button sits at the
- * foot of a tall card and the field it is complaining about can be off-screen,
- * so "nothing happened" is the only reading available without one.
- *
- * When the API named the fields, the toast points at them instead of repeating
- * their sentences: those are already under the boxes, verbatim, which is where
- * they are worth reading. When it named none, the API's own message IS the
- * whole explanation, so it is what gets announced.
+ * The keys-refused toast when the API named the fields, whose own sentences are
+ * already under the boxes (see `refusalNote` in `SettingsPaymentsPage.tsx`).
  */
 export const FIELDS_REFUSED = 'Those keys were not saved — check the fields marked below.'
 
@@ -232,9 +212,7 @@ export const FALLBACK_LOOK = { icon: 'hgi-wallet-01', tint: 'bg-line text-muted'
  * browser and its button silently submits the outer form instead.
  */
 export const PHONE_REQUEST_FORM_ID = 'settings-profile-phone'
-
 export const PHONE_CONFIRM_FORM_ID = 'settings-profile-phone-code'
-
 export const PHONE_REMOVE_FORM_ID = 'settings-profile-phone-remove'
 
 /** Long enough that a fast typist gets one request, short enough to feel live. */
@@ -272,12 +250,9 @@ export const AUDIT_PAGE_SIZE = 20
 
 /** The phone's three submissions on the console's profile form (US-SET-01). */
 export const PHONE_REQUEST_INTENT = 'phone'
-
 export const PHONE_CONFIRM_INTENT = 'phone-code'
-
 export const PHONE_REMOVE_INTENT = 'phone-remove'
 
 /** The Integrations page's two submissions (US-MTG-08). */
 export const CONNECT_CALENDAR_INTENT = 'connect'
-
 export const DISCONNECT_CALENDAR_INTENT = 'disconnect'

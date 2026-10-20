@@ -4,9 +4,7 @@
 export const SEAT = 'shrink-0 rounded-[3px] bg-muted/30'
 
 export const UNTITLED = 'Your event'
-
 export const HIGHLIGHT_SEPARATOR = '|'
-
 export const DEFAULT_HIGHLIGHT_ICON = 'hgi-sparkles'
 
 /* Page-scoped CSS from the source <style> block (focus rings, FAQ chevron, the
@@ -57,7 +55,7 @@ summary { list-style: none; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
 `
 
-export const MINIMAL_PAGE_PAGE_STYLE = `
+export const MINIMAL_STYLE = `
   html { scroll-behavior: smooth; }
   body { overflow-x: hidden; }
   a:focus-visible, button:focus-visible, summary:focus-visible {
@@ -83,7 +81,7 @@ export const MINIMAL_PAGE_PAGE_STYLE = `
   }
 `
 
-export const NOIR_PAGE_PAGE_STYLE = `
+export const NOIR_STYLE = `
   html, body { overflow-x: hidden; }
   summary { list-style: none; }
   summary::-webkit-details-marker { display: none; }

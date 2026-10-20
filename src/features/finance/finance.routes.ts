@@ -19,7 +19,7 @@ import type {
   VatLedgerWire,
 } from './finance.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
-import { INVOICE_TABS, MAX_SEARCH, PAYOUT_TABS, SATANG_PER_BAHT, YEARS_BACK } from '@/lib/constants/finance.constants'
+import { INVOICE_TABS, MAX_SEARCH_LENGTH, PAYOUT_TABS, SATANG_PER_BAHT, YEARS_BACK } from '@/lib/constants/finance.constants'
 
 /** Payouts, invoices and VAT periods (US-FIN-03..12). */
 
@@ -139,7 +139,7 @@ async function loadInvoices({ request }: LoaderArgs): Promise<InvoicesData> {
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
     status: tab === 'all' ? undefined : (tab as InvoiceStatus),
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 
   const [list, events] = await Promise.all([invoicesApi.list(query), eventOptions()])

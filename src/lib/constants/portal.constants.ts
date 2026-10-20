@@ -6,13 +6,11 @@ import type { JpgPngImageType } from '@/lib/imageUploads'
 /** The portal module's named constants. */
 
 /**
- * The product's one timezone, restated here rather than imported: `@/lib/format`
- * keeps it private and this change owns only `features/portal`.
+ * The product's one timezone, which the portal's account settings offer and
+ * fall back to. `@/lib/format` keeps its own copy private.
  */
 export const BANGKOK = 'Asia/Bangkok'
-
 export const THB = 'THB'
-
 export const DEFAULT_LOCALE = 'en' as const
 
 export const LOCALES = ['en', 'th'] as const
@@ -26,7 +24,8 @@ export const CURRENCY_CODE = /^[A-Z]{3}$/
  * The other seven members of `notification_kind` belong to the organizer and
  * are refused for this persona, which is why only these two are named here.
  * Order confirmations and receipts are in NEITHER list on purpose: they are
- * transactional, and nothing in this file can switch them off (criterion 2).
+ * transactional, and nothing on the Notifications card can switch them off
+ * (criterion 2).
  */
 export const ATTENDEE_NOTIFICATION_CATEGORIES = ['reminder', 'marketing'] as const
 
@@ -44,28 +43,28 @@ export const NOTIFICATION_ROW = {
 } as const
 
 export const UNAVAILABLE_FALLBACK = 'Unavailable'
-
 export const WAITLIST_OPEN = 'Sold out · join the waitlist'
 
 /**
  * Where "Back to event" goes.
  *
  * The checkout payload carries no event type, so the type-specific template
- * Discover picks cannot be worked out here — aurora is the general-purpose one
- * and every template reads the same event.
+ * Discover picks cannot be worked out in `toCheckoutView` — aurora is the
+ * general-purpose one and every template reads the same event.
  */
 export const BACK_TEMPLATE = 'aurora'
 
 export const ORDINAL: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' }
 
 export const PROMPT_PAY = 'PromptPay'
-
 export const FAILED = 'failed'
 
 /**
  * The one persona whose saved profile fills the buyer boxes.
  *
- * Named once and read by both rules below, because "whose details pre-fill"
+ * Named once and read, through `prefillsFromProfile`, by both rules —
+ * `toBuyerDefaults` in `features/portal/checkout.mapper.ts` and `savedProfile`
+ * in `features/portal/checkout.routes.ts` — because "whose details pre-fill"
  * and "whose profile is worth fetching" have to be the same answer: a loader
  * that fetched for somebody the mapper then ignores would spend a round trip
  * to achieve nothing, and one that fetched for fewer would leave a signed-in
@@ -75,11 +74,12 @@ export const PREFILLING_PERSONA: Persona = 'attendee'
 
 export const MISSING_EVENT = 'This registration link does not name an event.'
 
-/** The action's own discriminants, named so the rule above cannot drift. */
+/**
+ * The checkout action's own discriminants, named so `revalidateCheckout`
+ * (`features/portal/checkout.routes.ts`) cannot drift from them.
+ */
 export const QUOTE_INTENT = 'quote'
-
 export const BOOK_INTENT = 'book'
-
 export const WAITLIST_INTENT = 'waitlist'
 
 export const HOME = '/portal/discover'
@@ -118,9 +118,7 @@ export const EMAIL_FORM_ID = 'portal-profile-email'
  * instead.
  */
 export const PHONE_REQUEST_FORM_ID = 'portal-profile-phone'
-
 export const PHONE_CONFIRM_FORM_ID = 'portal-profile-phone-code'
-
 export const PHONE_REMOVE_FORM_ID = 'portal-profile-phone-remove'
 
 export const ROWS = {
@@ -130,16 +128,8 @@ export const ROWS = {
 }
 
 /**
- * The kit's switch, with its CSS, as used by the portal's Settings tab.
- *
- * Lifted out of `SettingsTab` when the Security card stopped being inert and a
- * second file needed it. Imperative `.switch` styling from the static kit; the
- * React part is only `checked`/`onChange`.
- *
- * Three declarations and two selectors are ADDED to the kit's rule set, for
- * `SwitchButton` below — the checked look keyed off `aria-checked` instead of
- * `input:checked`, and a button reset so a `<button class="switch">` is the
- * same box the `<span>` was. Nothing the kit already drew has changed.
+ * The kit's `.switch` rule set, plus the `aria-checked` look and button reset that
+ * `SwitchButton` (`features/portal/components/Switch.tsx`) needs.
  */
 export const SWITCH_CSS = `
 .switch{position:relative;display:inline-flex;height:1.25rem;width:2.25rem;flex:none;cursor:pointer;align-items:center}
@@ -155,14 +145,12 @@ button.switch{appearance:none;background:none;border:0;padding:0}
 
 /** Why there is no QR: a void ticket admits nobody, so none is drawn for it. */
 export const NO_LONGER_VALID = 'This ticket is no longer valid and will not admit anyone.'
-
 export const UNDRAWABLE = 'This code could not be drawn.'
 
 /** The most `GET /me/saved-events` sends in one page. */
 export const SAVED_PAGE_LIMIT = 48
 
 export const FREE = 'Free'
-
 /** The kit drew three; a card with two people should not claim a third. */
 export const MAX_FACES = 3
 
@@ -181,7 +169,6 @@ export const BADGE_LABEL: Record<'waitlist' | 'selling_fast', string> = {
  * the heart itself reverts, because it only ever showed the press.
  */
 export const SAVE_FAILED = "Couldn't save right now."
-
 export const UNSAVE_FAILED = "Couldn't remove it from saved right now."
 
 /** A grid row is three cards wide, so the page comes in whole rows. */
@@ -194,7 +181,6 @@ export const WAITLISTED = 'waitlisted'
 
 /** Turned down by the organizer (US-REG-02). */
 export const REJECTED = 'rejected'
-
 export const AWAITING_APPROVAL = 'Awaiting approval'
 
 export const NOT_APPROVED = 'The organizer did not approve this registration.'
@@ -237,9 +223,9 @@ export const GUEST_ORDER_METHODS = ['Card', 'PromptPay'] as const
 /** The account offer's submission; the payment form has no intent of its own. */
 export const ACCOUNT_LINK_INTENT = 'account-link'
 
-export const SECOND = 1000
-
-export const MINUTE = 60
+/** The seat-hold clock's units (`features/portal/lib/countdown.ts`). */
+export const MS_PER_SECOND = 1000
+export const SECONDS_PER_MINUTE = 60
 
 export const SVG_DATA_URL = 'data:image/svg+xml;charset=utf-8,'
 
@@ -259,9 +245,7 @@ export const EMAIL_CHANGE_INTENT = 'email'
  * the rest of the details form takes one (US-DISC-11 AC3).
  */
 export const PHONE_REQUEST_INTENT = 'phone'
-
 export const PHONE_CONFIRM_INTENT = 'phone-code'
-
 export const PHONE_REMOVE_INTENT = 'phone-remove'
 
 /** One notification switch (US-DISC-12, criterion 1). */
@@ -287,14 +271,11 @@ export const DISPLAY_PREFERENCE_INTENT = 'preference'
  * no page left.
  */
 export const PASSWORD_CHANGE_INTENT = 'change-password'
-
 export const REVOKE_OTHER_SESSIONS_INTENT = 'revoke-other-sessions'
-
 export const TWO_FACTOR_DISABLE_INTENT = 'disable-two-factor'
 
 export const SAVE_OFF =
   'absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60'
-
 export const SAVE_ON =
   'absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white text-red-500 shadow-sm transition'
 
@@ -304,9 +285,9 @@ export const TINTS = ['dd', '99', '55'] as const
 /** Where somebody whose order lapsed can start again. */
 export const DISCOVER = '/portal/discover'
 
-/* Nothing on this page is filtered — the tabs are component state and the only
+/* Nothing on My Events is filtered — the tabs are component state and the only
    query parameters are the payment history's page and page size — so an empty
-   list here always means "you have not done this yet", never "a filter hid it".
+   list there always means "you have not done this yet", never "a filter hid it".
    That makes the way forward the same in every case: go and find an event.
    Attendee pages never answer emptiness with "create one". */
 export const DISCOVER_ACTION = { label: 'Discover events', to: '/portal/discover', icon: 'hgi-search-01' }
@@ -371,13 +352,13 @@ export const STORAGE_PUT_FAILED = 'The photo could not be sent to storage.'
  * nothing is broken while this is showing.
  */
 export const VERIFIED = { tone: 'green', label: 'Verified' } as const
-
 export const PENDING = { tone: 'amber', label: 'Pending' } as const
 
 /**
  * A strict subset of the API's allow-list on purpose. The server also takes
- * WebP, but this card says "JPG or PNG", so offering a third type would make
- * the copy wrong. Nothing here accepts a type the server would refuse.
+ * WebP, but the profile photo card says "JPG or PNG", so offering a third type
+ * would make the copy wrong. Nothing here accepts a type the server would
+ * refuse.
  */
 export const ACCEPTED_PHOTO_TYPES = JPG_PNG_IMAGE_TYPES
 
@@ -385,8 +366,9 @@ export const ACCEPTED_PHOTO_TYPES = JPG_PNG_IMAGE_TYPES
 export const PHOTO_ACCEPT_ATTRIBUTE = acceptAttribute(ACCEPTED_PHOTO_TYPES)
 
 /**
- * What this card calls each type on screen — "JPG", where the settings logo
- * card says "JPEG". Per-feature copy, which is why it is not shared.
+ * What the profile photo card calls each type on screen — "JPG", where the
+ * settings logo card says "JPEG". Per-feature copy, which is why it is not
+ * shared.
  *
  * Exhaustive over the allow-list it names, so widening that list upstream
  * fails to compile here rather than leaving a type unnamed in a sentence.
@@ -396,11 +378,11 @@ export const NAME_OF: Readonly<Record<JpgPngImageType, string>> = {
   'image/png': 'PNG',
 }
 
-export const KEY = 'eventa.savedEvents'
+/** The `localStorage` key a signed-out visitor's saves live under (`savedEvents.ts`). */
+export const SAVED_EVENTS_STORAGE_KEY = 'eventa.savedEvents'
 
 /** The kit's own subtitle, kept for the one state it actually describes. */
 export const NEVER_SET_UP = 'Extra security at sign-in'
-
 /** An enrolment that was started and abandoned — a seed with nothing behind it. */
 export const UNFINISHED = 'Setup was started but never finished'
 
@@ -414,5 +396,4 @@ export const DELETE_CONFIRMATION = 'DELETE'
 
 /** The 0–10 scale a recommendation question is answered on. */
 export const MIN_NPS_SCORE = 0
-
 export const MAX_NPS_SCORE = 10

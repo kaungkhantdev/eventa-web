@@ -1,69 +1,50 @@
 /** The overview module's named constants. */
 
-export const RADIUS = 15.915
-
-export const GAP = 2.4
-
-export const STROKE = 4.5
-
+/**
+ * The activity ring's SVG geometry (`ActivityRingPanel`): in a 42×42 viewBox,
+ * r 15.915 makes the circumference 100, so a dash length is a percentage.
+ */
+export const ACTIVITY_RING_RADIUS = 15.915
+export const ACTIVITY_RING_GAP = 2.4
+export const ACTIVITY_RING_STROKE = 4.5
 /** Where a dash offset of 0 would start; the kit rotates arcs to 12 o'clock. */
-export const TOP = 25
+export const ACTIVITY_RING_TOP = 25
 
 export const NO_ACTIVE_EVENTS = 'No active events.'
-
 export const NOTHING_LIVE = 'Once an event is live and selling, its share of sign-ups shows here.'
 
-/**
- * What needs acting on (US-DASH-06).
- *
- * Every row is a link out: home never resolves anything, and the module that
- * owns the fix is the one that enforces who may make it. The API decides what
- * appears — an alert about money is simply absent for someone without finance
- * access, rather than shown and refused.
- */
+/** What the empty Alerts panel says it will flag (US-DASH-06). */
 export const NOTHING_WRONG =
   "We'll flag failed payments, cancellations and check-in problems here."
 
 export const NONE_YET = 'No registrations yet.'
-
 export const NOTHING_IN = 'Every sign-up across your events lands here, newest first.'
 
 export const NO_REVENUE = 'No revenue in this period.'
-
 export const NOTHING_SOLD = 'Paid registrations show up here as soon as the first one clears.'
 
 export const NOTHING_LOW = 'No tickets running low.'
-
 export const TIER_ICON = 'hgi-ticket-star'
-
 export const NOTHING_SCARCE =
   'Tiers close to selling out show up here, the scarcest first.'
 
 export const NO_REGISTRATIONS = 'No registrations yet.'
-
 export const NOTHING_TO_SPLIT = 'Once tickets sell, the split by type shows here.'
 
 export const MEETINGS = '/admin/meetings'
-
 export const NONE_TODAY = 'No meetings scheduled today.'
-
 export const NOTHING_BOOKED = 'Meetings you schedule for today appear here with their time and guest.'
 
 export const REGISTRATIONS = '/admin/registrations'
-
 export const NEW_EVENT = '/admin/event-form'
-
 export const NOTHING_YET = 'Share your registration link and new attendees appear here in real time.'
-
 /** Long enough to read, short enough that the button is ready for a second copy. */
 export const COPIED_MS = 1500
 
 export const NONE_UPCOMING = 'No upcoming events.'
-
 export const NOTHING_SCHEDULED = 'Events you publish show up here as their date gets closer.'
 
 export const SATANG_PER_BAHT = 100
-
 export const PER_THOUSAND = 1000
 
 /** Space above the tallest point, so the peak is not drawn on the ceiling. */
@@ -76,7 +57,6 @@ export const HEADROOM = 1.15
  * count urgent rather than merely low (US-DASH-11).
  */
 export const ONE_BOOKING = 8
-
 export const LAST_FEW = 3
 
 export const RANGES: readonly string[] = ['week', 'month', 'year']

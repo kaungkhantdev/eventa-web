@@ -1,4 +1,4 @@
-import { KEY } from '@/lib/constants/portal.constants'
+import { SAVED_EVENTS_STORAGE_KEY } from '@/lib/constants/portal.constants'
 /**
  * What a signed-out visitor has saved for later (US-DISC-03).
  *
@@ -33,14 +33,14 @@ export function createSavedEvents(store: KeyValueStore): SavedEvents {
    * visitor their shortlist, not the page.
    */
   const read = (): string[] => {
-    const stored = store.getItem(KEY)
+    const stored = store.getItem(SAVED_EVENTS_STORAGE_KEY)
     if (stored === null) return []
     const parsed = parse(stored)
     if (!Array.isArray(parsed)) return []
     return parsed.filter((id): id is string => typeof id === 'string')
   }
 
-  const write = (ids: string[]) => store.setItem(KEY, JSON.stringify(ids))
+  const write = (ids: string[]) => store.setItem(SAVED_EVENTS_STORAGE_KEY, JSON.stringify(ids))
 
   return {
     ids: read,
@@ -51,7 +51,7 @@ export function createSavedEvents(store: KeyValueStore): SavedEvents {
       write([...ids, eventId])
     },
     remove: (eventId) => write(read().filter((id) => id !== eventId)),
-    clear: () => store.removeItem(KEY),
+    clear: () => store.removeItem(SAVED_EVENTS_STORAGE_KEY),
   }
 }
 

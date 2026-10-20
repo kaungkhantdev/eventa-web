@@ -67,6 +67,7 @@ export function errorViewOf(cause: unknown): ErrorView {
   return view('failed', null, 'revalidate')
 }
 
+/** Whether the browser failed to fetch a code chunk. */
 function isModuleLoadFailure(cause: unknown): boolean {
   return cause instanceof Error && MODULE_LOAD_FAILURE.test(cause.message)
 }

@@ -41,7 +41,7 @@ export const CATEGORY_ICONS = [
 export const COVER_ACCEPT = acceptAttribute(JPG_PNG_IMAGE_TYPES)
 
 /**
- * This field's own wording. A total lookup, so a reason added to the shared
+ * The cover field's own wording. A total lookup, so a reason added to the shared
  * type must be worded here before this file compiles.
  *
  * The size message suggests an export size because the dropzone recommends
@@ -133,7 +133,6 @@ export const WAITLIST_HINT: Record<'ga' | 'reserved', string> = {
  * has no public page at all, and neither does an unlisted or private one.
  */
 export const LIVE_STATUSES: readonly string[] = ['planned', 'upcoming', 'live']
-
 export const PUBLIC_VISIBILITY = 'public'
 
 /** What the organizer is told when the browser blocks the preview tab (US-PAGE-09). */
@@ -141,7 +140,6 @@ export const POPUP_BLOCKED_HINT =
   'Your browser blocked the preview — allow pop-ups for this site and try again.'
 
 export const SAVED_TOAST = 'Changes saved.'
-
 export const SEAT_MAP_DEFERRED_TOAST = 'Saved. Give the new seats a ticket type in Assign seats to save the seat map.'
 
 /**
@@ -153,21 +151,16 @@ export const EVENT_OPTIONS_LIMIT = 100
 
 /** `ConfigureReservedDto`'s own ceilings: past them the API refuses the map. */
 export const SEAT_ROWS_MAX = 100
-
 export const SEATS_PER_ROW_MAX = 100
-
 export const NO_TICKET_TYPE = 'No ticket type'
-
 /** The "No ticket type" option's value, in a row's dropdown and the paint picker. */
 export const NO_TYPE_VALUE = ''
-
 /**
  * A row dropdown's value while the row's seats differ: a disabled "Mixed"
  * placeholder, until a type is picked for the whole row. Never a ticket id,
  * which the API makes a UUID.
  */
 export const MIXED_ROW = 'mixed'
-
 /** The API requires a map name; the venue is the sensible default, then this. */
 export const DEFAULT_MAP_NAME = 'Main hall'
 
@@ -207,7 +200,6 @@ export const EVENT_VIEWS = ['overview', 'calendar'] as const
 
 /** The orderings offered, spelled as the API spells them. */
 export const EVENT_SORTS = ['registrations', 'name', 'date'] as const
-
 export const EVENT_BUCKETS = ['active', 'completed'] as const
 
 /** How many cards the upcoming grid asks for — four rows of the widest layout. */
@@ -216,10 +208,10 @@ export const UPCOMING_LIMIT = 12
 /**
  * The longest search each endpoint's DTO accepts (`@MaxLength`). Past it the API
  * answers 400 — and a loader that throws takes the whole screen down with it, so
- * a pasted URL in the search box is truncated here rather than rejected there.
+ * the loaders in `events.routes.ts` truncate a pasted URL rather than have it
+ * rejected, and the search boxes stop at the same length.
  */
 export const MAX_EVENT_SEARCH = 120
-
 export const MAX_CATEGORY_SEARCH = 80
 
 /** Thrown for a delete nothing in the console posts — a bug, not a refusal. */
@@ -241,13 +233,10 @@ export const CATEGORY_VIEWS = ['grid', 'list'] as const
 
 export const TEMPLATE_IDS: readonly string[] = ['aurora', 'noir', 'minimal', 'atlas']
 
-/** What the API's `q` accepts; longer and it answers 400 instead of a list. */
-export const EVENT_CATEGORIES_PAGE_MAX_SEARCH_LENGTH = 80
-
 /** Long enough to read, short enough to try again. */
 export const COPIED_MS = 1500
 
-/** How this page's action names a session removal. */
+/** How the event detail page's action names a session removal. */
 export const REMOVE_SESSION_FIELDS = { intent: 'remove-session' }
 
 export const SESSION_TYPES = ['Keynote', 'Talk', 'Workshop', 'Panel', 'Break']
@@ -262,7 +251,6 @@ export const DESC_MAX = 5000
 
 /** The longest address and colour `UpdatePageDto` accepts. */
 export const PAGE_SLUG_MAX = 80
-
 export const PAGE_ACCENT_MAX = 9
 
 /* Scoped CSS ported verbatim from the source page's inline <style> blocks. */
@@ -301,9 +289,6 @@ export const PAINTABLE_SEAT =
   'cursor-pointer hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white pointer-coarse:!h-7 pointer-coarse:!w-7'
 
 export const ALL_TYPES = 'All types'
-
-/** What the API's `q` accepts; longer and it answers 400 instead of a table. */
-export const EVENTS_PAGE_MAX_SEARCH_LENGTH = 120
 
 export const MENU_ITEM =
   'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-ink transition hover:bg-line'

@@ -5,6 +5,12 @@ import type { Persona } from '@/lib/persona'
 export const ACCEPT_INVITE_INCOMPLETE_LINK =
   'This invitation link is incomplete. Open the link from your email again, or ask an admin to re-send it.'
 
+/**
+ * The typo guard's words, for every form that asks for a password twice — both
+ * attendee sign-ups (the ordinary form and the one opened from a booking's
+ * emailed link, US-DISC-15), the password reset and the invitation — so they
+ * cannot drift apart.
+ */
 export const PASSWORDS_DIFFER = 'Those passwords do not match.'
 
 /** Where an account is made from a booking (US-DISC-15). */
@@ -27,7 +33,6 @@ export const MIN_PASSWORD_LENGTH = 8
  * a Thai letter or vowel sign never passes for one.
  */
 export const DIGIT = /\d/
-
 export const SYMBOL = /[^\p{L}\p{M}\p{N}]/u
 
 /** A comfortable length, which earns the last point. */

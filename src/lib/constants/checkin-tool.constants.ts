@@ -6,11 +6,9 @@ import { DEFAULT_PAGE_SIZE } from '@/lib/paging'
 export const MANUAL_LOOKUP_LABEL = 'Can’t scan? Find attendee manually'
 
 export const TO_MANUAL = `Use “${MANUAL_LOOKUP_LABEL}” below.`
-
 export const TO_UPLOAD_OR_MANUAL = `Upload a photo of the QR code instead, or use “${MANUAL_LOOKUP_LABEL}” below.`
 
 export const NO_CAMERA = 'No camera was found on this device.'
-
 export const CAMERA_BUSY = 'The camera is in use by another app, or could not be started.'
 
 /** `getUserMedia`'s refusals by `name`, worded for the person at the door. */
@@ -27,11 +25,9 @@ export const CAMERA_FAILED = 'The camera could not be started.'
 
 /** The kit's page-size choices, verbatim. */
 export const PAGE_SIZES = [10, 20, 30, 50] as const
-
 export const DEFAULT_SIZE = 10
 
 export const UNNAMED = 'Unnamed ticket'
-
 export const UNKNOWN = 'Unknown ticket'
 
 /** How many events the chooser offers. */
@@ -53,9 +49,7 @@ export const EMPTY_META = {
 }
 
 export const QR_FORMAT = 'qr_code'
-
 /** Gentle enough not to heat a phone, quick enough to feel instant at a door. */
 export const SCAN_INTERVAL_MS = 250
-
 /** How long the same code is ignored, so one badge is not read ten times. */
 export const REPEAT_GUARD_MS = 2500

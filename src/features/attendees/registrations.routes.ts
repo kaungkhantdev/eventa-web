@@ -13,7 +13,7 @@ import type {
   RegistrationWireStatus,
 } from './registrations.types'
 import { eventOptions as allEventOptions, type EventOption } from '@/features/events/eventOptions'
-import { EVENT_OPTIONS, MAX_SEARCH, REG_TABS, TIER_OPTIONS } from '@/lib/constants/attendees.constants'
+import { EVENT_OPTIONS, MAX_SEARCH_LENGTH, REG_TABS, TIER_OPTIONS } from '@/lib/constants/attendees.constants'
 
 /**
  * What the registrations queue loads, and what its controls do (US-REG-01..03).
@@ -60,7 +60,7 @@ export function listQueryOf(params: URLSearchParams): ListRegistrationsQuery {
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
     status: statusOfTab(tabOf(params)),
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 }
 

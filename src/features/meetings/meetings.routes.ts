@@ -17,7 +17,7 @@ import {
   calendarConnectionApi,
   type CalendarConnectionStatus,
 } from '@/features/settings/calendarConnection.api'
-import { MAX_SEARCH, MEETING_TABS } from '@/lib/constants/meetings.constants'
+import { MAX_SEARCH_LENGTH, MEETING_TABS } from '@/lib/constants/meetings.constants'
 
 /**
  * Meetings with venues, sponsors, vendors and speakers (US-MTG-01..08).
@@ -73,7 +73,7 @@ export function listQueryOf(params: URLSearchParams): MeetingQuery {
     bucket: tab === 'all' ? undefined : (tab as MeetingBucket),
     type: MEETING_TYPES.includes(type as MeetingType) ? (type as MeetingType) : undefined,
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 }
 

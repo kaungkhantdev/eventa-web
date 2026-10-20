@@ -1,34 +1,28 @@
 /** The ticketing module's named constants. */
 
 export const DISCOUNT_PANEL_FORM_ID = 'discount-form'
-
 export const MAX_PERCENT = 100
-
 export const ALL_EVENTS = 'All events'
 
 /** One order may hold at most this many seats — the API's own ceiling. */
 export const MAX_PER_ORDER = 8
-
 export const TICKET_PANEL_FORM_ID = 'ticket-form'
 
 export const COPY_IDLE = 'Copy link'
-
 export const COPY_DONE = 'Copied'
-
 export const TICKET_QR_MODAL_COPY_RESET_MS = 1600
 
 export const SATANG_PER_BAHT = 100
-
 export const FULL = 100
-
 export const BANGKOK = 'Asia/Bangkok'
-
 export const RANGE_DASH = ' – '
 
 export const DISCOUNT_TABS = ['all', 'active', 'scheduled', 'expired', 'disabled'] as const
 
-export const MAX_SEARCH = 120
-
+/**
+ * The longest search the API's DTO accepts (`@MaxLength`) — past it the API
+ * answers 400. The routes cut a longer one; the search boxes stop at it.
+ */
 export const MAX_SEARCH_LENGTH = 120
 
 export const DISCOUNTS_PAGE_COPY_RESET_MS = 1200

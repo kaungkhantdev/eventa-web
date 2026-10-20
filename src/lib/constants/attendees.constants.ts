@@ -4,9 +4,7 @@ export const FORM_ID = 'attendee-contact-form'
 
 /** The DTO's own limits — past them the API answers 400 (`@MaxLength`). */
 export const MAX_NAME = 120
-
 export const MAX_EMAIL = 254
-
 export const MAX_PHONE = 24
 
 /**
@@ -17,10 +15,13 @@ export const MAX_PHONE = 24
 export const VERSION_INPUT = 'stored-version'
 
 export const SEGMENTS = ['all', 'new', 'checked_in', 'vip'] as const
-
 export const SORTS = ['recent', 'name', 'events', 'tickets'] as const
 
-export const MAX_SEARCH = 120
+/**
+ * The longest search the API's DTO accepts (`@MaxLength`) — past it the API
+ * answers 400. The routes cut a longer one; the search boxes stop at it.
+ */
+export const MAX_SEARCH_LENGTH = 120
 
 /** The URL parameter naming whose profile panel is open. */
 export const PROFILE_PARAM = 'profile'
@@ -31,7 +32,7 @@ export const TIMELINE_LIMIT = 20
 /** The one kind of record `GET /audit` can be asked the trail of today. */
 export const ATTENDEE_SUBJECT = 'attendee'
 
-/** What the edit panel asks for; anything else on this route is an invitation. */
+/** What the edit panel asks for; anything else `runDirectoryAction` receives is an invitation. */
 export const CONTACT_INTENT = 'contact'
 
 /** The three details an organizer may correct, as the row stores them. */
@@ -39,33 +40,14 @@ export const CONTACT_FIELDS = ['name', 'email', 'phone'] as const
 
 export const ALL_TAGS = 'All tags'
 
-export const MAX_SEARCH_LENGTH = 120
-
-/**
- * Inviting somebody to an event (US-REG-06).
- *
- * ONE NAMED PERSON, which is what the story asks for: "Given I enter a
- * recipient name, email and exactly one event". This was a textarea of
- * addresses with no name field — a bulk invite that appears in no story and
- * that no endpoint accepts. Two of the story's five criteria (the recipient
- * name, and the inline error when it is missing) could not be met by a form
- * with nowhere to type one, and the route it posted to was the event-wide
- * broadcast, which refused every request.
- *
- * The event is required: an invitation is to something, and the API has no
- * notion of a workspace-wide one.
- */
 /** `SendInviteDto`: `@MaxLength(120)` on the name, 250 on the note. */
 export const MAX_RECIPIENT_NAME = 120
-
 export const MAX_INVITE_MESSAGE = 250
 
 export const ALL_EVENTS = 'All events'
 
 export const PAID = 'paid'
-
 export const REJECT = 'Reject'
-
 /** Said before the click: this rejection gives the buyer's money back (US-REG-02). */
 export const REJECT_AND_REFUND = 'Reject and refund'
 
@@ -91,10 +73,11 @@ export const REJECT_AND_REFUND = 'Reject and refund'
  *
  * What that costs is real and worth stating rather than glossing: expired
  * rows are findable only by looking under All, narrowed by event or search.
- * `tabOf` falls back to `all` for a tab it does not know, so not even a
- * hand-typed `?tab=expired` reaches them. If reconciliation turns out to need
- * them separately, the count is already published and a pill is one line
- * here, one in `TAB_STATUS` and one in `TAB_LABEL`.
+ * `tabOf` (`registrations.routes.ts`) falls back to `all` for a tab it does not
+ * know, so not even a hand-typed `?tab=expired` reaches them. If reconciliation
+ * turns out to need them separately, the count is already published and a pill
+ * is one line here, one in `TAB_STATUS` (`registrations.routes.ts`) and one in
+ * `TAB_LABEL` (`RegistrationsPage.tsx`).
  */
 export const REG_TABS = ['all', 'pending', 'waitlist', 'cancelled'] as const
 

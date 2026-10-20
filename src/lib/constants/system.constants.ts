@@ -1,7 +1,7 @@
 /** The system module's named constants. */
 
 /**
- * Whether the browser failed to fetch a code chunk.
+ * What the browser says when it failed to fetch a code chunk.
  *
  * Matched on the message because there is no error type for it — each engine
  * words it differently, and all three are a `TypeError`.

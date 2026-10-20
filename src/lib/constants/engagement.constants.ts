@@ -13,7 +13,7 @@ export const FORM_ID = 'reschedule-announcement'
 /**
  * Names this app knows, because a slug is not a sentence. Anything else is made
  * readable rather than shown raw — `kind` is free text from the worker, so a
- * new message type will appear here before this list does.
+ * new message type will reach the delivery log before this list does.
  */
 export const KIND_LABEL: Record<string, string> = {
   'registration-confirmation': 'Registration confirmation',
@@ -35,14 +35,12 @@ export const DELIVERY_TABS = ['all', 'failed'] as const
 
 /** What the API names nobody as. A row must never read "null joined". */
 export const SOMEONE = 'Someone'
-
 export const AN_EVENT = 'an event'
 
 /** How many rows the notification bell previews. */
 export const NOTIFICATION_PREVIEW_SIZE = 5
 
 export const MINUTE_MS = 60_000
-
 export const HOUR_MS = 60 * MINUTE_MS
 
 export const NOTIFICATION_TABS = ['all', 'unread'] as const

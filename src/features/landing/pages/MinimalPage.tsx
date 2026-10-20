@@ -6,7 +6,7 @@ import { Icon,
 } from '@/components/ui'
 import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
-import { MINIMAL_PAGE_PAGE_STYLE } from '@/lib/constants/landing.constants'
+import { MINIMAL_STYLE } from '@/lib/constants/landing.constants'
 
 /* Port of landing/minimal.html — a centered, editorial single-column event page.
    Renders the event it is given, already mapped from the API, with the same
@@ -70,7 +70,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
 
   return (
     <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
-      <style>{MINIMAL_PAGE_PAGE_STYLE}</style>
+      <style>{MINIMAL_STYLE}</style>
 
       {/* ============ 1 · STICKY NAV ============ */}
       <header className="sticky top-0 z-50 border-b border-line bg-canvas/85 backdrop-blur">

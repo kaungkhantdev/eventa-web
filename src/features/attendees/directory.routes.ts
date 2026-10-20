@@ -18,7 +18,7 @@ import type {
   SegmentCountsWire,
 } from './directory.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
-import { ATTENDEE_SUBJECT, CONTACT_INTENT, MAX_SEARCH, PROFILE_PARAM, SEGMENTS, SORTS, TIMELINE_LIMIT } from '@/lib/constants/attendees.constants'
+import { ATTENDEE_SUBJECT, CONTACT_INTENT, MAX_SEARCH_LENGTH, PROFILE_PARAM, SEGMENTS, SORTS, TIMELINE_LIMIT } from '@/lib/constants/attendees.constants'
 
 /**
  * Everyone who has ever registered (US-CHK-06/07).
@@ -113,7 +113,7 @@ export function listQueryOf(params: URLSearchParams): DirectoryQuery {
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
     segment: segmentOf(params),
     tag: TAGS.includes(tag as AttendeeTag) ? (tag as AttendeeTag) : undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
     sort: enumParam(params, 'sort', SORTS, 'recent'),
   }
 }

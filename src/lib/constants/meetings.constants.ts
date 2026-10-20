@@ -1,7 +1,6 @@
 /** The meetings module's named constants. */
 
 export const FORM_ID = 'meeting-form'
-
 export const ALL_EVENTS = 'All events'
 
 export const SEPARATOR = ' · '
@@ -19,11 +18,13 @@ export const NOT_CONNECTED_NOTE =
 
 export const MEETING_TABS = ['all', 'today', 'upcoming', 'past'] as const
 
-export const MAX_SEARCH = 120
+/**
+ * The longest search the API's DTO accepts (`@MaxLength`) — past it the API
+ * answers 400. The routes cut a longer one; the search boxes stop at it.
+ */
+export const MAX_SEARCH_LENGTH = 120
 
 export const ALL_TYPES = 'All types'
-
-export const MAX_SEARCH_LENGTH = 120
 
 /** The kit's chip, from meetings.html's header — copied verbatim. */
 export const CHIP_CLASS =

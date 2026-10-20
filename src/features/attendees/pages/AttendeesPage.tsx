@@ -402,6 +402,20 @@ function AttendeeTableRow({ row, onView }: { row: AttendeeRow; onView: () => voi
   )
 }
 
+/**
+ * Inviting somebody to an event (US-REG-06).
+ *
+ * ONE NAMED PERSON, which is what the story asks for: "Given I enter a
+ * recipient name, email and exactly one event". This was a textarea of
+ * addresses with no name field — a bulk invite that appears in no story and
+ * that no endpoint accepts. Two of the story's five criteria (the recipient
+ * name, and the inline error when it is missing) could not be met by a form
+ * with nowhere to type one, and the route it posted to was the event-wide
+ * broadcast, which refused every request.
+ *
+ * The event is required: an invitation is to something, and the API has no
+ * notion of a workspace-wide one.
+ */
 function InvitePanel({
   open,
   onClose,

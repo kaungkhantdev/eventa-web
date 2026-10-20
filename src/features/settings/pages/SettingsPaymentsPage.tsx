@@ -220,6 +220,18 @@ function Fact({ label, value, mono }: { label: string; value: string; mono?: boo
   )
 }
 
+/**
+ * What the toast says when the keys are refused.
+ *
+ * A refusal must never be quieter than a success — the Save button sits at the
+ * foot of a tall card and the field it is complaining about can be off-screen,
+ * so "nothing happened" is the only reading available without one.
+ *
+ * When the API named the fields, the toast points at them instead of repeating
+ * their sentences: those are already under the boxes, verbatim, which is where
+ * they are worth reading. When it named none, the API's own message IS the
+ * whole explanation, so it is what gets announced.
+ */
 function refusalNote(
   failed: ActionResult | null,
   fields: Record<string, string>,
@@ -228,6 +240,19 @@ function refusalNote(
   return Object.keys(fields).length > 0 ? FIELDS_REFUSED : (failed.error ?? null)
 }
 
+/**
+ * The API keys card (US-SET-08).
+ *
+ * The mode segmented control is part of this card's own form rather than page
+ * chrome, because mode and keys are submitted together: they have to agree, and
+ * the API refuses a pair that disagrees with the toggle above it. A live pair
+ * saved under Test takes real money from real people while the banner says
+ * nothing is charged.
+ *
+ * The secret field is empty on load rather than pre-filled. There is nothing to
+ * pre-fill it with — the API answers with a masked tail — and a box that looked
+ * populated would invite an organizer to "save" a value the browser never held.
+ */
 function KeysPanel({
   payments,
   mode,

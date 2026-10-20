@@ -5,6 +5,14 @@ import type { AlertRow } from '../overview.types'
 import { SectionHeader } from './PanelChrome'
 import { NOTHING_WRONG } from '@/lib/constants/overview.constants'
 
+/**
+ * What needs acting on (US-DASH-06).
+ *
+ * Every row is a link out: home never resolves anything, and the module that
+ * owns the fix is the one that enforces who may make it. The API decides what
+ * appears — an alert about money is simply absent for someone without finance
+ * access, rather than shown and refused.
+ */
 export function AlertsPanel({ alerts, emptyMessage }: { alerts: AlertRow[]; emptyMessage: string }) {
   return (
     <section className="rounded-2xl bg-surface p-4 xl:col-span-1">

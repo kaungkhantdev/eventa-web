@@ -26,7 +26,7 @@ import { EventCalendar } from '../components/EventCalendar'
 import { COVER, STATUS_PILL, eventDetailPath as detailPath } from '../events.presentation'
 import { EVENT_TYPES, type EventsData } from '../events.routes'
 import type { EventBucket, EventRow } from '../types'
-import { ALL_TYPES, EVENT_SORTS, EVENTS_PAGE_MAX_SEARCH_LENGTH, MENU_ITEM } from '@/lib/constants/events.constants'
+import { ALL_TYPES, EVENT_SORTS, MAX_EVENT_SEARCH, MENU_ITEM } from '@/lib/constants/events.constants'
 
 /* admin/events.html — the organizer's event list, plus a month calendar.
 
@@ -165,7 +165,7 @@ export default function EventsPage() {
                     onChange={(e) => setTerm(e.target.value)}
                     className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
                     placeholder="Search events…"
-                    maxLength={EVENTS_PAGE_MAX_SEARCH_LENGTH}
+                    maxLength={MAX_EVENT_SEARCH}
                     aria-label="Search events"
                   />
                 </div>

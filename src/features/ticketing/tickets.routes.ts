@@ -10,7 +10,7 @@ import type { SeatSetWire, TicketCard, TicketCountsWire, TicketShareWire } from 
 import type { TicketStatus } from './types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 import { quantityFromSeatsOf } from '@/features/events/eventSeating.mapper'
-import { MAX_SEARCH, SATANG_PER_BAHT, TICKET_TABS } from '@/lib/constants/ticketing.constants'
+import { MAX_SEARCH_LENGTH, SATANG_PER_BAHT, TICKET_TABS } from '@/lib/constants/ticketing.constants'
 
 /**
  * The cross-event ticket inventory (US-TKT-01..06).
@@ -36,7 +36,7 @@ export function listQueryOf(params: URLSearchParams): ListTicketsQuery {
     // All sends no status, so every bucket is listed.
     status: tab === 'all' ? undefined : (tab as TicketStatus),
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 }
 

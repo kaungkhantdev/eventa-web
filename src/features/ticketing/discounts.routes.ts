@@ -8,7 +8,7 @@ import { toDiscountRow } from './discounts.mapper'
 import type { DiscountRow } from './discounts.types'
 import type { DiscountStatus, DiscountType } from './types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
-import { DISCOUNT_TABS, MAX_SEARCH, SATANG_PER_BAHT } from '@/lib/constants/ticketing.constants'
+import { DISCOUNT_TABS, MAX_SEARCH_LENGTH, SATANG_PER_BAHT } from '@/lib/constants/ticketing.constants'
 
 /** Promo codes (US-TKT-07..10/12). Filtered, counted and paged by the API. */
 
@@ -27,7 +27,7 @@ export function listQueryOf(params: URLSearchParams): ListDiscountsQuery {
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
     status: tab === 'all' ? undefined : (tab as DiscountStatus),
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 }
 

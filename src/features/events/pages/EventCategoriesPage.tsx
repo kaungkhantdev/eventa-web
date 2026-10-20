@@ -24,7 +24,7 @@ import { useIsFiltering } from '@/lib/usePendingPath'
 import { CATEGORY_COLORS, COLOR_KEYS, DEFAULT_NEW_CATEGORY } from '../categories.presentation'
 import { categoryViewOf, type CategoriesData } from '../events.routes'
 import type { CategoryCard, Tone } from '../types'
-import { CATEGORY_ICONS, CATEGORY_SORTS, EVENT_CATEGORIES_PAGE_MAX_SEARCH_LENGTH } from '@/lib/constants/events.constants'
+import { CATEGORY_ICONS, CATEGORY_SORTS, MAX_CATEGORY_SEARCH } from '@/lib/constants/events.constants'
 
 /* admin/event-categories.html — the workspace's categories, with a create/edit
    panel. Search and sort live in the URL; every change is a form post to the
@@ -169,7 +169,7 @@ export default function EventCategoriesPage() {
                 onChange={(e) => setTerm(e.target.value)}
                 className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
                 placeholder="Search categories…"
-                maxLength={EVENT_CATEGORIES_PAGE_MAX_SEARCH_LENGTH}
+                maxLength={MAX_CATEGORY_SEARCH}
                 aria-label="Search categories"
               />
             </div>

@@ -241,8 +241,9 @@ here so this repo is self-governing; the same standard, server-adapted, applies 
 **SOLID & responsibilities**
 - **Single Responsibility — one job per file.** `*.api.ts` fetches · `*.mapper.ts` converts a wire row to
   a view model · `pages/` reads loader data and renders · `components/` are presentational · hooks hold
-  interaction state · `@/lib` is cross-feature. **Never mix.** If you need "and" to describe a file, it
-  is two files.
+  interaction state · `@/lib` is cross-feature, except `@/lib/constants`, which holds each feature's
+  named constants (see *Enums and constants* below). **Never mix.** If you need "and" to describe a
+  file, it is two files.
 - **Dependency Inversion** — depend on abstractions. A component takes the data and callbacks it needs
   as props; it does not reach for a router, a fetch, or a global. That is what makes it testable and
   reusable across the portal and the admin console.
@@ -260,7 +261,8 @@ here so this repo is self-governing; the same standard, server-adapted, applies 
 - **View models at the edge** — never render a raw API row. Map it first, in the feature's mapper, so an
   API field rename breaks one file rather than seven.
 - **Cross-cutting code lives in `@/lib` or `@/components/ui`, never in a feature.** A helper used by two
-  features belongs there; a default used by one belongs to that feature as a local `const`.
+  features belongs there. A default used by one is still named in `@/lib/constants/<feature>.constants`;
+  it stays a local `const` only when it needs that feature's own types, components or functions.
 
 **Domain & correctness**
 - **Business rules live in a named, tested function** — never scattered through components or inlined in
@@ -274,8 +276,9 @@ here so this repo is self-governing; the same standard, server-adapted, applies 
 - **Enums and constants over magic values** — a status, a page size, a tab id, a route path, a storage
   key: name it once in `src/lib/constants/<feature>.constants.ts` (one file per feature, imported as
   `@/lib/constants/<feature>.constants`). A constant that needs its feature's own types, components or
-  functions stays beside them — `@/lib` never imports from a feature. If a literal appears twice or carries
-  domain meaning, it gets a name. Derive from a single source of truth rather than re-typing a list.
+  functions stays beside them — a constants file never imports from a feature. If a literal appears
+  twice or carries domain meaning, it gets a name. Derive from a single source of truth rather than
+  re-typing a list.
 - **Errors are surfaced, never swallowed.** An empty `catch`, or one that logs and continues, hides a
   broken product from the person using it. Show the API's own message — it is written for them.
 - **Every async surface has three states**: loading, empty, and failed. A page that only renders the

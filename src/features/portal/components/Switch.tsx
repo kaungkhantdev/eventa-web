@@ -1,3 +1,17 @@
+/**
+ * The kit's switch, with its CSS, as used by the portal's Settings tab.
+ *
+ * Lifted out of `SettingsTab` when the Security card stopped being inert and a
+ * second file needed it. Imperative `.switch` styling from the static kit; the
+ * React part is only `checked`/`onChange`.
+ *
+ * Three declarations and two selectors are ADDED to the kit's rule set
+ * (`SWITCH_CSS`), for `SwitchButton` below — the checked look keyed off
+ * `aria-checked` instead of `input:checked`, and a button reset so a
+ * `<button class="switch">` is the same box the `<span>` was. Nothing the kit
+ * already drew has changed.
+ */
+
 import { SWITCH_CSS } from '@/lib/constants/portal.constants'
 
 /**

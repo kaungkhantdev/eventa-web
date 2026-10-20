@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MINUTE, SECOND } from '@/lib/constants/portal.constants'
+import { MS_PER_SECOND, SECONDS_PER_MINUTE } from '@/lib/constants/portal.constants'
 
 /**
  * The clock on a seat hold.
@@ -26,9 +26,9 @@ export function remainingOf(deadline: string | null, now: Date): Remaining {
 }
 
 function clockOf(msLeft: number): string {
-  const total = Math.floor(msLeft / SECOND)
-  const seconds = total % MINUTE
-  return `${Math.floor(total / MINUTE)}:${String(seconds).padStart(2, '0')}`
+  const total = Math.floor(msLeft / MS_PER_SECOND)
+  const seconds = total % SECONDS_PER_MINUTE
+  return `${Math.floor(total / SECONDS_PER_MINUTE)}:${String(seconds).padStart(2, '0')}`
 }
 
 /**
@@ -56,7 +56,7 @@ export function useCountdown(deadline: string | null): Remaining {
       const next = remainingOf(deadline, new Date())
       setRemaining(next)
       if (next.lapsed) clearInterval(timer)
-    }, SECOND)
+    }, MS_PER_SECOND)
     return () => clearInterval(timer)
   }, [deadline])
 

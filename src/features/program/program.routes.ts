@@ -8,7 +8,7 @@ import type { AgendaBlock, AgendaDay, SpeakerCard } from './program.types'
 import { STATUS_LABEL } from '@/features/events/eventDetail.mapper'
 import type { EventStatus } from '@/features/events/types'
 import { bangkokDate } from '@/lib/format'
-import { EMPTY_WINDOW, EVENT_OPTIONS, MAX_SEARCH } from '@/lib/constants/program.constants'
+import { EMPTY_WINDOW, EVENT_OPTIONS, MAX_SEARCH_LENGTH } from '@/lib/constants/program.constants'
 
 /**
  * The agenda and the speaker directory (US-PROG-01..07).
@@ -140,7 +140,7 @@ async function loadSpeakers({ request }: LoaderArgs): Promise<SpeakersData> {
   const page = await programApi.speakers(event.id, {
     page: intParam(params, 'page', 1),
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   })
 
   return {

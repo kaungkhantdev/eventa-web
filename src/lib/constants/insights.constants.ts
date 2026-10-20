@@ -38,7 +38,6 @@ export const TOP_EVENTS = 6
 export const OVERVIEW_RANGES = ['7d', '30d', '90d', 'year'] as const
 
 export const NO_REVENUE = 'No revenue in this period.'
-
 export const NOTHING_CLEARED = 'Paid registrations show up here as soon as the first one clears.'
 
 /** US-RPT-02 AC2, in the story's own words — the API says the same. */

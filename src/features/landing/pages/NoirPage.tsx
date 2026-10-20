@@ -6,7 +6,7 @@ import { Icon,
 } from '@/components/ui'
 import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
-import { NOIR_PAGE_PAGE_STYLE } from '@/lib/constants/landing.constants'
+import { NOIR_STYLE } from '@/lib/constants/landing.constants'
 
 /* Port of landing/noir.html — a wide "spotlight split" event page: a cover
    banner, a two-column hero with a sticky register card, then whichever of the
@@ -75,7 +75,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
 
   return (
     <div className="bg-canvas text-ink font-sans antialiased">
-      <style>{NOIR_PAGE_PAGE_STYLE}</style>
+      <style>{NOIR_STYLE}</style>
 
       {/* 1 · Sticky nav */}
       <header className="sticky top-0 z-40 bg-canvas/85 backdrop-blur-md border-b border-line">
