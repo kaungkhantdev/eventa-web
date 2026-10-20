@@ -18,6 +18,7 @@ import { SettingsHeader } from '../components/SettingsHeader'
 import { canEditOrganization } from '../organizationAccess'
 import type { OrganizationData } from '../settings.routes'
 import type { OrganizationForm } from '../settings.types'
+import { TIMEZONES } from '@/lib/constants/settings.constants'
 
 /**
  * The workspace itself (US-ACC-02).
@@ -26,8 +27,6 @@ import type { OrganizationForm } from '../settings.types'
  * decide how every invoice and receipt this workspace has already issued was
  * calculated, and changing one is not a form field — it is a conversation.
  */
-
-const TIMEZONES = ['Asia/Bangkok', 'Asia/Singapore', 'Asia/Tokyo', 'Europe/London', 'UTC']
 
 export default function SettingsOrganizationPage() {
   const { organization, summary } = useLoaderData() as OrganizationData

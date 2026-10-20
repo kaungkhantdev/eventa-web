@@ -5,10 +5,10 @@ import { messageOf } from '@/lib/api'
 import { useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import { qrDataUrl } from '@/lib/qr'
-import { TWO_FACTOR_DISABLE_INTENT } from '../myEvents.routes'
 import { securityApi } from '../security.api'
 import type { TwoFactorCard, TwoFactorStartWire } from '../security.types'
 import { CodeField } from './CodeField'
+import { TWO_FACTOR_DISABLE_INTENT } from '@/lib/constants/portal.constants'
 
 /**
  * Two-factor, in one panel for both directions (US-DISC-12, criterion 5).

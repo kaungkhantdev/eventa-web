@@ -31,5 +31,3 @@ export function lookOf(slug: string): CardLook {
   return LOOKS[total % LOOKS.length]
 }
 
-/** The icon on the card's badge — one shape, since the API sends no type here. */
-export const EVENT_ICON = 'hgi-calendar-03'

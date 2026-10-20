@@ -2,19 +2,12 @@ import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { mapPanel, panel, type Panel } from '@/app/panels'
 import { ApiError, api, type Query } from '@/lib/api'
 import { enumParam } from '@/lib/urlFilters'
-import {
-  GROUP_LABEL,
-  NOTIFICATION_PREVIEW_SIZE,
-  toNotification,
-  toNotificationPreview,
-  type NotificationPreview,
-  type NotificationView,
-} from './notifications.mapper'
+import { GROUP_LABEL, toNotification, toNotificationPreview, type NotificationPreview, type NotificationView } from './notifications.mapper'
 import type { FeedBucket, NotificationFeedWire } from './notifications.types'
+import { NOTIFICATION_PREVIEW_SIZE, NOTIFICATION_TABS, PREVIEW_UNAVAILABLE } from '@/lib/constants/engagement.constants'
 
 /** The notification feed (US-MSG-03). */
 
-export const NOTIFICATION_TABS = ['all', 'unread'] as const
 export type NotificationTab = (typeof NOTIFICATION_TABS)[number]
 
 const notificationsApi = {
@@ -73,9 +66,6 @@ export const notificationsRoute = {
   loader: pageData(loadNotifications),
   action: pageAction(runNotificationsAction),
 }
-
-/** What the bell says when its read failed for a reason the API did not word. */
-const PREVIEW_UNAVAILABLE = 'We couldn’t load your notifications.'
 
 /**
  * The bell's preview of the feed, as a panel: loaded, or what to say instead.

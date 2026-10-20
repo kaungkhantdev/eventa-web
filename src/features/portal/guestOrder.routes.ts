@@ -11,6 +11,7 @@ import type {
 import { checkoutApi } from './checkout.api'
 import { toPaymentStep } from './checkout.mapper'
 import type { PaymentStep } from './checkout.types'
+import { ACCOUNT_LINK_INTENT, GUEST_ORDER_METHODS } from '@/lib/constants/portal.constants'
 
 /**
  * The buyer's own copy of their order (US-DISC-06/07).
@@ -21,11 +22,9 @@ import type { PaymentStep } from './checkout.types'
  * through the route's `errorElement` like any other missing thing.
  */
 
-/** The methods the API will start a payment for (`PayOrderDto`). */
-const METHODS = ['Card', 'PromptPay'] as const
-type Method = (typeof METHODS)[number]
+type Method = (typeof GUEST_ORDER_METHODS)[number]
 
-const isMethod = (value: unknown): value is Method => METHODS.includes(value as Method)
+const isMethod = (value: unknown): value is Method => GUEST_ORDER_METHODS.includes(value as Method)
 
 /** What the pay action reports back: how to pay, or why the API said no. */
 export interface PayResult {
@@ -33,9 +32,6 @@ export interface PayResult {
   /** The API's own sentence, shown verbatim — it was written for the reader. */
   error?: string
 }
-
-/** The account offer's submission; the payment form has no intent of its own. */
-export const ACCOUNT_LINK_INTENT = 'account-link'
 
 /** The order, and what the account offer under it needs to know. */
 export interface GuestOrderData extends AccountOfferContext {

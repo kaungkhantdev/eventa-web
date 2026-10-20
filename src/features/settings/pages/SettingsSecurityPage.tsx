@@ -20,11 +20,12 @@ import { cn } from '@/lib/cn'
 import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
 import type { Me } from '@/features/auth/types'
 import { SettingsHeader } from '../components/SettingsHeader'
-import { AUDIT_EXPORT_PATH, auditExportOf } from '../auditExport'
+import { auditExportOf } from '../auditExport'
 import { auditLook } from '../settings.presentation'
 import type { SecurityData } from '../settings.routes'
 import type { AuditRow, SessionRow } from '../settings.types'
 import { twoFactorDoneMessage, twoFactorSetupStep } from '../twoFactorSetup'
+import { AUDIT_EXPORT_PATH } from '@/lib/constants/settings.constants'
 
 /**
  * Password, two-factor and sessions (US-ACC-04..07), ported from

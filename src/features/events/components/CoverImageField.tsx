@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { messageOf } from '@/lib/api'
-import { COVER_ACCEPT, rejectionOf, uploadCover } from '../coverUpload'
+import { rejectionOf, uploadCover } from '../coverUpload'
+import { COVER_ACCEPT } from '@/lib/constants/events.constants'
 
 /**
  * The event's cover image (US-EVT-02).

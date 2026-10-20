@@ -2,7 +2,7 @@ import { queryOf, type LoaderArgs } from '@/app/loaders'
 import { ApiError, NetworkError, messageOf, meProfileApi, session, type ProfileWire } from '@/lib/api'
 import type { Persona } from '@/lib/persona'
 import { homeFor } from './personas'
-import { TOKEN_PARAM } from './verifyEmail.routes'
+import { INCOMPLETE_CONFIRM_LINK, TOKEN_PARAM } from '@/lib/constants/auth.constants'
 
 /**
  * Opening the link an email change sends to the NEW address (US-SET-01,
@@ -22,9 +22,6 @@ export type ConfirmEmailData =
       next: string | null
     }
   | { ok: false; error: string }
-
-export const INCOMPLETE_CONFIRM_LINK =
-  'This confirmation link is incomplete. Open the most recent link in your email, or change your email again.'
 
 export async function loadEmailConfirmation(
   request: Request,

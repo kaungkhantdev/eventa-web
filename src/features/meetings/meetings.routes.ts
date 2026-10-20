@@ -17,6 +17,7 @@ import {
   calendarConnectionApi,
   type CalendarConnectionStatus,
 } from '@/features/settings/calendarConnection.api'
+import { MAX_SEARCH, MEETING_TABS } from '@/lib/constants/meetings.constants'
 
 /**
  * Meetings with venues, sponsors, vendors and speakers (US-MTG-01..08).
@@ -26,7 +27,6 @@ import {
  * "today" is a Thai calendar fact, not the reader's clock.
  */
 
-export const MEETING_TABS = ['all', 'today', 'upcoming', 'past'] as const
 export type MeetingTab = (typeof MEETING_TABS)[number]
 
 export const MEETING_TYPES: readonly MeetingType[] = [
@@ -39,7 +39,6 @@ export const MEETING_TYPES: readonly MeetingType[] = [
 
 export const MEETING_MODES: readonly MeetingMode[] = ['Video', 'In person', 'Phone']
 
-const MAX_SEARCH = 120
 interface MeetingQuery extends Query {
   page?: number
   limit?: number

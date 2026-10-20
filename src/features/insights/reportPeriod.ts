@@ -1,5 +1,6 @@
 import type { FilterPatch } from '@/lib/urlFilters'
 import type { ReportPeriodWire } from './insights.types'
+import { BOTH_DATES, END_BEFORE_START, MAX_SPAN_MONTHS } from '@/lib/constants/insights.constants'
 
 /**
  * The date range every report sub-page filters by (US-RPT-02).
@@ -9,14 +10,6 @@ import type { ReportPeriodWire } from './insights.types'
  * explicit days win over it anyway. Applying drops the page number too — that
  * is `nextParams`' rule for every filter (AC5).
  */
-
-/** US-RPT-02 AC2, in the story's own words — the API says the same. */
-export const END_BEFORE_START = 'End date must be on or after the start date'
-
-const BOTH_DATES = 'Choose both a start and an end date'
-
-/** The API's cap: 731 days, which the story states as 24 months. */
-const MAX_SPAN_MONTHS = 24
 
 export type DateRangeResult = { ok: true; patch: FilterPatch } | { ok: false; error: string }
 

@@ -8,14 +8,11 @@ import { toDiscountRow } from './discounts.mapper'
 import type { DiscountRow } from './discounts.types'
 import type { DiscountStatus, DiscountType } from './types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import { DISCOUNT_TABS, MAX_SEARCH, SATANG_PER_BAHT } from '@/lib/constants/ticketing.constants'
 
 /** Promo codes (US-TKT-07..10/12). Filtered, counted and paged by the API. */
 
-export const DISCOUNT_TABS = ['all', 'active', 'scheduled', 'expired', 'disabled'] as const
 export type DiscountTab = (typeof DISCOUNT_TABS)[number]
-
-const MAX_SEARCH = 120
-const SATANG_PER_BAHT = 100
 
 export function tabOf(params: URLSearchParams): DiscountTab {
   return enumParam(params, 'tab', DISCOUNT_TABS, 'all')

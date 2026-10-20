@@ -10,11 +10,11 @@ import type {
   DisplayPreferences,
   NotificationSwitch,
 } from '../accountSettings.types'
-import { DISPLAY_PREFERENCE_INTENT, NOTIFICATION_INTENT } from '../myEvents.routes'
 import type { AttendeeSecurity } from '../security.types'
 import { DangerZoneCard } from './DangerZoneCard'
 import { SecurityCard } from './SecurityCard'
 import { Switch, SwitchStyles } from './Switch'
+import { DISPLAY_PREFERENCE_INTENT, NOTIFICATION_INTENT, ROWS } from '@/lib/constants/portal.constants'
 
 /**
  * "My Account" → Settings (US-DISC-12), lifted out of `MyEventsPage` whole.
@@ -84,12 +84,6 @@ export function SettingsTab({
 }
 
 /* ---------------------------- notifications ------------------------------ */
-
-const ROWS = {
-  email: 'flex items-center justify-between py-3 first:pt-0',
-  middle: 'flex items-center justify-between py-3',
-  marketing: 'flex items-center justify-between py-3 last:pb-0',
-}
 
 /**
  * The switches, or why they are not there.

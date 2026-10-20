@@ -15,17 +15,9 @@ import { toast } from '@/lib/toast'
 import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import { MEETING_MODES, MEETING_TYPES } from '../meetings.routes'
-import {
-  MEETING_MODE_PROMPT,
-  NO_MODE,
-  initialMeetingMode,
-  meetingModeChoice,
-  meetingSaveLabel,
-  promisesMeetLink,
-  scheduleNote,
-  type MeetingModeChoice,
-} from '../meetings.presentation'
+import { initialMeetingMode, meetingModeChoice, meetingSaveLabel, promisesMeetLink, scheduleNote, type MeetingModeChoice } from '../meetings.presentation'
 import type { MeetingDraft } from '../meetings.types'
+import { ALL_EVENTS, FORM_ID, MEETING_MODE_PROMPT, NO_MODE } from '@/lib/constants/meetings.constants'
 
 /** Schedule or reschedule a meeting (US-MTG-01/02). */
 
@@ -43,9 +35,6 @@ interface MeetingPanelProps {
    */
   calendarConnected: boolean
 }
-
-const FORM_ID = 'meeting-form'
-const ALL_EVENTS = 'All events'
 
 export function MeetingPanel({
   open,

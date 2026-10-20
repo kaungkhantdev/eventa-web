@@ -16,6 +16,7 @@ import type {
   StatCard,
   TierRow,
 } from './overview.types'
+import { RANGES } from '@/lib/constants/overview.constants'
 
 /** The analytics dashboard (US-DASH-08..13). It only ever reads. */
 
@@ -37,7 +38,6 @@ export interface DashboardData {
 }
 
 const DEFAULT_RANGE: RevenueRange = 'year'
-const RANGES: readonly string[] = ['week', 'month', 'year']
 
 /**
  * Which slice of time the page is showing.

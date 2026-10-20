@@ -3,6 +3,7 @@ import { queryOf, type LoaderArgs } from '@/app/loaders'
 import { ApiError, NetworkError, messageOf } from '@/lib/api'
 import { authApi, type ResetLinkCheck } from './api'
 import { toResetLinkView, type ResetLinkView } from './resetPassword.mapper'
+import { PASSWORDS_DIFFER, RESET_PASSWORD_INCOMPLETE_LINK, TOKEN_PARAM } from '@/lib/constants/auth.constants'
 
 /**
  * Opening the reset link from a forgot-password email (US-ACC-04).
@@ -34,15 +35,6 @@ export type ResetScreen =
   | { kind: 'done'; view: ResetLinkView; message: string }
   | { kind: 'invalid'; error: string }
 
-/** Fixed by the link the API emails: `${PUBLIC_WEB_URL}/reset-password?token=…`. */
-const TOKEN_PARAM = 'token'
-
-export const INCOMPLETE_LINK =
-  'This reset link is incomplete. Open the most recent link in your email, or request a new one.'
-
-/** The same words the sign-up form uses for the same typo. */
-export const PASSWORDS_DIFFER = 'Those passwords do not match.'
-
 type CheckLink = (token: string) => Promise<ResetLinkCheck>
 type ResetPassword = (token: string, newPassword: string) => Promise<{ message: string }>
 
@@ -52,7 +44,7 @@ function tokenOf(request: Request): string | null {
 
 export async function loadResetLink(request: Request, check: CheckLink): Promise<ResetLinkData> {
   const token = tokenOf(request)
-  if (!token) return { state: 'invalid', error: INCOMPLETE_LINK }
+  if (!token) return { state: 'invalid', error: RESET_PASSWORD_INCOMPLETE_LINK }
   try {
     return { state: 'ready', view: toResetLinkView(await check(token)) }
   } catch (cause) {
@@ -79,7 +71,7 @@ export async function submitNewPassword(
   reset: ResetPassword,
 ): Promise<ResetResult> {
   const token = tokenOf(request)
-  if (!token) return { ok: false, error: INCOMPLETE_LINK, recheck: false }
+  if (!token) return { ok: false, error: RESET_PASSWORD_INCOMPLETE_LINK, recheck: false }
   const form = await request.formData()
   const newPassword = String(form.get('newPassword') ?? '')
   if (newPassword !== String(form.get('confirmPassword') ?? '')) {

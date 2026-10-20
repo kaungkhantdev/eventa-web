@@ -2,6 +2,7 @@ import type { PickerEvent } from '@/components/ui'
 import { bangkokDate } from '@/lib/format'
 import { STATUS_LABEL } from './eventDetail.mapper'
 import { eventsApi } from './events.api'
+import { EVENT_OPTIONS_LIMIT } from '@/lib/constants/events.constants'
 
 /**
  * The workspace's events, shaped for the shared `EventPicker`.
@@ -12,13 +13,6 @@ import { eventsApi } from './events.api'
  * The date and status were in the same response all along; they were dropped on
  * the way through. One builder, so a filter cannot quietly lose them again.
  */
-
-/**
- * How many events a picker offers. Enough that the search box is doing the
- * narrowing rather than this limit; a workspace past it needs the server-side
- * search the picker's UI is already shaped for.
- */
-export const EVENT_OPTIONS_LIMIT = 100
 
 /**
  * One option from the API. Narrower than `PickerEvent`, whose `id` is optional

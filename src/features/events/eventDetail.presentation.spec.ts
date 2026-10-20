@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { PAYMENT_PILL_FALLBACK, paymentPill } from './eventDetail.presentation'
+import { paymentPill } from './eventDetail.presentation'
 import { toRegistrationRow, type PaymentStatusWire } from './eventDetail.mapper'
 import type { EventRegistrationWire } from './eventDetail.api'
+import { PAYMENT_PILL_FALLBACK } from '@/lib/constants/events.constants'
 
 const ENTRY: EventRegistrationWire = {
   reference: 'ORD-2026-000045',

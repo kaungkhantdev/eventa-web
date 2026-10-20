@@ -3,8 +3,9 @@ import { useFetcher } from 'react-router'
 import type { ActionResult } from '@/app/loaders'
 import { Button, Hint, Label, Modal, Textarea } from '@/components/ui'
 import { toast } from '@/lib/toast'
-import { CANCELLED_MESSAGE, CANCEL_REASON_MAX, cancelReasonGiven } from '../events.presentation'
+import { cancelReasonGiven } from '../events.presentation'
 import type { EventDialog } from '../types'
+import { CANCELLED_MESSAGE, CANCEL_REASON_MAX } from '@/lib/constants/events.constants'
 
 /**
  * Cancelling an event that cannot be deleted (US-EVT-08).

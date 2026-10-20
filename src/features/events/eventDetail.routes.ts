@@ -24,6 +24,7 @@ import {
   type SpeakerCard,
   type TicketRow,
 } from './eventDetail.mapper'
+import { EVENT_TABS, REGISTRATION_FILTERS, SPEAKER_LIMIT } from '@/lib/constants/events.constants'
 
 /**
  * The event workspace (US-EVT-14).
@@ -34,22 +35,9 @@ import {
  * to show one would make every visit pay for five it does not use.
  */
 
-export const EVENT_TABS = [
-  'overview',
-  'registrations',
-  'attendees',
-  'speakers',
-  'agenda',
-  'tickets',
-] as const
 export type EventTab = (typeof EVENT_TABS)[number]
 
-/** The API's own payment-status filters for the registrations tab. */
-export const REGISTRATION_FILTERS = ['all', 'paid', 'pending', 'refunded'] as const
 export type RegistrationFilter = (typeof REGISTRATION_FILTERS)[number]
-
-/** How many speakers the tab shows before it would need paging of its own. */
-const SPEAKER_LIMIT = 100
 
 export function tabOf(params: URLSearchParams): EventTab {
   return enumParam(params, 'tab', EVENT_TABS, 'overview')

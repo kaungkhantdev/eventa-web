@@ -21,22 +21,15 @@ import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
-import {
-  CATEGORY_COLORS,
-  CATEGORY_ICONS,
-  COLOR_KEYS,
-  DEFAULT_NEW_CATEGORY,
-} from '../categories.presentation'
-import { CATEGORY_SORTS, categoryViewOf, type CategoriesData } from '../events.routes'
+import { CATEGORY_COLORS, COLOR_KEYS, DEFAULT_NEW_CATEGORY } from '../categories.presentation'
+import { categoryViewOf, type CategoriesData } from '../events.routes'
 import type { CategoryCard, Tone } from '../types'
+import { CATEGORY_ICONS, CATEGORY_SORTS, EVENT_CATEGORIES_PAGE_MAX_SEARCH_LENGTH } from '@/lib/constants/events.constants'
 
 /* admin/event-categories.html — the workspace's categories, with a create/edit
    panel. Search and sort live in the URL; every change is a form post to the
    API, and the list revalidates from the server rather than being patched
    locally, so what is on screen is what was actually stored. */
-
-/** What the API's `q` accepts; longer and it answers 400 instead of a list. */
-const MAX_SEARCH_LENGTH = 80
 
 const SORT_LABEL: Record<(typeof CATEGORY_SORTS)[number], string> = {
   name: 'Name A–Z',
@@ -176,7 +169,7 @@ export default function EventCategoriesPage() {
                 onChange={(e) => setTerm(e.target.value)}
                 className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
                 placeholder="Search categories…"
-                maxLength={MAX_SEARCH_LENGTH}
+                maxLength={EVENT_CATEGORIES_PAGE_MAX_SEARCH_LENGTH}
                 aria-label="Search categories"
               />
             </div>

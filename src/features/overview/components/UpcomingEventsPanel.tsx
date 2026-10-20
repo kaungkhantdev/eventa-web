@@ -4,11 +4,9 @@ import type { Panel } from '@/app/panels'
 import { cn } from '@/lib/cn'
 import type { UpcomingCard } from '../overview.types'
 import { PanelUnavailable, SectionHeader } from './PanelChrome'
+import { NONE_UPCOMING, NOTHING_SCHEDULED } from '@/lib/constants/overview.constants'
 
 /** The next events and how full they are (US-DASH-04). */
-
-const NONE_UPCOMING = 'No upcoming events.'
-const NOTHING_SCHEDULED = 'Events you publish show up here as their date gets closer.'
 
 export function UpcomingEventsPanel({ upcoming }: { upcoming: Panel<UpcomingCard[]> }) {
   return (

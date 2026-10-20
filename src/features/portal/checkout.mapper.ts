@@ -24,6 +24,7 @@ import type {
   WaitlistJoinedWire,
   WaitlistPlace,
 } from './checkout.types'
+import { BACK_TEMPLATE, FAILED, ORDINAL, PREFILLING_PERSONA, PROMPT_PAY, UNAVAILABLE_FALLBACK, WAITLIST_OPEN } from '@/lib/constants/portal.constants'
 
 /**
  * The public checkout → what the register page renders (US-DISC-04/05/06).
@@ -59,18 +60,6 @@ const UNAVAILABLE: Record<Exclude<TicketStatusWire, 'onsale'>, string> = {
   paused: 'Paused',
   scheduled: 'Not on sale yet',
 }
-
-const UNAVAILABLE_FALLBACK = 'Unavailable'
-const WAITLIST_OPEN = 'Sold out · join the waitlist'
-
-/**
- * Where "Back to event" goes.
- *
- * The checkout payload carries no event type, so the type-specific template
- * Discover picks cannot be worked out here — aurora is the general-purpose one
- * and every template reads the same event.
- */
-const BACK_TEMPLATE = 'aurora'
 
 export function toCheckoutView(wire: CheckoutViewWire): CheckoutView {
   return {
@@ -158,8 +147,6 @@ function ordinalSuffix(n: number): string {
   if (teen >= 11 && teen <= 13) return 'th'
   return ORDINAL[n % 10] ?? 'th'
 }
-
-const ORDINAL: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' }
 
 export function toWaitlistPlace(joined: WaitlistJoinedWire): WaitlistPlace {
   return {
@@ -316,9 +303,6 @@ export function toPlacedOrder(order: OrderPlacedWire): PlacedOrder {
   }
 }
 
-const PROMPT_PAY = 'PromptPay'
-const FAILED = 'failed'
-
 /**
  * What the buyer still has to do.
  *
@@ -343,17 +327,6 @@ function stateOf(intent: PaymentIntentWire): PaymentStep['state'] {
 }
 
 /* ── who is booking (US-DISC-11, criterion 5) ───────────────────────────── */
-
-/**
- * The one persona whose saved profile fills the buyer boxes.
- *
- * Named once and read by both rules below, because "whose details pre-fill"
- * and "whose profile is worth fetching" have to be the same answer: a loader
- * that fetched for somebody the mapper then ignores would spend a round trip
- * to achieve nothing, and one that fetched for fewer would leave a signed-in
- * attendee retyping details the product already holds.
- */
-const PREFILLING_PERSONA: Persona = 'attendee'
 
 /**
  * Whether this visitor's saved profile should be read at all.

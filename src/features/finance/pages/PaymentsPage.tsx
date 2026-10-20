@@ -30,6 +30,7 @@ import type { Me } from '@/features/auth/types'
 import { refundControl } from '../payments.mapper'
 import { METHODS, type LedgerTab, type PaymentsData, type TabCounts } from '../payments.routes'
 import type { PaymentRow } from '../payments.types'
+import { ALL_EVENTS, ALL_METHODS, MAX_SEARCH_LENGTH } from '@/lib/constants/finance.constants'
 
 /**
  * The payments ledger (US-FIN-01/02). Layout ported from payments.html.
@@ -38,10 +39,6 @@ import type { PaymentRow } from '../payments.types'
  * knows the provider's window and what has already gone back. A control that
  * cannot be used says why.
  */
-
-const ALL_EVENTS = 'All events'
-const ALL_METHODS = 'All methods'
-const MAX_SEARCH_LENGTH = 120
 
 export default function PaymentsPage() {
   const data = useLoaderData() as PaymentsData

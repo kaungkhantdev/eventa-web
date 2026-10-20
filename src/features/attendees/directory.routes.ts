@@ -18,6 +18,7 @@ import type {
   SegmentCountsWire,
 } from './directory.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import { ATTENDEE_SUBJECT, CONTACT_INTENT, MAX_SEARCH, PROFILE_PARAM, SEGMENTS, SORTS, TIMELINE_LIMIT } from '@/lib/constants/attendees.constants'
 
 /**
  * Everyone who has ever registered (US-CHK-06/07).
@@ -28,11 +29,8 @@ import { eventOptions, type EventOption } from '@/features/events/eventOptions'
  * rank the ten it happened to receive.
  */
 
-export const SEGMENTS = ['all', 'new', 'checked_in', 'vip'] as const
-export const SORTS = ['recent', 'name', 'events', 'tickets'] as const
 export const TAGS: readonly AttendeeTag[] = ['VIP', 'Speaker', 'Sponsor', 'Student']
 
-const MAX_SEARCH = 120
 interface DirectoryQuery extends Query {
   page?: number
   limit?: number
@@ -41,15 +39,6 @@ interface DirectoryQuery extends Query {
   search?: string
   sort?: AttendeeSort
 }
-
-/** The URL parameter naming whose profile panel is open. */
-export const PROFILE_PARAM = 'profile'
-
-/** How far back the panel's timeline reaches before deferring to the audit log. */
-const TIMELINE_LIMIT = 20
-
-/** The one kind of record `GET /audit` can be asked the trail of today. */
-const ATTENDEE_SUBJECT = 'attendee'
 
 interface ActivityQuery extends Query {
   subjectType: typeof ATTENDEE_SUBJECT
@@ -207,10 +196,6 @@ function withPage(current: string, page: number): string {
   url.searchParams.set('page', String(page))
   return url.pathname + url.search
 }
-
-
-/** What the edit panel asks for; anything else on this route is an invitation. */
-export const CONTACT_INTENT = 'contact'
 
 async function runDirectoryAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()

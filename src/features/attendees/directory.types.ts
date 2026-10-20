@@ -1,3 +1,4 @@
+import { CONTACT_FIELDS } from '@/lib/constants/attendees.constants'
 /** The attendee directory (US-CHK-06/07): everyone who ever registered. */
 
 export type AttendeeTag = 'VIP' | 'Speaker' | 'Sponsor' | 'Student'
@@ -31,9 +32,6 @@ export interface SegmentCountsWire {
   checkedIn: number
   vip: number
 }
-
-/** The three details an organizer may correct, as the row stores them. */
-export const CONTACT_FIELDS = ['name', 'email', 'phone'] as const
 
 export type ContactField = (typeof CONTACT_FIELDS)[number]
 

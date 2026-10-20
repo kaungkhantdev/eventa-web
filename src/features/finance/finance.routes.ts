@@ -19,10 +19,9 @@ import type {
   VatLedgerWire,
 } from './finance.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import { INVOICE_TABS, MAX_SEARCH, PAYOUT_TABS, SATANG_PER_BAHT, YEARS_BACK } from '@/lib/constants/finance.constants'
 
 /** Payouts, invoices and VAT periods (US-FIN-03..12). */
-
-const MAX_SEARCH = 120
 
 function withPage(current: string, page: number): string {
   const url = new URL(current)
@@ -32,7 +31,6 @@ function withPage(current: string, page: number): string {
 
 /* ── payouts ──────────────────────────────────────────────────────────── */
 
-export const PAYOUT_TABS = ['all', 'scheduled', 'processing', 'paid', 'failed'] as const
 export type PayoutTab = (typeof PAYOUT_TABS)[number]
 
 const payoutsApi = {
@@ -109,7 +107,6 @@ export const payoutsRoute = {
 
 /* ── invoices ─────────────────────────────────────────────────────────── */
 
-export const INVOICE_TABS = ['all', 'issued', 'paid', 'overdue', 'void'] as const
 export type InvoiceTab = (typeof INVOICE_TABS)[number]
 
 const invoicesApi = {
@@ -218,9 +215,6 @@ export interface TaxesData {
   }
 }
 
-/** How many years back the picker goes. VAT records are kept for five. */
-const YEARS_BACK = 5
-
 /**
  * Which tax year is on screen.
  *
@@ -250,8 +244,6 @@ async function loadTaxes({ request }: LoaderArgs): Promise<TaxesData> {
     },
   }
 }
-
-const SATANG_PER_BAHT = 100
 
 /** The headline figures are always disclosed here, so plain baht will do. */
 function money(satang: number): string {

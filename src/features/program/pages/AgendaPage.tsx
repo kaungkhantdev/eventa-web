@@ -7,9 +7,10 @@ import { useFilters } from '@/lib/useFilters'
 import { EventChooser } from '../components/EventChooser'
 import { RemoveSessionModal } from '../components/RemoveSessionModal'
 import { SessionPanel } from '../components/SessionPanel'
-import { HOUR_HEIGHT, calendarHours } from '../program.mapper'
+import { calendarHours } from '../program.mapper'
 import type { AgendaData } from '../program.routes'
 import type { AgendaBlock, AgendaDay, SessionColor, SessionDraft } from '../program.types'
+import { HOUR_HEIGHT } from '@/lib/constants/program.constants'
 
 /**
  * The event schedule (US-PROG-01..03). Layout ported from agenda.html.

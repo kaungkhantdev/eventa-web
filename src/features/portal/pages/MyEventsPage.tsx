@@ -20,20 +20,14 @@ import { TicketModal } from '../components/TicketModal'
 import { useTicketModal } from '../lib/useTicketModal'
 import type { MyEventsData } from '../myEvents.routes'
 import type { MyEventRow } from '../myEvents.types'
-import { EVENT_ICON, lookOf } from '../portal.presentation'
+import { lookOf } from '../portal.presentation'
+import { DISCOVER_ACTION, EVENT_ICON } from '@/lib/constants/portal.constants'
 
 /* Attendee "My Account" (portal/my-events.html). Standalone page with four
    tabs (My Events, Payment history, Profile, Settings), a paginated
    transactions table and a downloadable QR-ticket modal. */
 
 type Tab = 'events' | 'payments' | 'profile' | 'settings'
-
-/* Nothing on this page is filtered — the tabs are component state and the only
-   query parameters are the payment history's page and page size — so an empty
-   list here always means "you have not done this yet", never "a filter hid it".
-   That makes the way forward the same in every case: go and find an event.
-   Attendee pages never answer emptiness with "create one". */
-const DISCOVER_ACTION = { label: 'Discover events', to: '/portal/discover', icon: 'hgi-search-01' }
 
 function hideOnError(e: React.SyntheticEvent<HTMLImageElement>) {
   e.currentTarget.style.display = 'none'

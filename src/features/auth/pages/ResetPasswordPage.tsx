@@ -4,7 +4,6 @@ import { Icon } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { PasswordInput } from '@/features/auth/components/PasswordInput'
 import { PasswordStrengthMeter } from '@/features/auth/components/PasswordStrengthMeter'
-import { MIN_PASSWORD_LENGTH } from '@/features/auth/passwordStrength'
 import { forgotPathFor } from '@/features/auth/personas'
 import type { ResetLinkView } from '@/features/auth/resetPassword.mapper'
 import {
@@ -12,6 +11,7 @@ import {
   type ResetLinkData,
   type ResetResult,
 } from '@/features/auth/resetPassword.routes'
+import { MIN_PASSWORD_LENGTH } from '@/lib/constants/auth.constants'
 
 /**
  * The end of the reset email's link (US-ACC-04).

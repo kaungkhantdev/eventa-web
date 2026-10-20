@@ -27,6 +27,7 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal'
 import { DiscountPanel } from '../components/DiscountPanel'
 import type { DiscountTab, DiscountsData } from '../discounts.routes'
 import type { DiscountRow } from '../discounts.types'
+import { ALL_EVENTS, DISCOUNTS_PAGE_COPY_RESET_MS, MAX_SEARCH_LENGTH } from '@/lib/constants/ticketing.constants'
 
 /**
  * Promo codes (US-TKT-07..10/12). Layout ported from discounts.html.
@@ -34,10 +35,6 @@ import type { DiscountRow } from '../discounts.types'
  * The table is what the API returned for these filters — the page does not
  * re-slice it, so the paginator's count and the rows always agree.
  */
-
-const ALL_EVENTS = 'All events'
-const MAX_SEARCH_LENGTH = 120
-const COPY_RESET_MS = 1200
 
 export default function DiscountsPage() {
   const data = useLoaderData() as DiscountsData
@@ -323,7 +320,7 @@ function CopyCodeButton({ code }: { code: string }) {
     if (navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {})
     setCopied(true)
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setCopied(false), COPY_RESET_MS)
+    timer.current = window.setTimeout(() => setCopied(false), DISCOUNTS_PAGE_COPY_RESET_MS)
   }
 
   return (

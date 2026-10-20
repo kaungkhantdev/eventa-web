@@ -4,6 +4,7 @@ import type {
   ContactPatch,
   StoredContact,
 } from './directory.types'
+import { VERSION_INPUT } from '@/lib/constants/attendees.constants'
 
 /**
  * What a contact save actually asks the API to change (US-REG-08).
@@ -72,13 +73,6 @@ export function hasContactChanges(patch: ContactPatch): boolean {
 export function storedInput(field: ContactField): string {
   return `stored-${field}`
 }
-
-/**
- * The hidden input carrying the row's version, named here so the panel that
- * writes it and the action that reads it cannot drift apart — the same reason
- * `storedInput` exists.
- */
-export const VERSION_INPUT = 'stored-version'
 
 /** The panel's submitted form, as the change it is asking for. */
 export function contactPatchOfForm(form: FormData): ContactPatch {

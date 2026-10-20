@@ -2,9 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useFilters } from '@/lib/useFilters'
 import type { ReportPeriodWire } from '../insights.types'
 import { dateRangePatch, trimmedNote } from '../reportPeriod'
-
-const DATE_INPUT =
-  'h-10 w-full rounded-lg bg-surface px-3 text-[13px] text-ink focus:outline-none focus:ring-4 focus:ring-brand/15 sm:w-36'
+import { DATE_INPUT } from '@/lib/constants/insights.constants'
 
 /**
  * A start and an end date for the report (US-RPT-02).

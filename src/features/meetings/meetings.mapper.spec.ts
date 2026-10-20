@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarConnectionStatus } from '@/features/settings/calendarConnection.api'
 import { connectLinkLabel } from '@/features/settings/calendarConnection.mapper'
-import {
-  ASK_ADMIN_NOTE,
-  pendingKeyOf,
-  shouldPollSync,
-  syncActionOf,
-  toMeetingCard,
-} from './meetings.mapper'
+import { pendingKeyOf, shouldPollSync, syncActionOf, toMeetingCard } from './meetings.mapper'
 import { meetingModeChoice } from './meetings.presentation'
 import type { MeetingStatus, MeetingWire, SyncStatus } from './meetings.types'
+import { ASK_ADMIN_NOTE } from '@/lib/constants/meetings.constants'
 
 const wire = (over: Partial<MeetingWire> = {}): MeetingWire => ({
   id: 'm-1',

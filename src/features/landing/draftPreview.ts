@@ -1,4 +1,5 @@
 import type { LandingEvent, LandingHighlight } from './types'
+import { DEFAULT_HIGHLIGHT_ICON, HIGHLIGHT_SEPARATOR, UNTITLED } from '@/lib/constants/landing.constants'
 
 /**
  * The create-event wizard's "preview this template" (US-PAGE-02).
@@ -12,10 +13,6 @@ import type { LandingEvent, LandingHighlight } from './types'
  * The kit filled the gaps from a demo event. Showing somebody another event's
  * speakers under their own title is not a preview of their page.
  */
-
-const UNTITLED = 'Your event'
-const HIGHLIGHT_SEPARATOR = '|'
-const DEFAULT_HIGHLIGHT_ICON = 'hgi-sparkles'
 
 /** Everything a draft cannot know. Stated once, so the omissions are visible. */
 const BLANK: LandingEvent = {

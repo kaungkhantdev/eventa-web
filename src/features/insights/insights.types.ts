@@ -1,3 +1,4 @@
+import { OVERVIEW_RANGES } from '@/lib/constants/insights.constants'
 /**
  * What `/reports/*` returns (US-RPT-02/05/08/09).
  *
@@ -237,7 +238,6 @@ export interface PayoutsReportWire {
 
 /* ── the overview (US-RPT-01/03) ───────────────────────────────────────── */
 
-export const OVERVIEW_RANGES = ['7d', '30d', '90d', 'year'] as const
 export type OverviewRange = (typeof OVERVIEW_RANGES)[number]
 
 export interface KpiWire {

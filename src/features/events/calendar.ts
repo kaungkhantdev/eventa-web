@@ -1,4 +1,5 @@
 import type { CalendarEvent } from './types'
+import { CELLS, MAX_PILLS_PER_DAY } from '@/lib/constants/events.constants'
 
 /**
  * The month grid, as pure calendar arithmetic.
@@ -9,12 +10,6 @@ import type { CalendarEvent } from './types'
  * of the events they are looking at. `events` already carry their Bangkok day
  * (see `toCalendarEvents`), so both sides of the comparison mean the same thing.
  */
-
-/** How many event pills fit in a square before they roll up into "+N more". */
-export const MAX_PILLS_PER_DAY = 3
-
-/** Six weeks — the most any month can span, and a grid that never reflows. */
-const CELLS = 42
 
 export interface DayCell {
   /** `YYYY-MM-DD`. */

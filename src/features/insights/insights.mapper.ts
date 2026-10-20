@@ -20,6 +20,7 @@ import type {
   ReportPayoutStatus,
   SplitWire,
 } from './insights.types'
+import { MIX_RAMP } from '@/lib/constants/insights.constants'
 
 /**
  * Report rows and tiles, from the wire to what the page renders.
@@ -389,15 +390,6 @@ export function toPayoutTiles(totals: PayoutsReportWire['totals']) {
 }
 
 /* ── the overview (US-RPT-01/03) ───────────────────────────────────────── */
-
-/**
- * The kit's brand tint ramp, applied BY POSITION.
- *
- * The mix arrives largest-first, so the biggest slice takes the strongest tint
- * the way the static page did. Not `hashIndex`, which is for lists that have no
- * order of their own — here the order is the point.
- */
-const MIX_RAMP = ['#1ba770', '#4cbd96', '#9fe0cd', '#d1d5db']
 
 /** A tile, already formatted, with its chip when there is one to show. */
 export interface OverviewTile {

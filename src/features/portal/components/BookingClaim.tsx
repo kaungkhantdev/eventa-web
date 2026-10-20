@@ -5,10 +5,11 @@ import { cn } from '@/lib/cn'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { PasswordInput } from '@/features/auth/components/PasswordInput'
 import { PasswordStrengthMeter } from '@/features/auth/components/PasswordStrengthMeter'
-import { MIN_PASSWORD_LENGTH } from '@/features/auth/passwordStrength'
 import { signInPathFor } from '@/features/auth/personas'
 import { useFailureToast } from '@/lib/useSavedToast'
 import type { ClaimRefusal, RegisterScreen } from '../portalRegister.types'
+import { HOME, NOTICE_TONES } from '@/lib/constants/portal.constants'
+import { MIN_PASSWORD_LENGTH } from '@/lib/constants/auth.constants'
 
 /**
  * The attendee sign-up opened from the link emailed to a booking's address
@@ -19,8 +20,6 @@ import type { ClaimRefusal, RegisterScreen } from '../portalRegister.types'
  * and terms box as the ordinary sign-up beside it — and, for the refusals,
  * the reset page's centred notice.
  */
-
-const HOME = '/portal/discover'
 
 type ClaimScreen = Extract<RegisterScreen, { kind: 'claim' }>
 
@@ -231,11 +230,6 @@ export function ClaimInvalid({
     </AuthLayout>
   )
 }
-
-const NOTICE_TONES = {
-  brand: 'bg-brand-soft text-brand',
-  rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
-} as const
 
 /** The reset page's centred notice: an icon in a disc, and one sentence. */
 function Notice({

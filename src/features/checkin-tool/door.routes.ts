@@ -8,6 +8,7 @@ import { intParam } from '@/lib/urlFilters'
 import { countsOf, doorApi } from './door.api'
 import { toAttendanceRow, toDoorCounts, toScanFeedback } from './door.mapper'
 import type { AttendanceRow, DoorCounts, ScanFeedback } from './door.types'
+import { EMPTY_META, EVENT_OPTIONS, FEED_SIZE, STATUSES } from '@/lib/constants/checkin-tool.constants'
 
 /**
  * The two screens the door uses (US-REG-11/12/13).
@@ -15,12 +16,6 @@ import type { AttendanceRow, DoorCounts, ScanFeedback } from './door.types'
  * Both read `GET /events/:eventId/check-ins` — the queue by name, the station
  * newest-first. One list, two views.
  */
-
-/** How many events the chooser offers. */
-const EVENT_OPTIONS = 50
-
-/** How many arrivals the station's live feed shows. */
-export const FEED_SIZE = 8
 
 export interface EventChoice {
   id: string
@@ -47,8 +42,6 @@ function chosenEvent(events: EventChoice[], params: URLSearchParams): EventChoic
   return events.find((event) => event.id === asked) ?? events[0] ?? null
 }
 
-const STATUSES = ['checked_in', 'expected'] as const
-
 /* ── the queue ────────────────────────────────────────────────────────── */
 
 export interface QueueData {
@@ -66,16 +59,6 @@ const EMPTY_COUNTS: DoorCounts = {
   percent: 0,
   onSite: 0,
   late: 0,
-}
-
-/** A page with nothing on it — the shape `pageWindow` needs to say "0 of 0". */
-const EMPTY_META = {
-  page: 1,
-  limit: DEFAULT_PAGE_SIZE,
-  total: 0,
-  totalPages: 0,
-  hasNext: false,
-  hasPrevious: false,
 }
 
 export const checkInQueueRoute = {

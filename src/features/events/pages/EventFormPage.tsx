@@ -9,40 +9,13 @@ import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
 import { swatchClassOf } from '@/lib/seatSwatches'
 import { toast } from '@/lib/toast'
-import { SEAT_SET_QUANTITY } from '@/features/ticketing/tickets.mapper'
-import {
-  SEAT_TYPES_REQUIREMENT,
-  categoryIdOf,
-  publishGaps,
-  seatRowsApply,
-  type EventFormValues,
-  type TicketDraft,
-} from '../eventForm.mapper'
+import { categoryIdOf, publishGaps, seatRowsApply, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
 import type { EventFormData } from '../eventForm.routes'
 import { EVENT_TYPES } from '../events.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
 import { eventDetailPath } from '../events.presentation'
 import type { EventType } from '../types'
-import {
-  HL_ICONS,
-  NO_SEATS_TO_ASSIGN,
-  STEPS,
-  WAITLIST_HINT,
-  assignSeatsViewOf,
-  finalLabel,
-  headerSaveLabel,
-  POPUP_BLOCKED_HINT,
-  SAVING_TICKET_TYPES,
-  SEAT_MAP_DEFERRED_NOTE,
-  landingPreviewHref,
-  openPreviewTab,
-  saveIntentOf,
-  seatMapDeferredOn,
-  stepProgress,
-  summaryCapacity,
-  type Highlight,
-  type StepKey,
-} from '../eventForm.presentation'
+import { NO_SEATS_TO_ASSIGN, STEPS, assignSeatsViewOf, finalLabel, headerSaveLabel, landingPreviewHref, openPreviewTab, saveIntentOf, seatMapDeferredOn, stepProgress, summaryCapacity, type Highlight, type StepKey } from '../eventForm.presentation'
 import {
   paintChoiceOf,
   paintOptionsOf,
@@ -64,6 +37,8 @@ import {
 import { CoverImageField } from '../components/CoverImageField'
 import { PaintPicker } from '../components/PaintPicker'
 import { RowTicketTypes } from '../components/RowTicketTypes'
+import { DESC_MAX, HL_ICONS, PAGE_ACCENT_MAX, PAGE_SLUG_MAX, PAINTABLE_SEAT, POPUP_BLOCKED_HINT, SAVING_TICKET_TYPES, SCOPED_CSS, SEAT_MAP_DEFERRED_NOTE, SEAT_TYPES_REQUIREMENT, WAITLIST_HINT } from '@/lib/constants/events.constants'
+import { SEAT_SET_QUANTITY } from '@/lib/constants/ticketing.constants'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
    Basics · Date & location · Seating · Tickets · Assign seats · Review &
@@ -74,14 +49,6 @@ import { RowTicketTypes } from '../components/RowTicketTypes'
 type LocMode = 'inperson' | 'online'
 type Seating = 'ga' | 'reserved'
 type LandingTpl = (typeof LANDING_TEMPLATES)[number]['id']
-
-/**
- * The cap the counter shows, in CHARACTERS THE ORGANIZER TYPED — not markup.
- * The API allows 10,000 characters of sanitised HTML, so this leaves roughly
- * double the typed length as headroom for tags. Counting the markup instead
- * would make the number jump when someone bolded a word.
- */
-const DESC_MAX = 5000
 
 /**
  * The API's publish requirements, in its own words — see events.service.ts.
@@ -104,10 +71,6 @@ const REQUIREMENT_MET: Record<(typeof PUBLISH_REQUIREMENTS)[number], string> = {
   [SEAT_TYPES_REQUIREMENT]: 'Every seat has a ticket type',
 }
 
-/** The longest address and colour `UpdatePageDto` accepts. */
-const PAGE_SLUG_MAX = 80
-const PAGE_ACCENT_MAX = 9
-
 /**
  * The ticket list's column spans, header and rows alike. With no Quantity
  * column (an in-person reserved event, US-EVT-05) name and price take its width.
@@ -123,37 +86,6 @@ function statusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
-/* Scoped CSS ported verbatim from the source page's inline <style> blocks. */
-const SCOPED_CSS = `
-.efhouse{background:radial-gradient(120% 90% at 50% -10%, #17201c 0%, #0c110f 60%)}
-.efseat{height:16px;width:16px;flex:none;border-radius:5px 5px 2px 2px;background:rgba(255,255,255,.16)}
-.efseat-sel{background:#1ba770;box-shadow:0 0 0 2px rgba(27,167,112,.3)}
-.efseat-booked{background:rgba(255,255,255,.05)}
-.efrowlab{color:rgba(255,255,255,.5);font-size:10px;font-weight:600;width:14px;text-align:center;flex:none}
-#desc-editor-wrap{ border:1px solid rgb(var(--hair)); border-radius:10px; background:rgb(var(--surface)); transition:box-shadow .15s ease; }
-#desc-editor-wrap:focus-within{ box-shadow:0 0 0 4px rgb(27 167 112 / .15); }
-#desc-editor-wrap .ql-toolbar.ql-snow{ border:0; border-bottom:1px solid rgb(var(--line)); border-radius:10px 10px 0 0; padding:7px 8px; }
-#desc-editor-wrap .ql-container.ql-snow{ border:0; border-radius:0 0 10px 10px; font-family:inherit; font-size:13px; }
-#desc-editor-wrap .ql-editor{ min-height:118px; padding:12px; line-height:1.6; color:rgb(var(--ink)); }
-#desc-editor-wrap .ql-editor.ql-blank::before{ left:12px; right:12px; color:rgb(var(--muted)); font-style:normal; }
-#desc-editor-wrap .ql-snow .ql-stroke{ stroke:rgb(var(--muted)); }
-#desc-editor-wrap .ql-snow .ql-fill{ fill:rgb(var(--muted)); }
-#desc-editor-wrap .ql-snow .ql-picker{ color:rgb(var(--ink)); }
-#desc-editor-wrap .ql-snow.ql-toolbar button:hover .ql-stroke,
-#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-stroke,
-#desc-editor-wrap .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke{ stroke:#1ba770; }
-#desc-editor-wrap .ql-snow.ql-toolbar button:hover .ql-fill,
-#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-fill{ fill:#1ba770; }
-#desc-editor-wrap .ql-snow.ql-toolbar button:hover,
-#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active,
-#desc-editor-wrap .ql-snow .ql-picker-label:hover,
-#desc-editor-wrap .ql-snow .ql-picker-item:hover,
-#desc-editor-wrap .ql-snow .ql-picker-item.ql-selected{ color:#1ba770; }
-#desc-editor-wrap .ql-snow .ql-picker-options{ background:rgb(var(--surface)); border-color:rgb(var(--hair))!important; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.14); }
-#desc-editor-wrap .ql-snow .ql-tooltip{ background:rgb(var(--surface)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); box-shadow:0 8px 24px rgba(0,0,0,.16); border-radius:8px; }
-#desc-editor-wrap .ql-snow .ql-tooltip input[type=text]{ background:rgb(var(--canvas)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); border-radius:6px; }
-`
-
 /* ---------- Reserved-seating live preview ----------
    Rows are numbered as the API numbers them, and each seat takes its ticket
    type's colour (US-EVT-05); a seat with no type keeps the plain seat. The
@@ -167,10 +99,6 @@ interface SeatPainter {
   /** Give this seat the picked paint type. */
   onPaint: (row: number, seat: number) => void
 }
-
-/** A seat to paint: a hit target a thumb can use on a phone, and a visible focus. */
-const PAINTABLE_SEAT =
-  'cursor-pointer hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white pointer-coarse:!h-7 pointer-coarse:!w-7'
 
 function SeatPreview({
   swatches,

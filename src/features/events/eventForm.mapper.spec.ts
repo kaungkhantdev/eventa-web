@@ -1,20 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import {
-  SEAT_TYPES_REQUIREMENT,
-  bahtOf,
-  categoryIdOf,
-  publishGaps,
-  seatRowsApply,
-  satangOf,
-  toCreateBody,
-  toEventFormValues,
-  toTicketBody,
-  toUpdateBody,
-  type EventFormValues,
-  type TicketDraft,
-} from './eventForm.mapper'
+import { bahtOf, categoryIdOf, publishGaps, seatRowsApply, satangOf, toCreateBody, toEventFormValues, toTicketBody, toUpdateBody, type EventFormValues, type TicketDraft } from './eventForm.mapper'
 import type { EventWire } from './types'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
+import { SEAT_TYPES_REQUIREMENT } from '@/lib/constants/events.constants'
 
 const event = (over: Partial<EventWire> = {}): EventWire => ({
   id: 'evt-1',

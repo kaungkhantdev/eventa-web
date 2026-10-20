@@ -1,26 +1,4 @@
-/**
- * The kit's switch, with its CSS, as used by the portal's Settings tab.
- *
- * Lifted out of `SettingsTab` when the Security card stopped being inert and a
- * second file needed it. Imperative `.switch` styling from the static kit; the
- * React part is only `checked`/`onChange`.
- *
- * Three declarations and two selectors are ADDED to the kit's rule set, for
- * `SwitchButton` below — the checked look keyed off `aria-checked` instead of
- * `input:checked`, and a button reset so a `<button class="switch">` is the
- * same box the `<span>` was. Nothing the kit already drew has changed.
- */
-const SWITCH_CSS = `
-.switch{position:relative;display:inline-flex;height:1.25rem;width:2.25rem;flex:none;cursor:pointer;align-items:center}
-.switch input{position:absolute;inset:0;opacity:0;cursor:pointer}
-.switch .track{height:1.25rem;width:2.25rem;border-radius:9999px;background:rgb(var(--line));transition:background .18s}
-.switch .dot{position:absolute;left:.125rem;height:1rem;width:1rem;border-radius:9999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .18s}
-.switch input:checked + .track{background:#1ba770}
-.switch input:checked ~ .dot{transform:translateX(1rem)}
-button.switch{appearance:none;background:none;border:0;padding:0}
-.switch[aria-checked="true"] .track{background:#1ba770}
-.switch[aria-checked="true"] .dot{transform:translateX(1rem)}
-`
+import { SWITCH_CSS } from '@/lib/constants/portal.constants'
 
 /**
  * The stylesheet, mounted once by the tab rather than by each switch.

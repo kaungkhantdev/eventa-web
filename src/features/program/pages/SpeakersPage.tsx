@@ -24,6 +24,7 @@ import { SpeakerPanel } from '../components/SpeakerPanel'
 import { speakerRemovalWarning } from '../program.presentation'
 import type { SpeakersData } from '../program.routes'
 import type { SpeakerCard } from '../program.types'
+import { MAX_SEARCH_LENGTH } from '@/lib/constants/program.constants'
 
 /**
  * The speaker directory (US-PROG-04..07). Layout ported from speakers.html.
@@ -33,8 +34,6 @@ import type { SpeakerCard } from '../program.types'
  */
 
 type ViewMode = 'grid' | 'list'
-
-const MAX_SEARCH_LENGTH = 120
 
 export default function SpeakersPage() {
   const data = useLoaderData() as SpeakersData

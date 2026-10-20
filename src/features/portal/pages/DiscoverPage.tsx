@@ -8,9 +8,10 @@ import { MASKED } from '@/lib/format'
 import type { PageWindow } from '@/lib/paging'
 import type { ActionResult } from '@/app/loaders'
 import { signUpPathFor } from '@/features/auth/personas'
-import { ALL_CATEGORIES, lookOfCategory } from '../discover.presentation'
+import { lookOfCategory } from '../discover.presentation'
 import type { DiscoverData } from '../discover.routes'
 import type { DiscoverCard } from '../discover.types'
+import { ALL_CATEGORIES, SAVE_OFF, SAVE_ON, TINTS } from '@/lib/constants/portal.constants'
 
 /**
  * Attendee "What's on" browser (portal/discover.html), on the public feed.
@@ -23,11 +24,6 @@ import type { DiscoverCard } from '../discover.types'
  * The kit invented a rating, a cover photo and three attendee faces from each
  * slug. All three now come from the API or not at all.
  */
-
-const SAVE_OFF =
-  'absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/60'
-const SAVE_ON =
-  'absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-white text-red-500 shadow-sm transition'
 
 export default function DiscoverPage() {
   const data = useLoaderData() as DiscoverData
@@ -451,9 +447,6 @@ function GoingCluster({ faces, accent }: { faces: number; accent: string }) {
     </span>
   )
 }
-
-/** Alpha suffixes, lightening each circle in the stack. */
-const TINTS = ['dd', '99', '55'] as const
 
 /** No price is not a free price — nothing is left to buy. */
 function Price({ price }: { price: DiscoverCard['price'] }) {

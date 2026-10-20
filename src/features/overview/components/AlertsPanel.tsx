@@ -3,17 +3,7 @@ import { Icon, PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { AlertRow } from '../overview.types'
 import { SectionHeader } from './PanelChrome'
-
-/**
- * What needs acting on (US-DASH-06).
- *
- * Every row is a link out: home never resolves anything, and the module that
- * owns the fix is the one that enforces who may make it. The API decides what
- * appears — an alert about money is simply absent for someone without finance
- * access, rather than shown and refused.
- */
-const NOTHING_WRONG =
-  "We'll flag failed payments, cancellations and check-in problems here."
+import { NOTHING_WRONG } from '@/lib/constants/overview.constants'
 
 export function AlertsPanel({ alerts, emptyMessage }: { alerts: AlertRow[]; emptyMessage: string }) {
   return (

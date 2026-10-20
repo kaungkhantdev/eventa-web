@@ -14,10 +14,9 @@ import type {
   TaxRow,
   TaxStatus,
 } from './finance.types'
+import { PAYOUT_MANAGEMENT, SATANG_PER_BAHT } from '@/lib/constants/finance.constants'
 
 /** The rules behind payouts, invoices and VAT (US-FIN-03..12). */
-
-const SATANG_PER_BAHT = 100
 
 /**
  * Money that moved, or a figure being withheld.
@@ -83,9 +82,6 @@ export function toBalances(wire: BalancesWire): Balances {
     connected: wire.payoutsConnected,
   }
 }
-
-/** Bank, schedule and tax forms are an Admin's to change (US-FIN-05, US-FIN-14). */
-const PAYOUT_MANAGEMENT = 'finManage'
 
 /**
  * Whether to offer "Manage payouts" — the way to the provider, where bank

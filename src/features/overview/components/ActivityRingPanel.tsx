@@ -3,6 +3,7 @@ import type { Panel } from '@/app/panels'
 import type { ActivityRing } from '../overview.routes'
 import type { ShareSlice } from '../overview.types'
 import { PanelUnavailable, SectionHeader } from './PanelChrome'
+import { GAP, NOTHING_LIVE, NO_ACTIVE_EVENTS, RADIUS, STROKE, TOP } from '@/lib/constants/overview.constants'
 
 /**
  * Which active events are driving sign-ups (US-DASH-05).
@@ -12,15 +13,6 @@ import { PanelUnavailable, SectionHeader } from './PanelChrome'
  * page's own arc maths, and its centre label and responsive box are page-local
  * sizes the shared component's fixed geometry cannot reproduce.
  */
-
-const RADIUS = 15.915
-const GAP = 2.4
-const STROKE = 4.5
-/** Where a dash offset of 0 would start; the kit rotates arcs to 12 o'clock. */
-const TOP = 25
-
-const NO_ACTIVE_EVENTS = 'No active events.'
-const NOTHING_LIVE = 'Once an event is live and selling, its share of sign-ups shows here.'
 
 export function ActivityRingPanel({ ring }: { ring: Panel<ActivityRing> }) {
   return (

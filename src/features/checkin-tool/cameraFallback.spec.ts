@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  MANUAL_LOOKUP_LABEL,
-  cameraFailureMessage,
-  scannerUnavailableMessage,
-} from './cameraFallback'
+import { cameraFailureMessage, scannerUnavailableMessage } from './cameraFallback'
+import { MANUAL_LOOKUP_LABEL } from '@/lib/constants/checkin-tool.constants'
 
 /*
  * US-REG-12: "Given the camera can't be opened (permission denied, no camera,

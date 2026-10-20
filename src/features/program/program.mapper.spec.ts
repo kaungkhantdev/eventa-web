@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { HOUR_HEIGHT, agendaDaysOf, toAgendaBlock, toSpeakerCard } from './program.mapper'
+import { agendaDaysOf, toAgendaBlock, toSpeakerCard } from './program.mapper'
 import type { SessionWire, SpeakerWire } from './program.types'
+import { HOUR_HEIGHT } from '@/lib/constants/program.constants'
 
 const speaker = (over: Partial<SpeakerWire> = {}): SpeakerWire => ({
   id: 's-1',

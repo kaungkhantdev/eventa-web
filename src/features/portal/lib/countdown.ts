@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MINUTE, SECOND } from '@/lib/constants/portal.constants'
 
 /**
  * The clock on a seat hold.
@@ -8,9 +9,6 @@ import { useEffect, useState } from 'react'
  * absolute instant from the API — UTC on the wire — so there is no timezone
  * arithmetic here, only a subtraction.
  */
-
-const SECOND = 1000
-const MINUTE = 60
 
 export interface Remaining {
   /** `m:ss`, or `null` when there is no deadline to count to. */

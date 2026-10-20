@@ -28,6 +28,7 @@ import { useFilters } from '@/lib/useFilters'
 import type { ActionResult } from '@/app/loaders'
 import type { MemberCounts, UsersData } from '../settings.routes'
 import type { MemberRow } from '../settings.types'
+import { SEARCH_SETTLE_MS } from '@/lib/constants/settings.constants'
 
 /**
  * Who can get into the workspace (US-ACC-08..11). Ported from users.html.
@@ -273,9 +274,6 @@ const STATUS_TABS = [
   label: string
   count: keyof MemberCounts
 }[]
-
-/** Long enough that a fast typist gets one request, short enough to feel live. */
-const SEARCH_SETTLE_MS = 300
 
 /**
  * Status tabs, search and a role filter (US-ACC-02), as the kit draws them.

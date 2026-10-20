@@ -6,37 +6,12 @@ import { Icon,
 } from '@/components/ui'
 import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
+import { MINIMAL_PAGE_PAGE_STYLE } from '@/lib/constants/landing.constants'
 
 /* Port of landing/minimal.html — a centered, editorial single-column event page.
    Renders the event it is given, already mapped from the API, with the same
    copy and Tailwind class strings as the static template. Sections it has no
    content for are left out rather than headed. */
-
-const PAGE_STYLE = `
-  html { scroll-behavior: smooth; }
-  body { overflow-x: hidden; }
-  a:focus-visible, button:focus-visible, summary:focus-visible {
-    outline: 2px solid #1ba770;
-    outline-offset: 3px;
-    border-radius: 6px;
-  }
-  details.faq > summary { list-style: none; cursor: pointer; }
-  details.faq > summary::-webkit-details-marker { display: none; }
-  details.faq[open] .faq-chev { transform: rotate(180deg); }
-  .faq-chev { transition: transform .22s ease; }
-  section[id] { scroll-margin-top: 72px; }
-  @media (prefers-reduced-motion: no-preference) {
-    .reveal { animation: rise .7s cubic-bezier(.22,.61,.36,1) both; }
-    .reveal.d1 { animation-delay: .06s; }
-    .reveal.d2 { animation-delay: .13s; }
-    .reveal.d3 { animation-delay: .20s; }
-    .reveal.d4 { animation-delay: .27s; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-  }
-`
 
 export default function MinimalPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()
@@ -95,7 +70,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
 
   return (
     <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
-      <style>{PAGE_STYLE}</style>
+      <style>{MINIMAL_PAGE_PAGE_STYLE}</style>
 
       {/* ============ 1 · STICKY NAV ============ */}
       <header className="sticky top-0 z-50 border-b border-line bg-canvas/85 backdrop-blur">

@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 import { useRevalidator } from 'react-router'
 import { pendingKeyOf } from './meetings.mapper'
 import type { MeetingCard } from './meetings.types'
-import { NO_POLLS, SYNC_POLL_MS, budgetFor, mayPoll, spend } from './syncPoll'
+import { NO_POLLS, budgetFor, mayPoll, spend } from './syncPoll'
+import { SYNC_POLL_MS } from '@/lib/constants/meetings.constants'
 
 /**
  * Re-read the meetings while an invite is on its way (US-MTG-04 AC1), within

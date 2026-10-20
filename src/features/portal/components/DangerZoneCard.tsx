@@ -5,14 +5,12 @@ import { messageOf, session } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { useDisclosure } from '@/lib/useDisclosure'
 import type { Panel } from '@/app/panels'
-import { DELETE_CONFIRMATION, isDeleteConfirmed, toDeleteBody } from '../security.mapper'
+import { isDeleteConfirmed, toDeleteBody } from '../security.mapper'
 import { securityApi } from '../security.api'
 import type { DeletionWarning } from '../security.types'
 import { CodeField } from './CodeField'
 import { PasswordField } from './PasswordField'
-
-/** One dialog on one page, so the id can be quoted in the footer's `form=`. */
-const FORM_ID = 'portal-delete-account'
+import { DANGER_ZONE_CARD_FORM_ID, DELETE_CONFIRMATION } from '@/lib/constants/portal.constants'
 
 /**
  * "My Account" → Settings → Danger zone (US-DISC-14).
@@ -125,7 +123,7 @@ function DeleteAccountModal({
           </button>
           <button
             type="submit"
-            form={FORM_ID}
+            form={DANGER_ZONE_CARD_FORM_ID}
             className="btn btn-danger flex-1"
             disabled={!armed || deletion.busy}
           >
@@ -148,7 +146,7 @@ function DeleteAccountModal({
 
         <ForfeitWarning warning={warning} />
 
-        <form id={FORM_ID} onSubmit={submit} className="space-y-3.5 border-t border-hair pt-3.5">
+        <form id={DANGER_ZONE_CARD_FORM_ID} onSubmit={submit} className="space-y-3.5 border-t border-hair pt-3.5">
           <div>
             <label className="label" htmlFor={`${id}-confirm`}>
               Type {DELETE_CONFIRMATION} to confirm

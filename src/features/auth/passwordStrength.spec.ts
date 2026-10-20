@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { MIN_PASSWORD_LENGTH, STRENGTH_TEXTS, scorePassword } from './passwordStrength'
+import { scorePassword } from './passwordStrength'
+import { MIN_PASSWORD_LENGTH, STRENGTH_TEXTS } from '@/lib/constants/auth.constants'
 
 describe('scorePassword', () => {
   it('scores nothing typed as nothing', () => {

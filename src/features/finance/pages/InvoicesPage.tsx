@@ -29,6 +29,7 @@ import { useIsFiltering } from '@/lib/usePendingPath'
 import type { ActionResult } from '@/app/loaders'
 import type { InvoiceTab, InvoicesData, TabCounts } from '../finance.routes'
 import type { InvoiceRow } from '../finance.types'
+import { ALL_EVENTS, MAX_SEARCH_LENGTH } from '@/lib/constants/finance.constants'
 
 /**
  * Tax invoices (US-FIN-06..10). Layout ported from invoices.html.
@@ -37,9 +38,6 @@ import type { InvoiceRow } from '../finance.types'
  * and a voided one is already gone. The reason travels with the verdict so a
  * disabled control explains itself.
  */
-
-const ALL_EVENTS = 'All events'
-const MAX_SEARCH_LENGTH = 120
 
 export default function InvoicesPage() {
   const data = useLoaderData() as InvoicesData

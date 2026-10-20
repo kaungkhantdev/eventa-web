@@ -1,13 +1,6 @@
 import type { Persona } from '@/lib/persona'
 
 /**
- * The typo guard's words, for both attendee sign-ups — the ordinary form and
- * the one opened from a booking's emailed link (US-DISC-15) — so they cannot
- * drift apart.
- */
-export const PASSWORDS_DIFFER = 'Those passwords do not match.'
-
-/**
  * The sign-up form, as `POST /auth/register` wants it.
  *
  * The mirror of `credentialsOf`, and a named function for the same reason: the

@@ -4,12 +4,10 @@ import type { Panel } from '@/app/panels'
 import { cn } from '@/lib/cn'
 import type { TodayMeetings } from '../overview.routes'
 import { CountBadge, PanelUnavailable, SectionHeader } from './PanelChrome'
+import { MEETINGS, NONE_TODAY, NOTHING_BOOKED } from '@/lib/constants/overview.constants'
 
 /** Today's meetings (US-DASH-03). Markup ported from admin/home.html. */
 
-const MEETINGS = '/admin/meetings'
-const NONE_TODAY = 'No meetings scheduled today.'
-const NOTHING_BOOKED = 'Meetings you schedule for today appear here with their time and guest.'
 /** The empty card already offers this, so the footer link would be it twice. */
 const noneToday = (m: Panel<TodayMeetings>) => m.ok && m.data.rows.length === 0
 

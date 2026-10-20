@@ -1,28 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { swatchOf } from '@/lib/seatSwatches'
-import {
-  MIXED_ROW,
-  paintChoiceOf,
-  paintOptionsOf,
-  quantityColumnOf,
-  quantityFromSeatsOf,
-  rowChoiceOf,
-  seatAriaLabel,
-  seatLegend,
-  seatRowCount,
-  seatSwatchesOf,
-  seatTicketTypesFor,
-  seatTicketTypesOf,
-  seatingWaitsForSeatTypes,
-  seatsPerRowCount,
-  storedQuantityOf,
-  ticketTypeChoices,
-  toReservedSeatingBody,
-  typeOfChoice,
-  withRowType,
-  withSeatType,
-  type TicketTypeChoice,
-} from './eventSeating.mapper'
+import { paintChoiceOf, paintOptionsOf, quantityColumnOf, quantityFromSeatsOf, rowChoiceOf, seatAriaLabel, seatLegend, seatRowCount, seatSwatchesOf, seatTicketTypesFor, seatTicketTypesOf, seatingWaitsForSeatTypes, seatsPerRowCount, storedQuantityOf, ticketTypeChoices, toReservedSeatingBody, typeOfChoice, withRowType, withSeatType, type TicketTypeChoice } from './eventSeating.mapper'
 import {
   toEventFormValues,
   toTicketBody,
@@ -30,6 +8,7 @@ import {
   type QuantityFacts,
   type TicketDraft,
 } from './eventForm.mapper'
+import { MIXED_ROW } from '@/lib/constants/events.constants'
 
 /**
  * US-EVT-05: a reserved seat map is split between ticket types seat by seat —

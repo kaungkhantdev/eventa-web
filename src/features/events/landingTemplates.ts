@@ -9,10 +9,9 @@
  */
 
 import type { EventStatus } from './types'
+import { TEMPLATE_IDS } from '@/lib/constants/events.constants'
 
 export type TemplateId = 'aurora' | 'noir' | 'minimal' | 'atlas'
-
-const TEMPLATE_IDS: readonly string[] = ['aurora', 'noir', 'minimal', 'atlas']
 
 /**
  * Whether a value off the wire names one of the four designs.

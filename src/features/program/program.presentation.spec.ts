@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { SESSION_REMOVAL_WARNING, speakerRemovalWarning } from './program.presentation'
+import { speakerRemovalWarning } from './program.presentation'
+import { SESSION_REMOVAL_WARNING } from '@/lib/constants/program.constants'
 
 describe('speakerRemovalWarning', () => {
   // US-PROG-11: the confirmation warns that the speaker comes off all their

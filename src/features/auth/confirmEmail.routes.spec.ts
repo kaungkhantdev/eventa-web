@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, NetworkError, meProfileApi, session, type ProfileWire } from '@/lib/api'
-import { INCOMPLETE_CONFIRM_LINK, loadEmailConfirmation } from './confirmEmail.routes'
+import { loadEmailConfirmation } from './confirmEmail.routes'
+import { INCOMPLETE_CONFIRM_LINK } from '@/lib/constants/auth.constants'
 
 /**
  * The page at the end of the email-change link (US-SET-01 "a confirmation link

@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn'
 import type { TicketModalState } from '../lib/useTicketModal'
 import { ticketChoices } from '../myEvents.mapper'
 import type { TicketPass } from '../myEvents.types'
+import { NO_LONGER_VALID, UNDRAWABLE } from '@/lib/constants/portal.constants'
 
 /* QR ticket modal from my-events.html: one ticket's scannable QR, its
    reference, a preview of the printable pass, and its download (US-DISC-07).
@@ -91,10 +92,6 @@ function TicketBody({
   }
   return <TicketDetails pass={pass.data} />
 }
-
-/** Why there is no QR: a void ticket admits nobody, so none is drawn for it. */
-const NO_LONGER_VALID = 'This ticket is no longer valid and will not admit anyone.'
-const UNDRAWABLE = 'This code could not be drawn.'
 
 function TicketDetails({ pass }: { pass: TicketPass }) {
   const noCode = pass.valid ? UNDRAWABLE : NO_LONGER_VALID

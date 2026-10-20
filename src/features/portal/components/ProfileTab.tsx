@@ -5,14 +5,10 @@ import { messageOf } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
-import { EMAIL_CHANGE_INTENT,
-  PHONE_CONFIRM_INTENT,
-  PHONE_REMOVE_INTENT,
-  PHONE_REQUEST_INTENT,
-} from '../myEvents.routes'
 import { profileApi } from '../profile.api'
-import { PHOTO_ACCEPT_ATTRIBUTE, checkProfilePhoto } from '../profile.photo'
+import { checkProfilePhoto } from '../profile.photo'
 import type { AttendeeProfileCard } from '../profile.types'
+import { EMAIL_CHANGE_INTENT, EMAIL_FORM_ID, PHONE_CONFIRM_FORM_ID, PHONE_CONFIRM_INTENT, PHONE_REMOVE_FORM_ID, PHONE_REMOVE_INTENT, PHONE_REQUEST_FORM_ID, PHONE_REQUEST_INTENT, PHOTO_ACCEPT_ATTRIBUTE } from '@/lib/constants/portal.constants'
 
 /**
  * "My Account" → Profile (US-DISC-11), lifted out of `MyEventsPage` whole.
@@ -29,26 +25,6 @@ import type { AttendeeProfileCard } from '../profile.types'
  * and a plausible number on somebody's own profile is a claim this app cannot
  * support: the Interests list, "Events attended" and "Member since".
  */
-
-/**
- * The email-change form's id, named once because three elements have to agree
- * on it: the form, the box the kit left in the details grid, and its button.
- *
- * A fixed id rather than `useId()`, as the checkout page's `form="booking"`
- * already does — there is one Profile tab on one page, and the id has to be
- * quotable in a `form=` attribute.
- */
-const EMAIL_FORM_ID = 'portal-profile-email'
-
-/**
- * The phone's three submissions, each its own form — and like the email's,
- * all OUTSIDE the details form, because forms cannot nest: a nested one is
- * dropped by the browser and its button silently submits the outer form
- * instead.
- */
-const PHONE_REQUEST_FORM_ID = 'portal-profile-phone'
-const PHONE_CONFIRM_FORM_ID = 'portal-profile-phone-code'
-const PHONE_REMOVE_FORM_ID = 'portal-profile-phone-remove'
 
 export function ProfileTab({ profile }: { profile: AttendeeProfileCard }) {
   return (

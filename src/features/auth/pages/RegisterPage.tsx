@@ -4,13 +4,9 @@ import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { SocialAuth } from '@/features/auth/components/SocialAuth'
-import {
-  MIN_PASSWORD_LENGTH,
-  STRENGTH_COLORS,
-  STRENGTH_TEXTS,
-  scorePassword,
-} from '@/features/auth/passwordStrength'
+import { scorePassword } from '@/features/auth/passwordStrength'
 import { useSignUp } from '@/features/auth/useSignUp'
+import { MIN_PASSWORD_LENGTH, STRENGTH_COLORS, STRENGTH_TEXTS } from '@/lib/constants/auth.constants'
 
 /**
  * Organizer sign-up — a workspace and its first owner (US-ACC-01).

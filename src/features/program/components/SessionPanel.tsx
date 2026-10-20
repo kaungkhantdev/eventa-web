@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast'
 import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import type { AgendaDay, SessionDraft, SessionType } from '../program.types'
+import { SESSION_PANEL_FORM_ID } from '@/lib/constants/program.constants'
 
 /**
  * Add or edit a session (US-PROG-01/02).
@@ -26,7 +27,6 @@ interface SessionPanelProps {
   onDelete?: () => void
 }
 
-const FORM_ID = 'session-form'
 const TYPES: SessionType[] = ['Keynote', 'Talk', 'Workshop', 'Panel', 'Break']
 
 export function SessionPanel({
@@ -68,7 +68,7 @@ export function SessionPanel({
               Cancel
             </Button>
           )}
-          <Button variant="primary" className="flex-1" type="submit" form={FORM_ID} disabled={saving}>
+          <Button variant="primary" className="flex-1" type="submit" form={SESSION_PANEL_FORM_ID} disabled={saving}>
             {saving ? 'Saving…' : 'Save session'}
           </Button>
         </>
@@ -77,7 +77,7 @@ export function SessionPanel({
       {/* Rebuilt per opening, so a second New session does not open on the
           last one's title and times. */}
       <fetcher.Form
-        id={FORM_ID}
+        id={SESSION_PANEL_FORM_ID}
         key={opening}
         method="post"
         className="space-y-4"

@@ -1,13 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CalendarConnectionStatus, CalendarConnectionWire } from './calendarConnection.api'
-import {
-  INTEGRATIONS_PATH,
-  authorizeUrlOf,
-  calendarChipOf,
-  connectLinkLabel,
-  returnToastOf,
-  toCalendarConnectionCard,
-} from './calendarConnection.mapper'
+import { authorizeUrlOf, calendarChipOf, connectLinkLabel, returnToastOf, toCalendarConnectionCard } from './calendarConnection.mapper'
+import { INTEGRATIONS_PATH } from '@/lib/constants/settings.constants'
 
 const wire = (over: Partial<CalendarConnectionWire> = {}): CalendarConnectionWire => ({
   provider: 'google',

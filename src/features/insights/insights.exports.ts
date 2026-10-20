@@ -1,4 +1,5 @@
 import { fileDownloads, type FileDownload } from '@/lib/exportFormats'
+import { REPORTS } from '@/lib/constants/insights.constants'
 
 /**
  * Every report's Export menu (US-RPT-11).
@@ -6,16 +7,6 @@ import { fileDownloads, type FileDownload } from '@/lib/exportFormats'
  * One entry per report, built from the report's own key, so the API path and
  * the saved file's name are derived rather than retyped on six pages.
  */
-
-const REPORTS = [
-  'registrations',
-  'attendance',
-  'events',
-  'income',
-  'discounts',
-  'transactions',
-  'payouts',
-] as const
 
 type Report = (typeof REPORTS)[number]
 

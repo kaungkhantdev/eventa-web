@@ -3,7 +3,8 @@ import { useFetcher } from 'react-router'
 import type { ActionResult } from '@/app/loaders'
 import { toast } from '@/lib/toast'
 import { ConfirmDeleteModal } from '@/features/ticketing/components/ConfirmDeleteModal'
-import { SESSION_REMOVAL_WARNING } from '../program.presentation'
+import { SESSION_REMOVAL_WARNING } from '@/lib/constants/program.constants'
+
 
 /**
  * Removing a session (US-PROG-04), from the agenda or the event workspace.

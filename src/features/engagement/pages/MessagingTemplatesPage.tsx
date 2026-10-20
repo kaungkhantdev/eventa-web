@@ -23,6 +23,7 @@ import { useSavedToast } from '@/lib/useSavedToast'
 import { insertAtCursor } from '../merge-field'
 import type { TemplateCard } from '../templates.mapper'
 import type { TemplatesData } from '../templates.routes'
+import { LOCALES } from '@/lib/constants/engagement.constants'
 
 /**
  * The automated messages a workspace sends (US-MSG-01). Cards ported from
@@ -179,11 +180,6 @@ function TemplateTile({ card }: { card: TemplateCard }) {
 }
 
 type Locale = 'en' | 'th'
-
-const LOCALES = [
-  { value: 'en' as const, label: 'English' },
-  { value: 'th' as const, label: 'ไทย' },
-]
 
 /**
  * The wording editor (US-MSG-02).

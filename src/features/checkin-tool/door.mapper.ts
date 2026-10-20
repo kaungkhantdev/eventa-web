@@ -7,6 +7,7 @@ import type {
   ScanFeedback,
   ScanResultWire,
 } from './door.types'
+import { UNKNOWN, UNNAMED } from '@/lib/constants/checkin-tool.constants'
 
 /**
  * The door's rules (US-REG-11/12/13).
@@ -15,9 +16,6 @@ import type {
  * door to do, so they never collapse into "no": an unknown code, a ticket for
  * next week's event and a refunded one each need a different sentence.
  */
-
-const UNNAMED = 'Unnamed ticket'
-const UNKNOWN = 'Unknown ticket'
 
 export function toAttendanceRow(wire: AttendanceWire): AttendanceRow {
   const checkedIn = wire.status === 'checked_in'

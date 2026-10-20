@@ -24,6 +24,7 @@ import type { Me } from '@/features/auth/types'
 import { offersPayoutManagement } from '../finance.mapper'
 import type { PayoutTab, PayoutsData } from '../finance.routes'
 import type { PayoutRow } from '../finance.types'
+import { PAYOUT_SETTINGS } from '@/lib/constants/finance.constants'
 
 /**
  * Payouts to the organizer's bank (US-FIN-03..05). Ported from payouts.html.
@@ -40,18 +41,6 @@ const TABS: PillTabItem<PayoutTab>[] = [
   { value: 'paid', label: 'Paid' },
   { value: 'failed', label: 'Failed' },
 ]
-
-/**
- * Where connecting a payout account actually happens.
- *
- * Not a `POST /payouts/settings-link` from here, which is what this page used
- * to offer: for an unconnected workspace that endpoint answers
- * `{connected:false, url:null}` — there is no provider URL to follow in exactly
- * the case the button is shown — and `pageAction` returns `{ok:true}` for
- * anything that is not a `Response`, so the link would never reach the page
- * even when the provider had one. A plain link, as in the kit (payouts.html).
- */
-const PAYOUT_SETTINGS = '/admin/settings-payments'
 
 export default function PayoutsPage() {
   const data = useLoaderData() as PayoutsData

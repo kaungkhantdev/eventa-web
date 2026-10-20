@@ -7,6 +7,7 @@ import { discoverApi } from './discover.api'
 import { toDiscoverCard } from './discover.mapper'
 import { savedEvents } from './savedEvents'
 import type { DiscoverCard } from './discover.types'
+import { DISCOVER_PAGE_SIZE, SAVE_FAILED, UNSAVE_FAILED } from '@/lib/constants/portal.constants'
 
 /**
  * What's on (US-DISC-01/02/03).
@@ -16,17 +17,6 @@ import type { DiscoverCard } from './discover.types'
  * page meant to be shareable. A session is read only to decide *where* the
  * shortlist lives.
  */
-
-/**
- * What the card says when a heart cannot be recorded. US-DISC-03 names the
- * message, so it is this rather than the API's or the network's own sentence;
- * the heart itself reverts, because it only ever showed the press.
- */
-const SAVE_FAILED = "Couldn't save right now."
-const UNSAVE_FAILED = "Couldn't remove it from saved right now."
-
-/** A grid row is three cards wide, so the page comes in whole rows. */
-export const DISCOVER_PAGE_SIZE = 12
 
 export interface DiscoverData {
   cards: DiscoverCard[]

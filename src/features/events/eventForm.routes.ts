@@ -6,7 +6,6 @@ import { ticketingApi } from '@/features/ticketing/ticketing.api'
 import { categoriesApi } from './categories.api'
 import { eventContentApi } from './eventContent.api'
 import { eventsApi, type PageSettingsBody } from './events.api'
-import { CATEGORIES_LIMIT } from './events.routes'
 import {
   toCreateBody,
   toEventFormValues,
@@ -17,6 +16,7 @@ import {
 import { quantityFromSeatsOf, seatTicketTypesOf, toReservedSeatingBody } from './eventSeating.mapper'
 import { isTemplateId, type TemplateId } from './landingTemplates'
 import type { CategoryWire } from './types'
+import { CATEGORIES_LIMIT, SAVED_TOAST, SEAT_MAP_DEFERRED_TOAST } from '@/lib/constants/events.constants'
 
 /**
  * The create/edit wizard (US-EVT-02..07).
@@ -146,9 +146,6 @@ async function savePage(id: string, saved: EventFormValues, form: FormData): Pro
   const changes = pageChangesOf(saved, form)
   if (changes) await eventsApi.updatePage(id, changes)
 }
-
-const SAVED_TOAST = 'Changes saved.'
-const SEAT_MAP_DEFERRED_TOAST = 'Saved. Give the new seats a ticket type in Assign seats to save the seat map.'
 
 /**
  * What a save announces once it lands, or null for none.

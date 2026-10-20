@@ -8,19 +8,10 @@ import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
 import type { Me } from '@/features/auth/types'
 import { SettingsHeader } from '../components/SettingsHeader'
-import {
-  CALENDAR_RETURN_PARAM,
-  authorizeUrlOf,
-  returnToastOf,
-  toCalendarConnectionCard,
-  type CalendarConnectionCard,
-} from '../calendarConnection.mapper'
+import { authorizeUrlOf, returnToastOf, toCalendarConnectionCard, type CalendarConnectionCard } from '../calendarConnection.mapper'
 import { canManageIntegrations } from '../integrationsAccess'
-import {
-  CONNECT_CALENDAR_INTENT,
-  DISCONNECT_CALENDAR_INTENT,
-  type IntegrationsData,
-} from '../settings.routes'
+import { type IntegrationsData } from '../settings.routes'
+import { BLURB, CALENDAR_RETURN_PARAM, CONNECT_CALENDAR_INTENT, DISCONNECT_CALENDAR_INTENT, TILE_TINT } from '@/lib/constants/settings.constants'
 
 /**
  * Settings → Integrations (US-MTG-08): where an Admin connects, reconnects and
@@ -81,12 +72,6 @@ function useCalendarReturnToast() {
     )
   }, [outcome, setParams])
 }
-
-const BLURB =
-  "Sends each meeting's calendar invite to the guest, adds a Google Meet link to video meetings and sets a reminder 15 minutes before."
-
-/** Google's own blue, in the tints the payment methods' tiles use. */
-const TILE_TINT = 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400'
 
 function GoogleCalendarCard({ card }: { card: CalendarConnectionCard }) {
   // Held here, not in the buttons: a disconnect that worked removes its own

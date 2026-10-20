@@ -3,15 +3,10 @@ import { uploadLogo } from '../logoUpload'
 import { useRevalidator } from 'react-router'
 import { Button, Card, Icon } from '@/components/ui'
 import { messageOf } from '@/lib/api'
-import {
-  UPLOADABLE_IMAGE_TYPES,
-  UPLOAD_MAX_MIB,
-  acceptAttribute,
-  imageRefusal,
-  type ImageRefusal,
-} from '@/lib/imageUploads'
+import { UPLOADABLE_IMAGE_TYPES, imageRefusal } from '@/lib/imageUploads'
 import { toast } from '@/lib/toast'
 import { accountApi } from '../settings.routes'
+import { LOGO_ACCEPT, REFUSAL } from '@/lib/constants/settings.constants'
 
 /**
  * The workspace logo (US-SET-07) — what attendees see on public pages,
@@ -36,19 +31,6 @@ import { accountApi } from '../settings.routes'
  * promise "JPG or PNG" and so offer the narrower list — a real difference in
  * what each surface advertises, not a copy that fell behind.
  */
-
-const LOGO_ACCEPT = acceptAttribute(UPLOADABLE_IMAGE_TYPES)
-
-/**
- * This card's own wording. A total lookup, so a reason added to the shared
- * type must be worded here before this file compiles — no refusal can reach
- * somebody as a blank message.
- */
-const REFUSAL: Readonly<Record<ImageRefusal, string>> = {
-  'wrong-type': 'A logo has to be a JPEG, PNG or WebP image.',
-  empty: 'That file is empty.',
-  'too-large': `That logo is over ${UPLOAD_MAX_MIB}MB. Try a smaller one, or export it at 512×512.`,
-}
 
 export function LogoCard({
   logoUrl,

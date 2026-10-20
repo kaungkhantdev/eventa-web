@@ -4,6 +4,7 @@ import { RichText, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
+import { ATLAS_STYLE } from '@/lib/constants/landing.constants'
 
 /* Atlas — full-bleed poster landing template. Ported from landing/atlas.html.
    The static kit filled every slot imperatively from landing-data.js; the event
@@ -11,32 +12,6 @@ import type { LandingEvent } from '@/features/landing/types'
    when it has something in it — a real event has no agenda or speakers far more
    often than the kit's demo one did. The sticky bar starts transparent over the
    hero and turns solid once you scroll ~0.72 viewports down. */
-
-/* Page-scoped CSS from the source <style> block (focus rings, FAQ chevron, the
-   reveal keyframe and the transparent→solid sticky bar). */
-const ATLAS_STYLE = `
-a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid #1ba770; outline-offset: 3px; border-radius: 12px; }
-.on-brand:focus-visible { outline-color: #fff; }
-.faq[open] .faq-chev { transform: rotate(180deg); }
-summary::-webkit-details-marker { display: none; }
-summary { list-style: none; }
-@media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
-  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-  .reveal { animation: rise .55s cubic-bezier(.22,.61,.36,1) both; }
-}
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
-#bar { background: transparent; transition: background .3s ease, border-color .3s ease; border-bottom: 1px solid transparent; }
-#bar.bar-solid { background: rgb(var(--canvas) / .88); backdrop-filter: blur(12px); border-bottom-color: rgb(var(--line)); }
-#bar-title { color: #fff; }
-#bar.bar-solid #bar-title { color: rgb(var(--ink)); }
-#bar-logo { background: rgba(255,255,255,.16); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
-#bar.bar-solid #bar-logo { background: #1ba770; color: #fff; box-shadow: none; }
-.bar-reg { background: #fff; color: #1ba770; }
-.bar-reg:hover { background: rgba(255,255,255,.9); }
-#bar.bar-solid .bar-reg { background: #1ba770; color: #fff; }
-#bar.bar-solid .bar-reg:hover { background: #178a60; }
-`
 
 export default function AtlasPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()

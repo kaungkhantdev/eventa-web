@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, NetworkError, session } from '@/lib/api'
-import { ACCOUNT_LINK_INTENT, guestOrderRoute, knownAccount, requestAccountLink } from './guestOrder.routes'
+import { guestOrderRoute, knownAccount, requestAccountLink } from './guestOrder.routes'
+import { ACCOUNT_LINK_INTENT } from '@/lib/constants/portal.constants'
 
 /**
  * The account offer's two calls (US-DISC-15): which offer to make, and the

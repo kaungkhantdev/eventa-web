@@ -4,32 +4,11 @@ import { RichText, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
+import { AURORA_STYLE } from '@/lib/constants/landing.constants'
 
 /* Aurora — a calm, card-stacked landing template. Ported from landing/aurora.html.
    The event is passed in, already mapped from the API, and each card renders
    only when it has content — an empty heading is worse than no section. */
-
-/* Page-scoped CSS from the source <style> block: the 1080px content column,
-   brand focus rings, the FAQ chevron, and the gentle staggered load-in. */
-const AURORA_STYLE = `
-.wrap { max-width: 1080px; margin-inline: auto; }
-a:focus-visible, button:focus-visible, summary:focus-visible {
-  outline: 2px solid #1ba770; outline-offset: 3px; border-radius: 10px;
-}
-.on-brand:focus-visible { outline-color: #fff; }
-.faq[open] .faq-chev { transform: rotate(180deg); }
-summary::-webkit-details-marker { display: none; }
-summary { list-style: none; }
-@media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
-  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-  .reveal { animation: rise .55s cubic-bezier(.22,.61,.36,1) both; }
-  .reveal.d1 { animation-delay: .05s; }
-  .reveal.d2 { animation-delay: .10s; }
-  .reveal.d3 { animation-delay: .16s; }
-}
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
-`
 
 export default function AuroraPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()

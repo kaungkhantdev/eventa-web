@@ -1,8 +1,6 @@
 import type { VerifiedEmail } from './api'
 import { signInPathFor } from './personas'
-
-/** The query key `/auth/login` reads to prefill the workspace field. */
-export const ORG_PARAM = 'org'
+import { ORG_PARAM } from '@/lib/constants/auth.constants'
 
 /**
  * Where a just-confirmed account signs in.

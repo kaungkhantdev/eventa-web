@@ -1,6 +1,6 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { bangkokMonthKey } from '@/lib/format'
+import { bangkokDate, bangkokMonthKey } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { categoriesApi, type CategoryInput } from './categories.api'
@@ -21,7 +21,7 @@ import type {
   UpcomingCard,
 } from './types'
 import { STATUS_LABEL } from './eventDetail.mapper'
-import { bangkokDate } from '@/lib/format'
+import { CATEGORIES_LIMIT, CATEGORY_SORTS, CATEGORY_VIEWS, EVENT_BUCKETS, EVENT_SORTS, EVENT_VIEWS, MAX_CATEGORY_SEARCH, MAX_EVENT_SEARCH, PREVIEW_EVENTS, UNCONFIRMED_DELETE, UPCOMING_LIMIT } from '@/lib/constants/events.constants'
 
 /**
  * What the events screens load, and what their controls do.
@@ -36,27 +36,11 @@ import { bangkokDate } from '@/lib/format'
 /** Every event type the API knows, in the kit's order — the filter's options. */
 export const EVENT_TYPES = Object.keys(TYPE_META) as EventType[]
 
-export const EVENT_VIEWS = ['overview', 'calendar'] as const
 export type EventView = (typeof EVENT_VIEWS)[number]
-
-/** The orderings offered, spelled as the API spells them. */
-export const EVENT_SORTS = ['registrations', 'name', 'date'] as const
-export const EVENT_BUCKETS = ['active', 'completed'] as const
 
 const DEFAULT_SORT: EventSort = 'registrations'
 const DEFAULT_BUCKET: EventBucket = 'active'
 const DEFAULT_VIEW: EventView = 'overview'
-
-/** How many cards the upcoming grid asks for — four rows of the widest layout. */
-const UPCOMING_LIMIT = 12
-
-/**
- * The longest search each endpoint's DTO accepts (`@MaxLength`). Past it the API
- * answers 400 — and a loader that throws takes the whole screen down with it, so
- * a pasted URL in the search box is truncated here rather than rejected there.
- */
-const MAX_EVENT_SEARCH = 120
-const MAX_CATEGORY_SEARCH = 80
 
 /** The `q` to send, or nothing at all when the box is empty. */
 export function searchOf(params: URLSearchParams, max: number): string | undefined {
@@ -151,9 +135,6 @@ function deleteConfirmed(form: FormData): boolean {
   return form.get('confirm') === 'true'
 }
 
-/** Thrown for a delete nothing in the console posts — a bug, not a refusal. */
-const UNCONFIRMED_DELETE = 'This delete was not confirmed.'
-
 /** A cancellation, as `POST /events/:id/cancel` wants it (US-EVT-08). */
 export function cancelInputOf(form: FormData): { id: string; reason: string; version?: number } {
   const version = Number(form.get('version'))
@@ -207,9 +188,6 @@ export const upcomingRoute = {
 
 /* ----------------------------- landing pages ----------------------------- */
 
-/** How many of the workspace's events the "Preview with" switcher offers. */
-const PREVIEW_EVENTS = 3
-
 export interface LandingPagesData {
   /** The events a template can be previewed against — the newest few. */
   events: PreviewEvent[]
@@ -249,17 +227,8 @@ export const landingPagesRoute = {
 
 /* ------------------------------- categories ------------------------------ */
 
-/**
- * The categories screen is not paged — it asks for the whole set in one go, up
- * to the API's own maximum. That is what lets it sort by event count in the
- * browser without the count on screen disagreeing with the cards below it.
- */
-export const CATEGORIES_LIMIT = 100
-
-export const CATEGORY_SORTS = ['name', 'count-desc', 'count-asc'] as const
 export type CategorySort = (typeof CATEGORY_SORTS)[number]
 
-export const CATEGORY_VIEWS = ['grid', 'list'] as const
 export type CategoryView = (typeof CATEGORY_VIEWS)[number]
 
 export function categorySortOf(params: URLSearchParams): CategorySort {

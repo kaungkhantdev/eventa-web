@@ -18,6 +18,7 @@ import type {
   SummaryLines,
   TierOption,
 } from '../checkout.types'
+import { PORTAL_CHECKOUT_PAGE_METHODS, SEAT_CSS, WAITING_TONE } from '@/lib/constants/portal.constants'
 
 /**
  * Registering for an event (portal/register.html), on the public checkout.
@@ -31,21 +32,6 @@ import type {
  * hands off to the payment provider, which owns the fields and the card number;
  * this page never holds either.
  */
-
-const SEAT_CSS = `
-.house { background: radial-gradient(120% 90% at 50% -10%, #17201c 0%, #0c110f 60%); }
-.seat {
-  position: relative; height: 30px; width: 30px; border-radius: 9px 9px 4px 4px;
-  display: grid; place-items: center; font-size: 11px; font-weight: 600;
-  transition: background .12s, box-shadow .12s, color .12s; user-select: none;
-}
-.seat::after { content: ''; position: absolute; bottom: -3px; left: 4px; right: 4px; height: 3px; border-radius: 2px; background: inherit; opacity: .55; }
-.seat-avail  { background: rgba(255,255,255,.08); color: rgba(255,255,255,.72); cursor: pointer; }
-.seat-avail:hover { background: rgba(27,167,112,.4); color: #fff; }
-.seat-sel    { background: #1ba770; color: #fff; cursor: pointer; box-shadow: 0 0 0 3px rgba(27,167,112,.28); }
-.seat-booked { background: rgba(255,255,255,.035); color: rgba(255,255,255,.16); cursor: not-allowed; }
-.rowlab { color: rgba(255,255,255,.4); font-size: 12px; font-weight: 600; width: 18px; text-align: center; }
-`
 
 /**
  * Each seat state's look and its legend wording. The kit draws three; another
@@ -603,11 +589,6 @@ function payLabel(input: {
     : `Pay ${total}`.trim()
 }
 
-const METHODS = [
-  { method: 'Card' as const, icon: 'hgi-credit-card', title: 'Card', sub: 'Visa · Mastercard' },
-  { method: 'PromptPay' as const, icon: 'hgi-qr-code-01', title: 'PromptPay', sub: 'Thai QR · banking app' },
-]
-
 function PaymentMethods({
   offered,
   method,
@@ -627,7 +608,7 @@ function PaymentMethods({
   return (
     <div className="card p-4 sm:p-5">
       <div className="grid grid-cols-2 gap-3">
-        {METHODS.filter((option) => offered.includes(option.method)).map((option) => {
+        {PORTAL_CHECKOUT_PAGE_METHODS.filter((option) => offered.includes(option.method)).map((option) => {
           const on = method === option.method
           return (
             <button
@@ -838,9 +819,6 @@ interface OverlayHead {
   /** Amber while the money is outstanding: not done, not wrong. */
   tone: string
 }
-
-/** Not done, not wrong — the money or the organizer is still to come. */
-const WAITING_TONE = 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
 
 function headOf(order: PlacedOrder, payment: PaymentStep | null): OverlayHead {
   if (payment?.state === 'failed') {

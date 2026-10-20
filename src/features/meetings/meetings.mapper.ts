@@ -8,11 +8,9 @@ import type {
 } from './meetings.types'
 import { MEETING_MODE_LABEL } from './meetings.presentation'
 import type { CalendarConnectionStatus } from '@/features/settings/calendarConnection.api'
+import { ALL_EVENTS, SEPARATOR } from '@/lib/constants/meetings.constants'
 
 /** The rules behind the meetings list (US-MTG-01..08). */
-
-const SEPARATOR = ' · '
-const ALL_EVENTS = 'All events'
 
 /** Icon and tint per type — copied from the kit's own chip map. */
 export const TYPE_STYLE: Record<MeetingType, TypeStyle> = {
@@ -138,9 +136,6 @@ export function toMeetingCard(wire: MeetingWire): MeetingCard {
  * - `ask_admin` — the same fact for someone who cannot, with who can.
  */
 export type SyncAction = 'retry' | 'connect' | 'ask_admin'
-
-/** Said on a card that needs a calendar connected, to someone who cannot. */
-export const ASK_ADMIN_NOTE = 'Ask an Admin to connect Google Calendar.'
 
 export function syncActionOf(
   card: Pick<MeetingCard, 'syncNote' | 'syncStatus'>,

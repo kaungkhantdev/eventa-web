@@ -1,5 +1,6 @@
 import { initials } from '@/lib/format'
 import type { AttendeeProfileCard, ProfilePatch, ProfileWire } from './profile.types'
+import { DEFAULT_LOCALE, PENDING, VERIFIED } from '@/lib/constants/portal.constants'
 
 /**
  * `/me/profile` → the Profile tab's view model (US-DISC-11).
@@ -12,18 +13,6 @@ import type { AttendeeProfileCard, ProfilePatch, ProfileWire } from './profile.t
 
 /** A form binds to a string; `null` in an input renders the word "null". */
 const text = (value: string | null): string => value ?? ''
-
-const DEFAULT_LOCALE = 'en' as const
-
-/**
- * What the badge beside the address says.
- *
- * Amber, not red: an unconfirmed change is a step somebody still has to take,
- * not a fault. The old address goes on working until the link is opened, so
- * nothing is broken while this is showing.
- */
-const VERIFIED = { tone: 'green', label: 'Verified' } as const
-const PENDING = { tone: 'amber', label: 'Pending' } as const
 
 export function toAttendeeProfileCard(profile: ProfileWire): AttendeeProfileCard {
   return {

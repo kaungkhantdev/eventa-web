@@ -1,10 +1,8 @@
 import { api, type Query } from '@/lib/api'
 import type { EventCardWire } from './discover.types'
+import { SAVED_PAGE_LIMIT } from '@/lib/constants/portal.constants'
 
 /** Every call the What's on browser makes (US-DISC-01/02/03). */
-
-/** The most `GET /me/saved-events` sends in one page. */
-const SAVED_PAGE_LIMIT = 48
 
 export interface DiscoverQuery extends Query {
   page: number

@@ -5,14 +5,12 @@ import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/li
 import { intParam } from '@/lib/urlFilters'
 import { announcementsApi, type SendAnnouncementInput } from './announcements.api'
 import { toAnnouncementRow, type AnnouncementRow } from './announcements.mapper'
+import { ANNOUNCEMENT_INTENTS, DELIVERY_MODES } from '@/lib/constants/engagement.constants'
 
 /** Broadcasts sent, or scheduled, to an event's attendees (US-MSG-04/05). */
 
-export const ANNOUNCEMENT_INTENTS = ['send', 'cancel', 'reschedule'] as const
 export type AnnouncementIntent = (typeof ANNOUNCEMENT_INTENTS)[number]
 
-/** The composer's "Delivery" choice. */
-export const DELIVERY_MODES = ['now', 'schedule'] as const
 export type DeliveryMode = (typeof DELIVERY_MODES)[number]
 
 /**

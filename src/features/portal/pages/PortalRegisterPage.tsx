@@ -3,16 +3,12 @@ import { Link, useFetcher, useLoaderData } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
-import {
-  MIN_PASSWORD_LENGTH,
-  STRENGTH_COLORS,
-  STRENGTH_TEXTS,
-  scorePassword,
-} from '@/features/auth/passwordStrength'
+import { scorePassword } from '@/features/auth/passwordStrength'
 import { useSignUp } from '@/features/auth/useSignUp'
 import { ClaimExists, ClaimForm, ClaimInvalid } from '../components/BookingClaim'
 import { registerScreenOf } from '../portalRegister.mapper'
 import type { ClaimRefusal, PortalRegisterData } from '../portalRegister.types'
+import { MIN_PASSWORD_LENGTH, STRENGTH_COLORS, STRENGTH_TEXTS } from '@/lib/constants/auth.constants'
 
 /* Attendee sign-up — the portal's own, separate from the organizer sign-up at
    /auth/register, exactly as the two logins are separate. It creates a

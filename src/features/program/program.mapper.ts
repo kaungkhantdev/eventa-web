@@ -9,18 +9,9 @@ import type {
   SpeakerTone,
   SpeakerWire,
 } from './program.types'
+import { FIRST_HOUR, HOUR_HEIGHT, LAST_HOUR, MINUTES_PER_HOUR, MIN_BLOCK_HEIGHT, MS_PER_DAY } from '@/lib/constants/program.constants'
 
 /** The rules behind the agenda and speakers screens (US-PROG-01..07). */
-
-/** The calendar's first hour, and how tall an hour is — the kit's geometry. */
-export const FIRST_HOUR = 9
-export const LAST_HOUR = 16
-export const HOUR_HEIGHT = 64
-
-const MINUTES_PER_HOUR = 60
-/** The shortest block the calendar draws — still tall enough to click. */
-const MIN_BLOCK_HEIGHT = HOUR_HEIGHT / 4
-const MS_PER_DAY = 86_400_000
 
 const TONES: readonly SpeakerTone[] = ['green', 'blue', 'purple', 'amber', 'red', 'pink']
 

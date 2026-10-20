@@ -46,6 +46,7 @@ import type {
   SessionRow,
   TwoFactorWire,
 } from './settings.types'
+import { AUDIT_PAGE_SIZE, CONNECT_CALENDAR_INTENT, DISCONNECT_CALENDAR_INTENT, GROUP_ORDER, PHONE_CONFIRM_INTENT, PHONE_REMOVE_INTENT, PHONE_REQUEST_INTENT } from '@/lib/constants/settings.constants'
 
 /** Users, roles, security and notification preferences. */
 
@@ -221,8 +222,6 @@ export interface RolesData {
   groups: { name: string; permissions: PermissionOption[] }[]
 }
 
-const GROUP_ORDER = ['Events', 'Registrations', 'Finance', 'Settings'] as const
-
 async function loadRoles(): Promise<RolesData> {
   const [roles, permissions] = await Promise.all([settingsApi.roles(), settingsApi.permissions()])
   const options = permissions.map(toPermissionOption)
@@ -274,9 +273,6 @@ export const rolesRoute = {
 }
 
 /* ── security ─────────────────────────────────────────────────────────── */
-
-/** How much recent activity the audit panel shows before deferring to export. */
-const AUDIT_PAGE_SIZE = 20
 
 export interface SecurityData {
   sessions: SessionRow[]
@@ -379,11 +375,6 @@ export const notificationsRoute = {
 export interface ProfileData {
   profile: ProfileCard
 }
-
-/** The phone's three submissions on the console's profile form (US-SET-01). */
-export const PHONE_REQUEST_INTENT = 'phone'
-export const PHONE_CONFIRM_INTENT = 'phone-code'
-export const PHONE_REMOVE_INTENT = 'phone-remove'
 
 export const profileRoute = {
   loader: pageData(async (): Promise<ProfileData> => ({
@@ -509,10 +500,6 @@ export const paymentsRoute = {
 export interface IntegrationsData {
   connection: CalendarConnectionWire
 }
-
-/** The Integrations page's two submissions (US-MTG-08). */
-export const CONNECT_CALENDAR_INTENT = 'connect'
-export const DISCONNECT_CALENDAR_INTENT = 'disconnect'
 
 export const integrationsRoute = {
   loader: pageData(

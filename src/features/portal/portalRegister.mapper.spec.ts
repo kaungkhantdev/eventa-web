@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ASK_FOR_A_NEW_LINK, registerScreenOf } from './portalRegister.mapper'
+import { registerScreenOf } from './portalRegister.mapper'
+import { ASK_FOR_A_NEW_LINK } from '@/lib/constants/portal.constants'
 
 /**
  * Which screen `/portal/register` shows (US-DISC-15, and US-DISC-08 for the

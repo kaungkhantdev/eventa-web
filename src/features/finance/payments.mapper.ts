@@ -3,6 +3,7 @@ import { can } from '@/features/auth/permissions'
 import type { Me } from '@/features/auth/types'
 import { bangkokDate, bangkokTime, initials, satang } from '@/lib/format'
 import type { LedgerEntryWire, LedgerStatus, PaymentMethod, PaymentRow } from './payments.types'
+import { ADMIN_ONLY, NOT_ELIGIBLE, REFUND_PERMISSION } from '@/lib/constants/finance.constants'
 
 /** The rules behind the payments ledger (US-FIN-01/02). */
 
@@ -49,11 +50,6 @@ export function toPaymentRow(wire: LedgerEntryWire): PaymentRow {
     refundBlockedReason: wire.refundBlockedReason,
   }
 }
-
-/** Refunding is its own capability — an Admin's, never an Organizer's (US-FIN-14). */
-const REFUND_PERMISSION = 'finRefund'
-const ADMIN_ONLY = 'Only an Admin can issue refunds.'
-const NOT_ELIGIBLE = 'Not eligible for refund'
 
 export interface RefundControl {
   enabled: boolean

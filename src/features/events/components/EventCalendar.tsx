@@ -13,8 +13,9 @@ import {
   shiftMonth,
   shortTime,
 } from '../calendar'
-import { CAL_PILL, COVER, MONTHS, WEEK } from '../events.presentation'
+import { CAL_PILL, COVER } from '../events.presentation'
 import type { CalendarEvent } from '../types'
+import { MONTHS, WEEK } from '@/lib/constants/events.constants'
 
 /** The 1st, as the day a freshly-opened month selects. */
 const firstDayOf = (month: string): string => `${month}-01`

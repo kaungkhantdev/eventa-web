@@ -1,6 +1,7 @@
 import type { BadgeTone } from '@/components/ui'
 import { bangkokDate } from '@/lib/format'
 import type { SurveyStatus, SurveyWire } from './surveys.types'
+import { PERCENT } from '@/lib/constants/engagement.constants'
 
 /**
  * A survey, as the organizer's list shows it (US-MSG-09).
@@ -208,8 +209,6 @@ export function toNpsView(wire: NpsWire): NpsView {
     })),
   }
 }
-
-const PERCENT = 100
 
 /** A bar's width: 0 rather than NaN when there is nothing to share out. */
 function shareOf(count: number, total: number): number {

@@ -3,15 +3,13 @@ import { queryOf, type LoaderArgs } from '@/app/loaders'
 import { authApi, type BookingClaim } from '@/features/auth/api'
 import { guestOnly } from '@/features/auth/guestOnly'
 import { homeFor } from '@/features/auth/personas'
-import {
-  PASSWORDS_DIFFER,
-  bookingClaimInputOf,
-  type BookingClaimInput,
-} from '@/features/auth/signUpInput'
+import { bookingClaimInputOf, type BookingClaimInput } from '@/features/auth/signUpInput'
 import type { LoginResult } from '@/features/auth/types'
 import { ApiError, NetworkError, messageOf } from '@/lib/api'
 import { adoptGuestSaves } from './guestSaves'
 import type { ClaimRefusal, PortalRegisterData } from './portalRegister.types'
+import { CLAIM_PARAM, INCOMPLETE_CLAIM_LINK } from '@/lib/constants/portal.constants'
+import { PASSWORDS_DIFFER } from '@/lib/constants/auth.constants'
 
 /**
  * The attendee sign-up at `/portal/register`, and the one-time link emailed
@@ -27,12 +25,6 @@ import type { ClaimRefusal, PortalRegisterData } from './portalRegister.types'
  * the URL it arrived in and sent only in request bodies; nothing here logs or
  * stores it.
  */
-
-/** Fixed by the link the API emails: `${PUBLIC_WEB_URL}/portal/register?claim=…`. */
-const CLAIM_PARAM = 'claim'
-
-export const INCOMPLETE_CLAIM_LINK =
-  'This link is incomplete. Open the most recent link in your email, or ask for a new one from your booking confirmation.'
 
 type InspectClaim = (token: string) => Promise<BookingClaim>
 type ClaimAccount = (input: BookingClaimInput) => Promise<LoginResult>

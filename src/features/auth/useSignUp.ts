@@ -5,7 +5,8 @@ import type { Persona } from '@/lib/persona'
 import { useFailureToast } from '@/lib/useSavedToast'
 import { authApi } from './api'
 import { checkEmailPathFor } from './personas'
-import { PASSWORDS_DIFFER, signUpInputOf } from './signUpInput'
+import { signUpInputOf } from './signUpInput'
+import { PASSWORDS_DIFFER } from '@/lib/constants/auth.constants'
 
 /**
  * Signing up, for either audience.

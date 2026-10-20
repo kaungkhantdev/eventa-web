@@ -4,8 +4,8 @@ import { Icon } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { PasswordInput } from '@/features/auth/components/PasswordInput'
 import { PasswordStrengthMeter } from '@/features/auth/components/PasswordStrengthMeter'
-import { MIN_PASSWORD_LENGTH } from '@/features/auth/passwordStrength'
 import type { AcceptInviteResult } from '@/features/auth/acceptInvite.routes'
+import { MIN_PASSWORD_LENGTH } from '@/lib/constants/auth.constants'
 
 /**
  * The end of a teammate's invitation link (US-SET-11).

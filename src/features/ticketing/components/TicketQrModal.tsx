@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { TicketShareWire } from '../tickets.types'
+import { COPY_DONE, COPY_IDLE, TICKET_QR_MODAL_COPY_RESET_MS } from '@/lib/constants/ticketing.constants'
 
 /**
  * The registration link and QR for one ticket type (US-TKT-06).
@@ -16,10 +17,6 @@ import type { TicketShareWire } from '../tickets.types'
  * This is a share link — one QR opens the sign-up page for the tier. It is not
  * a per-attendee entry pass; those are issued in Check-in.
  */
-
-const COPY_IDLE = 'Copy link'
-const COPY_DONE = 'Copied'
-const COPY_RESET_MS = 1600
 
 interface TicketQrModalProps {
   open: boolean
@@ -67,7 +64,7 @@ export function TicketQrModal({
     const done = () => {
       setCopied(true)
       window.clearTimeout(copyTimer.current)
-      copyTimer.current = window.setTimeout(() => setCopied(false), COPY_RESET_MS)
+      copyTimer.current = window.setTimeout(() => setCopied(false), TICKET_QR_MODAL_COPY_RESET_MS)
     }
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(share.registrationUrl).then(done, done)

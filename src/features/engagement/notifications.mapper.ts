@@ -1,5 +1,6 @@
 import { bangkokDayKey, satangAmount } from '@/lib/format'
 import type { FeedBucket, FeedItemWire, FeedKind, NotificationFeedWire } from './notifications.types'
+import { AN_EVENT, HOUR_MS, MINUTE_MS, SOMEONE } from '@/lib/constants/engagement.constants'
 
 /**
  * The feed's view model (US-MSG-03).
@@ -40,10 +41,6 @@ const TITLE: Record<FeedKind, string> = {
   alert: 'Payment declined',
 }
 
-/** What the API names nobody as. A row must never read "null joined". */
-const SOMEONE = 'Someone'
-const AN_EVENT = 'an event'
-
 export const GROUP_LABEL: Record<FeedBucket, string> = {
   today: 'Today',
   yesterday: 'Yesterday',
@@ -65,9 +62,6 @@ export function toNotification(item: FeedItemWire, now: Date): NotificationView 
     unread: item.unread,
   }
 }
-
-/** How many rows the notification bell previews. */
-export const NOTIFICATION_PREVIEW_SIZE = 5
 
 /** What the bell shows: the newest few rows, and the WHOLE feed's unread count. */
 export interface NotificationPreview {
@@ -114,9 +108,6 @@ function bodyOf(item: FeedItemWire): BodySegment[] {
       return [{ text: `${who}’s payment was declined for ` }, { text: event, bold: true }]
   }
 }
-
-const MINUTE_MS = 60_000
-const HOUR_MS = 60 * MINUTE_MS
 
 /**
  * How long ago, as the organizer would say it.

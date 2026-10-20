@@ -1,12 +1,6 @@
 import { can } from '@/features/auth/permissions'
 import type { Me } from '@/features/auth/types'
-
-/**
- * The permission eventa-api's `organization.controller.ts` requires on
- * `PATCH /organization` and on every logo route. Reading the profile needs
- * none, which is why an Organizer or Staff member can still open the page.
- */
-const EDIT_ORGANIZATION = 'setSettings'
+import { EDIT_ORGANIZATION } from '@/lib/constants/settings.constants'
 
 /**
  * Whether Settings → Organization offers an edit at all (US-SET-07).

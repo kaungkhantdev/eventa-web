@@ -1,10 +1,5 @@
-import {
-  MIXED_ROW,
-  rowChoiceOf,
-  typeOfChoice,
-  type SeatTicketTypes,
-  type TicketTypeChoice,
-} from '../eventSeating.mapper'
+import { rowChoiceOf, typeOfChoice, type SeatTicketTypes, type TicketTypeChoice } from '../eventSeating.mapper'
+import { MIXED_ROW } from '@/lib/constants/events.constants'
 
 /**
  * "Ticket types by row" on the wizard's Assign seats step (US-EVT-05): one

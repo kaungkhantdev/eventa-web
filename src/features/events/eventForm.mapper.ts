@@ -1,6 +1,7 @@
 import { bangkokDayKey, bangkokInstant, bangkokTime } from '@/lib/format'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
 import type { EventType, EventWire, EventWireStatus } from './types'
+import { SEAT_TYPES_REQUIREMENT } from '@/lib/constants/events.constants'
 
 /**
  * The create/edit wizard's rules.
@@ -253,9 +254,6 @@ function capacityOf(typed: string): { capacity?: number } {
   if (!typed.trim() || !Number.isInteger(capacity) || capacity <= 0) return {}
   return { capacity }
 }
-
-/** What the Review step's checklist says a reserved event still needs (US-EVT-05). */
-export const SEAT_TYPES_REQUIREMENT = 'a ticket type for every seat'
 
 /** What decides whether an event has a seat map at all. */
 export type SeatingFacts = Pick<EventFormValues, 'seatingMode' | 'isOnline'>

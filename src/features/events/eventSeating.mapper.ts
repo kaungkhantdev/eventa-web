@@ -8,6 +8,7 @@ import {
   type QuantityFacts,
   type TicketDraft,
 } from './eventForm.mapper'
+import { DEFAULT_MAP_NAME, MIXED_ROW, NO_TICKET_TYPE, NO_TYPE_VALUE, SEATS_PER_ROW_MAX, SEAT_ROWS_MAX } from '@/lib/constants/events.constants'
 
 /**
  * The wizard's rules for a reserved map split between ticket types seat by
@@ -43,21 +44,6 @@ export interface PaintOption {
   label: string
   swatch: number | null
 }
-
-/** `ConfigureReservedDto`'s own ceilings: past them the API refuses the map. */
-const SEAT_ROWS_MAX = 100
-const SEATS_PER_ROW_MAX = 100
-const NO_TICKET_TYPE = 'No ticket type'
-/** The "No ticket type" option's value, in a row's dropdown and the paint picker. */
-const NO_TYPE_VALUE = ''
-/**
- * A row dropdown's value while the row's seats differ: a disabled "Mixed"
- * placeholder, until a type is picked for the whole row. Never a ticket id,
- * which the API makes a UUID.
- */
-export const MIXED_ROW = 'mixed'
-/** The API requires a map name; the venue is the sensible default, then this. */
-const DEFAULT_MAP_NAME = 'Main hall'
 
 /** GET /seating's rows → each seat's type at its row and seat number. */
 export function seatTicketTypesOf(

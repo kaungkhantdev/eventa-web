@@ -1,3 +1,4 @@
+import { KEY } from '@/lib/constants/portal.constants'
 /**
  * What a signed-out visitor has saved for later (US-DISC-03).
  *
@@ -8,8 +9,6 @@
  * for a signed-in attendee — two stores that both claim to know is exactly the
  * divergence the API is meant to prevent.
  */
-
-const KEY = 'eventa.savedEvents'
 
 /** The slice of `Storage` this needs — passed in, so the rules are testable. */
 export interface KeyValueStore {

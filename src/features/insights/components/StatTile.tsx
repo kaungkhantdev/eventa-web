@@ -1,6 +1,7 @@
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { Delta } from '../insights.mapper'
+import { ARROW } from '@/lib/constants/insights.constants'
 
 /**
  * One headline figure and how it moved — the kit's stat card, from the API.
@@ -17,11 +18,6 @@ const TONE: Record<Delta['tone'], string> = {
   bad: 'text-red-500',
   neutral: 'text-muted',
 }
-
-const ARROW = {
-  up: 'hgi-arrow-up-right-01',
-  down: 'hgi-arrow-down-right-01',
-} as const
 
 export function StatTile({
   icon,

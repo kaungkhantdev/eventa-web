@@ -1,9 +1,6 @@
 import { signInPathFor } from '@/features/auth/personas'
 import type { ClaimRefusal, PortalRegisterData, RegisterScreen } from './portalRegister.types'
-
-/** Where a refused link sends somebody, since the page cannot know their booking. */
-export const ASK_FOR_A_NEW_LINK =
-  'Ask for a new link from your booking confirmation — or, if you have already chosen a password, sign in.'
+import { ASK_FOR_A_NEW_LINK } from '@/lib/constants/portal.constants'
 
 /**
  * Which screen `/portal/register` shows (US-DISC-15), from what the loader

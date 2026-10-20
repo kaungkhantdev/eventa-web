@@ -1,3 +1,4 @@
+import { MANAGE_INTEGRATIONS } from '@/lib/constants/settings.constants'
 /* ============================================================
    Admin navigation model — the single source of truth for the
    icon rail (modules) and the labeled panel (grouped sub-nav).
@@ -7,7 +8,7 @@
    becomes `/admin/events-upcoming`.
    ============================================================ */
 
-import { MANAGE_INTEGRATIONS } from '@/features/settings/integrationsAccess'
+
 
 export type NavLeaf = {
   label: string

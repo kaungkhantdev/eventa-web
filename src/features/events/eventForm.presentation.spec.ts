@@ -1,21 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import {
-  NO_SEATS_TO_ASSIGN,
-  POPUP_BLOCKED_HINT,
-  SAVING_TICKET_TYPES,
-  SEAT_MAP_DEFERRED_NOTE,
-  STEPS,
-  assignSeatsViewOf,
-  finalLabel,
-  headerSaveLabel,
-  landingPreviewHref,
-  openPreviewTab,
-  saveIntentOf,
-  seatMapDeferredOn,
-  stepProgress,
-  summaryCapacity,
-} from './eventForm.presentation'
+import { NO_SEATS_TO_ASSIGN, STEPS, assignSeatsViewOf, finalLabel, headerSaveLabel, landingPreviewHref, openPreviewTab, saveIntentOf, seatMapDeferredOn, stepProgress, summaryCapacity } from './eventForm.presentation'
 import { toEventFormValues, type EventFormValues } from './eventForm.mapper'
+import { POPUP_BLOCKED_HINT, SAVING_TICKET_TYPES, SEAT_MAP_DEFERRED_NOTE } from '@/lib/constants/events.constants'
 
 /**
  * The wizard's summary rail showed `0` for an event whose capacity was never

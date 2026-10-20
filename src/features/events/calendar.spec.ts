@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import {
-  MAX_PILLS_PER_DAY,
-  dayHeading,
-  eventsOnDay,
-  longTime,
-  monthGrid,
-  shiftMonth,
-  shortTime,
-} from './calendar'
+import { dayHeading, eventsOnDay, longTime, monthGrid, shiftMonth, shortTime } from './calendar'
 import type { CalendarEvent } from './types'
+import { MAX_PILLS_PER_DAY } from '@/lib/constants/events.constants'
 
 const at = (day: string, time: string, name = 'Standup'): CalendarEvent => ({
   id: `${day}T${time}`,

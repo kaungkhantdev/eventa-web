@@ -12,6 +12,7 @@ import type {
   TransactionRow,
   TransactionWire,
 } from './myEvents.types'
+import { SVG_DATA_URL } from '@/lib/constants/portal.constants'
 
 /**
  * The attendee's own tickets and payments → what the portal renders.
@@ -70,8 +71,6 @@ export function toMyEventRow(wire: MyRegistrationWire): MyEventRow {
     image: wire.coverImage,
   }
 }
-
-const SVG_DATA_URL = 'data:image/svg+xml;charset=utf-8,'
 
 /**
  * One ticket's pass → the modal (US-DISC-07).

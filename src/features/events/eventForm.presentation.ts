@@ -1,5 +1,6 @@
 import { seatRowsApply, type SeatingFacts } from './eventForm.mapper'
 import { seatingWaitsForSeatTypes, type SeatMapState } from './eventSeating.mapper'
+import { LIVE_STATUSES, PUBLIC_VISIBILITY } from '@/lib/constants/events.constants'
 
 /** The wizard's own vocabulary: its steps and its icon set. */
 
@@ -7,26 +8,6 @@ export type Highlight = {
   icon: string
   label: string
 }
-
-/** Icons offered in each highlight row's dropdown. */
-export const HL_ICONS: { slug: string; label: string }[] = [
-  { slug: 'hgi-sparkles', label: 'Sparkles' },
-  { slug: 'hgi-mic-01', label: 'Speakers' },
-  { slug: 'hgi-user-multiple', label: 'People' },
-  { slug: 'hgi-presentation-bar-chart-01', label: 'Talks' },
-  { slug: 'hgi-headphones', label: 'Workshops' },
-  { slug: 'hgi-star', label: 'Star' },
-  { slug: 'hgi-champion', label: 'Award' },
-  { slug: 'hgi-ticket-01', label: 'Ticket' },
-  { slug: 'hgi-gift', label: 'Gift' },
-  { slug: 'hgi-music-note-01', label: 'Music' },
-  { slug: 'hgi-camera-01', label: 'Photo' },
-  { slug: 'hgi-rocket-01', label: 'Launch' },
-  { slug: 'hgi-global', label: 'Global' },
-  { slug: 'hgi-favourite', label: 'Heart' },
-  { slug: 'hgi-wifi-01', label: 'Wi-Fi' },
-  { slug: 'hgi-medal-first-place', label: 'Medal' },
-]
 
 /** Each wizard step, named so the page renders it by name rather than by position. */
 export type StepKey = 'basics' | 'when' | 'seating' | 'tickets' | 'seats' | 'review'
@@ -104,10 +85,6 @@ export function seatMapDeferredOn(step: StepKey, event: SeatMapState): boolean {
   return step === 'seating' && seatingWaitsForSeatTypes(event)
 }
 
-/** What the Seating step says, under its hint, while its save leaves the seat map to Assign seats. */
-export const SEAT_MAP_DEFERRED_NOTE =
-  'New seats need a ticket type. The seat map is saved when you give them one in Assign seats.'
-
 /**
  * The write a step's save sends. Seating saves the rest of the event instead
  * of the seat map while the map must wait for Assign seats (`seatMapDeferredOn`),
@@ -135,9 +112,6 @@ export const NO_SEATS_TO_ASSIGN: Record<NoSeatsToAssign, string> = {
   ga: 'General admission has no seats to assign. To sell seats by ticket type, choose Reserved seating on the Seating step.',
 }
 
-/** What Assign seats says while the types saved from Tickets are still landing. */
-export const SAVING_TICKET_TYPES = 'Saving your ticket types…'
-
 /**
  * What Assign seats shows (US-EVT-05). Only an in-person reserved event has
  * seats to assign; an online event has no seating at all, so it is told that
@@ -151,17 +125,6 @@ export function assignSeatsViewOf(event: SeatingFacts, savedTypes: number, savin
   if (!seatRowsApply(event)) return 'ga'
   if (savedTypes > 0) return 'rows'
   return saving ? 'saving' : 'empty'
-}
-
-/**
- * What the waitlist switch says under it (US-REG-04). Reserved seating has no
- * waitlist: a freed seat would have to be one particular seat, picked for
- * somebody who is not at the map to pick it — so the switch says why it is off
- * instead of looking broken.
- */
-export const WAITLIST_HINT: Record<'ga' | 'reserved', string> = {
-  ga: 'Let attendees join a waitlist once capacity is reached.',
-  reserved: 'Waitlists are for general admission — a freed seat can’t be offered without choosing it.',
 }
 
 /**
@@ -221,17 +184,6 @@ export interface TypedEvent {
   online: boolean
   highlights: Highlight[]
 }
-
-/**
- * The statuses and visibility whose public page eventa-api will actually serve.
- *
- * Mirrored from its `public-pages.repository`, which returns a row only when
- * the event is PUBLIC, one of these statuses, and has a `publishedAt`. Guessing
- * wider than the server does is what turns a Preview button into a 404: a draft
- * has no public page at all, and neither does an unlisted or private one.
- */
-const LIVE_STATUSES: readonly string[] = ['planned', 'upcoming', 'live']
-const PUBLIC_VISIBILITY = 'public'
 
 /** The slug to preview by, or null when there is no public page to preview. */
 function publicSlugOf(saved: SavedEvent | null): string | null {
@@ -296,10 +248,6 @@ export function landingPreviewHref(
   const query = params.toString()
   return `/landing/${template}${query ? `?${query}` : ''}`
 }
-
-/** What the organizer is told when the browser blocks the preview tab (US-PAGE-09). */
-export const POPUP_BLOCKED_HINT =
-  'Your browser blocked the preview — allow pop-ups for this site and try again.'
 
 /**
  * Open the preview in a new tab; false when the browser blocked it.

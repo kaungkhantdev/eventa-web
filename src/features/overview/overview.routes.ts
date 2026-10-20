@@ -8,7 +8,7 @@ import {
   toTodayRegistrations,
   toUpcomingCard,
 } from './home.mapper'
-import { UPCOMING_PREVIEW, overviewApi } from './overview.api'
+import { overviewApi } from './overview.api'
 import type {
   AlertRow,
   SetupWire,
@@ -17,6 +17,7 @@ import type {
   TodayRegistrations,
   UpcomingCard,
 } from './overview.types'
+import { ALL_CAUGHT_UP, UPCOMING_PREVIEW } from '@/lib/constants/overview.constants'
 
 /** The organizer's home screen (US-DASH-01..07). It only ever reads. */
 
@@ -56,9 +57,6 @@ const NOTHING_KNOWN: SetupWire = {
   ticketTypeAdded: null,
   eventPublished: null,
 }
-
-/** What the alert feed says when there is nothing outstanding (US-DASH-06). */
-const ALL_CAUGHT_UP = "You're all caught up."
 
 export const homeRoute = {
   loader: pageData(async (): Promise<HomeData> => {

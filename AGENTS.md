@@ -272,8 +272,10 @@ here so this repo is self-governing; the same standard, server-adapted, applies 
 - **Time is UTC on the wire, Asia/Bangkok on screen**; the conversion belongs in `@/lib/format`, once.
   Never derive a business "today" from the browser's timezone.
 - **Enums and constants over magic values** — a status, a page size, a tab id, a route path, a storage
-  key: name it once as a module-level `const`. If a literal appears twice or carries domain meaning, it
-  gets a name. Derive from a single source of truth rather than re-typing a list.
+  key: name it once in `src/lib/constants/<feature>.constants.ts` (one file per feature, imported as
+  `@/lib/constants/<feature>.constants`). A constant that needs its feature's own types, components or
+  functions stays beside them — `@/lib` never imports from a feature. If a literal appears twice or carries
+  domain meaning, it gets a name. Derive from a single source of truth rather than re-typing a list.
 - **Errors are surfaced, never swallowed.** An empty `catch`, or one that logs and continues, hides a
   broken product from the person using it. Show the API's own message — it is written for them.
 - **Every async surface has three states**: loading, empty, and failed. A page that only renders the

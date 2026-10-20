@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { cameraFailureMessage, scannerUnavailableMessage } from './cameraFallback'
+import { QR_FORMAT, REPEAT_GUARD_MS, SCAN_INTERVAL_MS } from '@/lib/constants/checkin-tool.constants'
 
 /**
  * Reading QR codes from the device camera, for the door station (US-REG-12).
@@ -23,12 +24,6 @@ interface BarcodeDetectorLike {
   detect(source: CanvasImageSource | ImageBitmapSource): Promise<DetectedBarcode[]>
 }
 type BarcodeDetectorCtor = new (options?: { formats?: string[] }) => BarcodeDetectorLike
-
-const QR_FORMAT = 'qr_code'
-/** Gentle enough not to heat a phone, quick enough to feel instant at a door. */
-const SCAN_INTERVAL_MS = 250
-/** How long the same code is ignored, so one badge is not read ten times. */
-const REPEAT_GUARD_MS = 2500
 
 function detectorCtor(): BarcodeDetectorCtor | null {
   const ctor = (globalThis as { BarcodeDetector?: BarcodeDetectorCtor }).BarcodeDetector

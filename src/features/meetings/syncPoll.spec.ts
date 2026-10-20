@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { NO_POLLS, SYNC_POLL_LIMIT, SYNC_POLL_MS, budgetFor, mayPoll, spend } from './syncPoll'
+import { NO_POLLS, budgetFor, mayPoll, spend } from './syncPoll'
+import { SYNC_POLL_LIMIT, SYNC_POLL_MS } from '@/lib/constants/meetings.constants'
 
 /*
  * US-MTG-04 AC1: the list re-reads itself while an invite is on its way, so

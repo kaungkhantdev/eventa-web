@@ -4,6 +4,7 @@ import { Icon, PanelEmptyPreview, type EmptyAction } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { TodayRegistrations } from '../overview.types'
 import { CountBadge, SectionHeader } from './PanelChrome'
+import { COPIED_MS, NEW_EVENT, NOTHING_YET, REGISTRATIONS } from '@/lib/constants/overview.constants'
 
 /**
  * Today's sign-ups (US-DASH-02). Markup ported from admin/home.html.
@@ -11,12 +12,6 @@ import { CountBadge, SectionHeader } from './PanelChrome'
  * The whole panel is absent — not empty, not zero — for someone who may not see
  * attendee personal data; `today` is null in that case and the page omits it.
  */
-
-const REGISTRATIONS = '/admin/registrations'
-const NEW_EVENT = '/admin/event-form'
-const NOTHING_YET = 'Share your registration link and new attendees appear here in real time.'
-/** Long enough to read, short enough that the button is ready for a second copy. */
-const COPIED_MS = 1500
 
 type CopyState = 'idle' | 'copied' | 'failed'
 

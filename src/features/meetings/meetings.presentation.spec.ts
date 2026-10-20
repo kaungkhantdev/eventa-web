@@ -1,16 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import {
-  MEETING_MODE_LABEL,
-  NO_MODE,
-  initialMeetingMode,
-  makesMeetLink,
-  meetingInviteNote,
-  meetingModeChoice,
-  meetingSaveLabel,
-  promisesMeetLink,
-  scheduleNote,
-} from './meetings.presentation'
+import { MEETING_MODE_LABEL, initialMeetingMode, makesMeetLink, meetingInviteNote, meetingModeChoice, meetingSaveLabel, promisesMeetLink, scheduleNote } from './meetings.presentation'
 import type { MeetingMode } from './meetings.types'
+import { NO_MODE } from '@/lib/constants/meetings.constants'
 
 /**
  * Every mode the API accepts, written out rather than taken from the union so

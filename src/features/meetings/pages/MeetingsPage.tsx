@@ -26,17 +26,15 @@ import { useFailureToast } from '@/lib/useSavedToast'
 import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
 import type { Me } from '@/features/auth/types'
 import type { CalendarConnectionStatus } from '@/features/settings/calendarConnection.api'
-import {
-  INTEGRATIONS_PATH,
-  calendarChipOf,
-  connectLinkLabel,
-} from '@/features/settings/calendarConnection.mapper'
+import { calendarChipOf, connectLinkLabel } from '@/features/settings/calendarConnection.mapper'
 import { canManageIntegrations } from '@/features/settings/integrationsAccess'
 import { MeetingPanel } from '../components/MeetingPanel'
-import { ASK_ADMIN_NOTE, syncActionOf } from '../meetings.mapper'
+import { syncActionOf } from '../meetings.mapper'
 import { MEETING_TYPES, type MeetingTab, type MeetingsData } from '../meetings.routes'
 import type { MeetingCard, MeetingDraft } from '../meetings.types'
 import { useSyncPoll } from '../useSyncPoll'
+import { ALL_EVENTS, ALL_TYPES, ASK_ADMIN_NOTE, CHIP_CLASS, MAX_SEARCH_LENGTH } from '@/lib/constants/meetings.constants'
+import { INTEGRATIONS_PATH } from '@/lib/constants/settings.constants'
 
 /**
  * Meetings (US-MTG-01..08). Layout ported from meetings.html.
@@ -45,10 +43,6 @@ import { useSyncPoll } from '../useSyncPoll'
  * derived per request from the Bangkok day. The old page pinned "today" to a
  * hard-coded Jul 19, 2026 so the demo buckets stayed still.
  */
-
-const ALL_EVENTS = 'All events'
-const ALL_TYPES = 'All types'
-const MAX_SEARCH_LENGTH = 120
 
 export default function MeetingsPage() {
   const data = useLoaderData() as MeetingsData
@@ -221,10 +215,6 @@ function tabItems(counts: MeetingsData['counts']): PillTabItem<MeetingTab>[] {
     { value: 'past', label: 'Past', count: counts.past },
   ]
 }
-
-/** The kit's chip, from meetings.html's header — copied verbatim. */
-const CHIP_CLASS =
-  'hidden items-center gap-1.5 rounded-lg border border-hair bg-surface px-2.5 py-1.5 text-[12px] font-medium text-muted lg:inline-flex'
 
 /**
  * Whether invites are going out (US-MTG-08 AC1, AC3). A link for an Admin,

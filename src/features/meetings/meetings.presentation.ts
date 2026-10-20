@@ -1,4 +1,5 @@
 import type { MeetingDraft, MeetingMode } from './meetings.types'
+import { NOT_CONNECTED_NOTE, NO_MODE } from '@/lib/constants/meetings.constants'
 
 /** The meetings panel's own wording. */
 
@@ -15,12 +16,7 @@ export function meetingSaveLabel(isEditing: boolean, saving: boolean): string {
   return isEditing ? 'Save changes' : 'Schedule meeting'
 }
 
-/** The Mode box before the organizer has picked anything (US-MTG-03). */
-export const NO_MODE = ''
-
 export type MeetingModeChoice = MeetingMode | typeof NO_MODE
-
-export const MEETING_MODE_PROMPT = "Choose how you'll meet"
 
 /**
  * What each mode is called — on the card's badge, and as the start of the
@@ -65,9 +61,6 @@ export function meetingInviteNote(mode: MeetingModeChoice): string {
     : 'A Google Calendar invite is'
   return `${sent} emailed to each guest, with a reminder 15 minutes before.`
 }
-
-const NOT_CONNECTED_NOTE =
-  "Google Calendar isn't connected, so this meeting will be saved without an invite or Meet link."
 
 /**
  * The note above Schedule, given whether the workspace calendar is connected

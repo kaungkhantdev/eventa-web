@@ -15,6 +15,7 @@ import type {
   EventRegistrationWire,
 } from './eventDetail.api'
 import type { EventStatus, EventWire, EventWireStatus } from './types'
+import { AVATAR_TONES } from '@/lib/constants/events.constants'
 
 /**
  * The event workspace's view models (US-EVT-14).
@@ -35,14 +36,6 @@ export const STATUS_LABEL: Record<EventWireStatus, EventStatus> = {
   cancelled: 'Cancelled',
 }
 
-/**
- * Which avatar tint a person gets.
- *
- * The API sends no colour — it is presentation, not data — so it is derived
- * from the name, which keeps the same person the same colour on every visit
- * instead of shuffling on each render.
- */
-const AVATAR_TONES = ['brand', 'blue', 'pink', 'amber', 'violet'] as const
 export type AvatarTone = (typeof AVATAR_TONES)[number]
 
 export function toneOf(name: string): AvatarTone {

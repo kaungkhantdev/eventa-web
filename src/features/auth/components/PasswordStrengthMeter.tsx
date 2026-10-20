@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn'
-import { STRENGTH_COLORS, STRENGTH_TEXTS, scorePassword } from '../passwordStrength'
+import { scorePassword } from '../passwordStrength'
+import { STRENGTH_COLORS, STRENGTH_TEXTS } from '@/lib/constants/auth.constants'
 
 /**
  * The three-bar strength meter under a new password, markup verbatim from the

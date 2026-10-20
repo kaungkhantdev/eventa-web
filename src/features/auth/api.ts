@@ -3,6 +3,7 @@ import type { Persona } from '@/lib/persona'
 import { personaOfSession } from './personas'
 import type { BookingClaimInput } from './signUpInput'
 import type { Credentials, LoginResult, Me, WorkspaceOption } from './types'
+import { FROM_BOOKING } from '@/lib/constants/auth.constants'
 
 /**
  * A confirmed account, and where it signs in.
@@ -81,9 +82,6 @@ export interface AcceptedInvite {
   email: string
   status: string
 }
-
-/** Where an account is made from a booking (US-DISC-15). */
-const FROM_BOOKING = '/auth/register/from-booking'
 
 export const authApi = {
   async login(credentials: Credentials): Promise<LoginResult> {

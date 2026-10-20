@@ -4,7 +4,6 @@ import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 import { api, whenForbidden, withoutForbidden, type Query } from '@/lib/api'
 import { MASKED, num, satangAmount } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
-import { OVERVIEW_RANGES } from './insights.types'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import {
   earnedSomething,
@@ -45,9 +44,7 @@ import type {
   RegistrationsReportWire,
   ReportPeriodWire,
 } from './insights.types'
-
-/** The stages the status control offers; '' is "every stage". */
-export const EVENT_LIFECYCLES = ['upcoming', 'live', 'completed', 'cancelled', ''] as const
+import { EVENT_LIFECYCLES, MAX_SEARCH, OVERVIEW_RANGES, TOP_EVENTS } from '@/lib/constants/insights.constants'
 
 /**
  * The reports that read straight from `/reports/*` (US-RPT-05/08/09).
@@ -58,8 +55,6 @@ export const EVENT_LIFECYCLES = ['upcoming', 'live', 'completed', 'cancelled', '
  * string is the single source of truth and the row count can never disagree
  * with the rows.
  */
-
-const MAX_SEARCH = 120
 
 const reportsApi = {
   registrations: (query: Query) =>
@@ -350,9 +345,6 @@ async function loadPayouts({ request }: LoaderArgs): Promise<PayoutsReportData> 
     exportQuery: exportQuery(query),
   }
 }
-
-/** How many events the overview previews before "View all". */
-const TOP_EVENTS = 6
 
 /**
  * Workspace health at a glance (US-RPT-01/03/04).

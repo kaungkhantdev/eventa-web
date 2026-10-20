@@ -7,6 +7,7 @@ import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import type { EventOption } from '../tickets.routes'
 import type { DiscountType } from '../types'
+import { ALL_EVENTS, DISCOUNT_PANEL_FORM_ID, MAX_PERCENT } from '@/lib/constants/ticketing.constants'
 
 /**
  * Create or edit a promo code (US-TKT-07/08).
@@ -23,10 +24,6 @@ interface DiscountPanelProps {
   /** An unused code from the loader, offered by the Generate button. */
   suggestion: string
 }
-
-const FORM_ID = 'discount-form'
-const MAX_PERCENT = 100
-const ALL_EVENTS = 'All events'
 
 export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPanelProps) {
   const fetcher = useFetcher<ActionResult>()
@@ -70,7 +67,7 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
             variant="primary"
             className="flex-1"
             type="submit"
-            form={FORM_ID}
+            form={DISCOUNT_PANEL_FORM_ID}
             disabled={saving}
           >
             {saving ? 'Saving…' : 'Save code'}
@@ -80,7 +77,7 @@ export function DiscountPanel({ open, onClose, events, suggestion }: DiscountPan
     >
       {/* Rebuilt per opening as well: the boxes not reset above are
           uncontrolled, and would open on the last code's amount, limits and dates. */}
-      <fetcher.Form key={opening} id={FORM_ID} method="post" className="space-y-4">
+      <fetcher.Form key={opening} id={DISCOUNT_PANEL_FORM_ID} method="post" className="space-y-4">
         <input type="hidden" name="intent" value="create" />
         <input type="hidden" name="type" value={type} />
 

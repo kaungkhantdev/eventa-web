@@ -1,14 +1,9 @@
 import type { BadgeTone } from '@/components/ui'
 import { MASKED, bangkokDate } from '@/lib/format'
 import type { CalendarConnectionStatus, CalendarConnectionWire } from './calendarConnection.api'
+import { ADMIN_NOTE, FOLLOWABLE_PROTOCOLS, INTEGRATIONS_PATH } from '@/lib/constants/settings.constants'
 
 /** The rules behind Settings → Integrations and the Meetings header (US-MTG-08). */
-
-/** Where an Admin connects, reconnects and disconnects Google Calendar. */
-export const INTEGRATIONS_PATH = '/admin/settings-integrations'
-
-/** The search parameter eventa-api's callback redirects back with. */
-export const CALENDAR_RETURN_PARAM = 'calendar'
 
 export interface CalendarConnectionCard {
   statusLabel: string
@@ -81,8 +76,6 @@ const STATUS_LOOK: Record<CalendarConnectionStatus, StatusLook> = {
     canDisconnect: true,
   },
 }
-
-const ADMIN_NOTE = 'Only an Admin can connect or disconnect Google Calendar.'
 
 export function toCalendarConnectionCard(
   wire: CalendarConnectionWire,
@@ -182,8 +175,6 @@ export function returnToastOf(param: string | null): ReturnToast | null {
   if (param === null || !Object.hasOwn(RETURN_TOAST, param)) return null
   return RETURN_TOAST[param]
 }
-
-const FOLLOWABLE_PROTOCOLS = new Set(['https:', 'http:'])
 
 /**
  * The consent page the connect action answered with, if it is one the browser

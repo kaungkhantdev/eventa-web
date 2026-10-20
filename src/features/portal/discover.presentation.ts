@@ -1,4 +1,5 @@
 import type { EventType } from './discover.types'
+import { ALL_CATEGORIES } from '@/lib/constants/portal.constants'
 
 /**
  * How each kind of event looks on the What's on grid.
@@ -34,9 +35,6 @@ export function lookOfType(type: string): TypeLook {
   return LOOKS[type as EventType] ?? DEFAULT_LOOK
 }
 
-/** The strip's leading chip, which clears the category filter rather than sets it. */
-export const ALL_CATEGORIES = 'All events'
-
 export const ALL_LOOK: TypeLook = { icon: 'hgi-sparkles', colour: '#1ba770' }
 
 /** The icon and colour for a chip on the category strip. */
@@ -44,8 +42,3 @@ export function lookOfCategory(category: string): TypeLook {
   return category === ALL_CATEGORIES ? ALL_LOOK : lookOfType(category)
 }
 
-/** How each urgency badge reads. */
-export const BADGE_LABEL: Record<'waitlist' | 'selling_fast', string> = {
-  waitlist: 'Waitlist',
-  selling_fast: 'Selling fast',
-}

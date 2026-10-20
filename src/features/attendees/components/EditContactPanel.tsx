@@ -3,10 +3,10 @@ import { useFetcher } from 'react-router'
 import { Button, FieldError, Hint, Input, Label, Panel } from '@/components/ui'
 import type { ActionResult } from '@/app/loaders'
 import { toast } from '@/lib/toast'
-import { VERSION_INPUT, storedInput } from '../contact.changes'
+import { storedInput } from '../contact.changes'
 import { contactRefusalOf, type ContactRefusal } from '../contact.refusal'
-import { CONTACT_INTENT } from '../directory.routes'
 import type { AttendeeRow } from '../directory.types'
+import { CONTACT_INTENT, FORM_ID, MAX_EMAIL, MAX_NAME, MAX_PHONE, VERSION_INPUT } from '@/lib/constants/attendees.constants'
 
 /**
  * Correcting an attendee's contact details (US-REG-08).
@@ -22,13 +22,6 @@ import type { AttendeeRow } from '../directory.types'
  * the fetcher revalidates the directory afterwards — so the row and the segment
  * counts are re-read rather than patched by hand.
  */
-
-const FORM_ID = 'attendee-contact-form'
-
-/** The DTO's own limits — past them the API answers 400 (`@MaxLength`). */
-const MAX_NAME = 120
-const MAX_EMAIL = 254
-const MAX_PHONE = 24
 
 export function EditContactPanel({
   row,

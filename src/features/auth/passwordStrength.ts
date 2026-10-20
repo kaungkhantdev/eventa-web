@@ -1,3 +1,4 @@
+import { DIGIT, MIN_PASSWORD_LENGTH, STRONG_LENGTH, SYMBOL } from '@/lib/constants/auth.constants'
 /**
  * The strength meter on the sign-up and reset-password forms.
  *
@@ -9,38 +10,6 @@
  * This only tidies the form. The API enforces the rule, and its refusal is
  * what counts.
  */
-
-/**
- * Must equal `PASSWORD_MIN_LENGTH` in eventa-api's `auth-password.policy.ts`,
- * which is what `RegisterDto`, `ResetPasswordDto` and `ChangePasswordDto` all
- * enforce. Two repos, one number — change both together or the meter starts
- * lying again.
- */
-export const MIN_PASSWORD_LENGTH = 8
-
-/**
- * The rest of the API's `PASSWORD_PATTERN`: a number and a symbol (US-SET-02).
- * A symbol is anything that is not a letter, a combining mark or a number, so
- * a Thai letter or vowel sign never passes for one.
- */
-const DIGIT = /\d/
-const SYMBOL = /[^\p{L}\p{M}\p{N}]/u
-
-/** A comfortable length, which earns the last point. */
-const STRONG_LENGTH = 12
-
-export const STRENGTH_COLORS: Record<1 | 2 | 3, string> = {
-  1: '#ef4444',
-  2: '#d97706',
-  3: '#1ba770',
-}
-
-export const STRENGTH_TEXTS: Record<0 | 1 | 2 | 3, string> = {
-  0: `Use ${MIN_PASSWORD_LENGTH}+ characters with a number and a symbol`,
-  1: 'Weak password',
-  2: 'Fair password',
-  3: 'Strong password',
-}
 
 /**
  * 0–3, where 0 means the API would refuse it outright.

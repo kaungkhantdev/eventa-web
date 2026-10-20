@@ -5,6 +5,7 @@ import type {
   RegistrationStatus,
   RegistrationWireStatus,
 } from './registrations.types'
+import { PAID, REJECT, REJECT_AND_REFUND } from '@/lib/constants/attendees.constants'
 
 /**
  * Wire status → the kit's wording. A lookup, so a new status is one line.
@@ -46,11 +47,6 @@ const STATUS_LABEL: Record<RegistrationWireStatus, RegistrationStatus> = {
   rejected: 'Rejected',
   expired: 'Expired',
 }
-
-const PAID = 'paid'
-const REJECT = 'Reject'
-/** Said before the click: this rejection gives the buyer's money back (US-REG-02). */
-const REJECT_AND_REFUND = 'Reject and refund'
 
 /**
  * One queue row, display-ready (US-REG-01).

@@ -7,8 +7,8 @@ import type {
   NotificationRowId,
   PreferenceOption,
 } from './accountSettings.types'
-import { NOTIFICATION_ROW } from './accountSettings.types'
 import type { ProfilePatch, ProfileWire } from './profile.types'
+import { BANGKOK, CURRENCY_CODE, DEFAULT_LOCALE, LOCALES, NOTIFICATION_ROW, THB } from '@/lib/constants/portal.constants'
 
 /**
  * The Settings tab's rules (US-DISC-12, criteria 1–3).
@@ -131,14 +131,6 @@ export function toNotificationPatch(form: FormData): {
 
 /* -------------------------- display preferences -------------------------- */
 
-/**
- * The product's one timezone, restated here rather than imported: `@/lib/format`
- * keeps it private and this change owns only `features/portal`.
- */
-const BANGKOK = 'Asia/Bangkok'
-const THB = 'THB'
-const DEFAULT_LOCALE = 'en' as const
-
 /** The kit's own options (`portal/my-events.html`), labels verbatim. */
 const TIMEZONE_OPTIONS: readonly PreferenceOption[] = [
   { value: BANGKOK, label: '(GMT+7) Bangkok' },
@@ -151,7 +143,6 @@ const CURRENCY_OPTIONS: readonly PreferenceOption[] = [
   { value: 'USD', label: '$ US Dollar (USD)' },
 ]
 
-const LOCALES = ['en', 'th'] as const
 const isLocale = (value: string): value is (typeof LOCALES)[number] =>
   (LOCALES as readonly string[]).includes(value)
 
@@ -190,8 +181,6 @@ export function toDisplayPreferences(profile: ProfileWire): DisplayPreferences {
 }
 
 /* ------------------------- the card going back out ------------------------ */
-
-const CURRENCY_CODE = /^[A-Z]{3}$/
 
 /**
  * One changed select → `PATCH /me/profile`.

@@ -31,17 +31,12 @@ import {
   type TicketRow,
 } from '../eventDetail.mapper'
 import { paymentPill } from '../eventDetail.presentation'
-import {
-  EVENT_TABS,
-  REGISTRATION_FILTERS,
-  type EventDetailData,
-  type EventTab,
-  type RegistrationFilter,
-} from '../eventDetail.routes'
+import { type EventDetailData, type EventTab, type RegistrationFilter } from '../eventDetail.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
 import { STATUS_PILL, copyLabel, type CopyState } from '../events.presentation'
 import { RemoveSessionModal } from '@/features/program/components/RemoveSessionModal'
-import { SEAT_SET_QUANTITY } from '@/features/ticketing/tickets.mapper'
+import { COPIED_MS, EVENT_TABS, REGISTRATION_FILTERS, REMOVE_SESSION_FIELDS, SESSION_TYPES } from '@/lib/constants/events.constants'
+import { SEAT_SET_QUANTITY } from '@/lib/constants/ticketing.constants'
 
 /* ---------- Event detail — admin/event-detail.html ----------
    Pill tabs switch between Overview, Registrations (filter + paging),
@@ -68,12 +63,6 @@ const FILTER_LABEL: Record<RegistrationFilter, string> = {
   refunded: 'Refunded',
 }
 
-/** Long enough to read, short enough to try again. */
-const COPIED_MS = 1500
-
-/** How this page's action names a session removal. */
-const REMOVE_SESSION_FIELDS = { intent: 'remove-session' }
-
 /** tone → avatar chip classes (light + dark). */
 const TONE: Record<AvatarTone, string> = {
   brand: 'bg-brand-soft text-brand-dark dark:text-brand',
@@ -91,8 +80,6 @@ const SESSION_TONE: Record<string, AvatarTone> = {
   Panel: 'amber',
   Break: 'brand',
 }
-
-const SESSION_TYPES = ['Keynote', 'Talk', 'Workshop', 'Panel', 'Break']
 
 /** Close on Escape while `open`. */
 function useEsc(open: boolean, onClose: () => void) {
@@ -1200,7 +1187,6 @@ function TicketsPanel({ tickets, onAdd }: { tickets: TicketRow[]; onAdd: () => v
     </section>
   )
 }
-
 
 /* ---------- Add session slide-over ---------- */
 function SessionPanel({

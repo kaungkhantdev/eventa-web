@@ -10,7 +10,7 @@ import {
   guestOrderPath,
   receiptHeading,
 } from '../guestOrder.mapper'
-import { ACCOUNT_LINK_INTENT, type GuestOrderData } from '../guestOrder.routes'
+import { type GuestOrderData } from '../guestOrder.routes'
 import type {
   AccountLinkResult,
   AccountOffer,
@@ -20,6 +20,7 @@ import type {
   OrderState,
 } from '../guestOrder.types'
 import { useCountdown } from '../lib/countdown'
+import { ACCOUNT_LINK_INTENT, DISCOVER } from '@/lib/constants/portal.constants'
 
 /**
  * What a guest sees after registering (US-DISC-06/07).
@@ -40,9 +41,6 @@ const TONES: Record<OrderState['tone'], string> = {
   red: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
   gray: 'bg-line text-muted',
 }
-
-/** Where somebody whose order lapsed can start again. */
-const DISCOVER = '/portal/discover'
 
 export default function GuestOrderPage() {
   const { order, ...account } = useLoaderData() as GuestOrderData

@@ -3,13 +3,9 @@ import { Badge, Button, Card, Hint, Icon, Input, Label, Select, Textarea } from 
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
-import {
-  PHONE_CONFIRM_INTENT,
-  PHONE_REMOVE_INTENT,
-  PHONE_REQUEST_INTENT,
-  type ProfileData,
-} from '../settings.routes'
+import { type ProfileData } from '../settings.routes'
 import type { ProfileCard } from '../settings.types'
+import { PHONE_CONFIRM_FORM_ID, PHONE_CONFIRM_INTENT, PHONE_REMOVE_FORM_ID, PHONE_REMOVE_INTENT, PHONE_REQUEST_FORM_ID, PHONE_REQUEST_INTENT, TIMEZONES } from '@/lib/constants/settings.constants'
 
 /**
  * Your own record (US-ACC-01, US-DISC-11).
@@ -18,17 +14,6 @@ import type { ProfileCard } from '../settings.types'
  * date. Only what the API actually holds is shown: inventing a tenure or a
  * count on somebody's own profile is a claim this app cannot support.
  */
-
-const TIMEZONES = ['Asia/Bangkok', 'Asia/Singapore', 'Asia/Tokyo', 'Europe/London', 'UTC']
-
-/**
- * The phone's three submissions, each its own form — and all OUTSIDE the
- * details form, because forms cannot nest: a nested one is dropped by the
- * browser and its button silently submits the outer form instead.
- */
-const PHONE_REQUEST_FORM_ID = 'settings-profile-phone'
-const PHONE_CONFIRM_FORM_ID = 'settings-profile-phone-code'
-const PHONE_REMOVE_FORM_ID = 'settings-profile-phone-remove'
 
 export default function SettingsProfilePage() {
   const { profile } = useLoaderData() as ProfileData

@@ -24,8 +24,9 @@ import { CancelEventModal } from '../components/CancelEventModal'
 import { DeleteEventModal } from '../components/DeleteEventModal'
 import { EventCalendar } from '../components/EventCalendar'
 import { COVER, STATUS_PILL, eventDetailPath as detailPath } from '../events.presentation'
-import { EVENT_SORTS, EVENT_TYPES, type EventsData } from '../events.routes'
+import { EVENT_TYPES, type EventsData } from '../events.routes'
 import type { EventBucket, EventRow } from '../types'
+import { ALL_TYPES, EVENT_SORTS, EVENTS_PAGE_MAX_SEARCH_LENGTH, MENU_ITEM } from '@/lib/constants/events.constants'
 
 /* admin/events.html — the organizer's event list, plus a month calendar.
 
@@ -39,11 +40,6 @@ const SORT_LABEL: Record<(typeof EVENT_SORTS)[number], string> = {
   name: 'Name A–Z',
   date: 'Date',
 }
-
-const ALL_TYPES = 'All types'
-
-/** What the API's `q` accepts; longer and it answers 400 instead of a table. */
-const MAX_SEARCH_LENGTH = 120
 
 export default function EventsPage() {
   const data = useLoaderData() as EventsData
@@ -169,7 +165,7 @@ export default function EventsPage() {
                     onChange={(e) => setTerm(e.target.value)}
                     className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
                     placeholder="Search events…"
-                    maxLength={MAX_SEARCH_LENGTH}
+                    maxLength={EVENTS_PAGE_MAX_SEARCH_LENGTH}
                     aria-label="Search events"
                   />
                 </div>
@@ -450,9 +446,6 @@ function useRowMenu() {
     },
   }
 }
-
-const MENU_ITEM =
-  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-ink transition hover:bg-line'
 
 function RowMenu({
   row,

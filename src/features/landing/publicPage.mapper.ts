@@ -9,6 +9,7 @@ import type {
   PublicSpeakerWire,
   PublicTicketWire,
 } from './publicPage.types'
+import { DEFAULT_HIGHLIGHT_ICON, NOT_HELD, TICKETS_TITLE } from '@/lib/constants/landing.constants'
 
 /**
  * The API's public event page → what the four templates render.
@@ -19,25 +20,6 @@ import type {
  * the templates already guard those, and a fabricated "1,500+ attendees" on
  * someone's public page would be a lie this app told about their event.
  */
-
-/** Fields the API holds nothing for. Named so the omission is deliberate. */
-const NOT_HELD = {
-  /** No headline separate from the name. */
-  kicker: '',
-  /** The API counts no attendees and publishes no remaining-seat figure. */
-  attendeesText: '',
-  seatsLeft: 0,
-  /** Not on the public payload; the organizer's address is not published. */
-  contactEmail: '',
-  socials: {},
-  /** Read by no template, but part of the shape. */
-  accent: '',
-  seating: '',
-  capacity: 0,
-} as const
-
-const TICKETS_TITLE = 'Tickets'
-const DEFAULT_HIGHLIGHT_ICON = 'hgi-sparkles'
 
 export function toLandingEvent(page: PublicPageWire): LandingEvent {
   const { event } = page

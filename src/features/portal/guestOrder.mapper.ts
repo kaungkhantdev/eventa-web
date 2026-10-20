@@ -12,6 +12,7 @@ import type {
   IssuedTicketWire,
   OrderState,
 } from './guestOrder.types'
+import { ADMITS, AWAITING_APPROVAL, MONEY_CHANGED_HANDS, NOT_APPROVED, NOT_NOW, OWES_NOTHING, RECEIPT_HEADING, REJECTED, REJECTED_MONEY, SIGNED_IN_PROMPT, UNTITLED_TICKET, WAITLISTED } from '@/lib/constants/portal.constants'
 
 /**
  * An order row → the page a guest sees after registering (US-DISC-06/07).
@@ -22,8 +23,6 @@ import type {
  * payment settles after the redirect — needs to say so plainly instead of
  * showing an empty ticket list and no explanation.
  */
-
-const UNTITLED_TICKET = 'Admission'
 
 /**
  * Nobody paid and the clock ran out.
@@ -39,19 +38,12 @@ export const EXPIRED_STATE: OrderState = {
   detail: 'The seats were released because the payment was not completed in time.',
 }
 
-/** In line for a sold-out ticket, with no seat offered yet (US-REG-04). */
-const WAITLISTED = 'waitlisted'
-
 export const WAITLIST_STATE: OrderState = {
   label: 'On the waitlist',
   tone: 'amber',
   detail:
     "Nothing is charged while you wait. If a place opens up we'll email you, and hold it for a limited time while you pay.",
 }
-
-/** Turned down by the organizer (US-REG-02). */
-const REJECTED = 'rejected'
-const AWAITING_APPROVAL = 'Awaiting approval'
 
 /*
  * Both point at THIS page, not an inbox: the organizer can switch the
@@ -74,27 +66,6 @@ export const AWAITING_APPROVAL_FREE_STATE: OrderState = {
     "The organizer reviews each registration. Your ticket will appear on this page once it's approved.",
 }
 
-const NOT_APPROVED = 'The organizer did not approve this registration.'
-
-/** What became of a rejected registration's money — nothing to say if none was taken. */
-const REJECTED_MONEY: Readonly<Partial<Record<string, string>>> = {
-  refunded: 'Your payment has been refunded.',
-  paid: 'Your payment is being refunded.',
-}
-
-/** Statuses that owe nothing, whatever the payment fields say. */
-const OWES_NOTHING: ReadonlySet<string> = new Set([WAITLISTED, REJECTED])
-
-/** Money reached the organizer — and stays a fact once it has gone back. */
-const MONEY_CHANGED_HANDS: ReadonlySet<string> = new Set(['paid', 'refunded'])
-
-/** The receipt's heading, for each of the three things its figures can mean. */
-const RECEIPT_HEADING = {
-  owed: 'What you owe',
-  paid: 'What you paid',
-  neither: 'Order total',
-} as const
-
 /**
  * The receipt's heading. The same figures are money still due, money that
  * changed hands, or money never taken — a lapsed order, a waitlist entry, a
@@ -115,13 +86,6 @@ const CONFIRMED_STATE: OrderState = {
   tone: 'green',
   detail: 'Show the code below at the door.',
 }
-
-/** How the offer is turned down — true only because it is made only for a ticketed order. */
-const NOT_NOW = 'Not now — your ticket is already in your email'
-
-/** For somebody already signed in, the offer's whole point: where every booking is. */
-const SIGNED_IN_PROMPT =
-  'You’re signed in — My Events lists every booking made with your account’s email.'
 
 /** Where this order lives — the link in the confirmation email. */
 export function guestOrderPath(orderId: string): string {
@@ -265,12 +229,6 @@ function toLine(line: GuestOrderLineWire) {
     total: satang(line.lineSubtotalSatang),
   }
 }
-
-/**
- * The ticket statuses that still admit — the API's own rule for a valid pass
- * (`attendee-tickets.service.ts`). A scanned ticket is still the guest's.
- */
-const ADMITS: ReadonlySet<string> = new Set(['issued', 'checked_in'])
 
 /**
  * A ticket names nobody until somebody assigns it; the buyer bought it.

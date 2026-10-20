@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Icon } from '@/components/ui'
 import { qrDataUrl } from '@/lib/qr'
 import type { PaymentStep } from '../checkout.types'
+import { HANDOFF_MS } from '@/lib/constants/portal.constants'
 
 /**
  * How the buyer actually pays, once the API has started a payment.
@@ -16,9 +17,6 @@ import type { PaymentStep } from '../checkout.types'
  * to the provider, which owns the fields and the card number; this component
  * only ever holds a URL.
  */
-
-/** Long enough to read what was booked, short enough not to feel stuck. */
-const HANDOFF_MS = 1_200
 
 export function PaymentHandoff({ payment }: { payment: PaymentStep }) {
   if (payment.state === 'failed') {

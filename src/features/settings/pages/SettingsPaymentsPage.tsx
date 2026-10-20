@@ -21,6 +21,7 @@ import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
 import type { PaymentsData } from '../settings.routes'
 import type { PaymentMethodRow, PaymentSettingsCard } from '../settings.types'
+import { FALLBACK_LOOK, FIELDS_REFUSED, METHOD_LOOKS, STRIPE_PURPLE } from '@/lib/constants/settings.constants'
 
 /**
  * Payment provider, API keys and checkout preferences (US-SET-08/09/10),
@@ -80,9 +81,6 @@ function TestModeBanner() {
     </div>
   )
 }
-
-/** Stripe's own brand purple, as the kit hard-codes it. */
-const STRIPE_PURPLE = 'bg-[#635BFF]'
 
 /**
  * The gateway: who it is on the left, the keys that make it so on the right.
@@ -221,33 +219,6 @@ function Fact({ label, value, mono }: { label: string; value: string; mono?: boo
     </div>
   )
 }
-
-/**
- * The API keys card (US-SET-08).
- *
- * The mode segmented control is part of this card's own form rather than page
- * chrome, because mode and keys are submitted together: they have to agree, and
- * the API refuses a pair that disagrees with the toggle above it. A live pair
- * saved under Test takes real money from real people while the banner says
- * nothing is charged.
- *
- * The secret field is empty on load rather than pre-filled. There is nothing to
- * pre-fill it with — the API answers with a masked tail — and a box that looked
- * populated would invite an organizer to "save" a value the browser never held.
- */
-/**
- * What the toast says when the keys are refused.
- *
- * A refusal must never be quieter than a success — the Save button sits at the
- * foot of a tall card and the field it is complaining about can be off-screen,
- * so "nothing happened" is the only reading available without one.
- *
- * When the API named the fields, the toast points at them instead of repeating
- * their sentences: those are already under the boxes, verbatim, which is where
- * they are worth reading. When it named none, the API's own message IS the
- * whole explanation, so it is what gets announced.
- */
-const FIELDS_REFUSED = 'Those keys were not saved — check the fields marked below.'
 
 function refusalNote(
   failed: ActionResult | null,
@@ -552,44 +523,6 @@ function TestConnectionButton() {
     </IntentAction>
   )
 }
-
-/**
- * How each method looks. The API says which methods exist and whether each is
- * on; everything here is presentation, so it stays a lookup table rather than a
- * branch — a new method Stripe adds needs a row here, not an `if`.
- */
-const METHOD_LOOKS: Record<
-  string,
-  { icon: string; tint: string; blurb?: string; schemes?: string[] }
-> = {
-  Card: {
-    icon: 'hgi-credit-card',
-    tint: 'bg-brand-soft text-brand',
-    schemes: ['VISA', 'MC', 'AMEX', 'JCB'],
-  },
-  PromptPay: {
-    icon: 'hgi-qr-code-01',
-    tint: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
-    blurb: 'Thailand QR bank transfer',
-  },
-  'Apple Pay': {
-    icon: 'hgi-apple',
-    tint: 'bg-line text-ink',
-    blurb: 'One-tap checkout on Apple devices',
-  },
-  'Google Pay': {
-    icon: 'hgi-wallet-01',
-    tint: 'bg-line text-muted',
-    blurb: 'One-tap checkout on Android & Chrome',
-  },
-  'Bank transfer': {
-    icon: 'hgi-bank',
-    tint: 'bg-line text-muted',
-    blurb: 'Pay by direct bank transfer',
-  },
-}
-
-const FALLBACK_LOOK = { icon: 'hgi-wallet-01', tint: 'bg-line text-muted' }
 
 function MethodsCard({ methods }: { methods: PaymentMethodRow[] }) {
   const save = useFetcher<ActionResult>()

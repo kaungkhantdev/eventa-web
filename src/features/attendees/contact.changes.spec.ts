@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import {
-  VERSION_INPUT,
-  contactPatchOf,
-  contactPatchOfForm,
-  hasContactChanges,
-  storedInput,
-} from './contact.changes'
+import { contactPatchOf, contactPatchOfForm, hasContactChanges, storedInput } from './contact.changes'
 import type { ContactDraft, StoredContact } from './directory.types'
+import { VERSION_INPUT } from '@/lib/constants/attendees.constants'
 
 /**
  * The version the fixture row was read at. Every patch below carries it,

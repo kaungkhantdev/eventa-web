@@ -6,7 +6,8 @@ import { CreateAccountPrompt } from '@/features/auth/components/CreateAccountPro
 import { SocialAuth } from '@/features/auth/components/SocialAuth'
 import { signUpPathFor } from '@/features/auth/personas'
 import { useSignIn } from '@/features/auth/useSignIn'
-import { ORG_PARAM } from '@/features/auth/verifiedSignIn'
+import { ORG_PARAM } from '@/lib/constants/auth.constants'
+
 
 export default function LoginPage() {
   const [showPw, setShowPw] = useState(false)

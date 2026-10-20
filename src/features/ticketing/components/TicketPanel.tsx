@@ -4,9 +4,10 @@ import { Button, EventPicker, Hint, Input, Label, Panel } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
-import { SEAT_SET_QUANTITY, readOnlyQuantityOf, seatSetFor } from '../tickets.mapper'
+import { readOnlyQuantityOf, seatSetFor } from '../tickets.mapper'
 import type { EventOption } from '../tickets.routes'
 import type { SeatSetWire, TicketDraft } from '../tickets.types'
+import { MAX_PER_ORDER, SEAT_SET_QUANTITY, TICKET_PANEL_FORM_ID } from '@/lib/constants/ticketing.constants'
 
 /**
  * Create or edit a ticket type (US-TKT-01/02).
@@ -23,10 +24,6 @@ interface TicketPanelProps {
   editing: TicketDraft | null
   events: EventOption[]
 }
-
-/** One order may hold at most this many seats — the API's own ceiling. */
-const MAX_PER_ORDER = 8
-const FORM_ID = 'ticket-form'
 
 export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps) {
   const [isFree, setIsFree] = useState(false)
@@ -96,7 +93,7 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
             variant="primary"
             className="flex-1"
             type="submit"
-            form={FORM_ID}
+            form={TICKET_PANEL_FORM_ID}
             disabled={saving}
           >
             {saving ? 'Saving…' : 'Save ticket type'}
@@ -104,7 +101,7 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
         </>
       }
     >
-      <fetcher.Form key={session} id={FORM_ID} method="post" className="space-y-4">
+      <fetcher.Form key={session} id={TICKET_PANEL_FORM_ID} method="post" className="space-y-4">
         <input type="hidden" name="intent" value={editing ? 'update' : 'create'} />
         <input type="hidden" name="type" value={isFree ? 'free' : 'paid'} />
         {editing && <input type="hidden" name="ticketId" value={editing.id} />}

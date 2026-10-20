@@ -8,6 +8,7 @@ import type { AgendaBlock, AgendaDay, SpeakerCard } from './program.types'
 import { STATUS_LABEL } from '@/features/events/eventDetail.mapper'
 import type { EventStatus } from '@/features/events/types'
 import { bangkokDate } from '@/lib/format'
+import { EMPTY_WINDOW, EVENT_OPTIONS, MAX_SEARCH } from '@/lib/constants/program.constants'
 
 /**
  * The agenda and the speaker directory (US-PROG-01..07).
@@ -17,9 +18,6 @@ import { bangkokDate } from '@/lib/format'
  * chosen event lives in the URL as `?eventId=` and defaults to the most recent
  * one, which is what an organizer is usually working on.
  */
-
-const EVENT_OPTIONS = 100
-const MAX_SEARCH = 120
 
 /** One entry in the event picker both screens carry. */
 export interface EventChoice {
@@ -151,16 +149,6 @@ async function loadSpeakers({ request }: LoaderArgs): Promise<SpeakersData> {
     cards: page.items.map(toSpeakerCard),
     window: pageWindow(page.meta),
   }
-}
-
-/** What a workspace with no events shows: nothing, and no count either. */
-const EMPTY_WINDOW: PageWindow = {
-  from: 0,
-  to: 0,
-  total: 0,
-  page: 1,
-  pageCount: 1,
-  size: DEFAULT_PAGE_SIZE,
 }
 
 export function speakerInputOf(form: FormData): SpeakerInput {

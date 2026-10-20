@@ -12,6 +12,7 @@ import type {
   PaymentRow,
 } from './payments.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import { LEDGER_TABS, MAX_SEARCH } from '@/lib/constants/finance.constants'
 
 /**
  * The payments ledger (US-FIN-01/02).
@@ -22,12 +23,10 @@ import { eventOptions, type EventOption } from '@/features/events/eventOptions'
  * row carries both its verdict and its reason.
  */
 
-export const LEDGER_TABS = ['all', 'paid', 'pending', 'refunded', 'failed'] as const
 export type LedgerTab = (typeof LEDGER_TABS)[number]
 
 export const METHODS: readonly PaymentMethod[] = ['Card', 'PromptPay', 'Bank transfer']
 
-const MAX_SEARCH = 120
 interface LedgerQuery extends Query {
   page?: number
   limit?: number
@@ -125,7 +124,6 @@ function withPage(current: string, page: number): string {
   url.searchParams.set('page', String(page))
   return url.pathname + url.search
 }
-
 
 async function runPaymentsAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()

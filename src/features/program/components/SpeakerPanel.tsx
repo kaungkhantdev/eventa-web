@@ -4,6 +4,7 @@ import { toast } from '@/lib/toast'
 import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import type { SpeakerCard } from '../program.types'
+import { SPEAKER_PANEL_FORM_ID } from '@/lib/constants/program.constants'
 
 /** Add or edit a speaker (US-PROG-04). */
 
@@ -15,8 +16,6 @@ interface SpeakerPanelProps {
   eventId: string
   eventName: string
 }
-
-const FORM_ID = 'speaker-form'
 
 export function SpeakerPanel({ open, onClose, editing, eventId, eventName }: SpeakerPanelProps) {
   const fetcher = useFetcher<ActionResult>()
@@ -42,7 +41,7 @@ export function SpeakerPanel({ open, onClose, editing, eventId, eventName }: Spe
           <Button variant="soft" className="flex-1" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button variant="primary" className="flex-1" type="submit" form={FORM_ID} disabled={saving}>
+          <Button variant="primary" className="flex-1" type="submit" form={SPEAKER_PANEL_FORM_ID} disabled={saving}>
             {saving ? 'Saving…' : 'Save speaker'}
           </Button>
         </>
@@ -50,7 +49,7 @@ export function SpeakerPanel({ open, onClose, editing, eventId, eventName }: Spe
     >
       {/* Rebuilt per opening, so the defaults are re-read: keyed on the speaker
           alone, a second Add speaker opened on the last one's name and bio. */}
-      <fetcher.Form id={FORM_ID} key={opening} method="post" className="space-y-4">
+      <fetcher.Form id={SPEAKER_PANEL_FORM_ID} key={opening} method="post" className="space-y-4">
         <input type="hidden" name="intent" value={editing ? 'update' : 'create'} />
         <input type="hidden" name="eventId" value={eventId} />
         {editing && (

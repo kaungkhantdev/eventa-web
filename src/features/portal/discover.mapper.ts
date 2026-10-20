@@ -1,6 +1,7 @@
 import { MASKED, bangkokDateRange, num } from '@/lib/format'
-import { BADGE_LABEL, lookOfType } from './discover.presentation'
+import { lookOfType } from './discover.presentation'
 import type { CardBadge, CardPrice, DiscoverCard, EventCardWire } from './discover.types'
+import { BADGE_LABEL, FREE, MAX_FACES } from '@/lib/constants/portal.constants'
 
 /**
  * A public feed row → the card the What's on grid renders (US-DISC-01).
@@ -13,10 +14,6 @@ import type { CardBadge, CardPrice, DiscoverCard, EventCardWire } from './discov
  * circles are drawn from the real count and carry no faces, because the feed is
  * public and the attendance port exposes nothing but a number.
  */
-
-const FREE = 'Free'
-/** The kit drew three; a card with two people should not claim a third. */
-const MAX_FACES = 3
 
 export function toDiscoverCard(row: EventCardWire): DiscoverCard {
   const look = lookOfType(row.type)

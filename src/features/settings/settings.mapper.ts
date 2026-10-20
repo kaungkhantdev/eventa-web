@@ -17,6 +17,7 @@ import type {
   RoleWire,
   SessionRow,
 } from './settings.types'
+import { BROWSERS, PLATFORMS, UNKNOWN_DEVICE } from '@/lib/constants/settings.constants'
 
 /** The rules behind the settings screens (US-ACC-*, US-SET-*). */
 
@@ -149,31 +150,6 @@ export function toPermissionRows(
       gaps.has(option.key) && !granted.has(option.key) && !pending.has(option.key),
   }))
 }
-
-/**
- * Browsers lie about each other, so the order here IS the rule: Edge claims to
- * be Chrome, Chrome claims to be Safari, and every one of them opens with
- * "Mozilla/5.0". The most specific claim has to be tested first.
- */
-const BROWSERS: readonly (readonly [RegExp, string])[] = [
-  [/\bEdg[e/]/, 'Edge'],
-  [/\bOPR\/|\bOpera\b/, 'Opera'],
-  [/\bFirefox\//, 'Firefox'],
-  [/\bChrome\//, 'Chrome'],
-  [/\bSafari\//, 'Safari'],
-]
-
-/** Same rule: iPhone and iPad are Mac-like, so they are checked before macOS. */
-const PLATFORMS: readonly (readonly [RegExp, string])[] = [
-  [/\biPhone\b/, 'iPhone'],
-  [/\biPad\b/, 'iPad'],
-  [/\bAndroid\b/, 'Android'],
-  [/\bWindows\b/, 'Windows'],
-  [/\bMac OS X\b|\bMacintosh\b/, 'macOS'],
-  [/\bLinux\b|\bX11\b/, 'Linux'],
-]
-
-const UNKNOWN_DEVICE = 'Unknown device'
 
 /**
  * A device an organizer can recognise (US-ACC-06).

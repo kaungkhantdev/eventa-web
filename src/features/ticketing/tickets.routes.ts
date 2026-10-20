@@ -10,6 +10,7 @@ import type { SeatSetWire, TicketCard, TicketCountsWire, TicketShareWire } from 
 import type { TicketStatus } from './types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
 import { quantityFromSeatsOf } from '@/features/events/eventSeating.mapper'
+import { MAX_SEARCH, SATANG_PER_BAHT, TICKET_TABS } from '@/lib/constants/ticketing.constants'
 
 /**
  * The cross-event ticket inventory (US-TKT-01..06).
@@ -19,11 +20,7 @@ import { quantityFromSeatsOf } from '@/features/events/eventSeating.mapper'
  * one request and cannot disagree.
  */
 
-export const TICKET_TABS = ['all', 'onsale', 'scheduled', 'paused', 'soldout'] as const
 export type TicketTab = (typeof TICKET_TABS)[number]
-
-/** `@MaxLength(120)` on the DTO — past it the API answers 400, not a list. */
-const MAX_SEARCH = 120
 
 export function tabOf(params: URLSearchParams): TicketTab {
   return enumParam(params, 'tab', TICKET_TABS, 'all')
@@ -75,8 +72,6 @@ export function ticketInputOf(form: FormData): TicketInput {
     version: Number.isInteger(version) && version > 0 ? version : undefined,
   }
 }
-
-const SATANG_PER_BAHT = 100
 
 /**
  * Baht typed into the price box → the integer satang the wire carries.

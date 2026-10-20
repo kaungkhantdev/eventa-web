@@ -1,3 +1,4 @@
+import { SYNC_POLL_LIMIT } from '@/lib/constants/meetings.constants'
 /**
  * How the meetings list waits for an invite to go out (US-MTG-04 AC1).
  *
@@ -7,12 +8,6 @@
  * costs {@link SYNC_POLL_LIMIT} requests per set of pending meetings rather
  * than one every few seconds for as long as the tab stays open.
  */
-
-/** How often the list re-reads itself while an invite is on its way. */
-export const SYNC_POLL_MS = 3000
-
-/** Reads per distinct set of pending meetings before the page stops asking. */
-export const SYNC_POLL_LIMIT = 10
 
 /** Which pending set is being waited on (`pendingKeyOf`), and reads spent on it. */
 export interface PollBudget {

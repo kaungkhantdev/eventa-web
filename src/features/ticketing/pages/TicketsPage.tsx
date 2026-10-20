@@ -27,6 +27,7 @@ import { TicketPanel } from '../components/TicketPanel'
 import { TicketQrModal } from '../components/TicketQrModal'
 import type { TabCounts, TicketTab, TicketsData } from '../tickets.routes'
 import type { TicketCard, TicketShareWire } from '../tickets.types'
+import { ALL_EVENTS, MAX_SEARCH_LENGTH, SHARE_FAILED } from '@/lib/constants/ticketing.constants'
 
 /**
  * The cross-event ticket inventory (US-TKT-04). Layout ported from tickets.html.
@@ -35,9 +36,6 @@ import type { TicketCard, TicketShareWire } from '../tickets.types'
  * pills, the cards and the paginator describe one answer rather than three
  * views of a list this page re-sliced.
  */
-
-const ALL_EVENTS = 'All events'
-const MAX_SEARCH_LENGTH = 120
 
 export default function TicketsPage() {
   const data = useLoaderData() as TicketsData
@@ -262,8 +260,6 @@ export default function TicketsPage() {
     </>
   )
 }
-
-const SHARE_FAILED = "That link couldn't be prepared. Close this and try again."
 
 function tabItems(counts: TabCounts): PillTabItem<TicketTab>[] {
   return [

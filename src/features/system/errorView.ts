@@ -1,4 +1,5 @@
 import { ApiError, NetworkError, messageOf } from '@/lib/api'
+import { MODULE_LOAD_FAILURE } from '@/lib/constants/system.constants'
 
 /**
  * What to put in front of someone when a page could not load.
@@ -65,14 +66,6 @@ export function errorViewOf(cause: unknown): ErrorView {
   // it belongs in an error reporter, not on the screen.
   return view('failed', null, 'revalidate')
 }
-
-/**
- * Whether the browser failed to fetch a code chunk.
- *
- * Matched on the message because there is no error type for it — each engine
- * words it differently, and all three are a `TypeError`.
- */
-const MODULE_LOAD_FAILURE = /dynamically imported module|importing a module script failed/i
 
 function isModuleLoadFailure(cause: unknown): boolean {
   return cause instanceof Error && MODULE_LOAD_FAILURE.test(cause.message)

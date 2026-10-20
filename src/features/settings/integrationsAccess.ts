@@ -1,12 +1,6 @@
 import { can } from '@/features/auth/permissions'
 import type { Me } from '@/features/auth/types'
-
-/**
- * The permission eventa-api's `calendar-connection.controller.ts` requires on
- * `POST /calendar-connection/connect` and `/disconnect`. Reading the status
- * needs none, which is why an Organizer or Staff member still sees it.
- */
-export const MANAGE_INTEGRATIONS = 'setIntegrations'
+import { MANAGE_INTEGRATIONS } from '@/lib/constants/settings.constants'
 
 /**
  * Whether the console offers to connect or disconnect Google Calendar

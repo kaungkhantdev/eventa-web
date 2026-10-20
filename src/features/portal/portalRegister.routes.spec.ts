@@ -1,15 +1,12 @@
 import { redirect } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import type { BookingClaim } from '@/features/auth/api'
-import { PASSWORDS_DIFFER, type BookingClaimInput } from '@/features/auth/signUpInput'
+import { type BookingClaimInput } from '@/features/auth/signUpInput'
 import type { LoginResult } from '@/features/auth/types'
 import { ApiError, NetworkError } from '@/lib/api'
-import {
-  INCOMPLETE_CLAIM_LINK,
-  loadPortalRegister,
-  shouldRecheckClaim,
-  submitBookingClaim,
-} from './portalRegister.routes'
+import { loadPortalRegister, shouldRecheckClaim, submitBookingClaim } from './portalRegister.routes'
+import { PASSWORDS_DIFFER } from '@/lib/constants/auth.constants'
+import { INCOMPLETE_CLAIM_LINK } from '@/lib/constants/portal.constants'
 
 /**
  * The attendee sign-up, opened directly or from the link emailed to a

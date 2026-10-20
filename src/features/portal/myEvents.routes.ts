@@ -2,7 +2,7 @@ import { attendeeAction, attendeeData, queryOf, type LoaderArgs } from '@/app/lo
 import { mapPanel, panel, type Panel } from '@/app/panels'
 import { authApi } from '@/features/auth/api'
 import type { Me } from '@/features/auth/types'
-import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
+import { isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { intParam } from '@/lib/urlFilters'
 import { accountSettingsApi } from './accountSettings.api'
 import {
@@ -21,6 +21,7 @@ import type { AttendeeProfileCard } from './profile.types'
 import { securityApi } from './security.api'
 import { countOtherDevices, toDeletionWarning, toTwoFactorCard } from './security.mapper'
 import type { AttendeeSecurity } from './security.types'
+import { DISPLAY_PREFERENCE_INTENT, EMAIL_CHANGE_INTENT, HISTORY_SIZE, NOTIFICATION_INTENT, PASSWORD_CHANGE_INTENT, PHONE_CONFIRM_INTENT, PHONE_REMOVE_INTENT, PHONE_REQUEST_INTENT, REVOKE_OTHER_SESSIONS_INTENT, TWO_FACTOR_DISABLE_INTENT } from '@/lib/constants/portal.constants'
 
 /**
  * The attendee's own account page (US-DISC-07/09/10).
@@ -54,9 +55,6 @@ export interface MyEventsData {
   totals: PaymentTotals
 }
 
-/** How many payments a page of the history shows. */
-const HISTORY_SIZE = DEFAULT_PAGE_SIZE
-
 export function historyQueryOf(params: URLSearchParams) {
   const limit = intParam(params, 'limit', HISTORY_SIZE)
   return {
@@ -64,48 +62,6 @@ export function historyQueryOf(params: URLSearchParams) {
     limit: isPageSize(limit) ? limit : HISTORY_SIZE,
   }
 }
-
-/**
- * Which of the two things the Profile tab can submit this is.
- *
- * Named once and shared with the tab's hidden field: the save is the default,
- * and moving the sign-in address is the one that has to say so.
- */
-export const EMAIL_CHANGE_INTENT = 'email'
-
-/**
- * The number is proved by a texted code, so it takes three submissions where
- * the rest of the details form takes one (US-DISC-11 AC3).
- */
-export const PHONE_REQUEST_INTENT = 'phone'
-export const PHONE_CONFIRM_INTENT = 'phone-code'
-export const PHONE_REMOVE_INTENT = 'phone-remove'
-
-/** One notification switch (US-DISC-12, criterion 1). */
-export const NOTIFICATION_INTENT = 'notification'
-
-/** One of the Preferences card's selects (criterion 3). */
-export const DISPLAY_PREFERENCE_INTENT = 'preference'
-
-/**
- * The Security card's three submissions (criteria 4–5).
- *
- * Only three of the five security calls are here, and the division is not
- * arbitrary: `guardedAction` reports `{ ok: true }` and discards whatever the
- * call answered, which is exactly right for these — none of them has anything
- * to say beyond "it worked", and each changes something the loader re-reads.
- *
- * Starting and confirming an enrolment are the opposite: their whole value IS
- * the answer — a seed, and the recovery codes the API will never show again —
- * and there is no loader read that could fetch either of them back. Those two
- * go straight to `securityApi` from the panel that shows them, as the profile
- * photo's three steps already do, and are gone when it closes. Deleting the
- * account is likewise not a submission the page can revalidate after: there is
- * no page left.
- */
-export const PASSWORD_CHANGE_INTENT = 'change-password'
-export const REVOKE_OTHER_SESSIONS_INTENT = 'revoke-other-sessions'
-export const TWO_FACTOR_DISABLE_INTENT = 'disable-two-factor'
 
 /**
  * What this page can submit, and what each one does.

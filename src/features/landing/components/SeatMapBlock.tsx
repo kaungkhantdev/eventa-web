@@ -1,9 +1,7 @@
 import { cn } from '@/lib/cn'
 import { swatchClassOf } from '@/lib/seatSwatches'
 import type { LandingSeatMap, LandingSeatRow } from '@/features/landing/types'
-
-/** A seat; its ticket's swatch overrides the neutral fill (the palette is `!important`). */
-const SEAT = 'shrink-0 rounded-[3px] bg-muted/30'
+import { SEAT } from '@/lib/constants/landing.constants'
 
 /**
  * The tickets section's seat map (US-PAGE-05): the stage, every seat in the

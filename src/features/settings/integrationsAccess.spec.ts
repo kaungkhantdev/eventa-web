@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Me } from '@/features/auth/types'
-import { MANAGE_INTEGRATIONS, canManageIntegrations } from './integrationsAccess'
+import { canManageIntegrations } from './integrationsAccess'
+import { MANAGE_INTEGRATIONS } from '@/lib/constants/settings.constants'
 
 const me = (permissions: string[]): Me => ({
   id: 'u-1',

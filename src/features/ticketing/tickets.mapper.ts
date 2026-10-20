@@ -3,18 +3,9 @@ import { bangkokDayKey, baht, num } from '@/lib/format'
 import { hashIndex } from '@/lib/palette'
 import type { SeatSetWire, TicketCard, TicketDraft, TicketWire } from './tickets.types'
 import type { TicketStatus } from './types'
+import { FREE, FULL, ICON_TINTS, SATANG_PER_BAHT } from '@/lib/constants/ticketing.constants'
 
 /** The rules behind the ticket inventory (US-TKT-03/04). */
-
-/**
- * What a quantity box says when it is read-only because the seat map sets it
- * (US-EVT-05). Shared by every place a tier's quantity is edited.
- */
-export const SEAT_SET_QUANTITY = 'Set by the seat map'
-
-const SATANG_PER_BAHT = 100
-const FULL = 100
-const FREE = 'Free'
 
 /** Badge tone, icon and wording per status — the kit's own map. */
 const STATUS_META: Record<TicketStatus, { tone: BadgeTone; icon: string; label: string }> = {
@@ -23,19 +14,6 @@ const STATUS_META: Record<TicketStatus, { tone: BadgeTone; icon: string; label: 
   paused: { tone: 'gray', icon: 'hgi-time-quarter-pass', label: 'Paused' },
   soldout: { tone: 'amber', icon: 'hgi-alert-circle', label: 'Sold out' },
 }
-
-/**
- * The kit hand-tinted each card's icon square. Real inventory has whatever the
- * workspace sells, so the tint comes from the tier's own id — stable, so a card
- * does not change colour when the list is refiltered.
- */
-const ICON_TINTS: readonly string[] = [
-  'bg-amber-50 text-amber-500 dark:bg-amber-400/15 dark:text-amber-300',
-  'bg-brand-soft text-brand',
-  'bg-red-50 text-red-500 dark:bg-red-500/15 dark:text-red-300',
-  'bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300',
-  'bg-purple-50 text-purple-500 dark:bg-purple-500/15 dark:text-purple-300',
-]
 
 export function toTicketCard(wire: TicketWire): TicketCard {
   const meta = STATUS_META[wire.status]

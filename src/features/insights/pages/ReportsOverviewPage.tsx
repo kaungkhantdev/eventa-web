@@ -16,6 +16,7 @@ import { useFilters } from '@/lib/useFilters'
 import { StatTile } from '../components/StatTile'
 import type { OverviewData } from '../insights.routes'
 import type { OverviewRange } from '../insights.types'
+import { NOTHING_CLEARED, NO_REVENUE } from '@/lib/constants/insights.constants'
 
 /**
  * Workspace health at a glance (US-RPT-01/03/04). Layout ported from the kit.
@@ -28,9 +29,6 @@ import type { OverviewRange } from '../insights.types'
  * or UTM column exists anywhere in the schema, so it could only ever have been
  * invented — it needs capture at checkout before it can be reported on.
  */
-
-const NO_REVENUE = 'No revenue in this period.'
-const NOTHING_CLEARED = 'Paid registrations show up here as soon as the first one clears.'
 
 const RANGE_TABS: PillTabItem<OverviewRange>[] = [
   { value: '7d', label: '7 days' },
