@@ -42,6 +42,10 @@ export default function SettingsProfilePage() {
   const saved = save.state === 'idle' && save.data?.ok === true
   useSavedToast(saved, 'Profile saved.')
   useFailureToast(save.state === 'idle' ? error : null)
+  // Here, beside the fetchers, rather than in the phone cell: the cell sits in
+  // the details form, which is rebuilt when the profile reloads with another
+  // email, and a cell mounted again announced its last answer again.
+  usePhoneToasts(phone)
 
   return (
     <>
@@ -225,6 +229,35 @@ function EmailForm({ profile }: { profile: ProfileCard }) {
   )
 }
 
+type PhoneFetchers = {
+  request: ReturnType<typeof useFetcher<ActionResult>>
+  confirm: ReturnType<typeof useFetcher<ActionResult>>
+  remove: ReturnType<typeof useFetcher<ActionResult>>
+}
+
+/** Whether any of the phone's three submissions is in flight. */
+function phoneBusy({ request, confirm, remove }: PhoneFetchers): boolean {
+  return request.state !== 'idle' || confirm.state !== 'idle' || remove.state !== 'idle'
+}
+
+/** The phone's announcements — called by the page, which owns its fetchers. */
+function usePhoneToasts(phone: PhoneFetchers) {
+  const { request, confirm, remove } = phone
+  const failure =
+    (request.data?.ok === false ? request.data.error : null) ??
+    (confirm.data?.ok === false ? confirm.data.error : null) ??
+    (remove.data?.ok === false ? remove.data.error : null)
+  useFailureToast(!phoneBusy(phone) ? failure : null)
+  useSavedToast(
+    request.state === 'idle' && request.data?.ok === true,
+    'Code sent. Check your phone.',
+  )
+  useSavedToast(
+    confirm.state === 'idle' && confirm.data?.ok === true,
+    'Number confirmed.',
+  )
+}
+
 /**
  * The number, proved by a texted code before Eventa will use it.
  *
@@ -245,29 +278,9 @@ function PhoneField({
    * Owned by the page, because the form elements live outside this cell —
    * forms cannot nest, so a button inside the details form would submit THAT.
    */
-  phone: {
-    request: ReturnType<typeof useFetcher<ActionResult>>
-    confirm: ReturnType<typeof useFetcher<ActionResult>>
-    remove: ReturnType<typeof useFetcher<ActionResult>>
-  }
+  phone: PhoneFetchers
 }) {
-  const { request, confirm, remove } = phone
-  const busy =
-    request.state !== 'idle' || confirm.state !== 'idle' || remove.state !== 'idle'
-
-  const failure =
-    (request.data?.ok === false ? request.data.error : null) ??
-    (confirm.data?.ok === false ? confirm.data.error : null) ??
-    (remove.data?.ok === false ? remove.data.error : null)
-  useFailureToast(!busy ? failure : null)
-  useSavedToast(
-    request.state === 'idle' && request.data?.ok === true,
-    'Code sent. Check your phone.',
-  )
-  useSavedToast(
-    confirm.state === 'idle' && confirm.data?.ok === true,
-    'Number confirmed.',
-  )
+  const busy = phoneBusy(phone)
 
   return (
     <div>
