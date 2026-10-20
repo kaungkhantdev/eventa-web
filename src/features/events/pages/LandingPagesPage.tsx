@@ -102,7 +102,7 @@ function ApplyTemplate({
     return (
       <Link
         to="/admin/event-form"
-        className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 py-2 text-[12.5px] font-semibold text-white transition hover:bg-brand-dark"
+        className="inline-flex flex-1 basis-[6.5rem] items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-brand px-3 py-2 text-[12.5px] font-semibold text-white transition hover:bg-brand-dark"
       >
         Use template
       </Link>
@@ -110,7 +110,7 @@ function ApplyTemplate({
   }
 
   return (
-    <fetcher.Form method="post" className="flex-1">
+    <fetcher.Form method="post" className="flex flex-1 basis-[6.5rem] flex-col">
       <input type="hidden" name="id" value={event.id} />
       <input type="hidden" name="template" value={template} />
       <button
@@ -118,7 +118,7 @@ function ApplyTemplate({
         disabled={busy || inUse}
         title={inUse ? `${event.name} already uses this` : `Use this for ${event.name}`}
         className={cn(
-          'inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-semibold transition',
+          'inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-[12.5px] font-semibold transition',
           inUse
             ? 'cursor-default bg-brand-soft text-brand'
             : 'bg-brand text-white hover:bg-brand-dark disabled:opacity-60',
@@ -252,13 +252,17 @@ export default function LandingPagesPage() {
                 </span>
               </div>
               <p className="mt-1 flex-1 text-[12.5px] leading-snug text-muted">{tpl.description}</p>
-              <div className="mt-3 flex items-center gap-2">
+              {/* Two equal buttons whose labels never wrap: side by side while
+                  both fit, stacked full-width when the card is too narrow. A
+                  plain flex-1 pair gave the form-wrapped one less room, so
+                  "Use template" broke onto two lines and stood taller. */}
+              <div className="mt-3 flex flex-wrap items-start gap-2">
                 <button
                   type="button"
                   onClick={() => preview(tpl.id)}
                   disabled={!previewSlug}
                   title={previewSlug ? undefined : 'Create an event first'}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-brand-soft px-3 py-2 text-[12.5px] font-semibold text-brand transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex flex-1 basis-[6.5rem] items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-brand-soft px-3 py-2 text-[12.5px] font-semibold text-brand transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Icon name="hgi-play" size={14} />
                   Preview
