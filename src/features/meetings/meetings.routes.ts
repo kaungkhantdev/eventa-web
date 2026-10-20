@@ -13,9 +13,13 @@ import type {
   MeetingWire,
 } from './meetings.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import {
+  calendarConnectionApi,
+  type CalendarConnectionStatus,
+} from '@/features/settings/calendarConnection.api'
 
 /**
- * Meetings with venues, sponsors, vendors and speakers (US-MTG-01..06).
+ * Meetings with venues, sponsors, vendors and speakers (US-MTG-01..08).
  *
  * Bucket, type, event, search and page live in the URL. Which bucket a meeting
  * falls in is the API's answer, derived per request from the Bangkok day —
@@ -79,13 +83,23 @@ export interface MeetingsData {
   window: PageWindow
   counts: MeetingCountsWire
   events: EventOption[]
+  /**
+   * The workspace's Google Calendar (US-MTG-08): the header says whether
+   * invites are going out, and a card saved while disconnected says what
+   * would send its invite.
+   */
+  calendarStatus: CalendarConnectionStatus
 }
 
 const NO_COUNTS: MeetingCountsWire = { all: 0, today: 0, upcoming: 0, past: 0 }
 
 async function loadMeetings({ request }: LoaderArgs): Promise<MeetingsData> {
   const query = listQueryOf(queryOf(request))
-  const [page, events] = await Promise.all([meetingsApi.list(query), eventOptions()])
+  const [page, events, calendar] = await Promise.all([
+    meetingsApi.list(query),
+    eventOptions(),
+    calendarConnectionApi.get(),
+  ])
 
   if (page.meta.total > 0 && query.page! > page.meta.totalPages) {
     throw redirect(withPage(request.url, page.meta.totalPages))
@@ -96,6 +110,7 @@ async function loadMeetings({ request }: LoaderArgs): Promise<MeetingsData> {
     window: pageWindow(page.meta),
     counts: (page.meta.counts as MeetingCountsWire | undefined) ?? NO_COUNTS,
     events,
+    calendarStatus: calendar.status,
   }
 }
 

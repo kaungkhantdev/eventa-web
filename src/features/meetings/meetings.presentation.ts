@@ -65,3 +65,23 @@ export function meetingInviteNote(mode: MeetingModeChoice): string {
     : 'A Google Calendar invite is'
   return `${sent} emailed to each guest, with a reminder 15 minutes before.`
 }
+
+const NOT_CONNECTED_NOTE =
+  "Google Calendar isn't connected, so this meeting will be saved without an invite or Meet link."
+
+/**
+ * The note above Schedule, given whether the workspace calendar is connected
+ * (US-MTG-08). Without one nothing is emailed at all, and the panel says so
+ * before the button rather than leaving the card to say it afterwards.
+ */
+export function scheduleNote(mode: MeetingModeChoice, calendarConnected: boolean): string {
+  return calendarConnected ? meetingInviteNote(mode) : NOT_CONNECTED_NOTE
+}
+
+/**
+ * Whether the Mode box may promise a Meet link: only for a video call, and
+ * only while there is a connected Google Calendar to make one.
+ */
+export function promisesMeetLink(mode: MeetingModeChoice, calendarConnected: boolean): boolean {
+  return calendarConnected && makesMeetLink(mode)
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useFetcher, useLoaderData } from 'react-router'
+import { Link, useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Button,
   Card,
@@ -22,13 +22,24 @@ import { useDisclosure } from '@/lib/useDisclosure'
 import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
-import type { ActionResult } from '@/app/loaders'
+import { useFailureToast } from '@/lib/useSavedToast'
+import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
+import type { Me } from '@/features/auth/types'
+import type { CalendarConnectionStatus } from '@/features/settings/calendarConnection.api'
+import {
+  INTEGRATIONS_PATH,
+  calendarChipOf,
+  connectLinkLabel,
+} from '@/features/settings/calendarConnection.mapper'
+import { canManageIntegrations } from '@/features/settings/integrationsAccess'
 import { MeetingPanel } from '../components/MeetingPanel'
+import { ASK_ADMIN_NOTE, syncActionOf } from '../meetings.mapper'
 import { MEETING_TYPES, type MeetingTab, type MeetingsData } from '../meetings.routes'
 import type { MeetingCard, MeetingDraft } from '../meetings.types'
+import { useSyncPoll } from '../useSyncPoll'
 
 /**
- * Meetings (US-MTG-01..06). Layout ported from meetings.html.
+ * Meetings (US-MTG-01..08). Layout ported from meetings.html.
  *
  * Which bucket a meeting is in — today, upcoming, past — is the API's answer,
  * derived per request from the Bangkok day. The old page pinned "today" to a
@@ -41,6 +52,9 @@ const MAX_SEARCH_LENGTH = 120
 
 export default function MeetingsPage() {
   const data = useLoaderData() as MeetingsData
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
+  // Tidying only: connect and disconnect answer 403 without the key anyway.
+  const canManage = canManageIntegrations(me)
   // Nothing here is written as a default — an absent `tab` is "all" — so every
   // parameter in the URL is a choice the organizer made, the bucket included.
   const { params, set, clear, filtered } = useFilters()
@@ -49,6 +63,7 @@ export default function MeetingsPage() {
   const cancelling = useDisclosure()
   const [editing, setEditing] = useState<MeetingDraft | null>(null)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+  useSyncPoll(data.cards)
 
   const schedule = () => {
     setEditing(null)
@@ -67,6 +82,7 @@ export default function MeetingsPage() {
         subtitle="Venue, sponsor, vendor and speaker meetings."
         actions={
           <>
+            <CalendarChip status={data.calendarStatus} canManage={canManage} />
             <Button variant="primary" onClick={schedule}>
               <Icon name="hgi-add-01" size={16} />
               <span className="hidden sm:inline">Schedule meeting</span>
@@ -150,6 +166,7 @@ export default function MeetingsPage() {
                   <MeetingRow
                     key={card.id}
                     card={card}
+                    calendar={{ status: data.calendarStatus, canManage }}
                     onEdit={() => {
                       setEditing(card.edit)
                       panel.onOpen()
@@ -184,6 +201,7 @@ export default function MeetingsPage() {
         onClose={panel.onClose}
         editing={editing}
         events={data.events}
+        calendarConnected={data.calendarStatus === 'connected'}
         onCancelMeeting={() => {
           panel.onClose()
           cancelling.onOpen()
@@ -204,9 +222,60 @@ function tabItems(counts: MeetingsData['counts']): PillTabItem<MeetingTab>[] {
   ]
 }
 
-function MeetingRow({ card, onEdit }: { card: MeetingCard; onEdit: () => void }) {
-  const sync = useFetcher<ActionResult>()
+/** The kit's chip, from meetings.html's header — copied verbatim. */
+const CHIP_CLASS =
+  'hidden items-center gap-1.5 rounded-lg border border-hair bg-surface px-2.5 py-1.5 text-[12px] font-medium text-muted lg:inline-flex'
 
+/**
+ * Whether invites are going out (US-MTG-08 AC1, AC3). A link for an Admin,
+ * who can connect the calendar; plain words for everyone else.
+ *
+ * Hidden below `lg`, as in the kit — on a phone the card prompts are the only
+ * place this is said.
+ */
+function CalendarChip({
+  status,
+  canManage,
+}: {
+  status: CalendarConnectionStatus
+  canManage: boolean
+}) {
+  const chip = calendarChipOf(status, canManage)
+  const content = (
+    <>
+      <Icon name={chip.icon} size={14} className={chip.iconClass} />
+      {chip.label}
+    </>
+  )
+  if (chip.to) {
+    return (
+      <Link to={chip.to} className={cn(CHIP_CLASS, 'hover:text-ink')}>
+        {content}
+      </Link>
+    )
+  }
+  return (
+    <span className={CHIP_CLASS} title={chip.title ?? undefined}>
+      {content}
+    </span>
+  )
+}
+
+/** The workspace calendar as a card needs it to say what would send its invite. */
+interface CardCalendar {
+  status: CalendarConnectionStatus
+  canManage: boolean
+}
+
+function MeetingRow({
+  card,
+  calendar,
+  onEdit,
+}: {
+  card: MeetingCard
+  calendar: CardCalendar
+  onEdit: () => void
+}) {
   return (
     <div className="flex items-start gap-3.5 px-2 py-3.5">
       <span
@@ -263,17 +332,7 @@ function MeetingRow({ card, onEdit }: { card: MeetingCard; onEdit: () => void })
           // is invalid HTML that React reports as a hydration error.
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-amber-500">
             <span>{card.syncNote}</span>
-            <sync.Form method="post">
-              <input type="hidden" name="intent" value="sync" />
-              <input type="hidden" name="meetingId" value={card.id} />
-              <button
-                type="submit"
-                className="font-semibold underline"
-                disabled={sync.state !== 'idle'}
-              >
-                {sync.state === 'idle' ? 'Send it now' : 'Sending…'}
-              </button>
-            </sync.Form>
+            <SyncPrompt card={card} calendar={calendar} />
           </div>
         )}
       </div>
@@ -296,6 +355,42 @@ function MeetingRow({ card, onEdit }: { card: MeetingCard; onEdit: () => void })
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * The step that would send a card's invite (US-MTG-04 AC3/AC4, US-MTG-08).
+ * "Send it now" only helps while a calendar is connected; without one the
+ * step is connecting it, which only an Admin can take.
+ */
+function SyncPrompt({ card, calendar }: { card: MeetingCard; calendar: CardCalendar }) {
+  const action = syncActionOf(card, calendar.status, calendar.canManage)
+  if (action === 'retry') return <RetrySync meetingId={card.id} />
+  if (action === 'connect') {
+    return (
+      <Link to={INTEGRATIONS_PATH} className="font-semibold underline">
+        {connectLinkLabel(calendar.status)}
+      </Link>
+    )
+  }
+  if (action === 'ask_admin') return <span>{ASK_ADMIN_NOTE}</span>
+  return null
+}
+
+function RetrySync({ meetingId }: { meetingId: string }) {
+  const sync = useFetcher<ActionResult>()
+  // A refused retry is said aloud (NFR-REL-02): the button only turning back
+  // into "Send it now" would read as the invite having gone.
+  useFailureToast(sync.state === 'idle' && sync.data?.ok === false ? sync.data.error : null)
+
+  return (
+    <sync.Form method="post">
+      <input type="hidden" name="intent" value="sync" />
+      <input type="hidden" name="meetingId" value={meetingId} />
+      <button type="submit" className="font-semibold underline" disabled={sync.state !== 'idle'}>
+        {sync.state === 'idle' ? 'Send it now' : 'Sending…'}
+      </button>
+    </sync.Form>
   )
 }
 

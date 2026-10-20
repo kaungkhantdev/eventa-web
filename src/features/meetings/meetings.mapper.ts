@@ -7,8 +7,9 @@ import type {
   TypeStyle,
 } from './meetings.types'
 import { MEETING_MODE_LABEL } from './meetings.presentation'
+import type { CalendarConnectionStatus } from '@/features/settings/calendarConnection.api'
 
-/** The rules behind the meetings list (US-MTG-01..06). */
+/** The rules behind the meetings list (US-MTG-01..08). */
 
 const SEPARATOR = ' · '
 const ALL_EVENTS = 'All events'
@@ -62,8 +63,22 @@ const SYNC_NOTE: Record<SyncStatus, string | null> = {
   not_connected: 'No calendar is connected, so no invite was sent.',
 }
 
+/**
+ * A cancelled meeting's invite is withdrawn, not sent (US-MTG-06), so the
+ * scheduled card's notes would ask for an invite to a meeting that is not
+ * happening. Only a withdrawal that failed is worth a word: the guest still
+ * has the meeting in their calendar.
+ */
+const CANCELLED_SYNC_NOTE: Record<SyncStatus, string | null> = {
+  pending: null,
+  failed: "The cancellation couldn't be sent to the guest's calendar.",
+  synced: null,
+  not_connected: null,
+}
+
 export function toMeetingCard(wire: MeetingWire): MeetingCard {
   const mode = MODE_STYLE[wire.mode]
+  const cancelled = wire.status === 'cancelled'
   return {
     id: wire.id,
     title: wire.title,
@@ -86,13 +101,14 @@ export function toMeetingCard(wire: MeetingWire): MeetingCard {
     // cancelled, and that the link is ready.
     canJoin: wire.canJoin,
     canEdit: wire.canEdit,
-    cancelled: wire.status === 'cancelled',
+    cancelled,
     // A lookup miss yields `undefined`, which is falsy and so renders as the
     // same blank as "nothing to report" — a status whose copy was never
     // written would look correct on screen. The card promises `string | null`,
     // so an unrecognised status is normalised to a deliberate silence instead.
     // Every value the API can send has a row above, so nothing real lands here.
-    syncNote: SYNC_NOTE[wire.syncStatus] ?? null,
+    syncNote: (cancelled ? CANCELLED_SYNC_NOTE : SYNC_NOTE)[wire.syncStatus] ?? null,
+    syncStatus: wire.syncStatus,
     cancellationReason: wire.cancellationReason,
     edit: {
       id: wire.id,
@@ -110,6 +126,51 @@ export function toMeetingCard(wire: MeetingWire): MeetingCard {
       version: wire.version,
     },
   }
+}
+
+/**
+ * What a card whose invite has not gone out offers (US-MTG-04, US-MTG-08).
+ *
+ * - `retry` — "Send it now": the invite is on its way or failed, or it was
+ *   saved while disconnected and the calendar is connected now.
+ * - `connect` — a link to Settings → Integrations, for someone who can
+ *   connect the calendar there.
+ * - `ask_admin` — the same fact for someone who cannot, with who can.
+ */
+export type SyncAction = 'retry' | 'connect' | 'ask_admin'
+
+/** Said on a card that needs a calendar connected, to someone who cannot. */
+export const ASK_ADMIN_NOTE = 'Ask an Admin to connect Google Calendar.'
+
+export function syncActionOf(
+  card: Pick<MeetingCard, 'syncNote' | 'syncStatus'>,
+  calendarStatus: CalendarConnectionStatus,
+  canManage: boolean,
+): SyncAction | null {
+  if (!card.syncNote) return null
+  if (card.syncStatus !== 'not_connected' || calendarStatus === 'connected') return 'retry'
+  return canManage ? 'connect' : 'ask_admin'
+}
+
+/**
+ * The meetings on this page whose invite is still on its way, as one string.
+ *
+ * It keys the page's poll: the budget restarts only when this set changes, so
+ * a worker that never answers costs a bounded number of reads per set rather
+ * than one every few seconds forever. Sorted, so the same set listed in a
+ * different order is not mistaken for a new one.
+ */
+export function pendingKeyOf(cards: readonly MeetingCard[]): string {
+  return cards
+    .filter((card) => !card.cancelled && card.syncStatus === 'pending')
+    .map((card) => card.id)
+    .sort()
+    .join(',')
+}
+
+/** Whether anything on the page is waiting for the worker to send an invite. */
+export function shouldPollSync(cards: readonly MeetingCard[]): boolean {
+  return pendingKeyOf(cards) !== ''
 }
 
 /**

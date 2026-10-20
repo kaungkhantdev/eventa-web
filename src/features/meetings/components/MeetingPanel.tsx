@@ -19,10 +19,10 @@ import {
   MEETING_MODE_PROMPT,
   NO_MODE,
   initialMeetingMode,
-  makesMeetLink,
-  meetingInviteNote,
   meetingModeChoice,
   meetingSaveLabel,
+  promisesMeetLink,
+  scheduleNote,
   type MeetingModeChoice,
 } from '../meetings.presentation'
 import type { MeetingDraft } from '../meetings.types'
@@ -36,6 +36,12 @@ interface MeetingPanelProps {
   editing: MeetingDraft | null
   events: { id: string; name: string }[]
   onCancelMeeting?: () => void
+  /**
+   * Whether the workspace's Google Calendar is connected (US-MTG-08). Without
+   * it nothing is emailed and no Meet link is made, so the panel must not
+   * promise either.
+   */
+  calendarConnected: boolean
 }
 
 const FORM_ID = 'meeting-form'
@@ -47,6 +53,7 @@ export function MeetingPanel({
   editing,
   events,
   onCancelMeeting,
+  calendarConnected,
 }: MeetingPanelProps) {
   const fetcher = useFetcher<ActionResult>()
   const saving = fetcher.state !== 'idle'
@@ -203,7 +210,9 @@ export function MeetingPanel({
               </option>
             ))}
           </Select>
-          {makesMeetLink(mode) && <Hint>A Meet link is generated automatically.</Hint>}
+          {promisesMeetLink(mode, calendarConnected) && (
+            <Hint>A Meet link is generated automatically.</Hint>
+          )}
         </div>
 
         <div>
@@ -263,11 +272,12 @@ export function MeetingPanel({
             without the organizer sending anything, which is worth saying before
             the button rather than after. Only on a new meeting: rescheduling
             does not re-invite anybody. It follows the chosen mode, so In person
-            or Phone call never promises a Meet link (US-MTG-04). */}
+            or Phone call never promises a Meet link (US-MTG-04), and with no
+            calendar connected it promises nothing at all (US-MTG-08). */}
         {!editing && (
           <div className="flex items-start gap-2 rounded-lg border border-hair bg-canvas p-3">
             <Icon name="hgi-calendar-check-in-01" size={16} className="mt-0.5 text-muted" />
-            <p className="text-[12px] text-muted">{meetingInviteNote(mode)}</p>
+            <p className="text-[12px] text-muted">{scheduleNote(mode, calendarConnected)}</p>
           </div>
         )}
       </fetcher.Form>

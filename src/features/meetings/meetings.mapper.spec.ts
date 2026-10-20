@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { toMeetingCard } from './meetings.mapper'
+import type { CalendarConnectionStatus } from '@/features/settings/calendarConnection.api'
+import { connectLinkLabel } from '@/features/settings/calendarConnection.mapper'
+import {
+  ASK_ADMIN_NOTE,
+  pendingKeyOf,
+  shouldPollSync,
+  syncActionOf,
+  toMeetingCard,
+} from './meetings.mapper'
 import { meetingModeChoice } from './meetings.presentation'
 import type { MeetingStatus, MeetingWire, SyncStatus } from './meetings.types'
 
@@ -209,5 +217,156 @@ describe('toMeetingCard', () => {
     expect(draft.startTime).toBe('10:00')
     expect(draft.endTime).toBe('10:30')
     expect(draft.version).toBe(1)
+  })
+})
+
+/*
+ * US-MTG-06: a cancelled meeting's invite is withdrawn, not sent. "The
+ * calendar invite has not been sent yet" under a Cancelled badge asks the
+ * organizer to send an invite for a meeting that is not happening — so a
+ * cancelled card says nothing unless the withdrawal itself failed.
+ */
+describe('the sync note on a cancelled meeting', () => {
+  const cancelled = (syncStatus: SyncStatus) =>
+    toMeetingCard(
+      wire({ status: 'cancelled', canJoin: false, canEdit: false, syncStatus }),
+    )
+
+  it("says the cancellation couldn't reach the guest's calendar when that failed", () => {
+    expect(cancelled('failed').syncNote).toBe(
+      "The cancellation couldn't be sent to the guest's calendar.",
+    )
+  })
+
+  it.each(['pending', 'synced', 'not_connected'] as const)(
+    'says nothing when the withdrawal is %s',
+    (syncStatus) => {
+      expect(cancelled(syncStatus).syncNote).toBe(NOTHING_TO_REPORT)
+    },
+  )
+
+  it('carries the sync status, so the card can offer the right next step', () => {
+    expect(cancelled('failed').syncStatus).toBe('failed')
+    expect(toMeetingCard(wire({ syncStatus: 'pending' })).syncStatus).toBe('pending')
+  })
+})
+
+/*
+ * US-MTG-04 AC3/AC4 and US-MTG-08: a card whose invite has not gone out says
+ * what would send it. "Send it now" only helps while a calendar is connected;
+ * without one, the step is connecting it — which only an Admin can take, so
+ * everyone else is told who to ask.
+ */
+describe('syncActionOf', () => {
+  const card = (syncStatus: SyncStatus) => toMeetingCard(wire({ syncStatus }))
+  const ADMIN = true
+  const VIEWER = false
+  const CALENDAR_STATUSES = [
+    'not_configured',
+    'disconnected',
+    'connected',
+    'expired',
+  ] as const satisfies readonly CalendarConnectionStatus[]
+
+  it.each(CALENDAR_STATUSES)('offers nothing for a synced meeting (calendar %s)', (calendar) => {
+    expect(syncActionOf(card('synced'), calendar, ADMIN)).toBeNull()
+    expect(syncActionOf(card('synced'), calendar, VIEWER)).toBeNull()
+  })
+
+  it.each(CALENDAR_STATUSES)(
+    'offers to send a pending or failed invite again (calendar %s)',
+    (calendar) => {
+      for (const canManage of [ADMIN, VIEWER]) {
+        expect(syncActionOf(card('pending'), calendar, canManage)).toBe('retry')
+        expect(syncActionOf(card('failed'), calendar, canManage)).toBe('retry')
+      }
+    },
+  )
+
+  // Saved while disconnected, and the calendar has since been connected.
+  it('offers to send it now once the calendar is connected', () => {
+    expect(syncActionOf(card('not_connected'), 'connected', ADMIN)).toBe('retry')
+    expect(syncActionOf(card('not_connected'), 'connected', VIEWER)).toBe('retry')
+  })
+
+  it.each(['disconnected', 'not_configured', 'expired'] as const)(
+    'sends an Admin to connect the calendar while it is %s',
+    (calendar) => {
+      expect(syncActionOf(card('not_connected'), calendar, ADMIN)).toBe('connect')
+    },
+  )
+
+  it.each(['disconnected', 'not_configured', 'expired'] as const)(
+    'tells anyone else to ask an Admin while it is %s',
+    (calendar) => {
+      expect(syncActionOf(card('not_connected'), calendar, VIEWER)).toBe('ask_admin')
+    },
+  )
+
+  it('offers to retry a cancellation that failed to reach the calendar', () => {
+    const failed = toMeetingCard(wire({ status: 'cancelled', syncStatus: 'failed' }))
+
+    expect(syncActionOf(failed, 'connected', VIEWER)).toBe('retry')
+  })
+
+  it('offers nothing on a cancelled card with no note', () => {
+    const pending = toMeetingCard(wire({ status: 'cancelled', syncStatus: 'pending' }))
+
+    expect(syncActionOf(pending, 'connected', ADMIN)).toBeNull()
+  })
+
+  // The card's link reads the same as the Meetings header's.
+  it('labels the connect link "Reconnect" once Google stopped accepting the connection', () => {
+    expect(connectLinkLabel('expired')).toBe('Reconnect Google Calendar')
+    expect(connectLinkLabel('disconnected')).toBe('Connect Google Calendar')
+    expect(connectLinkLabel('not_configured')).toBe('Connect Google Calendar')
+  })
+
+  it('names who can connect it, for everyone else', () => {
+    expect(ASK_ADMIN_NOTE).toBe('Ask an Admin to connect Google Calendar.')
+  })
+})
+
+/*
+ * US-MTG-04 AC1: a new meeting's invite goes out within seconds, from the
+ * worker. The list re-reads itself while an invite is on its way, so the card
+ * turns synced — with its Meet link — without a reload.
+ */
+describe('pendingKeyOf and shouldPollSync', () => {
+  const card = (id: string, syncStatus: SyncStatus, status: MeetingStatus = 'scheduled') =>
+    toMeetingCard(wire({ id, syncStatus, status }))
+
+  it('names the meetings whose invite is on its way, in a stable order', () => {
+    const cards = [card('m-3', 'pending'), card('m-1', 'pending'), card('m-2', 'synced')]
+
+    expect(pendingKeyOf(cards)).toBe('m-1,m-3')
+    expect(shouldPollSync(cards)).toBe(true)
+  })
+
+  // The key is what resets the poll budget, so the same set of meetings in a
+  // different order must not read as a new one.
+  it('is the same key whatever order the page lists them in', () => {
+    const a = [card('m-1', 'pending'), card('m-2', 'pending')]
+    const b = [card('m-2', 'pending'), card('m-1', 'pending')]
+
+    expect(pendingKeyOf(a)).toBe(pendingKeyOf(b))
+  })
+
+  it.each(['synced', 'failed', 'not_connected'] as const)(
+    'does not wait on a meeting whose sync is settled (%s)',
+    (syncStatus) => {
+      expect(pendingKeyOf([card('m-1', syncStatus)])).toBe('')
+      expect(shouldPollSync([card('m-1', syncStatus)])).toBe(false)
+    },
+  )
+
+  // A cancelled card shows no "not sent yet" note, so there is nothing on
+  // screen for a poll to change.
+  it('does not wait on a cancelled meeting', () => {
+    expect(pendingKeyOf([card('m-1', 'pending', 'cancelled')])).toBe('')
+  })
+
+  it('does not wait on an empty page', () => {
+    expect(shouldPollSync([])).toBe(false)
   })
 })

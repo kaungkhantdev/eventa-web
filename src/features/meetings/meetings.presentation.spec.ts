@@ -7,6 +7,8 @@ import {
   meetingInviteNote,
   meetingModeChoice,
   meetingSaveLabel,
+  promisesMeetLink,
+  scheduleNote,
 } from './meetings.presentation'
 import type { MeetingMode } from './meetings.types'
 
@@ -109,6 +111,54 @@ describe('meetingInviteNote', () => {
       expect(meetingInviteNote(mode)).toBe(
         'A Google Calendar invite is emailed to each guest, with a reminder 15 minutes before.',
       )
+    },
+  )
+})
+
+/*
+ * US-MTG-08: with no Google Calendar connected, scheduling saves the meeting
+ * and sends nothing — no invite, no Meet link. The panel said both were
+ * emailed regardless, so an organizer only learned otherwise from the card.
+ */
+describe('scheduleNote', () => {
+  const NOT_CONNECTED =
+    "Google Calendar isn't connected, so this meeting will be saved without an invite or Meet link."
+
+  it.each(['Video', 'In person', 'Phone', NO_MODE] as const)(
+    'keeps the invite note while the calendar is connected (%j)',
+    (mode) => {
+      expect(scheduleNote(mode, true)).toBe(meetingInviteNote(mode))
+    },
+  )
+
+  it.each(['Video', 'In person', 'Phone', NO_MODE] as const)(
+    'says nothing will be sent while it is not (%j)',
+    (mode) => {
+      expect(scheduleNote(mode, false)).toBe(NOT_CONNECTED)
+    },
+  )
+})
+
+/*
+ * The Mode hint under a Video choice — "A Meet link is generated
+ * automatically." — is the same promise, and Google makes the link. Without
+ * a connected calendar it would sit directly above a note saying no Meet link
+ * will be made.
+ */
+describe('promisesMeetLink', () => {
+  it('promises a Meet link for a video call while the calendar is connected', () => {
+    expect(promisesMeetLink('Video', true)).toBe(true)
+  })
+
+  it('promises none while it is not', () => {
+    expect(promisesMeetLink('Video', false)).toBe(false)
+  })
+
+  it.each(['In person', 'Phone', NO_MODE] as const)(
+    'promises none for %j, connected or not',
+    (mode) => {
+      expect(promisesMeetLink(mode, true)).toBe(false)
+      expect(promisesMeetLink(mode, false)).toBe(false)
     },
   )
 })
