@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { toMeetingCard } from './meetings.mapper'
+import { meetingModeChoice } from './meetings.presentation'
 import type { MeetingStatus, MeetingWire, SyncStatus } from './meetings.types'
 
 const wire = (over: Partial<MeetingWire> = {}): MeetingWire => ({
@@ -109,7 +110,18 @@ describe('toMeetingCard', () => {
 
   it('styles the type and the mode', () => {
     expect(toMeetingCard(wire({ type: 'Sponsor' })).typeStyle.icon).toBe('hgi-briefcase-01')
-    expect(toMeetingCard(wire({ mode: 'Phone' })).modeLabel).toBe('Phone')
+    expect(toMeetingCard(wire({ mode: 'Phone' })).modeLabel).toBe('Phone call')
+  })
+
+  // US-MTG-03: the badge repeats the words the organizer picked in the panel,
+  // so a new card never shows a mode that seems to have come from nowhere.
+  it.each([
+    ['Video', 'Video call'],
+    ['In person', 'In person'],
+    ['Phone', 'Phone call'],
+  ] as const)('badges %s as "%s", the words the panel offered', (mode, label) => {
+    expect(toMeetingCard(wire({ mode })).modeLabel).toBe(label)
+    expect(meetingModeChoice(mode)).toContain(label)
   })
 
   // Whether a join button appears is the API's call: it knows the meeting is

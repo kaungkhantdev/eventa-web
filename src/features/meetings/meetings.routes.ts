@@ -120,7 +120,9 @@ export function meetingInputOf(form: FormData): Record<string, unknown> {
     startTime: String(form.get('startTime') ?? ''),
     endTime: String(form.get('endTime') ?? ''),
     type: String(form.get('type') ?? 'Internal'),
-    mode: String(form.get('mode') ?? 'Video'),
+    // No default: the organizer must choose (US-MTG-03). A missing choice goes
+    // as an empty one, which the API refuses, rather than as a video call.
+    mode: String(form.get('mode') ?? ''),
     person: String(form.get('person') ?? '').trim(),
     role: String(form.get('role') ?? '').trim() || undefined,
     guestEmail: String(form.get('guestEmail') ?? '').trim(),

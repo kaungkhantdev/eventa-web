@@ -15,7 +15,15 @@ import { toast } from '@/lib/toast'
 import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import { MEETING_MODES, MEETING_TYPES } from '../meetings.routes'
-import { meetingSaveLabel } from '../meetings.presentation'
+import {
+  MEETING_MODE_PROMPT,
+  NO_MODE,
+  initialMeetingMode,
+  makesMeetLink,
+  meetingModeChoice,
+  meetingSaveLabel,
+  type MeetingModeChoice,
+} from '../meetings.presentation'
 import type { MeetingDraft } from '../meetings.types'
 
 /** Schedule or reschedule a meeting (US-MTG-01/02). */
@@ -55,13 +63,19 @@ export function MeetingPanel({
   })
 
   // Re-seeded from the meeting being edited each time the panel opens, so a
-  // reschedule does not inherit the previous one's event. Adjusted during
-  // render rather than in an effect, so the picker is right on the first paint.
+  // reschedule does not inherit the previous one's event or mode. Adjusted
+  // during render rather than in an effect, so both are right on the first
+  // paint. The mode is held here, not left to the box, because the Meet-link
+  // hint depends on it.
   const [eventId, setEventId] = useState(editing?.eventId ?? '')
+  const [mode, setMode] = useState(initialMeetingMode(editing))
   const [wasOpen, setWasOpen] = useState(open)
   if (open !== wasOpen) {
     setWasOpen(open)
-    if (open) setEventId(editing?.eventId ?? '')
+    if (open) {
+      setEventId(editing?.eventId ?? '')
+      setMode(initialMeetingMode(editing))
+    }
   }
 
   return (
@@ -168,14 +182,25 @@ export function MeetingPanel({
           </div>
           <div>
             <Label htmlFor="meeting-mode">Mode</Label>
-            <Select id="meeting-mode" name="mode" defaultValue={editing?.mode ?? 'Video'}>
-              {MEETING_MODES.map((mode) => (
-                <option key={mode} value={mode}>
-                  {mode}
+            {/* Required, with nothing chosen for a new meeting (US-MTG-03): a
+                preselected Video scheduled video calls nobody had picked. */}
+            <Select
+              id="meeting-mode"
+              name="mode"
+              required
+              value={mode}
+              onChange={(event) => setMode(event.target.value as MeetingModeChoice)}
+            >
+              <option value={NO_MODE} disabled>
+                {MEETING_MODE_PROMPT}
+              </option>
+              {MEETING_MODES.map((choice) => (
+                <option key={choice} value={choice}>
+                  {meetingModeChoice(choice)}
                 </option>
               ))}
             </Select>
-            <Hint>A Meet link is generated automatically.</Hint>
+            {makesMeetLink(mode) && <Hint>A Meet link is generated automatically.</Hint>}
           </div>
         </div>
 

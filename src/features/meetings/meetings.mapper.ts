@@ -6,6 +6,7 @@ import type {
   SyncStatus,
   TypeStyle,
 } from './meetings.types'
+import { MEETING_MODE_LABEL } from './meetings.presentation'
 
 /** The rules behind the meetings list (US-MTG-01..06). */
 
@@ -33,10 +34,16 @@ export const TYPE_STYLE: Record<MeetingType, TypeStyle> = {
   Internal: { tint: 'bg-brand-soft text-brand', icon: 'hgi-user-group' },
 }
 
+// The label comes from the panel's wording, so the badge repeats what the
+// organizer chose there (US-MTG-03).
 const MODE_STYLE: Record<MeetingMode, { icon: string; label: string; badge: string }> = {
-  Video: { icon: 'hgi-video-01', label: 'Video call', badge: 'badge-blue' },
-  'In person': { icon: 'hgi-location-01', label: 'In person', badge: 'badge-gray' },
-  Phone: { icon: 'hgi-call-02', label: 'Phone', badge: 'badge-gray' },
+  Video: { icon: 'hgi-video-01', label: MEETING_MODE_LABEL.Video, badge: 'badge-blue' },
+  'In person': {
+    icon: 'hgi-location-01',
+    label: MEETING_MODE_LABEL['In person'],
+    badge: 'badge-gray',
+  },
+  Phone: { icon: 'hgi-call-02', label: MEETING_MODE_LABEL.Phone, badge: 'badge-gray' },
 }
 
 /**

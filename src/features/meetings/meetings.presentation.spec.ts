@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { meetingSaveLabel } from './meetings.presentation'
+import {
+  MEETING_MODE_LABEL,
+  NO_MODE,
+  initialMeetingMode,
+  makesMeetLink,
+  meetingModeChoice,
+  meetingSaveLabel,
+} from './meetings.presentation'
+import type { MeetingMode } from './meetings.types'
+
+/**
+ * Every mode the API accepts, written out rather than taken from the union so
+ * a mode added there has to be named here — and so given words — before this
+ * file compiles.
+ */
+const API_MEETING_MODES = ['Video', 'In person', 'Phone'] as const satisfies readonly MeetingMode[]
 
 /**
  * The panel's primary button said "Save meeting" for both jobs. The kit calls
@@ -25,5 +40,51 @@ describe('meetingSaveLabel', () => {
   it('reports the write in progress, whichever job it is', () => {
     expect(meetingSaveLabel(false, true)).toBe('Saving…')
     expect(meetingSaveLabel(true, true)).toBe('Saving…')
+  })
+})
+
+/**
+ * US-MTG-03: the panel opened with Video already chosen and spelled "Video",
+ * so an organizer who never touched the box scheduled a video call without
+ * knowing — and only found out from the "Video call" badge on the new card.
+ */
+describe('initialMeetingMode', () => {
+  it('chooses nothing for a new meeting', () => {
+    expect(initialMeetingMode(null)).toBe(NO_MODE)
+  })
+
+  it('keeps the mode a meeting was saved with when it is edited', () => {
+    expect(initialMeetingMode({ mode: 'Phone' })).toBe('Phone')
+    expect(initialMeetingMode({ mode: 'Video' })).toBe('Video')
+  })
+})
+
+describe('meetingModeChoice', () => {
+  it('offers each mode in the words its badge will use', () => {
+    expect(meetingModeChoice('Video')).toBe('Video call (Google Meet)')
+    expect(meetingModeChoice('In person')).toBe('In person')
+    expect(meetingModeChoice('Phone')).toBe('Phone call')
+  })
+
+  // The badge is what the organizer reads afterwards, so the choice they made
+  // has to be recognisable in it — "Video" chosen, "Video call" shown was the
+  // mismatch that made the badge look like it came from nowhere.
+  it.each(API_MEETING_MODES)('starts with the badge label for %s', (mode) => {
+    expect(meetingModeChoice(mode).startsWith(MEETING_MODE_LABEL[mode])).toBe(true)
+  })
+})
+
+describe('makesMeetLink', () => {
+  it('promises a Meet link for a video call', () => {
+    expect(makesMeetLink('Video')).toBe(true)
+  })
+
+  it('promises none for a meeting held in person or by phone', () => {
+    expect(makesMeetLink('In person')).toBe(false)
+    expect(makesMeetLink('Phone')).toBe(false)
+  })
+
+  it('promises none before a mode has been chosen', () => {
+    expect(makesMeetLink(NO_MODE)).toBe(false)
   })
 })
