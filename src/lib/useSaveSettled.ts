@@ -13,10 +13,12 @@ import {
  * A panel's or a dialog's save, reported once — see `saveSettled.ts` for the
  * rule and why "idle and ok" is not it.
  *
- * `onSaved` runs on the render a submission made while the panel is open comes
- * back accepted, and never again for that answer: not on a later close, a
- * reopen, or a re-render. `refusal` is the API's sentence for a submission made
- * since the panel last opened, so a reopened panel starts clean. `opening`
+ * `onSaved` runs on the render a submission sent in this opening of the panel
+ * comes back accepted, and never again for that answer: not on a later close, a
+ * reopen, or a re-render — nor in a later opening, when the panel was closed
+ * mid-save and opened again before the answer came. `refusal` is the API's
+ * sentence for a submission sent since the panel last opened, so a reopened
+ * panel starts clean. `opening`
  * changes each time the panel opens; key the form on it and every opening is
  * seeded afresh rather than showing what was typed into the last one.
  */

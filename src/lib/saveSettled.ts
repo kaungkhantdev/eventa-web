@@ -6,8 +6,8 @@
  * answer" is therefore a STATE that lasts the rest of the page's life, not an
  * event, and a panel that closed itself on it closed again on every reopen.
  * What is tracked here is the moment the fetcher goes from busy to idle — once
- * per submission — and, for the panel's error line, only an answer that came
- * back since the panel last opened.
+ * per submission, and only to the opening of the panel that sent it — and, for
+ * the panel's error line, only an answer that came back since it last opened.
  */
 
 /** React Router's fetcher states. */
@@ -41,6 +41,12 @@ export interface SaveTrack<R extends SaveResult> {
   readonly open: boolean
   /** How many times the panel has opened — a key that rebuilds its form per opening. */
   readonly opening: number
+  /**
+   * The opening the submission in flight was sent from, or null when none is.
+   * Escape and the overlay close a panel mid-save, and Edit on another row can
+   * open it again before the answer is in; that answer is the sender's news.
+   */
+  readonly submittedIn: number | null
   /** The submission that finished since the panel last opened, if any. */
   readonly settlement: Settlement<R> | null
 }
@@ -54,13 +60,14 @@ export function settled(previous: FetcherState, next: FetcherState): boolean {
 
 /**
  * Where a component starts. Whatever its fetcher already holds is somebody
- * else's news: a keyed fetcher outlives the component that last used it.
+ * else's news: a keyed fetcher outlives the component that last used it. A
+ * submission still in flight counts as the first opening's.
  */
 export function startSaveTrack<R extends SaveResult>(
   state: FetcherState,
   open: boolean,
 ): SaveTrack<R> {
-  return { state, open, opening: 0, settlement: null }
+  return { state, open, opening: 0, submittedIn: state === IDLE ? null : 0, settlement: null }
 }
 
 /**
@@ -73,24 +80,39 @@ export function trackSave<R extends SaveResult>(
 ): SaveTrack<R> {
   if (state === track.state && open === track.open) return track
   const reopened = open && !track.open
+  const opening = reopened ? track.opening + 1 : track.opening
+  const finished = settled(track.state, state)
   return {
     state,
     open,
-    opening: reopened ? track.opening + 1 : track.opening,
-    settlement: settlementAfter(track, state, open, data, reopened),
+    opening,
+    submittedIn: submittedInAfter(track, state, opening, finished),
+    settlement: settlementAfter(track, { state, open, data }, opening, finished, reopened),
   }
+}
+
+function submittedInAfter<R extends SaveResult>(
+  track: SaveTrack<R>,
+  state: FetcherState,
+  opening: number,
+  finished: boolean,
+): number | null {
+  if (finished) return null
+  return track.state === IDLE && state !== IDLE ? opening : track.submittedIn
 }
 
 function settlementAfter<R extends SaveResult>(
   track: SaveTrack<R>,
-  state: FetcherState,
-  open: boolean,
-  data: R | undefined,
+  { open, data }: SaveRender<R>,
+  opening: number,
+  finished: boolean,
   reopened: boolean,
 ): Settlement<R> | null {
-  // Finishing behind a closed panel is nobody's news: there is nothing left to
-  // close, and the toast would explain nothing on screen.
-  if (settled(track.state, state)) return open ? { result: data } : null
+  // Only the opening that sent it hears the answer. Finishing behind a closed
+  // panel is nobody's news — there is nothing left to close, and the toast
+  // would explain nothing on screen — and finishing in a later opening, or a
+  // keyed fetcher swapped in by the reopen, is another record's.
+  if (finished) return open && track.submittedIn === opening ? { result: data } : null
   return reopened ? null : track.settlement
 }
 

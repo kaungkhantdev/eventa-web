@@ -130,6 +130,60 @@ describe('trackSave', () => {
       const mounted = startSaveTrack<SaveResult>('idle', true)
       expect(savedBy(trackSave(mounted, { state: 'idle', open: true, data: OK }))).toBe(false)
     })
+
+    it('is reported when it was already under way as the panel mounted', () => {
+      const mounted = startSaveTrack<SaveResult>('submitting', true)
+      expect(savedBy(after([{ state: 'idle', open: true, data: OK }], mounted))).toBe(true)
+    })
+  })
+
+  describe('a submission sent before the panel was closed and opened again', () => {
+    // Escape and the overlay close a panel mid-save, and Edit on another row
+    // opens it again before that save's answer is in. The answer belongs to the
+    // opening that sent it: meeting B's panel must not close itself on meeting
+    // A's save, toast for it, or show A's refusal.
+    const reopenedWhile = (busy: FetcherState, data: SaveResult): Render[] => [
+      { state: 'submitting', open: true },
+      { state: 'submitting', open: false },
+      { state: busy, open: true, data: busy === 'loading' ? data : undefined },
+      { state: 'idle', open: true, data },
+    ]
+
+    it.each(['submitting', 'loading'] as const)(
+      'is not the new opening’s save when it was still %s at the reopen',
+      (busy) => {
+        const track = after(reopenedWhile(busy, OK))
+        expect(savedBy(track)).toBe(false)
+        expect(track.settlement).toBeNull()
+      },
+    )
+
+    it.each(['submitting', 'loading'] as const)(
+      'puts no refusal on the new opening when it was still %s at the reopen',
+      (busy) => {
+        expect(refusalIn(after(reopenedWhile(busy, REFUSED)))).toBeNull()
+      },
+    )
+
+    it('leaves the new opening’s own save to be reported', () => {
+      const reopened = after(reopenedWhile('loading', REFUSED))
+      expect(savedBy(after(submission(OK), reopened))).toBe(true)
+    })
+
+    it('is not settled by a keyed fetcher the reopen swapped in', () => {
+      // DeleteSpeakerModal keys its fetcher by speaker. Closed while speaker
+      // A's removal is in flight and opened on speaker B, the tracker sees A's
+      // busy fetcher, then B's idle one holding B's own earlier answer.
+      for (const old of [OK, REFUSED]) {
+        const swapped = after([
+          { state: 'submitting', open: true },
+          { state: 'submitting', open: false },
+          { state: 'idle', open: true, data: old },
+        ])
+        expect(savedBy(swapped)).toBe(false)
+        expect(refusalIn(swapped)).toBeNull()
+      }
+    })
   })
 
   describe('a refusal', () => {
