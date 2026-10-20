@@ -25,7 +25,7 @@ export const REPORTS = [
  * the way the static page did. Not `hashIndex`, which is for lists that have no
  * order of their own — here the order is the point.
  */
-export const MIX_RAMP = ['#1ba770', '#4cbd96', '#9fe0cd', '#d1d5db']
+export const MIX_RAMP = ['#00c066', '#3ecf8b', '#a0e7c6', '#d1d5db']
 
 /** The stages the status control offers; '' is "every stage". */
 export const EVENT_LIFECYCLES = ['upcoming', 'live', 'completed', 'cancelled', ''] as const

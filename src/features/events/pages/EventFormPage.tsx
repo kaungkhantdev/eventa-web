@@ -202,7 +202,7 @@ function SeatMapPreview({
           <path
             d="M8 24 Q200 2 392 24"
             fill="none"
-            stroke="rgba(27,167,112,.7)"
+            stroke="rgba(0,192,102,.7)"
             strokeWidth="2.5"
             strokeLinecap="round"
           />

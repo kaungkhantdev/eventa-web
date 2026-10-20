@@ -98,7 +98,7 @@ function Ready({
 /** register.html's `#cpw-hint`, colours and all — the kit writes them as hex. */
 function MatchHint({ matches }: { matches: boolean }) {
   return (
-    <p className="hint" style={{ color: matches ? '#1ba770' : '#ef4444' }}>
+    <p className="hint" style={{ color: matches ? '#00c066' : '#ef4444' }}>
       {matches ? 'Passwords match' : 'Passwords do not match'}
     </p>
   )

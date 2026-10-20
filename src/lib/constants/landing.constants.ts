@@ -10,7 +10,7 @@ export const DEFAULT_HIGHLIGHT_ICON = 'hgi-sparkles'
 /* Page-scoped CSS from the source <style> block (focus rings, FAQ chevron, the
    reveal keyframe and the transparent→solid sticky bar). */
 export const ATLAS_STYLE = `
-a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid #1ba770; outline-offset: 3px; border-radius: 12px; }
+a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid #00c066; outline-offset: 3px; border-radius: 12px; }
 .on-brand:focus-visible { outline-color: #fff; }
 .faq[open] .faq-chev { transform: rotate(180deg); }
 summary::-webkit-details-marker { display: none; }
@@ -26,11 +26,11 @@ summary { list-style: none; }
 #bar-title { color: #fff; }
 #bar.bar-solid #bar-title { color: rgb(var(--ink)); }
 #bar-logo { background: rgba(255,255,255,.16); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
-#bar.bar-solid #bar-logo { background: #1ba770; color: #fff; box-shadow: none; }
-.bar-reg { background: #fff; color: #1ba770; }
+#bar.bar-solid #bar-logo { background: #00c066; color: #fff; box-shadow: none; }
+.bar-reg { background: #fff; color: #00c066; }
 .bar-reg:hover { background: rgba(255,255,255,.9); }
-#bar.bar-solid .bar-reg { background: #1ba770; color: #fff; }
-#bar.bar-solid .bar-reg:hover { background: #178a60; }
+#bar.bar-solid .bar-reg { background: #00c066; color: #fff; }
+#bar.bar-solid .bar-reg:hover { background: #00a256; }
 `
 
 /* Page-scoped CSS from the source <style> block: the 1080px content column,
@@ -38,7 +38,7 @@ summary { list-style: none; }
 export const AURORA_STYLE = `
 .wrap { max-width: 1080px; margin-inline: auto; }
 a:focus-visible, button:focus-visible, summary:focus-visible {
-  outline: 2px solid #1ba770; outline-offset: 3px; border-radius: 10px;
+  outline: 2px solid #00c066; outline-offset: 3px; border-radius: 10px;
 }
 .on-brand:focus-visible { outline-color: #fff; }
 .faq[open] .faq-chev { transform: rotate(180deg); }
@@ -59,7 +59,7 @@ export const MINIMAL_STYLE = `
   html { scroll-behavior: smooth; }
   body { overflow-x: hidden; }
   a:focus-visible, button:focus-visible, summary:focus-visible {
-    outline: 2px solid #1ba770;
+    outline: 2px solid #00c066;
     outline-offset: 3px;
     border-radius: 6px;
   }
@@ -85,7 +85,7 @@ export const NOIR_STYLE = `
   html, body { overflow-x: hidden; }
   summary { list-style: none; }
   summary::-webkit-details-marker { display: none; }
-  :focus-visible { outline: 2px solid #1ba770; outline-offset: 2px; border-radius: 6px; }
+  :focus-visible { outline: 2px solid #00c066; outline-offset: 2px; border-radius: 6px; }
   @media (prefers-reduced-motion: no-preference) {
     html { scroll-behavior: smooth; }
     @keyframes eventa-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }

@@ -257,11 +257,11 @@ export const PAGE_ACCENT_MAX = 9
 export const SCOPED_CSS = `
 .efhouse{background:radial-gradient(120% 90% at 50% -10%, #17201c 0%, #0c110f 60%)}
 .efseat{height:16px;width:16px;flex:none;border-radius:5px 5px 2px 2px;background:rgba(255,255,255,.16)}
-.efseat-sel{background:#1ba770;box-shadow:0 0 0 2px rgba(27,167,112,.3)}
+.efseat-sel{background:#00c066;box-shadow:0 0 0 2px rgba(0,192,102,.3)}
 .efseat-booked{background:rgba(255,255,255,.05)}
 .efrowlab{color:rgba(255,255,255,.5);font-size:10px;font-weight:600;width:14px;text-align:center;flex:none}
 #desc-editor-wrap{ border:1px solid rgb(var(--hair)); border-radius:10px; background:rgb(var(--surface)); transition:box-shadow .15s ease; }
-#desc-editor-wrap:focus-within{ box-shadow:0 0 0 4px rgb(27 167 112 / .15); }
+#desc-editor-wrap:focus-within{ box-shadow:0 0 0 4px rgb(0 192 102 / .15); }
 #desc-editor-wrap .ql-toolbar.ql-snow{ border:0; border-bottom:1px solid rgb(var(--line)); border-radius:10px 10px 0 0; padding:7px 8px; }
 #desc-editor-wrap .ql-container.ql-snow{ border:0; border-radius:0 0 10px 10px; font-family:inherit; font-size:13px; }
 #desc-editor-wrap .ql-editor{ min-height:118px; padding:12px; line-height:1.6; color:rgb(var(--ink)); }
@@ -271,14 +271,14 @@ export const SCOPED_CSS = `
 #desc-editor-wrap .ql-snow .ql-picker{ color:rgb(var(--ink)); }
 #desc-editor-wrap .ql-snow.ql-toolbar button:hover .ql-stroke,
 #desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-stroke,
-#desc-editor-wrap .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke{ stroke:#1ba770; }
+#desc-editor-wrap .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke{ stroke:#00c066; }
 #desc-editor-wrap .ql-snow.ql-toolbar button:hover .ql-fill,
-#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-fill{ fill:#1ba770; }
+#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-fill{ fill:#00c066; }
 #desc-editor-wrap .ql-snow.ql-toolbar button:hover,
 #desc-editor-wrap .ql-snow.ql-toolbar button.ql-active,
 #desc-editor-wrap .ql-snow .ql-picker-label:hover,
 #desc-editor-wrap .ql-snow .ql-picker-item:hover,
-#desc-editor-wrap .ql-snow .ql-picker-item.ql-selected{ color:#1ba770; }
+#desc-editor-wrap .ql-snow .ql-picker-item.ql-selected{ color:#00c066; }
 #desc-editor-wrap .ql-snow .ql-picker-options{ background:rgb(var(--surface)); border-color:rgb(var(--hair))!important; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.14); }
 #desc-editor-wrap .ql-snow .ql-tooltip{ background:rgb(var(--surface)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); box-shadow:0 8px 24px rgba(0,0,0,.16); border-radius:8px; }
 #desc-editor-wrap .ql-snow .ql-tooltip input[type=text]{ background:rgb(var(--canvas)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); border-radius:6px; }

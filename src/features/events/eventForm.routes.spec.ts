@@ -86,7 +86,7 @@ describe('pageChangesOf', () => {
     ...toEventFormValues(null, [], []),
     id: 'evt-1',
     slug: 'tech-summit-2026',
-    accentColor: '#1BA770',
+    accentColor: '#00C066',
   }
   const typed = (fields: Record<string, string>) => {
     const data = new FormData()
@@ -96,7 +96,7 @@ describe('pageChangesOf', () => {
 
   it('sends a new address', () => {
     expect(
-      pageChangesOf(saved, typed({ slug: ' bkk-summit ', accentColor: '#1BA770' })),
+      pageChangesOf(saved, typed({ slug: ' bkk-summit ', accentColor: '#00C066' })),
     ).toEqual({ slug: 'bkk-summit' })
   })
 
@@ -108,14 +108,14 @@ describe('pageChangesOf', () => {
 
   it('sends nothing when neither changed, or neither was on the form', () => {
     expect(
-      pageChangesOf(saved, typed({ slug: 'tech-summit-2026', accentColor: '#1BA770' })),
+      pageChangesOf(saved, typed({ slug: 'tech-summit-2026', accentColor: '#00C066' })),
     ).toBeNull()
     expect(pageChangesOf(saved, typed({}))).toBeNull()
   })
 
   // An emptied box is not a request for an address, or a colour, of nothing.
   it('keeps the address or the colour when its box is emptied', () => {
-    expect(pageChangesOf(saved, typed({ slug: '  ', accentColor: '#1BA770' }))).toBeNull()
+    expect(pageChangesOf(saved, typed({ slug: '  ', accentColor: '#00C066' }))).toBeNull()
     expect(pageChangesOf(saved, typed({ slug: 'tech-summit-2026', accentColor: '' }))).toBeNull()
   })
 })

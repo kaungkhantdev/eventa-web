@@ -450,9 +450,9 @@ function SeatPicker({
           <svg viewBox="0 0 400 34" className="w-full max-w-md" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="stageg" x1="0" x2="1">
-                <stop offset="0" stopColor="#1ba770" stopOpacity="0" />
-                <stop offset=".5" stopColor="#1ba770" />
-                <stop offset="1" stopColor="#1ba770" stopOpacity="0" />
+                <stop offset="0" stopColor="#00c066" stopOpacity="0" />
+                <stop offset=".5" stopColor="#00c066" />
+                <stop offset="1" stopColor="#00c066" stopOpacity="0" />
               </linearGradient>
             </defs>
             <path d="M8 30 Q200 2 392 30" fill="none" stroke="url(#stageg)" strokeWidth="2.5" strokeLinecap="round" />

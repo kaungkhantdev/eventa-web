@@ -17,7 +17,7 @@ interface TypeLook {
 
 const DEFAULT_LOOK: TypeLook = {
   icon: 'hgi-ticket-star',
-  colour: '#1ba770',
+  colour: '#00c066',
 }
 
 const LOOKS: Record<EventType, TypeLook> = {
@@ -35,7 +35,7 @@ export function lookOfType(type: string): TypeLook {
   return LOOKS[type as EventType] ?? DEFAULT_LOOK
 }
 
-export const ALL_LOOK: TypeLook = { icon: 'hgi-sparkles', colour: '#1ba770' }
+export const ALL_LOOK: TypeLook = { icon: 'hgi-sparkles', colour: '#00c066' }
 
 /** The icon and colour for a chip on the category strip. */
 export function lookOfCategory(category: string): TypeLook {

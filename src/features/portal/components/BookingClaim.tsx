@@ -115,7 +115,7 @@ function NewPasswordFields() {
           onChange={setConfirm}
         />
         {confirm && (
-          <p className="hint" style={{ color: confirm === password ? '#1ba770' : '#ef4444' }}>
+          <p className="hint" style={{ color: confirm === password ? '#00c066' : '#ef4444' }}>
             {confirm === password ? 'Passwords match' : 'Passwords do not match'}
           </p>
         )}

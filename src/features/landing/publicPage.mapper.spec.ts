@@ -35,7 +35,7 @@ const page = (over: Partial<PublicPageWire> = {}): PublicPageWire => ({
     venueAddress: '1 Phra Pradaeng',
     city: 'Samut Prakan',
     coverImage: null,
-    accentColor: '#1ba770',
+    accentColor: '#00c066',
     organizerName: 'Eventa Co.',
     template: 'noir',
     locale: 'en',

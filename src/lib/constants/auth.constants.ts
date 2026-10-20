@@ -41,7 +41,7 @@ export const STRONG_LENGTH = 12
 export const STRENGTH_COLORS: Record<1 | 2 | 3, string> = {
   1: '#ef4444',
   2: '#d97706',
-  3: '#1ba770',
+  3: '#00c066',
 }
 
 export const STRENGTH_TEXTS: Record<0 | 1 | 2 | 3, string> = {

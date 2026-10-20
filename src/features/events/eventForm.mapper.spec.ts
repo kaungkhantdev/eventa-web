@@ -139,7 +139,7 @@ describe('hydrating the wizard from an event being edited', () => {
 
   // The publish step shows the page's colour so it can be changed (US-PAGE-10).
   it('reads the page’s accent colour back, and none as blank', () => {
-    expect(toEventFormValues(event({ accentColor: '#1BA770' }), [], []).accentColor).toBe('#1BA770')
+    expect(toEventFormValues(event({ accentColor: '#00C066' }), [], []).accentColor).toBe('#00C066')
     expect(toEventFormValues(event({ accentColor: null }), [], []).accentColor).toBe('')
   })
 

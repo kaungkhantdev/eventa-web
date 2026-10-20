@@ -7,7 +7,7 @@
    Colours are expressed as CSS token references (never raw hex) so the charts flip
    with the theme automatically — no JS theme detection, no re-render on toggle:
 
-     brand  #1ba770         the one accent, identical in both themes
+     brand  #00c066         the one accent, identical in both themes
      grid   rgb(var(--line))   the hairline token  (#eef0f3 light)
      axis   rgb(var(--muted))  the muted label token (#8b93a4 light)
      ring   rgb(var(--surface)) card colour, so the dot's halo reads as a cut-out

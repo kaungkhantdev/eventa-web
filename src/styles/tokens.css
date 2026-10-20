@@ -13,7 +13,7 @@
   --line: 238 240 243;
   --ink: 19 42 34;
   --muted: 139 147 164;
-  --brand-soft: 230 246 239;
+  --brand-soft: 230 249 240;
 }
 
 html.dark {
@@ -24,7 +24,7 @@ html.dark {
   --line: 34 42 38;
   --ink: 232 237 234;
   --muted: 143 154 162;
-  --brand-soft: 22 46 36;
+  --brand-soft: 10 52 32;
   color-scheme: dark;
 }
 

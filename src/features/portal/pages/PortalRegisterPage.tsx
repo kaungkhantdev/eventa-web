@@ -178,7 +178,7 @@ function DirectSignUp() {
             </IconButton>
           </div>
           {confirm && (
-            <p className="hint" style={{ color: cpwMatch ? '#1ba770' : '#ef4444' }}>
+            <p className="hint" style={{ color: cpwMatch ? '#00c066' : '#ef4444' }}>
               {cpwMatch ? 'Passwords match' : 'Passwords do not match'}
             </p>
           )}

@@ -97,13 +97,13 @@ export const MEETING_TINTS: readonly string[] = [
  * Literal hex, as in the source: an SVG `stroke` cannot read a Tailwind token,
  * and these four are the kit's own donut palette.
  */
-export const SHARE_COLORS: readonly string[] = ['#1ba770', '#3b82f6', '#ec4899', '#f59e0b']
+export const SHARE_COLORS: readonly string[] = ['#00c066', '#3b82f6', '#ec4899', '#f59e0b']
 
 /**
  * The ticket-type donut's ramp: the brand green fading to grey, as in the kit.
  * Largest share first, so the ramp reads as an ordering rather than a palette.
  */
-export const TIER_COLORS: readonly string[] = ['#1ba770', '#4cbd96', '#9fe0cd', '#d1d5db']
+export const TIER_COLORS: readonly string[] = ['#00c066', '#3ecf8b', '#a0e7c6', '#d1d5db']
 
 /** The three urgency bands of the selling-fast list, mildest last. */
 export const URGENCY = {

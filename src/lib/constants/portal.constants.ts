@@ -136,10 +136,10 @@ export const SWITCH_CSS = `
 .switch input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .switch .track{height:1.25rem;width:2.25rem;border-radius:9999px;background:rgb(var(--line));transition:background .18s}
 .switch .dot{position:absolute;left:.125rem;height:1rem;width:1rem;border-radius:9999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .18s}
-.switch input:checked + .track{background:#1ba770}
+.switch input:checked + .track{background:#00c066}
 .switch input:checked ~ .dot{transform:translateX(1rem)}
 button.switch{appearance:none;background:none;border:0;padding:0}
-.switch[aria-checked="true"] .track{background:#1ba770}
+.switch[aria-checked="true"] .track{background:#00c066}
 .switch[aria-checked="true"] .dot{transform:translateX(1rem)}
 `
 
@@ -301,8 +301,8 @@ export const SEAT_CSS = `
 }
 .seat::after { content: ''; position: absolute; bottom: -3px; left: 4px; right: 4px; height: 3px; border-radius: 2px; background: inherit; opacity: .55; }
 .seat-avail  { background: rgba(255,255,255,.08); color: rgba(255,255,255,.72); cursor: pointer; }
-.seat-avail:hover { background: rgba(27,167,112,.4); color: #fff; }
-.seat-sel    { background: #1ba770; color: #fff; cursor: pointer; box-shadow: 0 0 0 3px rgba(27,167,112,.28); }
+.seat-avail:hover { background: rgba(0,192,102,.4); color: #fff; }
+.seat-sel    { background: #00c066; color: #fff; cursor: pointer; box-shadow: 0 0 0 3px rgba(0,192,102,.28); }
 .seat-booked { background: rgba(255,255,255,.035); color: rgba(255,255,255,.16); cursor: not-allowed; }
 .rowlab { color: rgba(255,255,255,.4); font-size: 12px; font-weight: 600; width: 18px; text-align: center; }
 `

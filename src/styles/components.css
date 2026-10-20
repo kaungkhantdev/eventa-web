@@ -68,11 +68,11 @@
   font-size: 12px;
 }
 .btn-primary {
-  background: #1ba770;
+  background: #00c066;
   color: #fff;
 }
 .btn-primary:hover {
-  background: #157e56;
+  background: #00924e;
 }
 .btn-ghost {
   color: rgb(var(--ink));
@@ -84,18 +84,18 @@
 }
 /* soft/tonal primary — light brand fill; use on white surface cards */
 .btn-soft {
-  color: #157e56;
+  color: #00924e;
   background: rgb(var(--brand-soft));
 }
 .btn-soft:hover {
-  color: #157e56;
-  background: color-mix(in srgb, rgb(var(--brand-soft)), #1ba770 12%);
+  color: #00924e;
+  background: color-mix(in srgb, rgb(var(--brand-soft)), #00c066 12%);
 }
 html.dark .btn-soft {
-  color: #45c98f;
+  color: #43d18e;
 }
 html.dark .btn-soft:hover {
-  color: #45c98f;
+  color: #43d18e;
 }
 .btn-danger {
   background: #ef4444;
@@ -169,8 +169,8 @@ html.dark .btn-soft:hover {
 .select:focus,
 .textarea:focus {
   outline: none;
-  border-color: #1ba770;
-  box-shadow: 0 0 0 3px rgba(27, 167, 112, 0.15);
+  border-color: #00c066;
+  box-shadow: 0 0 0 3px rgba(0, 192, 102, 0.15);
 }
 .textarea {
   resize: vertical;
@@ -197,10 +197,10 @@ html.dark .btn-soft:hover {
 }
 .badge-green {
   background: rgb(var(--brand-soft));
-  color: #157e56;
+  color: #00924e;
 }
 html.dark .badge-green {
-  color: #45c98f;
+  color: #43d18e;
 }
 .badge-amber {
   background: #fffbeb;
@@ -292,11 +292,11 @@ html.dark .badge-purple {
   place-items: center;
   border-radius: 9999px;
   background: rgb(var(--brand-soft));
-  color: #157e56;
+  color: #00924e;
   font-weight: 600;
 }
 html.dark .avatar {
-  color: #45c98f;
+  color: #43d18e;
 }
 
 /* ---------- Slide-over panels & modals ---------- */
@@ -368,8 +368,8 @@ html.dark .avatar {
   color: rgb(var(--ink));
 }
 .tab.tab-active {
-  color: #1ba770;
-  border-bottom-color: #1ba770;
+  color: #00c066;
+  border-bottom-color: #00c066;
 }
 
 /* pill tabs with count badge */
@@ -393,10 +393,10 @@ html.dark .avatar {
 }
 .pilltab.tab-active {
   background: rgb(var(--brand-soft));
-  color: #157e56;
+  color: #00924e;
 }
 html.dark .pilltab.tab-active {
-  color: #45c98f;
+  color: #43d18e;
 }
 .pilltab-count {
   display: inline-grid;
@@ -413,11 +413,11 @@ html.dark .pilltab.tab-active {
 }
 .pilltab.tab-active .pilltab-count {
   background: #fff;
-  color: #157e56;
+  color: #00924e;
 }
 html.dark .pilltab.tab-active .pilltab-count {
   background: rgb(255 255 255 / 0.14);
-  color: #45c98f;
+  color: #43d18e;
 }
 
 /* ---------- Skeleton placeholders ----------
@@ -588,7 +588,7 @@ html.dark .segmented button.active {
   width: 3.5rem;
   border-radius: 1rem;
   background: rgb(var(--brand-soft));
-  color: #1ba770;
+  color: #00c066;
   font-size: 26px;
 }
 .empty-title {
@@ -750,7 +750,7 @@ html.dark .segmented button.active {
 .checkbox:focus-visible {
   outline: none;
   border-color: var(--color-brand);
-  box-shadow: 0 0 0 3px rgba(27, 167, 112, 0.15);
+  box-shadow: 0 0 0 3px rgba(0, 192, 102, 0.15);
 }
 .checkbox:disabled {
   cursor: not-allowed;

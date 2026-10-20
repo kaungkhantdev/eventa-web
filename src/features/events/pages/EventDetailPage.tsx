@@ -1567,7 +1567,7 @@ function posterSVG(event: ShareEvent): string {
   const headline = title.length > 22 ? title.slice(0, 21) + '…' : title
   return (
     '<svg viewBox="0 0 440 540" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto" font-family="Inter, system-ui, sans-serif">' +
-    '<defs><linearGradient id="pbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1aa873"/><stop offset="1" stop-color="#128455"/></linearGradient>' +
+    '<defs><linearGradient id="pbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00c066"/><stop offset="1" stop-color="#008e4b"/></linearGradient>' +
     '<clipPath id="pcl"><rect x="0" y="0" width="440" height="540" rx="22"/></clipPath></defs>' +
     '<g clip-path="url(#pcl)">' +
     '<rect x="0" y="0" width="440" height="540" fill="url(#pbg)"/>' +
@@ -1588,10 +1588,10 @@ function posterSVG(event: ShareEvent): string {
     '<text x="142" y="338" font-size="12" font-weight="500" fill="#6f8078">' +
     escapeXml(event.where) +
     '</text>' +
-    '<text x="142" y="387" font-size="11" font-weight="800" letter-spacing="0.5" fill="#128455">SCAN TO REGISTER</text>' +
-    '<rect x="28" y="404" width="384" height="46" rx="23" fill="#128455"/>' +
+    '<text x="142" y="387" font-size="11" font-weight="800" letter-spacing="0.5" fill="#008e4b">SCAN TO REGISTER</text>' +
+    '<rect x="28" y="404" width="384" height="46" rx="23" fill="#008e4b"/>' +
     '<text x="220" y="433" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">Register on Eventa</text>' +
-    '<rect x="28" y="482" width="30" height="30" rx="9" fill="#128455"/>' +
+    '<rect x="28" y="482" width="30" height="30" rx="9" fill="#008e4b"/>' +
     flame(34, 487, 18, '#ffffff') +
     '<text x="66" y="503" font-size="15.5" font-weight="800" fill="#14342a">Eventa</text>' +
     '<text x="412" y="503" text-anchor="end" font-size="11" font-weight="500" fill="#6f8078">' +
