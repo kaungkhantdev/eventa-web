@@ -1,11 +1,13 @@
 import qrcode from 'qrcode-generator'
 
 /**
- * QR codes the portal has to draw itself.
+ * QR codes this app has to draw itself.
  *
- * Both the ticket pass and a PromptPay payment arrive as the *payload* rather
- * than as a picture — a ticket token, and the EMV string a Thai banking app
- * expects. Rendering is this app's job; inventing the contents never is.
+ * The ticket pass, a PromptPay payment and a two-factor enrolment all arrive as
+ * the *payload* rather than as a picture — a ticket token, the EMV string a
+ * Thai banking app expects, an `otpauth://` URI. Rendering is this app's job;
+ * inventing the contents never is. Shared, because both the portal and the
+ * organizer console enrol an authenticator.
  */
 
 export type QRCode = ReturnType<typeof qrcode>
@@ -25,6 +27,9 @@ export function makeQR(text: string): QRCode | null {
 /** How many screen pixels one module of the code occupies. */
 const CELL_SIZE = 4
 const MARGIN = 2
+
+/** What `qrDataUrl` writes: qrcode-generator encodes its data URLs as GIF. */
+export const QR_FILE_EXTENSION = '.gif'
 
 /** A payload → a `data:` image an `<img>` can show. `null` if it cannot encode. */
 export function qrDataUrl(payload: string): string | null {

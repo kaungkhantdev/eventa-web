@@ -1,5 +1,6 @@
-import { CATEGORY_COLORS, DEFAULT_CATEGORY_ICON, ICON_PREFIX } from './categories.presentation'
+import { CATEGORY_COLORS } from './categories.presentation'
 import type { CategoryCard, CategoryWire, Tone } from './types'
+import { DEFAULT_CATEGORY_ICON, ICON_PREFIX } from '@/lib/constants/events.constants'
 
 /** What a colour the design system has no swatch for falls back to. */
 const FALLBACK_COLOR: Tone = 'brand'

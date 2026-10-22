@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import { useFetcher, useLoaderData, useRevalidator, useRouteLoaderData } from 'react-router'
 import {
   Badge,
   Button,
@@ -14,14 +14,18 @@ import {
   Toggle,
 } from '@/components/ui'
 import { useDisclosure } from '@/lib/useDisclosure'
+import { useDownload } from '@/lib/useDownload'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
 import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
 import type { Me } from '@/features/auth/types'
 import { SettingsHeader } from '../components/SettingsHeader'
+import { auditExportOf } from '../auditExport'
 import { auditLook } from '../settings.presentation'
 import type { SecurityData } from '../settings.routes'
 import type { AuditRow, SessionRow } from '../settings.types'
+import { twoFactorDoneMessage, twoFactorSetupStep } from '../twoFactorSetup'
+import { AUDIT_EXPORT_PATH } from '@/lib/constants/settings.constants'
 
 /**
  * Password, two-factor and sessions (US-ACC-04..07), ported from
@@ -317,20 +321,16 @@ function TwoFactorPanel({
     }
   >()
   const error = act.data?.ok === false ? act.data.error : null
-  const secret = act.data && 'secret' in act.data ? act.data.secret : undefined
   const codes =
     act.data && 'recoveryCodes' in act.data ? act.data.recoveryCodes : undefined
-  const enrolling = Boolean(secret) || twoFactor.pending
+  const step = twoFactorSetupStep(twoFactor, act.data?.ok ? act.data : undefined)
   useFailureToast(act.state === 'idle' ? error : null)
-  // Neither toast nor close while the codes are up. They are shown exactly
-  // once — the API keeps only their hashes — so closing the panel on success
-  // would destroy the only copy, and a toast would land on top of the one
-  // sentence that has to be read. The codes ARE the confirmation.
-  useSavedToast(
-    act.state === 'idle' && act.data?.ok === true && !codes,
-    twoFactor.enabled ? 'Two-factor turned off.' : 'Two-factor is on.',
-    onClose,
-  )
+  // Neither toast nor close while the seed or the codes are up: the seed is
+  // what the member must scan next, and the codes are shown exactly once —
+  // the API keeps only their hashes — so closing the panel on success would
+  // destroy the only copy. The codes ARE the confirmation.
+  const done = act.state === 'idle' ? twoFactorDoneMessage(act.data) : null
+  useSavedToast(done !== null, done ?? '', onClose)
 
   return (
     <Panel
@@ -367,35 +367,54 @@ function TwoFactorPanel({
       ) : (
         <div className="space-y-4">
           <p className="text-[12.5px] leading-relaxed text-muted">
-            Add the key below to an authenticator app —{' '}
+            Scan the code below with an authenticator app —{' '}
             <span className="font-medium text-ink">Google Authenticator, 1Password or Authy</span>{' '}
-            — then enter the 6-digit code to finish.
+            — then enter the 6-digit code it shows to finish.
           </p>
 
-          {!enrolling && (
-            <act.Form method="post">
+          {step.startLabel && (
+            <act.Form method="post" className="space-y-2">
               <input type="hidden" name="intent" value="start-2fa" />
-              <Button variant="primary" type="submit" disabled={act.state !== 'idle'}>
-                Start setup
+              {twoFactor.pending && (
+                <Hint>
+                  Setup was started but not finished. Enter the code from your app, or start over
+                  for a new key.
+                </Hint>
+              )}
+              <Button
+                variant={twoFactor.pending ? 'soft' : 'primary'}
+                type="submit"
+                disabled={act.state !== 'idle'}
+              >
+                {step.startLabel}
               </Button>
             </act.Form>
           )}
 
-          {secret && (
-            <div>
-              <Label htmlFor="twofa-key">Can&rsquo;t scan? Enter this key</Label>
-              <div className="flex items-center gap-2 rounded-lg border border-hair bg-canvas px-3 py-2">
-                <code
-                  id="twofa-key"
-                  className="flex-1 select-all break-all font-mono text-[13px] tracking-wider text-ink"
-                >
-                  {secret}
-                </code>
+          {step.seed && (
+            <>
+              {step.seed.qr ? (
+                <div className="flex justify-center rounded-xl border border-hair bg-white p-4">
+                  <img src={step.seed.qr} alt="" width={160} height={160} className="h-40 w-40" />
+                </div>
+              ) : (
+                <Hint>This code could not be drawn. Enter the key below in your app instead.</Hint>
+              )}
+              <div>
+                <Label htmlFor="twofa-key">Can&rsquo;t scan? Enter this key</Label>
+                <div className="flex items-center gap-2 rounded-lg border border-hair bg-canvas px-3 py-2">
+                  <code
+                    id="twofa-key"
+                    className="flex-1 select-all break-all font-mono text-[13px] tracking-wider text-ink"
+                  >
+                    {step.seed.key}
+                  </code>
+                </div>
               </div>
-            </div>
+            </>
           )}
 
-          {enrolling && (
+          {step.canConfirm && (
             <act.Form method="post" className="space-y-4">
               <input type="hidden" name="intent" value="confirm-2fa" />
               <CodeField id="confirm-code" label="Enter the 6-digit code" />
@@ -451,11 +470,7 @@ function AuditLogPanel({
       onClose={onClose}
       title="Audit log"
       subtitle="Sign-ins, permission changes and exports."
-      footer={
-        <Button variant="soft" className="w-full" onClick={onClose}>
-          Close
-        </Button>
-      }
+      footer={<AuditExportForm onClose={onClose} />}
     >
       {rows.length === 0 ? (
         <p className="text-[13px] text-muted">Nothing has been recorded yet.</p>
@@ -467,6 +482,57 @@ function AuditLogPanel({
         </div>
       )}
     </Panel>
+  )
+}
+
+/**
+ * The kit's footer — Close and "Export log" — with the date range the export
+ * is for (US-SET-05). The API records the export as a new entry, so the page
+ * re-reads its loader afterwards and the panel shows it.
+ */
+function AuditExportForm({ onClose }: { onClose: () => void }) {
+  const { busy, error: failed, download } = useDownload()
+  const { revalidate } = useRevalidator()
+  const [refused, setRefused] = useState<string | null>(null)
+  const error = refused ?? failed
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    const request = auditExportOf(String(form.get('from') ?? ''), String(form.get('to') ?? ''))
+    setRefused(request.ok ? null : request.error)
+    if (!request.ok) return
+    await download(AUDIT_EXPORT_PATH, request.filename, request.query)
+    await revalidate()
+  }
+
+  return (
+    <form className="w-full space-y-3" onSubmit={(event) => void onSubmit(event)}>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label htmlFor="audit-from">From</Label>
+          <Input id="audit-from" name="from" type="date" required />
+        </div>
+        <div>
+          <Label htmlFor="audit-to">To</Label>
+          <Input id="audit-to" name="to" type="date" required />
+        </div>
+      </div>
+      {error && (
+        <p role="alert" className="text-[12px] text-red-500">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button variant="soft" type="button" className="flex-1" onClick={onClose}>
+          Close
+        </Button>
+        <Button variant="primary" type="submit" className="flex-1" disabled={busy}>
+          <Icon name="hgi-download-01" size={16} />
+          {busy ? 'Preparing…' : 'Export log'}
+        </Button>
+      </div>
+    </form>
   )
 }
 

@@ -9,17 +9,9 @@ import type {
   RevenueRange,
   UpcomingEventWire,
 } from './overview.types'
+import { MEETING_PREVIEW, RING_SIZE } from '@/lib/constants/overview.constants'
 
 /** Everything the two overview screens read. Nothing here writes. */
-
-/** How many events the activity ring names before the legend stops reading. */
-export const RING_SIZE = 4
-
-/** How many of today's meetings the home panel previews. */
-export const MEETING_PREVIEW = 2
-
-/** How many upcoming events fit the card row. */
-export const UPCOMING_PREVIEW = 3
 
 export const overviewApi = {
   /** Greeting, today's sign-ups and the alert feed, in one read. */

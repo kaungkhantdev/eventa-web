@@ -1,7 +1,7 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { mapPanel, panel, type Panel } from '@/app/panels'
-import { api, type Query } from '@/lib/api'
+import { api, withoutForbidden, type Query } from '@/lib/api'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { toTimeline } from './activity.mapper'
@@ -18,6 +18,7 @@ import type {
   SegmentCountsWire,
 } from './directory.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import { ATTENDEE_SUBJECT, CONTACT_INTENT, MAX_SEARCH_LENGTH, PROFILE_PARAM, SEGMENTS, SORTS, TIMELINE_LIMIT } from '@/lib/constants/attendees.constants'
 
 /**
  * Everyone who has ever registered (US-CHK-06/07).
@@ -28,11 +29,8 @@ import { eventOptions, type EventOption } from '@/features/events/eventOptions'
  * rank the ten it happened to receive.
  */
 
-export const SEGMENTS = ['all', 'new', 'checked_in', 'vip'] as const
-export const SORTS = ['recent', 'name', 'events', 'tickets'] as const
 export const TAGS: readonly AttendeeTag[] = ['VIP', 'Speaker', 'Sponsor', 'Student']
 
-const MAX_SEARCH = 120
 interface DirectoryQuery extends Query {
   page?: number
   limit?: number
@@ -41,15 +39,6 @@ interface DirectoryQuery extends Query {
   search?: string
   sort?: AttendeeSort
 }
-
-/** The URL parameter naming whose profile panel is open. */
-export const PROFILE_PARAM = 'profile'
-
-/** How far back the panel's timeline reaches before deferring to the audit log. */
-const TIMELINE_LIMIT = 20
-
-/** The one kind of record `GET /audit` can be asked the trail of today. */
-const ATTENDEE_SUBJECT = 'attendee'
 
 interface ActivityQuery extends Query {
   subjectType: typeof ATTENDEE_SUBJECT
@@ -124,7 +113,7 @@ export function listQueryOf(params: URLSearchParams): DirectoryQuery {
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
     segment: segmentOf(params),
     tag: TAGS.includes(tag as AttendeeTag) ? (tag as AttendeeTag) : undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
     sort: enumParam(params, 'sort', SORTS, 'recent'),
   }
 }
@@ -172,7 +161,9 @@ async function loadDirectory({ request }: LoaderArgs): Promise<DirectoryData> {
   const profileId = profileIdOf(params)
   const [page, events, activity] = await Promise.all([
     attendeesApi.list(query),
-    eventOptions(),
+    // The directory needs only `regView`; listing events needs `evCreate` or
+    // `regCheckin`. That 403 costs the invite panel its event list, not the page.
+    withoutForbidden(() => eventOptions()),
     // Wrapped rather than awaited bare: the profile's subject is the contact
     // details, which the directory row already carries, and the history is
     // context beside them. A failed read says so in its own section instead of
@@ -205,10 +196,6 @@ function withPage(current: string, page: number): string {
   url.searchParams.set('page', String(page))
   return url.pathname + url.search
 }
-
-
-/** What the edit panel asks for; anything else on this route is an invitation. */
-export const CONTACT_INTENT = 'contact'
 
 async function runDirectoryAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()

@@ -11,13 +11,14 @@ HTML/Tailwind kit **eventa-ui-kit** (see `CONVENTIONS.md` for the authoritative 
 It's the UI for **Eventa**, an event registration & management product: a public attendee **portal**,
 public event **landing pages**, and an organizer **admin console**. Package manager is **pnpm**.
 
-**The migration from prototype to real product is all but finished.** Sign-in is real (JWT against
-**eventa-api**) and `/admin/*` is behind a session guard. Nearly every page is now wired to the API
-through a route loader — `grep -c 'livePage(' src/app/routes.tsx` is the count, and the rest are
-auth/portal forms that fetch nothing. **One page is still on demo data:** `ReportsPayoutsPage`, the
-last holder of a `features/*/data/` module — `find src/features -type d -name data` will tell you
-whether that is still true. See **Talking to the API** below for the seam and the per-feature
-playbook. A page is either fully on the API or fully on demo data; never half.
+**The migration from prototype to real product is finished.** Sign-in is real (JWT against
+**eventa-api**) and `/admin/*` is behind a session guard. Every page that shows data is wired to the
+API through a route loader — `grep -c 'livePage(' src/app/routes.tsx` is the count, and the rest are
+auth/portal forms that fetch nothing. **No page reads demo data:** the last one, `ReportsPayoutsPage`,
+moved to `GET /reports/payouts`, and `find src/features -type d -name data` should keep returning
+nothing. Demo data can still hide outside `features/*/data/` — the header's notification bell was a
+hardcoded array in `components/ui/PageHeader.tsx` until it was wired — so a screen whose numbers do
+not move is worth a look. See **Talking to the API** below for the seam and the per-feature playbook.
 
 (Counts are given as commands on purpose. This file previously said every page still read demo data,
 long after all but one had been migrated, and a reader who believed it would have re-done finished
@@ -89,24 +90,30 @@ API"). A green `tsc` is not evidence a page works — open it. Anything under `/
 `components/` are directories, and the feature's non-visual files sit flat beside them as
 `<feature>.api.ts` · `.mapper.ts` · `.routes.ts` · `.types.ts` · `.presentation.ts` (there is no
 `types/` directory — types are a flat `<feature>.types.ts`). A feature **never imports another
-feature's `pages/`** — anything shared goes in `@/components/ui` or `@/lib`. The one surviving demo-data
-module is a typed, exported `const` in `features/insights/data/reportsPayouts.ts`, never inlined.
+feature's `pages/`** — anything shared goes in `@/components/ui` or `@/lib`.
 
 **The router and nav model are separate, data-driven files in `src/app/`:**
 - `routes.tsx` — the whole route manifest, every page **code-split** via `lazy`. Each admin *page* route
   carries a `handle.page` id (the static kit's old `data-page`) that drives **sidebar active state**, and
   `handle.focused: true` hides the sub-nav panel for focused flows (e.g. the create-event wizard). The
-  two loader-only resource routes (`tickets/share`, `check-in/search`) have no component and no
-  `handle` — there is nothing to highlight. Root `/` redirects to the public `/portal/discover`.
+  loader-only resource routes (`grep -n 'A resource route' src/app/routes.tsx` lists them) have no
+  component and no `handle` — there is nothing to highlight. **A resource route that a fetcher loads
+  must not throw** for anything but the 401 that `pageData` turns into the sign-in redirect: React
+  Router 8 renders a fetcher's thrown error at the boundary of the page that called it on the first
+  load, but at the **root** boundary when it is revalidated after an action (the resource route is
+  never among the page's matches), which replaces the whole admin shell. Return the failure as data —
+  `notifications/preview` (`previewPanel` in `notifications.routes.ts`) is the worked example.
+  Root `/` redirects to the public `/portal/discover`.
 - `navigation.ts` — the `MODULES` array is the **single source of truth** for the admin icon rail and its
   grouped sub-nav panel. Add/rename admin nav here, not in the shell. `moduleOfPage()` maps a page id → its rail module.
 
 **Skeleton loading is wired at the router, not in the pages.** Every route carries a `loader`, so
 React Router reports `navigation.state === 'loading'` on every visit. A migrated page's loader is its
 real API fetch; the handful of routes that fetch nothing get `pageLoader` (in `routes.tsx`), an
-artificial `PAGE_LOAD_MS` wait — 350 ms — so their skeleton is visible at all. Those 8 routes are the
-auth/portal forms plus the one remaining demo-data page, `reports-payouts` (set `PAGE_LOAD_MS` to 0 to
-drop the delay; both it and `pageLoader` go when the last page is migrated). Two layouts turn that into a
+artificial `PAGE_LOAD_MS` wait — 350 ms — so their skeleton is visible at all. Those are the
+auth/portal forms built with `page()` (`grep -n '\.\.\.page(' src/app/routes.tsx`); the ones that pass
+their own `guestOnly` loader do not get the wait. Set `PAGE_LOAD_MS` to 0 to drop the delay. Both it and
+`pageLoader` outlived the last demo-data page on purpose — the forms still use them. Two layouts turn that into a
 placeholder: `AdminShell` swaps its `<Outlet>` for the destination's skeleton on admin→admin moves
 (the rail and sub-nav stay mounted and jump to the destination via `routeStateOfPath`), and
 `RootLayout` replaces the whole screen for first paint (`HydrateFallback`), public routes, and
@@ -163,7 +170,7 @@ TS 7 drops it). Never use long relative chains.
   `useMemo` for search/filter. Keep filtering/sorting semantics and empty-state copy identical to the source.
 - A few features use **real libraries** where the static kit did: `quill` powers the rich-text editor on
   the create-event page (instantiated imperatively in `useEffect` with a StrictMode re-init guard);
-  `qrcode-generator` (via `features/portal/lib/qr.ts`) draws the 2FA QR, the PromptPay payment QR and the
+  `qrcode-generator` (via `@/lib/qr`) draws the 2FA QR, the PromptPay payment QR and the
   ticket pass. **This app renders no documents itself** — the API renders an invoice and serves it as an
   **SVG** (`/invoices/:id/invoice.svg`, fetched by `<DownloadButton>`), and report exports (CSV/XLSX/PDF)
   are API routes too; see `@/lib/exportFormats`.
@@ -234,8 +241,9 @@ here so this repo is self-governing; the same standard, server-adapted, applies 
 **SOLID & responsibilities**
 - **Single Responsibility — one job per file.** `*.api.ts` fetches · `*.mapper.ts` converts a wire row to
   a view model · `pages/` reads loader data and renders · `components/` are presentational · hooks hold
-  interaction state · `@/lib` is cross-feature. **Never mix.** If you need "and" to describe a file, it
-  is two files.
+  interaction state · `@/lib` is cross-feature, except `@/lib/constants`, which holds each feature's
+  named constants (see *Enums and constants* below). **Never mix.** If you need "and" to describe a
+  file, it is two files.
 - **Dependency Inversion** — depend on abstractions. A component takes the data and callbacks it needs
   as props; it does not reach for a router, a fetch, or a global. That is what makes it testable and
   reusable across the portal and the admin console.
@@ -253,7 +261,8 @@ here so this repo is self-governing; the same standard, server-adapted, applies 
 - **View models at the edge** — never render a raw API row. Map it first, in the feature's mapper, so an
   API field rename breaks one file rather than seven.
 - **Cross-cutting code lives in `@/lib` or `@/components/ui`, never in a feature.** A helper used by two
-  features belongs there; a default used by one belongs to that feature as a local `const`.
+  features belongs there. A default used by one is still named in `@/lib/constants/<feature>.constants`;
+  it stays a local `const` only when it needs that feature's own types, components or functions.
 
 **Domain & correctness**
 - **Business rules live in a named, tested function** — never scattered through components or inlined in
@@ -265,8 +274,11 @@ here so this repo is self-governing; the same standard, server-adapted, applies 
 - **Time is UTC on the wire, Asia/Bangkok on screen**; the conversion belongs in `@/lib/format`, once.
   Never derive a business "today" from the browser's timezone.
 - **Enums and constants over magic values** — a status, a page size, a tab id, a route path, a storage
-  key: name it once as a module-level `const`. If a literal appears twice or carries domain meaning, it
-  gets a name. Derive from a single source of truth rather than re-typing a list.
+  key: name it once in `src/lib/constants/<feature>.constants.ts` (one file per feature, imported as
+  `@/lib/constants/<feature>.constants`). A constant that needs its feature's own types, components or
+  functions stays beside them — a constants file never imports from a feature. If a literal appears
+  twice or carries domain meaning, it gets a name. Derive from a single source of truth rather than
+  re-typing a list.
 - **Errors are surfaced, never swallowed.** An empty `catch`, or one that logs and continues, hides a
   broken product from the person using it. Show the API's own message — it is written for them.
 - **Every async surface has three states**: loading, empty, and failed. A page that only renders the

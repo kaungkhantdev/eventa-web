@@ -1,8 +1,5 @@
 import type { SurveyQuestionType } from '@/features/engagement/surveys.types'
-
-/** The 0–10 scale a recommendation question is answered on. */
-const MIN_NPS_SCORE = 0
-const MAX_NPS_SCORE = 10
+import { MAX_NPS_SCORE, MIN_NPS_SCORE } from '@/lib/constants/portal.constants'
 
 export const NPS_SCALE: readonly number[] = Array.from(
   { length: MAX_NPS_SCORE - MIN_NPS_SCORE + 1 },

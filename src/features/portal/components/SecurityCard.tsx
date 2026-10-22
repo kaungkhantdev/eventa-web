@@ -5,11 +5,11 @@ import { useDisclosure } from '@/lib/useDisclosure'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
 import type { Panel } from '@/app/panels'
-import { REVOKE_OTHER_SESSIONS_INTENT } from '../myEvents.routes'
 import type { TwoFactorCard } from '../security.types'
 import { ChangePasswordPanel } from './ChangePasswordPanel'
 import { SwitchButton } from './Switch'
 import { TwoFactorPanel } from './TwoFactorPanel'
+import { REVOKE_OTHER_SESSIONS_INTENT } from '@/lib/constants/portal.constants'
 
 /**
  * "My Account" → Settings → Security (US-DISC-12, criteria 4–5).

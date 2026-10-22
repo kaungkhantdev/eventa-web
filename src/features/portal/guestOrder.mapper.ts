@@ -1,5 +1,10 @@
+import { homeFor, signInPathFor } from '@/features/auth/personas'
 import { bangkokDate, satang } from '@/lib/format'
+import { QR_FILE_EXTENSION, qrDataUrl } from '@/lib/qr'
 import type {
+  AccountLinkResult,
+  AccountOffer,
+  AccountOfferContext,
   GuestOrder,
   GuestOrderLineWire,
   GuestOrderWire,
@@ -7,6 +12,7 @@ import type {
   IssuedTicketWire,
   OrderState,
 } from './guestOrder.types'
+import { ADMITS, AWAITING_APPROVAL, MONEY_CHANGED_HANDS, NOT_APPROVED, NOT_NOW, OWES_NOTHING, RECEIPT_HEADING, REJECTED, REJECTED_MONEY, SIGNED_IN_PROMPT, UNTITLED_TICKET, WAITLISTED } from '@/lib/constants/portal.constants'
 
 /**
  * An order row → the page a guest sees after registering (US-DISC-06/07).
@@ -17,8 +23,6 @@ import type {
  * payment settles after the redirect — needs to say so plainly instead of
  * showing an empty ticket list and no explanation.
  */
-
-const UNTITLED_TICKET = 'Admission'
 
 /**
  * Nobody paid and the clock ran out.
@@ -34,19 +38,12 @@ export const EXPIRED_STATE: OrderState = {
   detail: 'The seats were released because the payment was not completed in time.',
 }
 
-/** In line for a sold-out ticket, with no seat offered yet (US-REG-04). */
-const WAITLISTED = 'waitlisted'
-
 export const WAITLIST_STATE: OrderState = {
   label: 'On the waitlist',
   tone: 'amber',
   detail:
     "Nothing is charged while you wait. If a place opens up we'll email you, and hold it for a limited time while you pay.",
 }
-
-/** Turned down by the organizer (US-REG-02). */
-const REJECTED = 'rejected'
-const AWAITING_APPROVAL = 'Awaiting approval'
 
 /*
  * Both point at THIS page, not an inbox: the organizer can switch the
@@ -69,27 +66,6 @@ export const AWAITING_APPROVAL_FREE_STATE: OrderState = {
     "The organizer reviews each registration. Your ticket will appear on this page once it's approved.",
 }
 
-const NOT_APPROVED = 'The organizer did not approve this registration.'
-
-/** What became of a rejected registration's money — nothing to say if none was taken. */
-const REJECTED_MONEY: Readonly<Partial<Record<string, string>>> = {
-  refunded: 'Your payment has been refunded.',
-  paid: 'Your payment is being refunded.',
-}
-
-/** Statuses that owe nothing, whatever the payment fields say. */
-const OWES_NOTHING: ReadonlySet<string> = new Set([WAITLISTED, REJECTED])
-
-/** Money reached the organizer — and stays a fact once it has gone back. */
-const MONEY_CHANGED_HANDS: ReadonlySet<string> = new Set(['paid', 'refunded'])
-
-/** The receipt's heading, for each of the three things its figures can mean. */
-const RECEIPT_HEADING = {
-  owed: 'What you owe',
-  paid: 'What you paid',
-  neither: 'Order total',
-} as const
-
 /**
  * The receipt's heading. The same figures are money still due, money that
  * changed hands, or money never taken — a lapsed order, a waitlist entry, a
@@ -104,8 +80,72 @@ export function receiptHeading({ canPay, paid }: { canPay: boolean; paid: boolea
   return paid ? RECEIPT_HEADING.paid : RECEIPT_HEADING.neither
 }
 
+/** Settled: paid or free, approved, and still standing. */
+const CONFIRMED_STATE: OrderState = {
+  label: 'Confirmed',
+  tone: 'green',
+  detail: 'Show the code below at the door.',
+}
+
+/** Where this order lives — the link in the confirmation email. */
+export function guestOrderPath(orderId: string): string {
+  return `/my/tickets/orders/${orderId}`
+}
+
+/**
+ * The account offer under the order (US-DISC-15), or `null` for none.
+ *
+ * Made only for an order with a ticket to keep — "I have just confirmed a
+ * registration", "alongside my ticket" — because its dismiss line says the
+ * ticket is already in their email, which is false for an order still unpaid,
+ * waiting or turned down: no ticket exists and no ticket email went out.
+ *
+ * Opening this page proves nothing about who reads the buyer's inbox — its
+ * link is shown to whoever booked, before anybody reads that inbox — so no
+ * account is ever made here, and no password is ever asked for here. "Create
+ * account" emails the booking's address a one-time link, and the account is
+ * made from that. An address that already has an account is invited to sign
+ * in instead, with no way to ask for a duplicate — and somebody already
+ * signed in, back from doing just that, is pointed at My Events rather than
+ * asked to sign in again.
+ *
+ * `link` is what the request for the link reported, when one was made.
+ */
+export function accountOfferFor(
+  order: Pick<GuestOrder, 'orderId' | 'buyerEmail' | 'ticketed'>,
+  { accountExists, signedIn }: AccountOfferContext,
+  link?: AccountLinkResult,
+): AccountOffer | null {
+  if (!order.ticketed) return null
+  if (signedIn) {
+    return { kind: 'signed-in', prompt: SIGNED_IN_PROMPT, myEventsTo: homeFor('attendee') }
+  }
+  if (link?.sentTo) {
+    return {
+      kind: 'sent',
+      message: `We've sent a link to ${link.sentTo}. Open it to choose a password — it proves the address is yours.`,
+    }
+  }
+  return {
+    kind: accountExists ? 'sign-in' : 'create',
+    prompt: accountExists
+      ? `You already have an account for ${order.buyerEmail}. Sign in to see every booking in one place.`
+      : `Create an account for ${order.buyerEmail} and every booking is in one place.`,
+    signInTo: signInBackTo(order.orderId),
+    dismiss: NOT_NOW,
+    error: link?.error ?? null,
+  }
+}
+
+/** The portal's sign-in, coming back to this order afterwards. */
+function signInBackTo(orderId: string): string {
+  return `${signInPathFor('attendee')}?from=${encodeURIComponent(guestOrderPath(orderId))}`
+}
+
 export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
   const holdLive = isHoldLive(wire, now)
+  const state = stateOf(wire, holdLive)
+  const tickets = wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName))
   return {
     orderId: wire.orderId,
     reference: wire.reference,
@@ -113,19 +153,22 @@ export function toGuestOrder(wire: GuestOrderWire, now: Date): GuestOrder {
     buyerName: wire.buyerName,
     buyerEmail: wire.buyerEmail,
     placedOn: bangkokDate(wire.placedAt),
-    state: stateOf(wire, holdLive),
+    state,
     lines: wire.lines.map(toLine),
     subtotal: satang(wire.subtotalSatang),
     // Nothing taken off is not a discount of zero: the row is simply absent.
     discount: wire.discountSatang > 0 ? satang(wire.discountSatang) : null,
     vat: satang(wire.vatSatang),
     total: satang(wire.totalSatang),
-    tickets: wire.tickets.map((ticket) => toTicket(ticket, wire.buyerName)),
+    tickets,
     awaitingPayment: isOwed(wire),
     paid: MONEY_CHANGED_HANDS.has(wire.paymentStatus),
     onWaitlist: wire.status === WAITLISTED,
     awaitingApproval: wire.awaitingApproval,
     ticketsExplained: ticketsExplained(wire),
+    // The state decides first: a stray ticket row on a cancelled or refunded
+    // order is not a ticket to keep.
+    ticketed: state === CONFIRMED_STATE && tickets.some((ticket) => ticket.valid),
     holdExpiresAt: wire.holdExpiresAt,
     payable: isOwed(wire) && wire.status === 'pending' && holdLive,
   }
@@ -187,13 +230,23 @@ function toLine(line: GuestOrderLineWire) {
   }
 }
 
-/** A ticket names nobody until somebody assigns it; the buyer bought it. */
+/**
+ * A ticket names nobody until somebody assigns it; the buyer bought it.
+ *
+ * The QR is drawn from the ticket's own token, the only thing the check-in
+ * station looks a ticket up by. One that no longer admits is not drawn: a
+ * picture the door refuses is worse than none.
+ */
 function toTicket(ticket: IssuedTicketWire, buyerName: string): GuestTicket {
+  const valid = ADMITS.has(ticket.status)
   return {
     id: ticket.id,
     qrToken: ticket.qrToken,
     holder: ticket.holderName ?? buyerName,
     label: ticket.ticketLabel ?? UNTITLED_TICKET,
+    valid,
+    qr: valid ? qrDataUrl(ticket.qrToken) : null,
+    download: `eventa-ticket-${ticket.id}${QR_FILE_EXTENSION}`,
   }
 }
 
@@ -227,5 +280,5 @@ function stateOf(wire: GuestOrderWire, holdLive: boolean): OrderState {
       detail: 'Your seats are held until the countdown ends.',
     }
   }
-  return { label: 'Confirmed', tone: 'green', detail: 'Show the code below at the door.' }
+  return CONFIRMED_STATE
 }

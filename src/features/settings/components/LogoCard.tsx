@@ -3,15 +3,10 @@ import { uploadLogo } from '../logoUpload'
 import { useRevalidator } from 'react-router'
 import { Button, Card, Icon } from '@/components/ui'
 import { messageOf } from '@/lib/api'
-import {
-  UPLOADABLE_IMAGE_TYPES,
-  UPLOAD_MAX_MIB,
-  acceptAttribute,
-  imageRefusal,
-  type ImageRefusal,
-} from '@/lib/imageUploads'
+import { UPLOADABLE_IMAGE_TYPES, imageRefusal } from '@/lib/imageUploads'
 import { toast } from '@/lib/toast'
 import { accountApi } from '../settings.routes'
+import { LOGO_ACCEPT, REFUSAL } from '@/lib/constants/settings.constants'
 
 /**
  * The workspace logo (US-SET-07) — what attendees see on public pages,
@@ -37,30 +32,20 @@ import { accountApi } from '../settings.routes'
  * what each surface advertises, not a copy that fell behind.
  */
 
-const LOGO_ACCEPT = acceptAttribute(UPLOADABLE_IMAGE_TYPES)
-
-/**
- * This card's own wording. A total lookup, so a reason added to the shared
- * type must be worded here before this file compiles — no refusal can reach
- * somebody as a blank message.
- */
-const REFUSAL: Readonly<Record<ImageRefusal, string>> = {
-  'wrong-type': 'A logo has to be a JPEG, PNG or WebP image.',
-  empty: 'That file is empty.',
-  'too-large': `That logo is over ${UPLOAD_MAX_MIB}MB. Try a smaller one, or export it at 512×512.`,
-}
-
 export function LogoCard({
   logoUrl,
   name,
   country,
   summary,
+  readOnly = false,
 }: {
   logoUrl: string | null
   name: string
   country: string
   /** Counts the API derives; absent until the caller has them. */
   summary?: { eventsHosted: number; teamMembers: number }
+  /** Shows the logo without Upload, Replace or Remove (US-SET-07). */
+  readOnly?: boolean
 }) {
   const file = useRef<HTMLInputElement>(null)
   const revalidator = useRevalidator()
@@ -131,35 +116,37 @@ export function LogoCard({
           </span>
         )}
 
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="soft"
-              size="sm"
-              type="button"
-              disabled={busy}
-              onClick={() => file.current?.click()}
-            >
-              <Icon name="hgi-image-upload" size={15} />
-              {logoUrl ? 'Replace' : 'Upload'}
-            </Button>
-            {/* A text link, as the kit draws it — removing a logo should not
-                look as reachable as choosing one. */}
-            {logoUrl && (
-              <button
+        {!readOnly && (
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="soft"
+                size="sm"
                 type="button"
                 disabled={busy}
-                onClick={() => void remove()}
-                className="text-[12px] font-medium text-muted transition hover:text-red-500 disabled:opacity-50"
+                onClick={() => file.current?.click()}
               >
-                Remove
-              </button>
-            )}
+                <Icon name="hgi-image-upload" size={15} />
+                {logoUrl ? 'Replace' : 'Upload'}
+              </Button>
+              {/* A text link, as the kit draws it — removing a logo should not
+                  look as reachable as choosing one. */}
+              {logoUrl && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void remove()}
+                  className="text-[12px] font-medium text-muted transition hover:text-red-500 disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] leading-snug text-muted">
+              JPEG, PNG or WebP · square looks best
+            </p>
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-muted">
-            JPEG, PNG or WebP · square looks best
-          </p>
-        </div>
+        )}
       </div>
 
       {/* The kit's identity block: who this workspace is, then the two figures

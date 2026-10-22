@@ -5,6 +5,7 @@ import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
 import type { NotificationsData } from '../settings.routes'
 import type { NotificationRow } from '../settings.types'
+import { CATEGORY_ICONS, FALLBACK_ICON } from '@/lib/constants/settings.constants'
 
 /**
  * What Eventa emails and texts you (US-DISC-14), ported from
@@ -55,23 +56,6 @@ export default function SettingsNotificationsPage() {
     </>
   )
 }
-
-/**
- * A tile per category. The kit tints the ones that matter to running an event
- * and leaves the rest neutral — product updates are not an operational signal,
- * and colouring them the same would say they were.
- */
-const CATEGORY_ICONS: Record<string, { icon: string; muted?: boolean }> = {
-  registration: { icon: 'hgi-user-add-01' },
-  payment: { icon: 'hgi-wallet-01' },
-  sales: { icon: 'hgi-tag-01' },
-  feedback: { icon: 'hgi-star' },
-  payout: { icon: 'hgi-bank' },
-  alert: { icon: 'hgi-alert-02' },
-  task: { icon: 'hgi-time-schedule', muted: true },
-}
-
-const FALLBACK_ICON = { icon: 'hgi-megaphone-01', muted: true }
 
 function PreferenceRow({ row }: { row: NotificationRow }) {
   const toggle = useFetcher<ActionResult>()

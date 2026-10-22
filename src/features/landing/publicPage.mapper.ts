@@ -1,11 +1,15 @@
 import { MASKED, bangkokDate, bangkokTime, initials } from '@/lib/format'
-import type { LandingEvent, LandingSpeaker, LandingTicket } from './types'
+import { seatKeyLabelOf, seatsOfType, seatsWhereOf, seatsWherePhraseOf, type SeatRowTypes } from '@/lib/seatPlaces'
+import { swatchOf } from '@/lib/seatSwatches'
+import type { LandingEvent, LandingSeatMap, LandingSpeaker, LandingTicket } from './types'
 import type {
   PublicPageWire,
+  PublicSeatMapWire,
   PublicSessionWire,
   PublicSpeakerWire,
   PublicTicketWire,
 } from './publicPage.types'
+import { DEFAULT_HIGHLIGHT_ICON, NOT_HELD, TICKETS_TITLE } from '@/lib/constants/landing.constants'
 
 /**
  * The API's public event page → what the four templates render.
@@ -17,28 +21,13 @@ import type {
  * someone's public page would be a lie this app told about their event.
  */
 
-/** Fields the API holds nothing for. Named so the omission is deliberate. */
-const NOT_HELD = {
-  /** No headline separate from the name. */
-  kicker: '',
-  /** The API counts no attendees and publishes no remaining-seat figure. */
-  attendeesText: '',
-  seatsLeft: 0,
-  /** Not on the public payload; the organizer's address is not published. */
-  contactEmail: '',
-  socials: {},
-  /** Read by no template, but part of the shape. */
-  accent: '',
-  seating: '',
-  capacity: 0,
-} as const
-
-const TICKETS_TITLE = 'Tickets'
-const DEFAULT_HIGHLIGHT_ICON = 'hgi-sparkles'
-
 export function toLandingEvent(page: PublicPageWire): LandingEvent {
   const { event } = page
+  // Seat colours follow the API's ticket order, expected to be the order the
+  // tickets were created, as the wizard's list is; the cards go cheapest first.
+  const byCreation = page.tickets.map((ticket) => ticket.id)
   const tickets = [...page.tickets].sort((a, b) => a.priceSatang - b.priceSatang)
+  const seats = seatTypesOf(page.seatMap)
 
   return {
     ...NOT_HELD,
@@ -72,7 +61,8 @@ export function toLandingEvent(page: PublicPageWire): LandingEvent {
     speakersTitle: page.sections.speakers,
     speakers: page.speakers.map(toSpeaker),
     ticketsTitle: TICKETS_TITLE,
-    tickets: tickets.map(toTicket(tickets)),
+    tickets: tickets.map(toTicket(tickets, seats)),
+    seatMap: seatMapOf(seats, tickets, byCreation),
     faqs: page.faqs.map((f) => ({ q: f.question, a: f.answer })),
     online: event.isOnline,
     onlineNote: event.onlineNote ?? '',
@@ -147,7 +137,7 @@ function toSpeaker(speaker: PublicSpeakerWire): LandingSpeaker {
 }
 
 /** Only the first recommended tier is lifted; two would break the grid. */
-function toTicket(ordered: PublicTicketWire[]) {
+function toTicket(ordered: PublicTicketWire[], seats: readonly SeatRowTypes[]) {
   const featured = ordered.find((t) => t.isRecommended)
   return (ticket: PublicTicketWire): LandingTicket => ({
     name: ticket.name,
@@ -157,6 +147,7 @@ function toTicket(ordered: PublicTicketWire[]) {
     note: noteOf(ticket),
     featured: ticket.id === featured?.id,
     features: ticket.includes,
+    rowsLabel: seatsWhereOf(seats, ticket.id),
   })
 }
 
@@ -164,4 +155,47 @@ function toTicket(ordered: PublicTicketWire[]) {
 function noteOf(ticket: PublicTicketWire): string {
   if (ticket.soldOut) return 'Sold out'
   return ticket.badge ?? ticket.urgency ?? ''
+}
+
+/** A ticket on the page that sells seats, with its colour. */
+type KeyedTicket = { ticket: PublicTicketWire; swatch: number }
+
+/** Each row's seats and their types, as the shared seat-places rule reads them; none without a map. */
+function seatTypesOf(seatMap: PublicSeatMapWire | null): SeatRowTypes[] {
+  return (seatMap?.rows ?? []).map((row) => ({ label: row.label, seats: row.seatTicketTypes }))
+}
+
+/**
+ * The seat map the tickets section shows (US-PAGE-05), or none.
+ *
+ * Only the tickets on the page are keyed, in the page's order, each in its
+ * colour by the order the tickets were created (`swatchOf`), so a type matches
+ * the organizer's preview. A seat whose type is not among them — none at all,
+ * or one the page does not offer — stays neutral: it names nothing a reader
+ * can buy. A map where every seat is neutral shows no split, so there is no map.
+ */
+function seatMapOf(
+  seats: readonly SeatRowTypes[],
+  tickets: readonly PublicTicketWire[],
+  byCreation: readonly string[],
+): LandingSeatMap | null {
+  const keyed = tickets.flatMap((ticket): KeyedTicket[] => {
+    const swatch = swatchOf(ticket.id, byCreation)
+    return seatsOfType(seats, ticket.id) > 0 && swatch !== null ? [{ ticket, swatch }] : []
+  })
+  if (keyed.length === 0) return null
+  return {
+    rows: seats.map((row) => ({ label: row.label, swatches: row.seats.map((type) => swatchOf(type, byCreation)) })),
+    legend: keyed.map(({ ticket, swatch }) => ({ label: seatKeyLabelOf(ticket.name, seats, ticket.id), swatch })),
+    summary: summaryOf(keyed, seats),
+  }
+}
+
+/**
+ * `Seat map: Free row 7 seats 1–5; Normal rows 3–6, row 7 seats 6–16` — the
+ * key, read aloud. Tickets are parted by "; " since one ticket's seats can
+ * already take a ", ".
+ */
+function summaryOf(keyed: readonly KeyedTicket[], seats: readonly SeatRowTypes[]): string {
+  return `Seat map: ${keyed.map(({ ticket }) => `${ticket.name} ${seatsWherePhraseOf(seats, ticket.id)}`).join('; ')}`
 }

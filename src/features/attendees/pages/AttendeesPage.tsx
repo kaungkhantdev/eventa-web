@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Button,
@@ -25,14 +25,16 @@ import { can } from '@/features/auth/permissions'
 import type { Me } from '@/features/auth/types'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
 import { AttendeeProfilePanel } from '../components/AttendeeProfilePanel'
 import { EditContactPanel } from '../components/EditContactPanel'
-import { PROFILE_PARAM, TAGS, type DirectoryData } from '../directory.routes'
+import { TAGS, type DirectoryData } from '../directory.routes'
 import type { AttendeeRow, AttendeeSegment, AttendeeSort } from '../directory.types'
 import { useOpenProfileId } from '../useOpenProfileId'
+import { ALL_TAGS, MAX_INVITE_MESSAGE, MAX_RECIPIENT_NAME, MAX_SEARCH_LENGTH, PROFILE_PARAM } from '@/lib/constants/attendees.constants'
 
 /**
  * The attendee directory (US-CHK-06/07). Layout ported from attendees.html.
@@ -41,9 +43,6 @@ import { useOpenProfileId } from '../useOpenProfileId'
  * directory — 390 people do not fit on a page, and sorting the ten that arrived
  * would put the wrong name at the top.
  */
-
-const ALL_TAGS = 'All tags'
-const MAX_SEARCH_LENGTH = 120
 
 /** What the loader sorts by when the URL says nothing — see `SORTS`. */
 const DEFAULT_SORT: AttendeeSort = 'recent'
@@ -138,8 +137,8 @@ export default function AttendeesPage() {
   //
   // Read in one direction only: a non-empty list proves events exist, so it can
   // withdraw an offer, but an empty one is not proof of the opposite anywhere it
-  // could have been masked (Registrations loads the same list through
-  // `withoutForbidden`, and gets `[]` for Staff who may not list events).
+  // could have been masked (the loader reads it through `withoutForbidden`, and
+  // gets `[]` for Staff who may not list events).
   const hasEvents = data.events.length > 0
 
   if (firstRun) {
@@ -417,10 +416,6 @@ function AttendeeTableRow({ row, onView }: { row: AttendeeRow; onView: () => voi
  * The event is required: an invitation is to something, and the API has no
  * notion of a workspace-wide one.
  */
-/** `SendInviteDto`: `@MaxLength(120)` on the name, 250 on the note. */
-const MAX_RECIPIENT_NAME = 120
-const MAX_INVITE_MESSAGE = 250
-
 function InvitePanel({
   open,
   onClose,
@@ -436,14 +431,15 @@ function InvitePanel({
   // hidden input a custom picker submits through).
   const [inviteEvent, setInviteEvent] = useState(events[0]?.id ?? '')
   const sending = fetcher.state !== 'idle'
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const sent = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!sent || !open) return
-    toast.success('Invitation sent.')
-    onClose()
-  }, [sent, open, onClose])
+  // Once per invitation: the panel stays mounted, and the fetcher's last `ok`
+  // would otherwise close the next invite as it opened.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Invitation sent.')
+      onClose()
+    },
+  })
 
   return (
     <Panel
@@ -467,7 +463,9 @@ function InvitePanel({
         </>
       }
     >
-      <fetcher.Form id="invite-form" method="post" className="space-y-4">
+      {/* Rebuilt per opening, so the next invite does not open on the last
+          recipient's name and address. */}
+      <fetcher.Form key={opening} id="invite-form" method="post" className="space-y-4">
         {error && (
           <p
             role="alert"

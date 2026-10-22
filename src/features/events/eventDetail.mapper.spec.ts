@@ -348,6 +348,7 @@ const ticket = (over: Partial<TicketWire> = {}): TicketWire => ({
   salesStartAt: null,
   salesEndAt: null,
   version: 1,
+  quantityFromSeats: false,
   ...over,
 })
 
@@ -371,6 +372,7 @@ const inventoryTicket = (over: Partial<InventoryTicketWire> = {}): InventoryTick
   salesStartAt: null,
   salesEndAt: null,
   version: 1,
+  quantityFromSeats: false,
   ...over,
 })
 

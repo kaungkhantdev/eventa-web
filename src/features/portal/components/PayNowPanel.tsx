@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui'
 import type { PayResult } from '../guestOrder.routes'
 import type { Remaining } from '../lib/countdown'
 import { PaymentHandoff } from './PaymentHandoff'
+import { POLL_MS } from '@/lib/constants/portal.constants'
 
 /**
  * Finishing a payment that was never finished (US-DISC-05).
@@ -17,9 +18,6 @@ import { PaymentHandoff } from './PaymentHandoff'
  * and a page that says "awaiting payment" indefinitely is lying by the time
  * anybody reads it twice.
  */
-
-/** How often to re-read the order while a PromptPay code is on screen. */
-const POLL_MS = 5_000
 
 interface PayNowProps {
   orderId: string

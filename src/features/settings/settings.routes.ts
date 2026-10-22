@@ -9,6 +9,7 @@ import {
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import type { IssuedUpload } from '@/lib/signedUpload'
 import { intParam } from '@/lib/urlFilters'
+import { calendarConnectionApi, type CalendarConnectionWire } from './calendarConnection.api'
 import {
   toOrganizationForm,
   toPaymentSettingsCard,
@@ -45,6 +46,7 @@ import type {
   SessionRow,
   TwoFactorWire,
 } from './settings.types'
+import { AUDIT_PAGE_SIZE, CONNECT_CALENDAR_INTENT, DISCONNECT_CALENDAR_INTENT, GROUP_ORDER, PHONE_CONFIRM_INTENT, PHONE_REMOVE_INTENT, PHONE_REQUEST_INTENT } from '@/lib/constants/settings.constants'
 
 /** Users, roles, security and notification preferences. */
 
@@ -220,8 +222,6 @@ export interface RolesData {
   groups: { name: string; permissions: PermissionOption[] }[]
 }
 
-const GROUP_ORDER = ['Events', 'Registrations', 'Finance', 'Settings'] as const
-
 async function loadRoles(): Promise<RolesData> {
   const [roles, permissions] = await Promise.all([settingsApi.roles(), settingsApi.permissions()])
   const options = permissions.map(toPermissionOption)
@@ -273,9 +273,6 @@ export const rolesRoute = {
 }
 
 /* ── security ─────────────────────────────────────────────────────────── */
-
-/** How much recent activity the audit panel shows before deferring to export. */
-const AUDIT_PAGE_SIZE = 20
 
 export interface SecurityData {
   sessions: SessionRow[]
@@ -378,11 +375,6 @@ export const notificationsRoute = {
 export interface ProfileData {
   profile: ProfileCard
 }
-
-/** The phone's three submissions on the console's profile form (US-SET-01). */
-export const PHONE_REQUEST_INTENT = 'phone'
-export const PHONE_CONFIRM_INTENT = 'phone-code'
-export const PHONE_REMOVE_INTENT = 'phone-remove'
 
 export const profileRoute = {
   loader: pageData(async (): Promise<ProfileData> => ({
@@ -500,6 +492,34 @@ export const paymentsRoute = {
       saveCards: form.get('saveCards') === 'true',
       emailReceipts: form.get('emailReceipts') === 'true',
     })
+  }),
+}
+
+/* ── integrations ─────────────────────────────────────────────────────── */
+
+export interface IntegrationsData {
+  connection: CalendarConnectionWire
+}
+
+export const integrationsRoute = {
+  loader: pageData(
+    async (): Promise<IntegrationsData> => ({ connection: await calendarConnectionApi.get() }),
+  ),
+
+  action: pageAction(async ({ request }: LoaderArgs) => {
+    const intent = (await request.formData()).get('intent')
+    // Returned, not dropped: the consent page's address exists only in this
+    // answer, and the page sends the browser there (see `actionSuccess`).
+    if (intent === CONNECT_CALENDAR_INTENT) return calendarConnectionApi.connect()
+    if (intent === DISCONNECT_CALENDAR_INTENT) {
+      // The status it answers with is left to the loader's revalidation,
+      // rather than kept as a second copy here.
+      await calendarConnectionApi.disconnect()
+      return null
+    }
+    // Never a default: a form that lost its intent must not disconnect the
+    // workspace by falling through to the destructive branch.
+    throw new Error('Unknown integrations intent')
   }),
 }
 

@@ -3,12 +3,9 @@ import { useFetcher } from 'react-router'
 import { Panel } from '@/components/ui'
 import { useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
-import { PASSWORD_CHANGE_INTENT } from '../myEvents.routes'
 import { passwordsMismatch } from '../security.mapper'
 import { PasswordField } from './PasswordField'
-
-/** One form on one page, so the id can be quoted in a footer `form=`. */
-const FORM_ID = 'portal-change-password'
+import { CHANGE_PASSWORD_PANEL_FORM_ID, PASSWORD_CHANGE_INTENT } from '@/lib/constants/portal.constants'
 
 /**
  * Changing the password (US-DISC-12, criterion 4).
@@ -60,13 +57,13 @@ export function ChangePasswordPanel({ open, onClose }: { open: boolean; onClose:
           <button type="button" className="btn btn-soft flex-1" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" form={FORM_ID} className="btn btn-primary flex-1" disabled={busy}>
+          <button type="submit" form={CHANGE_PASSWORD_PANEL_FORM_ID} className="btn btn-primary flex-1" disabled={busy}>
             {busy ? 'Updating…' : 'Update password'}
           </button>
         </div>
       }
     >
-      <change.Form id={FORM_ID} method="post" onSubmit={submit} className="space-y-4">
+      <change.Form id={CHANGE_PASSWORD_PANEL_FORM_ID} method="post" onSubmit={submit} className="space-y-4">
         <input type="hidden" name="intent" value={PASSWORD_CHANGE_INTENT} />
 
         <PasswordField

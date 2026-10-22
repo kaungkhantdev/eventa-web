@@ -21,6 +21,7 @@ import type {
 } from './checkout.types'
 import { profileApi } from './profile.api'
 import type { ProfileWire } from './profile.types'
+import { BOOK_INTENT, MISSING_EVENT, QUOTE_INTENT, WAITLIST_INTENT } from '@/lib/constants/portal.constants'
 
 /**
  * Registering for an event (US-DISC-04/05/06).
@@ -46,8 +47,6 @@ export type CheckoutResult =
   | { ok: true; intent: 'book'; order: PlacedOrder; payment: PaymentStep | null }
   | { ok: true; intent: 'waitlist'; place: WaitlistPlace }
   | { ok: false; error: string }
-
-const MISSING_EVENT = 'This registration link does not name an event.'
 
 export function slugOf(params: URLSearchParams): string {
   return params.get('event')?.trim() ?? ''
@@ -83,11 +82,6 @@ export function revalidateCheckout({
   if (intent === BOOK_INTENT || intent === WAITLIST_INTENT) return true
   return defaultShouldRevalidate
 }
-
-/** The action's own discriminants, named so the rule above cannot drift. */
-const QUOTE_INTENT = 'quote'
-const BOOK_INTENT = 'book'
-const WAITLIST_INTENT = 'waitlist'
 
 export const checkoutRoute = {
   loader: async ({ request }: LoaderArgs): Promise<CheckoutData> => {

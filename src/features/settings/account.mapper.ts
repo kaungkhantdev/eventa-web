@@ -8,6 +8,7 @@ import type {
   ProfileCard,
   ProfileWire,
 } from './settings.types'
+import { ACCOUNT_TAIL, DEFAULT_LOCALE, PROVIDER_NAMES } from '@/lib/constants/settings.constants'
 
 /**
  * The three account screens: who you are, who the workspace is, and how money
@@ -20,8 +21,6 @@ import type {
 
 /** A form binds to a string; `null` in an input renders the word "null". */
 const text = (value: string | null | undefined): string => value ?? ''
-
-const DEFAULT_LOCALE = 'en' as const
 
 export function toProfileCard(profile: ProfileWire): ProfileCard {
   return {
@@ -61,11 +60,6 @@ export function toOrganizationForm(organization: OrganizationWire): Organization
     version: organization.version,
   }
 }
-
-const PROVIDER_NAMES: Record<string, string> = { stripe: 'Stripe' }
-
-/** How many characters of the account id are enough to tell two apart. */
-const ACCOUNT_TAIL = 3
 
 export function toPaymentSettingsCard(
   settings: PaymentSettingsWire,

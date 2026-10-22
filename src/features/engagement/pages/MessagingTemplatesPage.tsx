@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import type { ActionResult } from '@/app/loaders'
 import {
@@ -20,8 +20,10 @@ import {
 import { cn } from '@/lib/cn'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useSavedToast } from '@/lib/useSavedToast'
+import { insertAtCursor } from '../merge-field'
 import type { TemplateCard } from '../templates.mapper'
 import type { TemplatesData } from '../templates.routes'
+import { LOCALES } from '@/lib/constants/engagement.constants'
 
 /**
  * The automated messages a workspace sends (US-MSG-01). Cards ported from
@@ -179,11 +181,6 @@ function TemplateTile({ card }: { card: TemplateCard }) {
 
 type Locale = 'en' | 'th'
 
-const LOCALES = [
-  { value: 'en' as const, label: 'English' },
-  { value: 'th' as const, label: 'ไทย' },
-]
-
 /**
  * The wording editor (US-MSG-02).
  *
@@ -226,11 +223,25 @@ function WordingEditor({
   const submit = () =>
     save.submit({ intent: 'wording', slug: card.slug, ...draft }, { method: 'post' })
 
-  const insert = (tag: string) =>
-    setDraft((current) => ({
-      ...current,
-      [bodyKey]: `${current[bodyKey]}${tag}`,
-    }))
+  const subjectField = useRef<HTMLInputElement>(null)
+  const bodyField = useRef<HTMLTextAreaElement>(null)
+  // Where a chip writes (US-MSG-02): the field last focused, or the end of the
+  // opening while neither has been.
+  const target = useRef<'subject' | 'body' | null>(null)
+
+  const insert = (tag: string) => {
+    const inSubject = target.current === 'subject'
+    const key = inSubject ? subjectKey : bodyKey
+    const field = inSubject ? subjectField.current : bodyField.current
+    const placed = insertAtCursor(draft[key], tag, field, target.current !== null)
+    setDraft((current) => ({ ...current, [key]: placed.text }))
+    // Once React has written the new value — which leaves the caret at the
+    // end — put it back just after the field, so typing carries on from there.
+    requestAnimationFrame(() => {
+      field?.focus()
+      field?.setSelectionRange(placed.caret, placed.caret)
+    })
+  }
 
   return (
     <Panel
@@ -266,6 +277,10 @@ function WordingEditor({
         <div>
           <Label>Subject</Label>
           <Input
+            ref={subjectField}
+            onFocus={() => {
+              target.current = 'subject'
+            }}
             type="text"
             maxLength={200}
             value={draft[subjectKey]}
@@ -279,6 +294,10 @@ function WordingEditor({
         <div>
           <Label>Opening</Label>
           <Textarea
+            ref={bodyField}
+            onFocus={() => {
+              target.current = 'body'
+            }}
             rows={6}
             maxLength={4000}
             value={draft[bodyKey]}

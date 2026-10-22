@@ -14,9 +14,13 @@ import type {
   LedgerRowWire,
   OverviewWire,
   MoneyWire,
+  PayoutRowWire,
+  PayoutsReportWire,
   RegistrationsReportWire,
+  ReportPayoutStatus,
   SplitWire,
 } from './insights.types'
+import { MIX_RAMP } from '@/lib/constants/insights.constants'
 
 /**
  * Report rows and tiles, from the wire to what the page renders.
@@ -337,16 +341,55 @@ export function toTransactionRow(row: LedgerRowWire): TransactionRow {
   }
 }
 
-/* ── the overview (US-RPT-01/03) ───────────────────────────────────────── */
+/* ── payouts (US-RPT-07) ───────────────────────────────────────────────── */
 
-/**
- * The kit's brand tint ramp, applied BY POSITION.
- *
- * The mix arrives largest-first, so the biggest slice takes the strongest tint
- * the way the static page did. Not `hashIndex`, which is for lists that have no
- * order of their own — here the order is the point.
- */
-const MIX_RAMP = ['#1ba770', '#4cbd96', '#9fe0cd', '#d1d5db']
+/** The story's three statuses, in the kit's colours. */
+const PAYOUT_BADGE: Record<ReportPayoutStatus, { label: string; tone: BadgeTone }> = {
+  paid: { label: 'Paid', tone: 'green' },
+  in_transit: { label: 'In transit', tone: 'blue' },
+  pending: { label: 'Pending', tone: 'amber' },
+}
+
+export interface PayoutRow {
+  reference: string
+  date: string
+  /** Masked by the API to its last four digits, and shown exactly as sent. */
+  bank: string
+  /** One event by name, several by count — the kit's wording. */
+  covered: string
+  amount: string
+  status: { label: string; tone: BadgeTone }
+}
+
+export function toPayoutRow(row: PayoutRowWire): PayoutRow {
+  return {
+    reference: row.reference,
+    date: bangkokDate(row.at),
+    bank: row.bankAccount,
+    covered: coveredEvents(row.events),
+    amount: money(row.amountSatang),
+    status: PAYOUT_BADGE[row.status],
+  }
+}
+
+/** A payout with no items covers nothing, which is a dash, not a blank cell. */
+function coveredEvents(events: PayoutRowWire['events']): string {
+  if (events.length === 0) return MASKED
+  if (events.length === 1) return events[0].eventName
+  return `${num(events.length)} events`
+}
+
+/** The four tiles. The average alone can be absent: no payouts, no average. */
+export function toPayoutTiles(totals: PayoutsReportWire['totals']) {
+  return {
+    paidOut: money(totals.paidOutSatang),
+    pending: money(totals.pendingSatang),
+    inTransit: money(totals.inTransitSatang),
+    average: totals.averageSatang === null ? MASKED : money(totals.averageSatang),
+  }
+}
+
+/* ── the overview (US-RPT-01/03) ───────────────────────────────────────── */
 
 /** A tile, already formatted, with its chip when there is one to show. */
 export interface OverviewTile {

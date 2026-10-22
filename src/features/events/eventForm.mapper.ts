@@ -1,6 +1,7 @@
 import { bangkokDayKey, bangkokInstant, bangkokTime } from '@/lib/format'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
 import type { EventType, EventWire, EventWireStatus } from './types'
+import { SEAT_TYPES_REQUIREMENT } from '@/lib/constants/events.constants'
 
 /**
  * The create/edit wizard's rules.
@@ -28,17 +29,21 @@ export interface HighlightDraft {
   icon?: string | null
 }
 
-/** Everything the five steps hold. */
+/** Everything the wizard's steps hold. */
 export interface EventFormValues {
   id: string | null
   status: EventWireStatus | null
   /** The public page's address; empty until the event exists. */
   slug: string
+  /** The public page's accent colour; empty until one is set (US-PAGE-10). */
+  accentColor: string
   /** `public` | `unlisted` | `private`; empty until the event exists. */
   visibility: string
   name: string
   description: string
   type: EventType
+  /** The workspace category, or null for none (US-EVT-03). */
+  categoryId: number | null
   /** `2026-07-18` and `09:00`, the Bangkok wall clock the organizer set. */
   startDate: string
   startTime: string
@@ -58,6 +63,13 @@ export interface EventFormValues {
   seatMapName: string
   seatRows: string
   seatsPerRow: string
+  /**
+   * Each seat's ticket type, `[row][seat]` with index 0 = row 1 and seat 1;
+   * `null` for none (US-EVT-05).
+   */
+  seatTicketTypes: (string | null)[][]
+  /** The seat map sets each ticket type's quantity, so it is not typed (US-EVT-05). */
+  quantityFromSeats: boolean
   coverImage: string
   tickets: TicketDraft[]
   highlights: HighlightDraft[]
@@ -73,10 +85,12 @@ function emptyValues(): EventFormValues {
     id: null,
     status: null,
     slug: '',
+    accentColor: '',
     visibility: '',
     name: '',
     description: '',
     type: DEFAULT_TYPE,
+    categoryId: null,
     startDate: '',
     startTime: '',
     endDate: '',
@@ -93,6 +107,8 @@ function emptyValues(): EventFormValues {
     seatMapName: '',
     seatRows: '',
     seatsPerRow: '',
+    seatTicketTypes: [],
+    quantityFromSeats: false,
     coverImage: '',
     tickets: [],
     highlights: [],
@@ -126,10 +142,12 @@ export function toEventFormValues(
     id: event.id,
     status: event.status,
     slug: event.slug,
+    accentColor: event.accentColor ?? '',
     visibility: event.visibility ?? '',
     name: event.name,
     description: event.description ?? '',
     type: event.type,
+    categoryId: event.categoryId ?? null,
     startDate: bangkokDayKey(event.startAt),
     startTime: bangkokTime(event.startAt),
     endDate: event.endAt ? bangkokDayKey(event.endAt) : '',
@@ -154,6 +172,25 @@ export function toEventFormValues(
   }
 }
 
+/**
+ * A ticket row → what the ticketing API is sent for it.
+ *
+ * The quantity goes only when the organizer types it. Where the seat map sets
+ * it (US-EVT-05), the API derives it and refuses a different one, so it is
+ * left out; a blank one is left out too, since 0 would mean unlimited.
+ */
+export function toTicketBody(row: TicketDraft, event: QuantityFacts) {
+  const total = Number(row.quantity) || undefined
+  return {
+    name: row.name.trim(),
+    isFree: row.isFree,
+    // A free tier carries no price at all — 0 would describe a paid tier that
+    // happens to cost nothing, which the API stores differently.
+    priceSatang: row.isFree ? undefined : satangOf(row.price),
+    ...(quantitySetBySeats(event) ? {} : { total }),
+  }
+}
+
 /** The body `POST /events` accepts — and nothing else, since it rejects extras. */
 export function toCreateBody(values: EventFormValues) {
   const description = values.description.trim()
@@ -162,7 +199,13 @@ export function toCreateBody(values: EventFormValues) {
     type: values.type,
     startAt: bangkokInstant(values.startDate, values.startTime),
     ...(description ? { description } : {}),
+    ...(values.categoryId === null ? {} : { categoryId: values.categoryId }),
   }
+}
+
+/** The category picker's value → the id, or null for its "No category" option. */
+export function categoryIdOf(value: string): number | null {
+  return value === '' ? null : Number(value)
 }
 
 /**
@@ -170,14 +213,17 @@ export function toCreateBody(values: EventFormValues) {
  *
  * A cleared text field is sent as `''` rather than omitted: omission means
  * "leave it alone" to the API, and the organizer meant "remove it". Fields the
- * wizard has no input for — `contactEmail`, `accentColor` — are left out
- * entirely, so a value set on another screen survives a save here.
+ * wizard has no input for — `contactEmail` — are left out entirely, so a value
+ * set on another screen survives a save here. `accentColor` is left out too:
+ * it belongs to the page, and goes through `PATCH /events/:id/page`.
  */
 export function toUpdateBody(values: EventFormValues) {
   return {
     name: values.name.trim(),
     description: values.description.trim(),
     type: values.type,
+    // null clears it — leaving the key out would mean "unchanged".
+    categoryId: values.categoryId,
     startAt: bangkokInstant(values.startDate, values.startTime),
     endAt: bangkokInstant(values.endDate, values.endTime),
     venueName: values.venueName.trim(),
@@ -209,11 +255,33 @@ function capacityOf(typed: string): { capacity?: number } {
   return { capacity }
 }
 
+/** What decides whether an event has a seat map at all. */
+export type SeatingFacts = Pick<EventFormValues, 'seatingMode' | 'isOnline'>
+
+/** What decides whether its ticket quantities are typed. */
+export type QuantityFacts = SeatingFacts & Pick<EventFormValues, 'quantityFromSeats'>
+
+/** Only an in-person, reserved event has seats to give ticket types. */
+export function seatRowsApply(values: SeatingFacts): boolean {
+  return values.seatingMode === 'reserved' && !values.isOnline
+}
+
+/**
+ * Whether the seat map, not the organizer, sets the ticket quantities
+ * (US-EVT-05). On an in-person reserved event it always does — its seats get
+ * their types on Assign seats — even before any seat has one. Elsewhere only
+ * while the API still says so: a switch away from reserved seating that has not
+ * been saved yet leaves the old map in charge.
+ */
+export function quantitySetBySeats(event: QuantityFacts): boolean {
+  return seatRowsApply(event) || event.quantityFromSeats
+}
+
 /**
  * The API's own publish requirements, checked here first.
  *
  * `events.service.ts` refuses a publish with a 422 listing what is missing.
- * The same four rules are applied to the loaded event so the wizard can say so
+ * The same rules are applied to the loaded event so the wizard can say so
  * on the Review step instead of letting someone click a button that cannot
  * work. The server still decides — this only saves a doomed request.
  */
@@ -225,5 +293,8 @@ export function publishGaps(values: EventFormValues): string[] {
   // Only tiers the API has stored count — an unsaved row would turn the button
   // green and the request would still be refused.
   if (!values.tickets.some((ticket) => ticket.id !== null)) gaps.push('at least one ticket type')
+  if (seatRowsApply(values) && values.seatTicketTypes.some((row) => row.includes(null))) {
+    gaps.push(SEAT_TYPES_REQUIREMENT)
+  }
   return gaps
 }

@@ -2,13 +2,9 @@ import { Icon, PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { SellingFastRow } from '../overview.types'
 import { SectionHeader } from './PanelChrome'
+import { NOTHING_LOW, NOTHING_SCARCE, TIER_ICON } from '@/lib/constants/overview.constants'
 
 /** Ticket types running low, scarcest first (US-DASH-11). */
-
-const NOTHING_LOW = 'No tickets running low.'
-const TIER_ICON = 'hgi-ticket-star'
-const NOTHING_SCARCE =
-  'Tiers close to selling out show up here, the scarcest first.'
 
 export function SellingFastPanel({ rows }: { rows: SellingFastRow[] }) {
   return (

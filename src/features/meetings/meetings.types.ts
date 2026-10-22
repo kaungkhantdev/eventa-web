@@ -91,8 +91,12 @@ export interface MeetingCard {
   link: string | null
   canJoin: boolean
   canEdit: boolean
+  /** Marked Cancelled whether or not a reason was given (US-MTG-06). */
+  cancelled: boolean
   /** Set when the calendar invite has not gone out — surfaced, not hidden. */
   syncNote: string | null
+  /** Where the invite stands, so the card can offer the step that sends it. */
+  syncStatus: SyncStatus
   cancellationReason: string | null
   /** Everything the edit form needs, so a click opens it filled in. */
   edit: MeetingDraft

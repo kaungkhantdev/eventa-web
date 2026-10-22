@@ -1,16 +1,31 @@
 import { EventPicker } from '@/components/ui'
 import type { EventOption } from '@/features/events/eventOptions'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
+import type { ReportPeriodWire } from '../insights.types'
+import { ReportDateRange } from './ReportDateRange'
 
 /**
- * The filter bar every report shares: a search and an event (US-RPT-02).
+ * The filter bar every report shares: a search, an event and a date range
+ * (US-RPT-02).
  *
  * Both write to the URL, because the API does the filtering. Typing is debounced
  * so a request is made once the organizer pauses rather than per keystroke, and
  * changing either drops the page number — page 4 of the old result set is not
  * page 4 of the new one.
+ *
+ * `searchLabel` says what the search actually matches, which is the API's
+ * decision per report — the payouts search covers references as well as events.
  */
-export function ReportFilters({ events }: { events: EventOption[] }) {
+export function ReportFilters({
+  events,
+  period,
+  searchLabel = 'Search events',
+}: {
+  events: EventOption[]
+  /** The window the report covered, as the API resolved it. */
+  period: ReportPeriodWire
+  searchLabel?: string
+}) {
   const { params, set } = useFilters()
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
 
@@ -23,8 +38,8 @@ export function ReportFilters({ events }: { events: EventOption[] }) {
           value={term}
           onChange={(event) => setTerm(event.target.value)}
           className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-          placeholder="Search events…"
-          aria-label="Search events"
+          placeholder={`${searchLabel}…`}
+          aria-label={searchLabel}
         />
       </div>
       <div className="relative w-full sm:w-52">
@@ -38,6 +53,7 @@ export function ReportFilters({ events }: { events: EventOption[] }) {
           className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
         />
       </div>
+      <ReportDateRange period={period} />
     </div>
   )
 }

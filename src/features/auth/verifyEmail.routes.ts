@@ -1,6 +1,7 @@
 import { queryOf, type LoaderArgs } from '@/app/loaders'
 import { ApiError, NetworkError, messageOf } from '@/lib/api'
 import { authApi, type VerifiedEmail } from './api'
+import { NO_TOKEN, TOKEN_PARAM } from '@/lib/constants/auth.constants'
 
 /**
  * Opening the confirmation link from a sign-up email (US-ACC-01, US-DISC-08).
@@ -17,11 +18,6 @@ import { authApi, type VerifiedEmail } from './api'
 export type VerifyEmailData =
   | { ok: true; verified: VerifiedEmail }
   | { ok: false; error: string }
-
-const NO_TOKEN =
-  'This confirmation link is incomplete. Open the most recent link in your email, or request a new one.'
-
-export const TOKEN_PARAM = 'token'
 
 export const verifyEmailRoute = {
   loader: async ({ request }: LoaderArgs): Promise<VerifyEmailData> => {

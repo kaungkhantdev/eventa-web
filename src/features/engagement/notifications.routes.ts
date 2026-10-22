@@ -1,12 +1,13 @@
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { api, type Query } from '@/lib/api'
+import { mapPanel, panel, type Panel } from '@/app/panels'
+import { ApiError, api, type Query } from '@/lib/api'
 import { enumParam } from '@/lib/urlFilters'
-import { GROUP_LABEL, toNotification, type NotificationView } from './notifications.mapper'
+import { GROUP_LABEL, toNotification, toNotificationPreview, type NotificationPreview, type NotificationView } from './notifications.mapper'
 import type { FeedBucket, NotificationFeedWire } from './notifications.types'
+import { NOTIFICATION_PREVIEW_SIZE, NOTIFICATION_TABS, PREVIEW_UNAVAILABLE } from '@/lib/constants/engagement.constants'
 
 /** The notification feed (US-MSG-03). */
 
-export const NOTIFICATION_TABS = ['all', 'unread'] as const
 export type NotificationTab = (typeof NOTIFICATION_TABS)[number]
 
 const notificationsApi = {
@@ -64,4 +65,37 @@ async function runNotificationsAction(): Promise<null> {
 export const notificationsRoute = {
   loader: pageData(loadNotifications),
   action: pageAction(runNotificationsAction),
+}
+
+/**
+ * The bell's preview of the feed, as a panel: loaded, or what to say instead.
+ *
+ * `panel()` turns the API refusing or the network failing into the API's own
+ * sentence. Unlike a page's panel, this one absorbs everything else as well,
+ * except an ended session, which `pageData` must see to redirect to sign-in.
+ * The reason is where React Router would render a throw from here: only the
+ * bell's fetcher calls this loader, and a fetcher's error goes to the boundary
+ * of the page that rendered it on the first load, and to the ROOT boundary when
+ * it is revalidated after an action — this route is never among the page's
+ * matches. Either would replace a working screen over a dropdown nobody opened.
+ * A bug therefore shows in the bell, with a fixed sentence rather than the
+ * exception's own message.
+ */
+export async function previewPanel(
+  feed: () => Promise<NotificationFeedWire>,
+  now: Date,
+): Promise<Panel<NotificationPreview>> {
+  try {
+    return mapPanel(await panel(feed()), (wire) =>
+      toNotificationPreview(wire, now, NOTIFICATION_PREVIEW_SIZE),
+    )
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.isUnauthorized) throw cause
+    return { ok: false, error: PREVIEW_UNAVAILABLE }
+  }
+}
+
+/** The bell's resource route: the feed's newest rows, never thrown over the page. */
+export const notificationPreviewRoute = {
+  loader: pageData(() => previewPanel(() => notificationsApi.feed({}), new Date())),
 }

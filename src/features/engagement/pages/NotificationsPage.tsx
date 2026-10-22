@@ -12,9 +12,10 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { useFilters } from '@/lib/useFilters'
+import { NotificationBody } from '../components/NotificationBody'
 import type { NotificationView } from '../notifications.mapper'
+import { NOTIFICATION_TINT } from '../notifications.presentation'
 import type { NotificationTab, NotificationsData } from '../notifications.routes'
-import type { FeedKind } from '../notifications.types'
 
 /**
  * The notification feed (US-MSG-03). Layout ported from admin/notifications.html.
@@ -25,23 +26,12 @@ import type { FeedKind } from '../notifications.types'
  * whether the older groups are expanded.
  */
 
-/** Icon tints per kind, from the kit. */
-const TINT: Record<FeedKind, string> = {
-  registration: 'bg-brand-soft text-brand',
-  payment: 'bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300',
-  payout: 'bg-brand-soft text-brand',
-  alert: 'bg-red-50 text-red-500 dark:bg-red-500/15 dark:text-red-300',
-}
-
 function NotificationRow({ item }: { item: NotificationView }) {
   return (
-    <div
-      className={cn(
-        'flex items-start gap-3 rounded-xl px-3 py-3 transition hover:bg-line',
-        item.unread && 'bg-brand-soft/50',
-      )}
-    >
-      <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', TINT[item.kind])}>
+    // Unread is marked by the green dot beside the title alone: a tinted row
+    // as well said the same thing twice and made the list read as selected.
+    <div className="flex items-start gap-3 rounded-xl px-3 py-3 transition hover:bg-line">
+      <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', NOTIFICATION_TINT[item.kind])}>
         <i className={cn('hgi-stroke', item.icon, 'text-[18px]')} aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
@@ -50,15 +40,7 @@ function NotificationRow({ item }: { item: NotificationView }) {
           {item.unread && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />}
         </div>
         <p className="mt-0.5 text-[12px] leading-snug text-muted">
-          {item.body.map((segment, index) =>
-            segment.bold ? (
-              <b key={index} className="font-semibold text-ink">
-                {segment.text}
-              </b>
-            ) : (
-              <span key={index}>{segment.text}</span>
-            ),
-          )}
+          <NotificationBody segments={item.body} />
         </p>
       </div>
       <span className="shrink-0 whitespace-nowrap text-[11px] text-muted tnum">{item.time}</span>

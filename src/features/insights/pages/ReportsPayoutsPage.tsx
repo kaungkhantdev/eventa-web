@@ -1,44 +1,38 @@
-import { useMemo, useState } from 'react'
+import { useLoaderData } from 'react-router'
 import {
-  PageHeader,
-  PageFooter,
+  Badge,
+  ExportMenu,
   HeaderUser,
-  Button,
-  Icon,
-  EventPicker,
+  PageFooter,
+  PageHeader,
   Paginator,
-  usePagination,
 } from '@/components/ui'
-import { cn } from '@/lib/cn'
-import { baht } from '@/lib/format'
-import { REPORT_PAYOUTS, REPORT_PAYOUT_BADGE } from '../data/reportsPayouts'
+import { useFilters } from '@/lib/useFilters'
+import { ReportEmptyRow } from '../components/ReportEmptyRow'
+import { ReportFilters } from '../components/ReportFilters'
+import { StatTile } from '../components/StatTile'
+import { REPORT_DOWNLOADS } from '../insights.exports'
+import type { PayoutsReportData } from '../insights.routes'
 
+/**
+ * Payouts and settlement (US-RPT-07). Layout ported from the kit.
+ *
+ * Read-only, like every report. Three statuses — Paid, In transit, Pending — and
+ * nothing else: a failed payout is not in this report, it is on Finance Payouts
+ * with its retry (US-FIN-04). The bank is masked by the API to its last four
+ * digits and shown as sent.
+ *
+ * A payout settles the takings of several events at once, so filtering to one
+ * event still shows every payout that covers it, at its whole amount.
+ *
+ * The tiles have no change chip: the kit drew one, but no criterion asks for a
+ * comparison here, and a percentage needs a previous period this report does
+ * not have.
+ */
 export default function ReportsPayoutsPage() {
-  const [event, setEvent] = useState<string>('All events')
-  const [q, setQ] = useState('')
-
-  const filtered = useMemo(() => {
-    const query = q.trim().toLowerCase()
-    return REPORT_PAYOUTS.filter((r) => {
-      if (!(event === 'All events' || r.event === event)) return false
-      if (!query) return true
-      return (
-        (r.ref + ' ' + r.bank + ' ' + r.covered + ' ' + r.status).toLowerCase().indexOf(query) !== -1
-      )
-    })
-  }, [event, q])
-
-  const pager = usePagination(filtered)
-  const { setPage } = pager
-
-  const onSearch = (v: string) => {
-    setQ(v)
-    setPage(1)
-  }
-  const onEvent = (v: string) => {
-    setEvent(v)
-    setPage(1)
-  }
+  const data = useLoaderData() as PayoutsReportData
+  const { set, clear, emptyReason } = useFilters({ total: data.window.total })
+  const { tiles } = data
 
   return (
     <>
@@ -47,89 +41,25 @@ export default function ReportsPayoutsPage() {
         subtitle="Bank withdrawals and pending balance."
         actions={
           <>
-            <Button variant="primary">
-              <Icon name="hgi-download-01" size={16} />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
+            <ExportMenu downloads={REPORT_DOWNLOADS.payouts} query={data.exportQuery} />
             <HeaderUser />
           </>
         }
       />
 
-      {/* filter bar: search + event */}
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <div className="relative w-full sm:w-64">
-          <i className="hgi-stroke hgi-search-01 text-[16px] pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={q}
-            onChange={(e) => onSearch(e.target.value)}
-            className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
-            placeholder="Search reference, bank or event…"
-          />
-        </div>
-        <div className="relative w-full sm:w-52">
-          <EventPicker
-            value={event}
-            onChange={onEvent}
-            className="h-10 w-full border-0 bg-surface text-[14px] font-semibold"
-          />
-        </div>
-      </div>
+      <ReportFilters
+        events={data.events}
+        period={data.period}
+        searchLabel="Search reference or event"
+      />
 
-      {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-bank text-[16px]" />
-            Paid out
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">฿2.9M</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              9.7%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-clock-01 text-[16px]" />
-            Pending
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">฿180k</p>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-truck-delivery text-[16px]" />
-            In transit
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">฿240k</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              4.0%
-            </span>
-          </div>
-        </div>
-        <div className="card p-3.5">
-          <div className="flex items-center gap-1.5 text-[12px] text-muted">
-            <i className="hgi-stroke hgi-wallet-01 text-[16px]" />
-            Avg payout
-          </div>
-          <div className="mt-2 flex items-end justify-between">
-            <p className="text-[22px] font-bold tracking-tight tnum">฿182k</p>
-            <span className="flex items-center gap-0.5 text-[12px] font-semibold text-brand">
-              <i className="hgi-stroke hgi-arrow-up-right-01 text-[13px]" />
-              3.2%
-            </span>
-          </div>
-        </div>
+        <StatTile icon="hgi-bank" label="Paid out" value={tiles.paidOut} />
+        <StatTile icon="hgi-clock-01" label="Pending" value={tiles.pending} />
+        <StatTile icon="hgi-truck-delivery" label="In transit" value={tiles.inTransit} />
+        <StatTile icon="hgi-wallet-01" label="Avg payout" value={tiles.average} />
       </div>
 
-      {/* detailed table: payout history */}
       <section className="card mt-3 p-4">
         <div className="flex items-center justify-between">
           <div>
@@ -150,40 +80,41 @@ export default function ReportsPayoutsPage() {
               </tr>
             </thead>
             <tbody className="text-[13px]">
-              {pager.slice.length ? (
-                pager.slice.map((r) => (
-                  <tr key={r.ref}>
-                    <td className="font-semibold text-ink">{r.ref}</td>
-                    <td className="text-muted">{r.date}</td>
-                    <td className="text-muted tnum">{r.bank}</td>
-                    <td className="text-ink">{r.covered}</td>
-                    <td className="text-right font-semibold text-ink tnum">{baht(r.amount)}</td>
+              {data.rows.length ? (
+                data.rows.map((row) => (
+                  <tr key={row.reference}>
+                    <td className="font-semibold text-ink tnum">{row.reference}</td>
+                    <td className="text-muted">{row.date}</td>
+                    <td className="text-muted tnum">{row.bank}</td>
+                    <td className="text-ink">{row.covered}</td>
+                    <td className="text-right font-semibold text-ink tnum">{row.amount}</td>
                     <td>
-                      <span className={cn('badge', REPORT_PAYOUT_BADGE[r.status])}>{r.status}</span>
+                      <Badge tone={row.status.tone}>{row.status.label}</Badge>
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center text-[13px] text-muted">
-                    No payouts for this selection.
-                  </td>
-                </tr>
+                <ReportEmptyRow
+                  colSpan={6}
+                  noun="payouts"
+                  reason={emptyReason}
+                  onClear={clear}
+                  headline="No payouts for this selection"
+                >
+                  No payout matches the current search and event filter. A payout appears under
+                  every event it settles, so try a different reference or event, or widen the
+                  period.
+                </ReportEmptyRow>
               )}
             </tbody>
           </table>
         </div>
 
         <Paginator
-          from={pager.from}
-          to={pager.to}
-          total={pager.total}
-          page={pager.page}
-          pageCount={pager.pageCount}
-          size={pager.size}
-          onPage={pager.setPage}
-          onSize={pager.setSize}
+          {...data.window}
           noun="payouts"
+          onPage={(page) => set({ page })}
+          onSize={(size) => set({ limit: size, page: null })}
         />
       </section>
 

@@ -24,13 +24,13 @@ import { guestOnly } from '@/features/auth/guestOnly'
 /**
  * Simulated per-page fetch latency, in milliseconds.
  *
- * Applies only to pages NOT YET wired to the API. Those still read from their
- * feature's `data/` module, so they have nothing to wait for and their
- * skeletons would flash past in the handful of milliseconds a chunk takes.
- * A migrated page passes its own loader to `page()` and waits on the real
- * request instead — see `@/app/loaders`.
+ * Applies only to routes that fetch nothing — a few public forms (the
+ * check-your-email screens, forgot-password). With no request to wait on,
+ * their skeletons would flash past in the handful of milliseconds a chunk
+ * takes. Every admin page is wired to the API and waits on its real request
+ * instead — see `@/app/loaders`.
  *
- * When the last page is migrated this constant and `pageLoader` go with it.
+ * It outlived the last demo-data page on purpose: those forms still use it.
  */
 export const PAGE_LOAD_MS = 350
 
@@ -184,6 +184,14 @@ const adminChildren = [
     }),
   },
   {
+    // A resource route: whether one event's seat map sets its ticket
+    // quantities, asked when the new-tier panel chooses that event.
+    path: 'tickets/seat-set',
+    lazy: async () => ({
+      loader: (await import('@/features/ticketing/tickets.routes')).ticketSeatSetRoute.loader,
+    }),
+  },
+  {
     // A resource route: the station's manual search, asked only once somebody
     // types into it.
     path: 'check-in/search',
@@ -314,7 +322,10 @@ const adminChildren = [
   },
   {
     path: 'reports-payouts',
-    ...page(() => import('@/features/insights/pages/ReportsPayoutsPage')),
+    ...livePage(
+      () => import('@/features/insights/pages/ReportsPayoutsPage'),
+      () => import('@/features/insights/insights.routes').then((m) => m.payoutsReportRoute),
+    ),
     handle: { page: 'reports-payouts' },
   },
   {
@@ -357,6 +368,15 @@ const adminChildren = [
       () => import('@/features/engagement/notifications.routes').then((m) => m.notificationsRoute),
     ),
     handle: { page: 'notifications' },
+  },
+  {
+    // A resource route: the header bell's preview of the feed. The bell loads it
+    // itself, on every admin page that shows one; it never answers a navigation.
+    path: 'notifications/preview',
+    lazy: async () => ({
+      loader: (await import('@/features/engagement/notifications.routes')).notificationPreviewRoute
+        .loader,
+    }),
   },
   {
     path: 'messaging-templates',
@@ -441,6 +461,14 @@ const adminChildren = [
     handle: { page: 'settings-payments' },
   },
   {
+    path: 'settings-integrations',
+    ...livePage(
+      () => import('@/features/settings/pages/SettingsIntegrationsPage'),
+      () => import('@/features/settings/settings.routes').then((m) => m.integrationsRoute),
+    ),
+    handle: { page: 'settings-integrations' },
+  },
+  {
     path: 'users',
     ...livePage(
       () => import('@/features/settings/pages/UsersPage'),
@@ -496,6 +524,17 @@ export const router = createBrowserRouter([
         ...livePage(
           () => import('@/features/auth/pages/VerifyEmailPage'),
           () => import('@/features/auth/verifyEmail.routes').then((m) => m.verifyEmailRoute),
+        ),
+      },
+      {
+        // Where an email change's confirmation link lands — the API builds it
+        // as `${PUBLIC_WEB_URL}/confirm-email?token=…`, so this path is fixed by
+        // that. Serves both personas, and is not `guestOnly`: the person who
+        // changed their email is usually still signed in on this device.
+        path: '/confirm-email',
+        ...livePage(
+          () => import('@/features/auth/pages/ConfirmEmailPage'),
+          () => import('@/features/auth/confirmEmail.routes').then((m) => m.confirmEmailRoute),
         ),
       },
       {
@@ -562,6 +601,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // A resource route: one ticket's pass, loaded when the ticket modal on
+        // My Events opens it. It never answers a navigation.
+        path: '/portal/my-events/tickets/:ticketId',
+        lazy: async () => ({
+          loader: (await import('@/features/portal/myEvents.routes')).ticketPassRoute.loader,
+        }),
+      },
+      {
         // Buying tickets — named for what it does. It was `/portal/register`,
         // which collided with registering an ACCOUNT next door; "register" now
         // means one thing in this app.
@@ -575,10 +622,14 @@ export const router = createBrowserRouter([
         // The attendee's own sign-up, paired with /portal/login. Separate from
         // the organizer's at /auth/register for the same reason the logins are
         // separate: different audience, different copy, different realm.
+        // Also where a booking's emailed account link lands — the API builds it
+        // as `${PUBLIC_WEB_URL}/portal/register?claim=…` (US-DISC-15) — so the
+        // loader checks that link, and keeps the guest guard for the ordinary
+        // sign-up only.
         path: '/portal/register',
-        ...page(
+        ...livePage(
           () => import('@/features/portal/pages/PortalRegisterPage'),
-          guestOnly('attendee'),
+          () => import('@/features/portal/portalRegister.routes').then((m) => m.portalRegisterRoute),
         ),
       },
       {

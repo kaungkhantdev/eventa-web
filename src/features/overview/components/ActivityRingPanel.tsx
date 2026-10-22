@@ -3,6 +3,14 @@ import type { Panel } from '@/app/panels'
 import type { ActivityRing } from '../overview.routes'
 import type { ShareSlice } from '../overview.types'
 import { PanelUnavailable, SectionHeader } from './PanelChrome'
+import {
+  ACTIVITY_RING_GAP,
+  ACTIVITY_RING_RADIUS,
+  ACTIVITY_RING_STROKE,
+  ACTIVITY_RING_TOP,
+  NOTHING_LIVE,
+  NO_ACTIVE_EVENTS,
+} from '@/lib/constants/overview.constants'
 
 /**
  * Which active events are driving sign-ups (US-DASH-05).
@@ -12,15 +20,6 @@ import { PanelUnavailable, SectionHeader } from './PanelChrome'
  * page's own arc maths, and its centre label and responsive box are page-local
  * sizes the shared component's fixed geometry cannot reproduce.
  */
-
-const RADIUS = 15.915
-const GAP = 2.4
-const STROKE = 4.5
-/** Where a dash offset of 0 would start; the kit rotates arcs to 12 o'clock. */
-const TOP = 25
-
-const NO_ACTIVE_EVENTS = 'No active events.'
-const NOTHING_LIVE = 'Once an event is live and selling, its share of sign-ups shows here.'
 
 export function ActivityRingPanel({ ring }: { ring: Panel<ActivityRing> }) {
   return (
@@ -81,9 +80,9 @@ function Arcs({ slices }: { slices: ShareSlice[] }) {
       <circle
         cx={21}
         cy={21}
-        r={RADIUS}
+        r={ACTIVITY_RING_RADIUS}
         fill="none"
-        strokeWidth={STROKE}
+        strokeWidth={ACTIVITY_RING_STROKE}
         className="stroke-line"
       />
     )
@@ -94,10 +93,10 @@ function Arcs({ slices }: { slices: ShareSlice[] }) {
       key={slice.name}
       cx={21}
       cy={21}
-      r={RADIUS}
+      r={ACTIVITY_RING_RADIUS}
       fill="none"
       stroke={slice.color}
-      strokeWidth={STROKE}
+      strokeWidth={ACTIVITY_RING_STROKE}
       strokeLinecap="round"
       strokeDasharray={`${length} ${100 - length}`}
       strokeDashoffset={offset}
@@ -115,7 +114,7 @@ function Arcs({ slices }: { slices: ShareSlice[] }) {
 function arcsOf(slices: ShareSlice[]) {
   let start = 0
   return slices.map((slice) => {
-    const arc = { slice, length: Math.max(slice.percent - GAP, 0.5), offset: TOP - start }
+    const arc = { slice, length: Math.max(slice.percent - ACTIVITY_RING_GAP, 0.5), offset: ACTIVITY_RING_TOP - start }
     start += slice.percent
     return arc
   })

@@ -4,11 +4,11 @@ import { Hint, Icon, Panel, RecoveryCodes} from '@/components/ui'
 import { messageOf } from '@/lib/api'
 import { useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
-import { qrDataUrl } from '../lib/qr'
-import { TWO_FACTOR_DISABLE_INTENT } from '../myEvents.routes'
+import { qrDataUrl } from '@/lib/qr'
 import { securityApi } from '../security.api'
 import type { TwoFactorCard, TwoFactorStartWire } from '../security.types'
 import { CodeField } from './CodeField'
+import { TWO_FACTOR_DISABLE_INTENT } from '@/lib/constants/portal.constants'
 
 /**
  * Two-factor, in one panel for both directions (US-DISC-12, criterion 5).
@@ -22,11 +22,11 @@ import { CodeField } from './CodeField'
  * Start and confirm go straight to `securityApi` rather than through the route
  * action, which is the opposite of how the rest of this page saves. The reason
  * is that both answers ARE the point: a shared seed and a list of recovery
- * codes, neither of which the API will ever repeat, and `guardedAction` reports
- * `{ ok: true }` and discards what the call returned. There is no loader read
+ * codes, neither of which the API will ever repeat. There is no loader read
  * that could fetch either back, so the response is rendered where it arrives
- * and dropped when the panel closes. The organizer console tries to read a
- * secret off an action result and therefore shows no key at all; see `notes`.
+ * and dropped when the panel closes. (The organizer console reaches the same
+ * answers through its route action, which `actionSuccess` carries through to
+ * the fetcher, and draws the same QR.)
  *
  * Nothing here is stored. The seed and the codes live in this component's state
  * for as long as the panel is open and are not written anywhere else.

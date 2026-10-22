@@ -1,4 +1,5 @@
 import type { LandingEvent, LandingHighlight } from './types'
+import { DEFAULT_HIGHLIGHT_ICON, HIGHLIGHT_SEPARATOR, UNTITLED } from '@/lib/constants/landing.constants'
 
 /**
  * The create-event wizard's "preview this template" (US-PAGE-02).
@@ -12,10 +13,6 @@ import type { LandingEvent, LandingHighlight } from './types'
  * The kit filled the gaps from a demo event. Showing somebody another event's
  * speakers under their own title is not a preview of their page.
  */
-
-const UNTITLED = 'Your event'
-const HIGHLIGHT_SEPARATOR = '|'
-const DEFAULT_HIGHLIGHT_ICON = 'hgi-sparkles'
 
 /** Everything a draft cannot know. Stated once, so the omissions are visible. */
 const BLANK: LandingEvent = {
@@ -48,6 +45,7 @@ const BLANK: LandingEvent = {
   speakers: [],
   ticketsTitle: '',
   tickets: [],
+  seatMap: null,
   faqs: [],
   online: false,
   onlineNote: '',
@@ -61,6 +59,25 @@ export function toDraftPreview(params: URLSearchParams): LandingEvent {
     venue: params.get('venue')?.trim() ?? '',
     online: params.get('online') === '1',
     highlights: highlightsOf(params.get('hl')),
+  }
+}
+
+/**
+ * A live event's saved page with what is typed in the wizard laid over it
+ * (US-PAGE-09): the preview shows the organizer's edits before they are saved.
+ *
+ * Only the fields the wizard sends are touched, and only when it sent them —
+ * the landing gallery and Discover open the same URL with none, and get the
+ * saved page as it is. A field sent empty is cleared, except the title: a live
+ * event always has one, and a blank hero previews nothing.
+ */
+export function overlayDraft(params: URLSearchParams, event: LandingEvent): LandingEvent {
+  return {
+    ...event,
+    title: params.get('title')?.trim() || event.title,
+    venue: params.get('venue')?.trim() ?? event.venue,
+    online: params.has('online') ? params.get('online') === '1' : event.online,
+    highlights: params.has('hl') ? highlightsOf(params.get('hl')) : event.highlights,
   }
 }
 

@@ -5,14 +5,10 @@ import { messageOf } from '@/lib/api'
 import { toast } from '@/lib/toast'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import type { ActionResult } from '@/app/loaders'
-import { EMAIL_CHANGE_INTENT,
-  PHONE_CONFIRM_INTENT,
-  PHONE_REMOVE_INTENT,
-  PHONE_REQUEST_INTENT,
-} from '../myEvents.routes'
 import { profileApi } from '../profile.api'
-import { PHOTO_ACCEPT_ATTRIBUTE, checkProfilePhoto } from '../profile.photo'
+import { checkProfilePhoto } from '../profile.photo'
 import type { AttendeeProfileCard } from '../profile.types'
+import { EMAIL_CHANGE_INTENT, EMAIL_FORM_ID, PHONE_CONFIRM_FORM_ID, PHONE_CONFIRM_INTENT, PHONE_REMOVE_FORM_ID, PHONE_REMOVE_INTENT, PHONE_REQUEST_FORM_ID, PHONE_REQUEST_INTENT, PHOTO_ACCEPT_ATTRIBUTE } from '@/lib/constants/portal.constants'
 
 /**
  * "My Account" → Profile (US-DISC-11), lifted out of `MyEventsPage` whole.
@@ -29,26 +25,6 @@ import type { AttendeeProfileCard } from '../profile.types'
  * and a plausible number on somebody's own profile is a claim this app cannot
  * support: the Interests list, "Events attended" and "Member since".
  */
-
-/**
- * The email-change form's id, named once because three elements have to agree
- * on it: the form, the box the kit left in the details grid, and its button.
- *
- * A fixed id rather than `useId()`, as the checkout page's `form="booking"`
- * already does — there is one Profile tab on one page, and the id has to be
- * quotable in a `form=` attribute.
- */
-const EMAIL_FORM_ID = 'portal-profile-email'
-
-/**
- * The phone's three submissions, each its own form — and like the email's,
- * all OUTSIDE the details form, because forms cannot nest: a nested one is
- * dropped by the browser and its button silently submits the outer form
- * instead.
- */
-const PHONE_REQUEST_FORM_ID = 'portal-profile-phone'
-const PHONE_CONFIRM_FORM_ID = 'portal-profile-phone-code'
-const PHONE_REMOVE_FORM_ID = 'portal-profile-phone-remove'
 
 export function ProfileTab({ profile }: { profile: AttendeeProfileCard }) {
   return (
@@ -245,6 +221,12 @@ function DetailsCard({ profile }: { profile: AttendeeProfileCard }) {
   const error = save.data?.ok === false ? save.data.error : null
   useSavedToast(save.state === 'idle' && save.data?.ok === true, 'Profile saved.')
   useFailureToast(save.state === 'idle' ? error : null)
+  // Here, beside the fetchers, rather than in the email and phone cells: those
+  // sit inside the details form, which is rebuilt by Cancel and by every
+  // reload of the profile, and a cell mounted again announced its last answer
+  // again — "Code sent. Check your phone." on pressing Cancel.
+  useEmailChangeToasts(email)
+  usePhoneToasts(phone)
 
   return (
     <div className="card p-5">
@@ -380,11 +362,6 @@ function EmailField({
   fetcher: ReturnType<typeof useFetcher<ActionResult>>
 }) {
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  useSavedToast(
-    fetcher.state === 'idle' && fetcher.data?.ok === true,
-    'Check the new address for a link.',
-  )
-  useFailureToast(fetcher.state === 'idle' ? error : null)
 
   return (
     <div>
@@ -442,6 +419,45 @@ function EmailField({
   )
 }
 
+/** The email change's announcements — called by the card that owns its fetcher. */
+function useEmailChangeToasts(fetcher: ReturnType<typeof useFetcher<ActionResult>>) {
+  const error = fetcher.data?.ok === false ? fetcher.data.error : null
+  useSavedToast(
+    fetcher.state === 'idle' && fetcher.data?.ok === true,
+    'Check the new address for a link.',
+  )
+  useFailureToast(fetcher.state === 'idle' ? error : null)
+}
+
+type PhoneFetchers = {
+  request: ReturnType<typeof useFetcher<ActionResult>>
+  confirm: ReturnType<typeof useFetcher<ActionResult>>
+  remove: ReturnType<typeof useFetcher<ActionResult>>
+}
+
+/** Whether any of the phone's three submissions is in flight. */
+function phoneBusy({ request, confirm, remove }: PhoneFetchers): boolean {
+  return request.state !== 'idle' || confirm.state !== 'idle' || remove.state !== 'idle'
+}
+
+/** The phone's announcements — called by the card that owns its fetchers. */
+function usePhoneToasts(phone: PhoneFetchers) {
+  const { request, confirm, remove } = phone
+  const failure =
+    (request.data?.ok === false ? request.data.error : null) ??
+    (confirm.data?.ok === false ? confirm.data.error : null) ??
+    (remove.data?.ok === false ? remove.data.error : null)
+  useFailureToast(!phoneBusy(phone) ? failure : null)
+  useSavedToast(
+    request.state === 'idle' && request.data?.ok === true,
+    'Code sent. Check your phone.',
+  )
+  useSavedToast(
+    confirm.state === 'idle' && confirm.data?.ok === true,
+    'Number confirmed.',
+  )
+}
+
 /**
  * The number, which is proved by a texted code before Eventa will use it
  * (US-DISC-11 AC3).
@@ -468,31 +484,9 @@ function PhoneField({
    * — forms cannot nest, and a nested one is dropped by the browser, so its
    * button would submit the DETAILS form instead.
    */
-  phone: {
-    request: ReturnType<typeof useFetcher<ActionResult>>
-    confirm: ReturnType<typeof useFetcher<ActionResult>>
-    remove: ReturnType<typeof useFetcher<ActionResult>>
-  }
+  phone: PhoneFetchers
 }) {
-  const { request, confirm, remove } = phone
-  const busy =
-    request.state !== 'idle' ||
-    confirm.state !== 'idle' ||
-    remove.state !== 'idle'
-
-  const failure =
-    (request.data?.ok === false ? request.data.error : null) ??
-    (confirm.data?.ok === false ? confirm.data.error : null) ??
-    (remove.data?.ok === false ? remove.data.error : null)
-  useFailureToast(!busy ? failure : null)
-  useSavedToast(
-    request.state === 'idle' && request.data?.ok === true,
-    'Code sent. Check your phone.',
-  )
-  useSavedToast(
-    confirm.state === 'idle' && confirm.data?.ok === true,
-    'Number confirmed.',
-  )
+  const busy = phoneBusy(phone)
 
   return (
     <div>

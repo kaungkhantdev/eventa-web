@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { RichText, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
+import { ATLAS_STYLE } from '@/lib/constants/landing.constants'
 
 /* Atlas — full-bleed poster landing template. Ported from landing/atlas.html.
    The static kit filled every slot imperatively from landing-data.js; the event
@@ -10,32 +12,6 @@ import type { LandingEvent } from '@/features/landing/types'
    when it has something in it — a real event has no agenda or speakers far more
    often than the kit's demo one did. The sticky bar starts transparent over the
    hero and turns solid once you scroll ~0.72 viewports down. */
-
-/* Page-scoped CSS from the source <style> block (focus rings, FAQ chevron, the
-   reveal keyframe and the transparent→solid sticky bar). */
-const ATLAS_STYLE = `
-a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid #1ba770; outline-offset: 3px; border-radius: 12px; }
-.on-brand:focus-visible { outline-color: #fff; }
-.faq[open] .faq-chev { transform: rotate(180deg); }
-summary::-webkit-details-marker { display: none; }
-summary { list-style: none; }
-@media (prefers-reduced-motion: no-preference) {
-  html { scroll-behavior: smooth; }
-  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-  .reveal { animation: rise .55s cubic-bezier(.22,.61,.36,1) both; }
-}
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
-#bar { background: transparent; transition: background .3s ease, border-color .3s ease; border-bottom: 1px solid transparent; }
-#bar.bar-solid { background: rgb(var(--canvas) / .88); backdrop-filter: blur(12px); border-bottom-color: rgb(var(--line)); }
-#bar-title { color: #fff; }
-#bar.bar-solid #bar-title { color: rgb(var(--ink)); }
-#bar-logo { background: rgba(255,255,255,.16); color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
-#bar.bar-solid #bar-logo { background: #1ba770; color: #fff; box-shadow: none; }
-.bar-reg { background: #fff; color: #1ba770; }
-.bar-reg:hover { background: rgba(255,255,255,.9); }
-#bar.bar-solid .bar-reg { background: #1ba770; color: #fff; }
-#bar.bar-solid .bar-reg:hover { background: #178a60; }
-`
 
 export default function AtlasPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()
@@ -387,7 +363,7 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                       feat ? 'bg-brand text-white shadow-lg md:-translate-y-2' : 'bg-canvas ring-1 ring-line',
                     )}
                   >
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                       <span
                         className={cn(
                           'text-[12px] font-semibold uppercase tracking-[0.08em]',
@@ -398,13 +374,18 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                       </span>
                       {t.note ? (
                         feat ? (
-                          <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+                          <span className="max-w-full rounded-full bg-white/20 leading-snug px-2.5 py-0.5 text-[11px] font-semibold text-white">
                             {t.note}
                           </span>
                         ) : (
-                          <span className="badge badge-green">{t.note}</span>
+                          <span className="badge badge-green max-w-full whitespace-normal leading-snug">{t.note}</span>
                         )
                       ) : null}
+                      {!isOnline && t.rowsLabel && (
+                        <span className={cn('basis-full text-[12px]', feat ? 'text-white/75' : 'text-muted')}>
+                          {t.rowsLabel}
+                        </span>
+                      )}
                     </div>
                     <div
                       className={cn(
@@ -452,6 +433,9 @@ export default function AtlasPage({ event }: { event: LandingEvent }) {
                 )
               })}
             </div>
+            {!isOnline && ev.seatMap && (
+              <SeatMapBlock seatMap={ev.seatMap} className="mt-4 rounded-2xl bg-canvas p-6 ring-1 ring-line" />
+            )}
           </div>
         </section>
       )}

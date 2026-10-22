@@ -1,10 +1,9 @@
 import { redirect } from 'react-router'
 import { pageData, queryOf, type LoaderArgs } from '@/app/loaders'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
-import { api, type Query } from '@/lib/api'
+import { api, whenForbidden, withoutForbidden, type Query } from '@/lib/api'
 import { MASKED, num, satangAmount } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
-import { OVERVIEW_RANGES } from './insights.types'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import {
   earnedSomething,
@@ -15,6 +14,8 @@ import {
   toMixSlices,
   toOverviewTiles,
   toTransactionRow,
+  toPayoutRow,
+  toPayoutTiles,
   toTrendLabels,
   toIncomeRow,
   toIncomeTiles,
@@ -27,6 +28,7 @@ import {
   type EventPerformanceRow,
   type MixSlice,
   type TransactionRow,
+  type PayoutRow,
   type IncomeReportRow,
   type RegistrationReportRow,
 } from './insights.mapper'
@@ -36,14 +38,13 @@ import type {
   OverviewRange,
   OverviewWire,
   TransactionsReportWire,
+  PayoutsReportWire,
   EventsReportWire,
   IncomeReportWire,
   RegistrationsReportWire,
   ReportPeriodWire,
 } from './insights.types'
-
-/** The stages the status control offers; '' is "every stage". */
-export const EVENT_LIFECYCLES = ['upcoming', 'live', 'completed', 'cancelled', ''] as const
+import { EVENT_LIFECYCLES, MAX_SEARCH, OVERVIEW_RANGES, TOP_EVENTS } from '@/lib/constants/insights.constants'
 
 /**
  * The reports that read straight from `/reports/*` (US-RPT-05/08/09).
@@ -54,8 +55,6 @@ export const EVENT_LIFECYCLES = ['upcoming', 'live', 'completed', 'cancelled', '
  * string is the single source of truth and the row count can never disagree
  * with the rows.
  */
-
-const MAX_SEARCH = 120
 
 const reportsApi = {
   registrations: (query: Query) =>
@@ -68,6 +67,7 @@ const reportsApi = {
     api.get<DiscountsReportWire>('/reports/discounts', { query }),
   transactions: (query: Query) =>
     api.get<TransactionsReportWire>('/reports/transactions', { query }),
+  payouts: (query: Query) => api.get<PayoutsReportWire>('/reports/payouts', { query }),
   overview: (query: Query) => api.get<OverviewWire>('/reports/overview', { query }),
 }
 
@@ -137,6 +137,17 @@ function exportQuery(query: Record<string, unknown>): Record<string, string> {
   return out
 }
 
+/**
+ * The events the filter offers, on the two reports Staff read.
+ *
+ * Registrations and attendance need `regView`, which Staff hold (US-RPT-08 AC3,
+ * US-RPT-12 AC1); `GET /events` needs `evCreate` or `regCheckin`, which a
+ * view-only member lacks. That 403 costs them the event dropdown, not the report.
+ */
+function staffEventOptions(): Promise<EventOption[]> {
+  return withoutForbidden(() => eventOptions())
+}
+
 /** A page past the end is a dead view; send the reader to the last real one. */
 function guardPage(request: Request, matchedEvents: number, query: { page: number; limit: number }) {
   const pages = Math.ceil(matchedEvents / query.limit)
@@ -148,7 +159,10 @@ function guardPage(request: Request, matchedEvents: number, query: { page: numbe
 
 async function loadRegistrations({ request }: LoaderArgs): Promise<RegistrationsReportData> {
   const query = reportQuery(request)
-  const [report, events] = await Promise.all([reportsApi.registrations(query), eventOptions()])
+  const [report, events] = await Promise.all([
+    reportsApi.registrations(query),
+    staffEventOptions(),
+  ])
   guardPage(request, report.matchedEvents, query)
 
   return {
@@ -163,7 +177,7 @@ async function loadRegistrations({ request }: LoaderArgs): Promise<Registrations
 
 async function loadAttendance({ request }: LoaderArgs): Promise<AttendanceReportData> {
   const query = reportQuery(request)
-  const [report, events] = await Promise.all([reportsApi.attendance(query), eventOptions()])
+  const [report, events] = await Promise.all([reportsApi.attendance(query), staffEventOptions()])
   guardPage(request, report.matchedEvents, query)
 
   return {
@@ -309,8 +323,28 @@ async function loadTransactions({
   }
 }
 
-/** How many events the overview previews before "View all". */
-const TOP_EVENTS = 6
+export type PayoutsReportData = ReportData<PayoutRow, ReturnType<typeof toPayoutTiles>>
+
+/**
+ * Payouts and settlement (US-RPT-07).
+ *
+ * Which payouts match — a payout covering several events matches a filter on
+ * any one of them — and every sum are the API's; this only maps them.
+ */
+async function loadPayouts({ request }: LoaderArgs): Promise<PayoutsReportData> {
+  const query = reportQuery(request)
+  const [report, events] = await Promise.all([reportsApi.payouts(query), eventOptions()])
+  guardPage(request, report.matchedPayouts, query)
+
+  return {
+    rows: report.rows.map(toPayoutRow),
+    tiles: toPayoutTiles(report.totals),
+    window: windowOf(report.matchedPayouts, query),
+    period: report.period,
+    events,
+    exportQuery: exportQuery(query),
+  }
+}
 
 /**
  * Workspace health at a glance (US-RPT-01/03/04).
@@ -323,6 +357,11 @@ const TOP_EVENTS = 6
  * There is deliberately no "sales by channel". No source, channel or UTM column
  * exists anywhere in the schema, so the panel could only ever have been
  * invented; it is dropped rather than faked.
+ *
+ * The top events are a preview of event performance, a finance report
+ * (US-RPT-12 AC1). A reader refused it still gets the overview — which is
+ * theirs — with `bars` and `topEvents` null, so the page hides the preview
+ * instead of claiming there were no events.
  */
 export interface OverviewData {
   range: OverviewRange
@@ -338,8 +377,10 @@ export interface OverviewData {
   mix: MixSlice[]
   /** The donut's centre: the registrations the mix accounts for. */
   mixTotal: string
-  bars: { id: string; name: string; count: string; width: number }[]
-  topEvents: EventPerformanceRow[]
+  /** Null when the reader may not see event performance. */
+  bars: { id: string; name: string; count: string; width: number }[] | null
+  /** Null when the reader may not see event performance. */
+  topEvents: EventPerformanceRow[] | null
   period: ReportPeriodWire
 }
 
@@ -348,10 +389,9 @@ async function loadOverview({ request }: LoaderArgs): Promise<OverviewData> {
   const range = enumParam(params, 'range', OVERVIEW_RANGES, 'year')
   const [report, events] = await Promise.all([
     reportsApi.overview({ range }),
-    reportsApi.events({ range, page: 1, limit: TOP_EVENTS }),
+    whenForbidden(() => reportsApi.events({ range, page: 1, limit: TOP_EVENTS }), null),
   ])
 
-  const busiest = events.rows[0]?.registrations ?? 0
   return {
     range,
     tiles: toOverviewTiles(report.kpis),
@@ -366,20 +406,27 @@ async function loadOverview({ request }: LoaderArgs): Promise<OverviewData> {
     },
     mix: toMixSlices(report.ticketMix),
     mixTotal: num(report.ticketMix.reduce((sum, slice) => sum + slice.seats, 0)),
-    bars: events.rows.map((row) => ({
-      id: row.eventId,
-      name: row.eventName,
-      count: num(row.registrations),
-      // Relative to the busiest, so the longest bar fills the track.
-      width: busiest === 0 ? 0 : Math.round((row.registrations / busiest) * 100),
-    })),
-    topEvents: events.rows.map(toEventPerformanceRow),
+    bars: events && toEventBars(events),
+    topEvents: events && events.rows.map(toEventPerformanceRow),
     period: report.period,
   }
 }
 
+/** The "registrations by event" bars, each relative to the busiest. */
+function toEventBars(events: EventsReportWire): NonNullable<OverviewData['bars']> {
+  const busiest = events.rows[0]?.registrations ?? 0
+  return events.rows.map((row) => ({
+    id: row.eventId,
+    name: row.eventName,
+    count: num(row.registrations),
+    // Relative to the busiest, so the longest bar fills the track.
+    width: busiest === 0 ? 0 : Math.round((row.registrations / busiest) * 100),
+  }))
+}
+
 export const overviewReportRoute = { loader: pageData(loadOverview) }
 export const transactionsReportRoute = { loader: pageData(loadTransactions) }
+export const payoutsReportRoute = { loader: pageData(loadPayouts) }
 export const discountsReportRoute = { loader: pageData(loadDiscounts) }
 export const eventsReportRoute = { loader: pageData(loadEvents) }
 export const registrationsReportRoute = { loader: pageData(loadRegistrations) }

@@ -11,15 +11,43 @@ export interface HighlightWire {
   icon?: string | null
 }
 
-/** `SeatingResponseDto` — the fields the wizard's Seating step reads. */
+/** One row of a reserved map and the ticket types its seats sell (US-EVT-05). */
+export interface SeatRowWire {
+  /** `"1"`..`"N"` — the API numbers rows. */
+  rowLabel: string
+  /** The type every seat of the row shares, or null when they differ or have none. */
+  ticketTypeId: string | null
+  seats: number
+  /** Each seat's type in seat-number order, seat 1 first; null for a seat with none. */
+  seatTicketTypes: (string | null)[]
+}
+
+/** `SeatingResponseDto` — the fields the wizard's Seating and Assign seats steps read. */
 export interface SeatingWire {
   seatingMode: 'ga' | 'reserved'
   isOnline: boolean
   capacity: number | null
   seatMap: { name: string; rows: number; seatsPerRow: number; totalSeats: number } | null
+  /** Every row of a reserved map, in row order; empty for general admission. */
+  rows: SeatRowWire[]
+  /** How many rows have at least one seat with no ticket type yet. */
+  unassignedRows: number
   ticketQuantity: number
   seatShortfall: { totalSeats: number; ticketQuantity: number } | null
   note: string | null
+}
+
+/**
+ * `PUT /seating/reserved`. `seatTicketTypes` is one entry per seat, `[row][seat]`
+ * with index 0 = row 1 and seat 1. The API's `rowTicketTypes` shorthand is never
+ * sent: the wizard holds every seat's type, and a row split between types has
+ * no single one.
+ */
+export interface ReservedSeatingBody {
+  name: string
+  rows: number
+  seatsPerRow: number
+  seatTicketTypes: (string | null)[][]
 }
 
 export const eventContentApi = {
@@ -35,7 +63,7 @@ export const eventContentApi = {
   setGeneralSeating: (id: string, headcount: number) =>
     api.put<SeatingWire>(`/events/${id}/seating/general`, { headcount }),
 
-  /** Reserved: a named grid. `name` is required by the API. */
-  setReservedSeating: (id: string, seatMap: { name: string; rows: number; seatsPerRow: number }) =>
+  /** Reserved: a named grid, and the ticket type each seat sells. `name` is required by the API. */
+  setReservedSeating: (id: string, seatMap: ReservedSeatingBody) =>
     api.put<SeatingWire>(`/events/${id}/seating/reserved`, seatMap),
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { signUpInputOf } from './signUpInput'
+import { bookingClaimInputOf, signUpInputOf } from './signUpInput'
 
 function form(fields: Record<string, string>): FormData {
   const data = new FormData()
@@ -58,5 +58,33 @@ describe('signUpInputOf', () => {
     expect(
       signUpInputOf(form({ ...FILLED, acceptTerms: 'on' }), 'admin', 'x').acceptTerms,
     ).toBe(true)
+  })
+})
+
+/**
+ * Choosing a password from the emailed claim link (US-DISC-15): "I am asked
+ * only for a password — my name comes from the booking". The address is the
+ * one the link was sent to, so whatever else the form holds stays behind.
+ */
+describe('bookingClaimInputOf', () => {
+  const CLAIM = 'claim.header.payload'
+
+  it('sends the token, the password and the terms, and nothing else', () => {
+    expect(
+      bookingClaimInputOf(
+        form({
+          name: 'Somebody Else',
+          email: 'else@example.test',
+          password: 'sw0rdfish!1',
+          confirmPassword: 'sw0rdfish!1',
+          acceptTerms: 'on',
+        }),
+        CLAIM,
+      ),
+    ).toEqual({ token: CLAIM, password: 'sw0rdfish!1', acceptTerms: true })
+  })
+
+  it('passes an unticked terms box through as false, for the API to refuse', () => {
+    expect(bookingClaimInputOf(form({ password: 'sw0rdfish!1' }), CLAIM).acceptTerms).toBe(false)
   })
 })

@@ -13,16 +13,20 @@ import type {
   MeetingWire,
 } from './meetings.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import {
+  calendarConnectionApi,
+  type CalendarConnectionStatus,
+} from '@/features/settings/calendarConnection.api'
+import { MAX_SEARCH_LENGTH, MEETING_TABS } from '@/lib/constants/meetings.constants'
 
 /**
- * Meetings with venues, sponsors, vendors and speakers (US-MTG-01..06).
+ * Meetings with venues, sponsors, vendors and speakers (US-MTG-01..08).
  *
  * Bucket, type, event, search and page live in the URL. Which bucket a meeting
  * falls in is the API's answer, derived per request from the Bangkok day —
  * "today" is a Thai calendar fact, not the reader's clock.
  */
 
-export const MEETING_TABS = ['all', 'today', 'upcoming', 'past'] as const
 export type MeetingTab = (typeof MEETING_TABS)[number]
 
 export const MEETING_TYPES: readonly MeetingType[] = [
@@ -35,7 +39,6 @@ export const MEETING_TYPES: readonly MeetingType[] = [
 
 export const MEETING_MODES: readonly MeetingMode[] = ['Video', 'In person', 'Phone']
 
-const MAX_SEARCH = 120
 interface MeetingQuery extends Query {
   page?: number
   limit?: number
@@ -70,7 +73,7 @@ export function listQueryOf(params: URLSearchParams): MeetingQuery {
     bucket: tab === 'all' ? undefined : (tab as MeetingBucket),
     type: MEETING_TYPES.includes(type as MeetingType) ? (type as MeetingType) : undefined,
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 }
 
@@ -79,13 +82,23 @@ export interface MeetingsData {
   window: PageWindow
   counts: MeetingCountsWire
   events: EventOption[]
+  /**
+   * The workspace's Google Calendar (US-MTG-08): the header says whether
+   * invites are going out, and a card saved while disconnected says what
+   * would send its invite.
+   */
+  calendarStatus: CalendarConnectionStatus
 }
 
 const NO_COUNTS: MeetingCountsWire = { all: 0, today: 0, upcoming: 0, past: 0 }
 
 async function loadMeetings({ request }: LoaderArgs): Promise<MeetingsData> {
   const query = listQueryOf(queryOf(request))
-  const [page, events] = await Promise.all([meetingsApi.list(query), eventOptions()])
+  const [page, events, calendar] = await Promise.all([
+    meetingsApi.list(query),
+    eventOptions(),
+    calendarConnectionApi.get(),
+  ])
 
   if (page.meta.total > 0 && query.page! > page.meta.totalPages) {
     throw redirect(withPage(request.url, page.meta.totalPages))
@@ -96,6 +109,7 @@ async function loadMeetings({ request }: LoaderArgs): Promise<MeetingsData> {
     window: pageWindow(page.meta),
     counts: (page.meta.counts as MeetingCountsWire | undefined) ?? NO_COUNTS,
     events,
+    calendarStatus: calendar.status,
   }
 }
 
@@ -120,7 +134,9 @@ export function meetingInputOf(form: FormData): Record<string, unknown> {
     startTime: String(form.get('startTime') ?? ''),
     endTime: String(form.get('endTime') ?? ''),
     type: String(form.get('type') ?? 'Internal'),
-    mode: String(form.get('mode') ?? 'Video'),
+    // No default: the organizer must choose (US-MTG-03). A missing choice goes
+    // as an empty one, which the API refuses, rather than as a video call.
+    mode: String(form.get('mode') ?? ''),
     person: String(form.get('person') ?? '').trim(),
     role: String(form.get('role') ?? '').trim() || undefined,
     guestEmail: String(form.get('guestEmail') ?? '').trim(),

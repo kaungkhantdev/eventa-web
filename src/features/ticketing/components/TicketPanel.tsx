@@ -4,8 +4,10 @@ import { Button, EventPicker, Hint, Input, Label, Panel } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
 import type { ActionResult } from '@/app/loaders'
+import { readOnlyQuantityOf, seatSetFor } from '../tickets.mapper'
 import type { EventOption } from '../tickets.routes'
-import type { TicketDraft } from '../tickets.types'
+import type { SeatSetWire, TicketDraft } from '../tickets.types'
+import { MAX_PER_ORDER, SEAT_SET_QUANTITY, TICKET_PANEL_FORM_ID } from '@/lib/constants/ticketing.constants'
 
 /**
  * Create or edit a ticket type (US-TKT-01/02).
@@ -22,10 +24,6 @@ interface TicketPanelProps {
   editing: TicketDraft | null
   events: EventOption[]
 }
-
-/** One order may hold at most this many seats — the API's own ceiling. */
-const MAX_PER_ORDER = 8
-const FORM_ID = 'ticket-form'
 
 export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps) {
   const [isFree, setIsFree] = useState(false)
@@ -64,6 +62,16 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
   const error = fetcher.data?.ok === false ? fetcher.data.error : null
   const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
 
+  // Whether the chosen event's seat map sets its quantities (US-EVT-05). Only
+  // a new tier asks: its event is chosen here, while a tier being edited
+  // carries its own answer and cannot change event.
+  const seatSet = useFetcher<SeatSetWire>()
+  const chooseEvent = (id: string) => {
+    setEventId(id)
+    if (id) seatSet.load(`/admin/tickets/seat-set?${new URLSearchParams({ eventId: id })}`)
+  }
+  const seatQuantity = readOnlyQuantityOf(editing, seatSetFor(eventId, seatSet.data))
+
   // The save succeeded and the loader has already revalidated; close.
   useEffect(() => {
     if (!saved || !open) return
@@ -85,7 +93,7 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
             variant="primary"
             className="flex-1"
             type="submit"
-            form={FORM_ID}
+            form={TICKET_PANEL_FORM_ID}
             disabled={saving}
           >
             {saving ? 'Saving…' : 'Save ticket type'}
@@ -93,7 +101,7 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
         </>
       }
     >
-      <fetcher.Form key={session} id={FORM_ID} method="post" className="space-y-4">
+      <fetcher.Form key={session} id={TICKET_PANEL_FORM_ID} method="post" className="space-y-4">
         <input type="hidden" name="intent" value={editing ? 'update' : 'create'} />
         <input type="hidden" name="type" value={isFree ? 'free' : 'paid'} />
         {editing && <input type="hidden" name="ticketId" value={editing.id} />}
@@ -130,7 +138,7 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
             id="ticket-event"
             name="eventId"
             value={eventId}
-            onChange={setEventId}
+            onChange={chooseEvent}
             options={events}
             allLabel={false}
             placeholder="Choose an event"
@@ -188,16 +196,39 @@ export function TicketPanel({ open, onClose, editing, events }: TicketPanelProps
 
         <div>
           <Label htmlFor="ticket-total">Quantity available</Label>
-          <Input
-            id="ticket-total"
-            name="total"
-            type="number"
-            min={0}
-            step={1}
-            defaultValue={editing?.total ?? ''}
-            placeholder="250"
-          />
-          <Hint>0 means unlimited.</Hint>
+          {/* The seat map sets it (US-EVT-05): shown, never posted — the box has
+              no name, so the save leaves the quantity as the API derived it. A
+              new tier there has no rows yet, so it shows 0. The two boxes are
+              keyed apart: choosing another event can swap one for the other,
+              and a reused box would carry the seat map's 0 into the typed one,
+              where 0 means unlimited. */}
+          {seatQuantity !== null ? (
+            <>
+              <Input
+                key="seat-set"
+                id="ticket-total"
+                type="number"
+                value={seatQuantity}
+                readOnly
+                className="bg-canvas text-muted"
+              />
+              <Hint>{SEAT_SET_QUANTITY}</Hint>
+            </>
+          ) : (
+            <>
+              <Input
+                key="typed"
+                id="ticket-total"
+                name="total"
+                type="number"
+                min={0}
+                step={1}
+                defaultValue={editing?.total ?? ''}
+                placeholder="250"
+              />
+              <Hint>0 means unlimited.</Hint>
+            </>
+          )}
         </div>
 
         {/* The instant behind each box travels with it, hidden, so a save that

@@ -1,6 +1,7 @@
 import { MASKED, bangkokDateRange } from '@/lib/format'
 import type { Persona } from '@/lib/persona'
 import type { ProfileWire } from './profile.types'
+import { PAY_METHODS } from './checkout.types'
 import type {
   BookingMode,
   BuyerDefaults,
@@ -13,13 +14,17 @@ import type {
   OrderSummaryWire,
   PaymentIntentWire,
   PaymentStep,
+  PayMethod,
   PlacedOrder,
+  SeatOption,
   SeatRow,
+  SeatState,
   SummaryLines,
   TierOption,
   WaitlistJoinedWire,
   WaitlistPlace,
 } from './checkout.types'
+import { BACK_TEMPLATE, FAILED, ORDINAL, PREFILLING_PERSONA, PROMPT_PAY, UNAVAILABLE_FALLBACK, WAITLIST_OPEN } from '@/lib/constants/portal.constants'
 
 /**
  * The public checkout → what the register page renders (US-DISC-04/05/06).
@@ -56,18 +61,6 @@ const UNAVAILABLE: Record<Exclude<TicketStatusWire, 'onsale'>, string> = {
   scheduled: 'Not on sale yet',
 }
 
-const UNAVAILABLE_FALLBACK = 'Unavailable'
-const WAITLIST_OPEN = 'Sold out · join the waitlist'
-
-/**
- * Where "Back to event" goes.
- *
- * The checkout payload carries no event type, so the type-specific template
- * Discover picks cannot be worked out here — aurora is the general-purpose one
- * and every template reads the same event.
- */
-const BACK_TEMPLATE = 'aurora'
-
 export function toCheckoutView(wire: CheckoutViewWire): CheckoutView {
   return {
     eventId: wire.event.id,
@@ -80,7 +73,16 @@ export function toCheckoutView(wire: CheckoutViewWire): CheckoutView {
     ),
     maxPerBooking: wire.maxPerBooking,
     paymentRequired: wire.paymentRequired,
+    paymentMethods: offeredMethods(wire.paymentMethods),
   }
+}
+
+/**
+ * The ways to pay this page offers: those the workspace switched on
+ * (US-SET-09), and only ones it knows how to take, in its own order.
+ */
+function offeredMethods(switchedOn: readonly string[]): PayMethod[] {
+  return PAY_METHODS.filter((method) => switchedOn.includes(method))
 }
 
 function toHeader(event: CheckoutEventWire): CheckoutHeader {
@@ -146,8 +148,6 @@ function ordinalSuffix(n: number): string {
   return ORDINAL[n % 10] ?? 'th'
 }
 
-const ORDINAL: Record<number, string> = { 1: 'st', 2: 'nd', 3: 'rd' }
-
 export function toWaitlistPlace(joined: WaitlistJoinedWire): WaitlistPlace {
   return {
     orderId: joined.orderId,
@@ -165,20 +165,110 @@ function toSeatRows(wire: CheckoutViewWire): SeatRow[] {
   for (const seat of wire.seatMap.seats) {
     const label = seat.rowLabel ?? ''
     const row = byRow.get(label) ?? { label, seats: [] }
-    row.seats.push({ id: seat.id, label: seat.seatNumber, available: seat.available })
+    row.seats.push({
+      id: seat.id,
+      label: seat.seatNumber,
+      available: seat.available,
+      ticketTypeId: seat.ticketTypeId,
+    })
     byRow.set(label, row)
   }
   const rows = [...byRow.values()]
-  for (const row of rows) row.seats.sort((a, b) => bySeatNumber(a.label, b.label))
-  return rows.sort((a, b) => a.label.localeCompare(b.label))
+  for (const row of rows) row.seats.sort((a, b) => numerically(a.label, b.label))
+  return rows.sort((a, b) => numerically(a.label, b.label))
 }
 
-/** `2` before `10`: seat numbers are numbers, and a string sort reverses them. */
-function bySeatNumber(a: string, b: string): number {
+/**
+ * `2` before `10`. The API numbers both rows and seats, and a string sort puts
+ * row 10 between rows 1 and 2.
+ */
+function numerically(a: string, b: string): number {
   const left = Number(a)
   const right = Number(b)
   if (Number.isNaN(left) || Number.isNaN(right)) return a.localeCompare(b)
   return left - right
+}
+
+/* ── seats of the chosen ticket type (US-DISC-04) ─────────────────────── */
+
+/** Whether any seat of the map has a ticket type (US-EVT-05). */
+export function mapHasTypes(rows: readonly SeatRow[]): boolean {
+  return rows.some((row) => row.seats.some((seat) => seat.ticketTypeId !== null))
+}
+
+/**
+ * Whether a seat can be bought under this ticket type: a seat of that type —
+ * each seat carries its own, so a row can be split between types — or, only
+ * on a map laid out before seats had types, a seat with no type, which the API
+ * sells under any type. Once any seat has a type the API refuses an untyped
+ * seat. Mirrors `CheckoutPolicy.resolveSeats`, so the map never offers
+ * a seat the API would refuse.
+ */
+function sellsUnder(seat: SeatOption, tierId: string, typedMap: boolean): boolean {
+  if (seat.ticketTypeId === null) return !typedMap
+  return seat.ticketTypeId === tierId
+}
+
+/**
+ * How a seat looks to a buyer who has chosen `tierId` and picked `selected`.
+ * `typedMap` is `mapHasTypes` of the whole map, worked out once per render.
+ */
+export function seatStateOf(
+  seat: SeatOption,
+  tierId: string,
+  selected: readonly number[],
+  typedMap: boolean,
+): SeatState {
+  if (!sellsUnder(seat, tierId, typedMap)) return 'other'
+  if (!seat.available) return 'booked'
+  return selected.includes(seat.id) ? 'selected' : 'available'
+}
+
+/** A seat can be tapped to pick it or to let it go — nothing else can. */
+export function canPick(state: SeatState): boolean {
+  return state === 'available' || state === 'selected'
+}
+
+/**
+ * The picked seats that survive a change of ticket type.
+ *
+ * Another type's seat would only come back from the API as a refusal; dropping
+ * it here keeps the buyer's other picks and asks them to choose again only for
+ * the seats that no longer fit.
+ */
+export function seatsKeptForTier(
+  selected: readonly number[],
+  rows: readonly SeatRow[],
+  tierId: string,
+): number[] {
+  const seats = new Map(rows.flatMap((row) => row.seats).map((seat) => [seat.id, seat]))
+  const typedMap = mapHasTypes(rows)
+  return selected.filter((id) => {
+    const seat = seats.get(id)
+    return seat !== undefined && sellsUnder(seat, tierId, typedMap)
+  })
+}
+
+const EVERYDAY_STATES: readonly SeatState[] = ['selected', 'available', 'booked']
+
+/**
+ * What the legend explains. Another type's seats are listed only when the map
+ * shows some — on a map with one type, or none, the entry would explain nothing.
+ */
+export function seatLegendOf(rows: readonly SeatRow[], tierId: string): SeatState[] {
+  const typedMap = mapHasTypes(rows)
+  const showsOther = rows.some((row) => row.seats.some((seat) => !sellsUnder(seat, tierId, typedMap)))
+  return showsOther ? [...EVERYDAY_STATES, 'other'] : [...EVERYDAY_STATES]
+}
+
+/**
+ * The order summary to show: the last quote, but only while something is
+ * picked. With nothing picked — every seat let go, or dropped by a change of
+ * ticket type — no quote is asked for, and the last one would still price
+ * seats the buyer no longer has (US-DISC-04).
+ */
+export function summaryShown(summary: SummaryLines | null, count: number): SummaryLines | null {
+  return count >= 1 ? summary : null
 }
 
 export function toSummaryLines(summary: OrderSummaryWire): SummaryLines {
@@ -213,9 +303,6 @@ export function toPlacedOrder(order: OrderPlacedWire): PlacedOrder {
   }
 }
 
-const PROMPT_PAY = 'PromptPay'
-const FAILED = 'failed'
-
 /**
  * What the buyer still has to do.
  *
@@ -240,17 +327,6 @@ function stateOf(intent: PaymentIntentWire): PaymentStep['state'] {
 }
 
 /* ── who is booking (US-DISC-11, criterion 5) ───────────────────────────── */
-
-/**
- * The one persona whose saved profile fills the buyer boxes.
- *
- * Named once and read by both rules below, because "whose details pre-fill"
- * and "whose profile is worth fetching" have to be the same answer: a loader
- * that fetched for somebody the mapper then ignores would spend a round trip
- * to achieve nothing, and one that fetched for fewer would leave a signed-in
- * attendee retyping details the product already holds.
- */
-const PREFILLING_PERSONA: Persona = 'attendee'
 
 /**
  * Whether this visitor's saved profile should be read at all.

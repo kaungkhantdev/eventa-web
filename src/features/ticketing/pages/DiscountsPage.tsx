@@ -18,6 +18,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -26,6 +27,7 @@ import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal'
 import { DiscountPanel } from '../components/DiscountPanel'
 import type { DiscountTab, DiscountsData } from '../discounts.routes'
 import type { DiscountRow } from '../discounts.types'
+import { ALL_EVENTS, DISCOUNTS_PAGE_COPY_RESET_MS, MAX_SEARCH_LENGTH } from '@/lib/constants/ticketing.constants'
 
 /**
  * Promo codes (US-TKT-07..10/12). Layout ported from discounts.html.
@@ -33,10 +35,6 @@ import type { DiscountRow } from '../discounts.types'
  * The table is what the API returned for these filters — the page does not
  * re-slice it, so the paginator's count and the rows always agree.
  */
-
-const ALL_EVENTS = 'All events'
-const MAX_SEARCH_LENGTH = 120
-const COPY_RESET_MS = 1200
 
 export default function DiscountsPage() {
   const data = useLoaderData() as DiscountsData
@@ -322,7 +320,7 @@ function CopyCodeButton({ code }: { code: string }) {
     if (navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {})
     setCopied(true)
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setCopied(false), COPY_RESET_MS)
+    timer.current = window.setTimeout(() => setCopied(false), DISCOUNTS_PAGE_COPY_RESET_MS)
   }
 
   return (
@@ -352,14 +350,15 @@ function DeleteDiscountModal({
   target: DiscountRow | null
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Discount code deleted.')
-    onClose()
-  }, [done, open, onClose])
+  // Once per deletion: the dialog stays mounted, and the fetcher's last `ok`
+  // would otherwise close the next code's dialog as it opened.
+  const { refusal: refused } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Discount code deleted.')
+      onClose()
+    },
+  })
 
   return (
     <ConfirmDeleteModal

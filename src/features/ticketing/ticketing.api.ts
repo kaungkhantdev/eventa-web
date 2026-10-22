@@ -22,6 +22,8 @@ export interface TicketWire {
   salesStartAt: string | null
   salesEndAt: string | null
   version: number
+  /** True on a reserved event whose rows have ticket types: `total` is its seats (US-EVT-05). */
+  quantityFromSeats: boolean
 }
 
 /** What the "Add ticket" slide-over sends. A free tier carries no price. */

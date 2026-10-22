@@ -85,6 +85,15 @@ export const meProfileApi = {
   changeEmail: (email: string) => api.post<ProfileWire>('/me/profile/email', { email }),
 
   /**
+   * Open the link that change emailed to the new address, and make it the
+   * sign-in email. Anonymous: the token in the link is the whole authority, and
+   * the link may be opened on a device signed in as somebody else, or as nobody.
+   * The token travels in the body, never a query string.
+   */
+  confirmEmail: (token: string) =>
+    api.post<ProfileWire>('/me/profile/email/confirm', { token }, { anonymous: true }),
+
+  /**
    * Ask to use a new number. The number is HELD (`pendingPhone`) and a code is
    * texted to it; the number already on the account goes on working until the
    * code comes back, which is why this answers 202 rather than 200.

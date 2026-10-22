@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { UPLOAD_MAX_BYTES } from '@/lib/imageUploads'
-import {
-  ACCEPTED_PHOTO_TYPES,
-  PHOTO_ACCEPT_ATTRIBUTE,
-  checkProfilePhoto,
-} from './profile.photo'
+import { checkProfilePhoto } from './profile.photo'
+import { ACCEPTED_PHOTO_TYPES, PHOTO_ACCEPT_ATTRIBUTE } from '@/lib/constants/portal.constants'
 
 /**
  * Criterion 4: a photo over 5 MB, or one that is not a JPG or PNG, is refused

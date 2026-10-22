@@ -4,38 +4,14 @@ import { Icon,
   VenueMap,
   RichText,
 } from '@/components/ui'
+import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
+import { MINIMAL_STYLE } from '@/lib/constants/landing.constants'
 
 /* Port of landing/minimal.html — a centered, editorial single-column event page.
    Renders the event it is given, already mapped from the API, with the same
    copy and Tailwind class strings as the static template. Sections it has no
    content for are left out rather than headed. */
-
-const PAGE_STYLE = `
-  html { scroll-behavior: smooth; }
-  body { overflow-x: hidden; }
-  a:focus-visible, button:focus-visible, summary:focus-visible {
-    outline: 2px solid #1ba770;
-    outline-offset: 3px;
-    border-radius: 6px;
-  }
-  details.faq > summary { list-style: none; cursor: pointer; }
-  details.faq > summary::-webkit-details-marker { display: none; }
-  details.faq[open] .faq-chev { transform: rotate(180deg); }
-  .faq-chev { transition: transform .22s ease; }
-  section[id] { scroll-margin-top: 72px; }
-  @media (prefers-reduced-motion: no-preference) {
-    .reveal { animation: rise .7s cubic-bezier(.22,.61,.36,1) both; }
-    .reveal.d1 { animation-delay: .06s; }
-    .reveal.d2 { animation-delay: .13s; }
-    .reveal.d3 { animation-delay: .20s; }
-    .reveal.d4 { animation-delay: .27s; }
-    @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-  }
-`
 
 export default function MinimalPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()
@@ -94,7 +70,7 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
 
   return (
     <div className="min-h-screen bg-canvas font-sans text-ink antialiased">
-      <style>{PAGE_STYLE}</style>
+      <style>{MINIMAL_STYLE}</style>
 
       {/* ============ 1 · STICKY NAV ============ */}
       <header className="sticky top-0 z-50 border-b border-line bg-canvas/85 backdrop-blur">
@@ -266,18 +242,21 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
                     key={i}
                     className={`flex h-full flex-col rounded-2xl p-5 ${feat ? 'bg-brand-soft' : 'bg-surface'}`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-[12.5px] font-bold uppercase tracking-wide text-ink">
+                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                      <h3 className="min-w-0 break-words text-[12.5px] font-bold uppercase tracking-wide text-ink">
                         {t.name}
                       </h3>
                       {t.note && (
                         <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide ${
+                          className={`max-w-full rounded-full px-2 py-0.5 text-[10.5px] font-semibold uppercase leading-snug tracking-wide ${
                             feat ? 'bg-brand text-white' : 'bg-brand-soft text-brand'
                           }`}
                         >
                           {t.note}
                         </span>
+                      )}
+                      {!isOnline && t.rowsLabel && (
+                        <span className="basis-full text-[12px] text-muted">{t.rowsLabel}</span>
                       )}
                     </div>
                     <div className="mt-3 text-[24px] font-extrabold tracking-tight tnum text-ink">
@@ -307,6 +286,9 @@ export default function MinimalPage({ event }: { event: LandingEvent }) {
                 )
               })}
             </div>
+            {!isOnline && ev.seatMap && (
+              <SeatMapBlock seatMap={ev.seatMap} className="mt-3 rounded-2xl bg-surface p-5" />
+            )}
           </section>
         )}
 

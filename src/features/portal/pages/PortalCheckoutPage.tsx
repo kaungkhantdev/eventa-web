@@ -6,15 +6,19 @@ import { cn } from '@/lib/cn'
 import { PaymentHandoff } from '../components/PaymentHandoff'
 import { WaitlistBar, WaitlistNote, WaitlistOverlay } from '../components/WaitlistPanel'
 import type { CheckoutData, CheckoutResult } from '../checkout.routes'
+import { canPick, mapHasTypes, seatLegendOf, seatStateOf, seatsKeptForTier, summaryShown } from '../checkout.mapper'
 import type {
   BuyerDefaults,
   CheckoutView,
   PaymentStep,
+  PayMethod,
   PlacedOrder,
   SeatRow,
+  SeatState,
   SummaryLines,
   TierOption,
 } from '../checkout.types'
+import { PORTAL_CHECKOUT_PAGE_METHODS, SEAT_CSS, WAITING_TONE } from '@/lib/constants/portal.constants'
 
 /**
  * Registering for an event (portal/register.html), on the public checkout.
@@ -29,31 +33,43 @@ import type {
  * this page never holds either.
  */
 
-const SEAT_CSS = `
-.house { background: radial-gradient(120% 90% at 50% -10%, #17201c 0%, #0c110f 60%); }
-.seat {
-  position: relative; height: 30px; width: 30px; border-radius: 9px 9px 4px 4px;
-  display: grid; place-items: center; font-size: 11px; font-weight: 600;
-  transition: background .12s, box-shadow .12s, color .12s; user-select: none;
+/**
+ * Each seat state's look and its legend wording. The kit draws three; another
+ * ticket type's seat (US-DISC-04) is booked's dim seat with an outline, so it
+ * reads as "not for this ticket" rather than "taken".
+ */
+const SEAT_CLASS: Record<SeatState, string> = {
+  selected: 'seat-sel',
+  available: 'seat-avail',
+  booked: 'seat-booked',
+  other: 'seat-booked ring-1 ring-inset ring-white/20',
 }
-.seat::after { content: ''; position: absolute; bottom: -3px; left: 4px; right: 4px; height: 3px; border-radius: 2px; background: inherit; opacity: .55; }
-.seat-avail  { background: rgba(255,255,255,.08); color: rgba(255,255,255,.72); cursor: pointer; }
-.seat-avail:hover { background: rgba(27,167,112,.4); color: #fff; }
-.seat-sel    { background: #1ba770; color: #fff; cursor: pointer; box-shadow: 0 0 0 3px rgba(27,167,112,.28); }
-.seat-booked { background: rgba(255,255,255,.035); color: rgba(255,255,255,.16); cursor: not-allowed; }
-.rowlab { color: rgba(255,255,255,.4); font-size: 12px; font-weight: 600; width: 18px; text-align: center; }
-`
+
+const SEAT_LEGEND: Record<SeatState, string> = {
+  selected: 'Selected',
+  available: 'Available',
+  booked: 'Booked',
+  other: 'Other ticket type',
+}
 
 export default function PortalCheckoutPage() {
   const { checkout, buyer } = useLoaderData() as CheckoutData
   const [tierId, setTierId] = useState(() => firstSellable(checkout.tiers))
   const [quantity, setQuantity] = useState(1)
   const [seatIds, setSeatIds] = useState<number[]>([])
-  const [method, setMethod] = useState<'Card' | 'PromptPay'>('Card')
+  // The first way to pay the workspace offers (US-SET-09); Card when it
+  // offers none this page can take, which the API then refuses in words.
+  const [method, setMethod] = useState<PayMethod>(checkout.paymentMethods[0] ?? 'Card')
   const [discountCode, setDiscountCode] = useState('')
 
   const { eventId, mode } = checkout
   const tier = checkout.tiers.find((option) => option.id === tierId) ?? null
+
+  // A seat of another type cannot be bought under this one, so it goes.
+  const chooseTier = (id: string) => {
+    setTierId(id)
+    setSeatIds((picked) => seatsKeptForTier(picked, checkout.rows, id))
+  }
   const count = mode === 'reserved' ? seatIds.length : quantity
 
   // A sold-out ticket with its waitlist open is chosen to JOIN the line, not
@@ -64,7 +80,7 @@ export default function PortalCheckoutPage() {
   const booking = useFetcher<CheckoutResult>()
   const joining = useFetcher<CheckoutResult>()
 
-  const summary = quote.data?.ok && quote.data.intent === 'quote' ? quote.data.summary : null
+  const summary = summaryShown(quote.data?.ok && quote.data.intent === 'quote' ? quote.data.summary : null, count)
   const booked = booking.data?.ok && booking.data.intent === 'book' ? booking.data : null
   const joined = joining.data?.ok && joining.data.intent === 'waitlist' ? joining.data.place : null
   const error = errorOf(joining.data) ?? errorOf(booking.data) ?? errorOf(quote.data)
@@ -104,7 +120,7 @@ export default function PortalCheckoutPage() {
                 key={option.id}
                 tier={option}
                 selected={option.id === tierId}
-                onSelect={() => setTierId(option.id)}
+                onSelect={() => chooseTier(option.id)}
               />
             ))}
           </div>
@@ -118,6 +134,7 @@ export default function PortalCheckoutPage() {
           {checkout.mode === 'reserved' ? (
             <SeatPicker
               rows={checkout.rows}
+              tierId={tierId}
               backTo={checkout.header.backTo}
               selected={seatIds}
               max={tier?.maxPerOrder ?? checkout.maxPerBooking}
@@ -149,6 +166,7 @@ export default function PortalCheckoutPage() {
             <StepHeading>4 · Payment</StepHeading>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_300px]">
               <PaymentMethods
+                offered={checkout.paymentMethods}
                 method={method}
                 onChange={setMethod}
                 discountCode={discountCode}
@@ -392,12 +410,15 @@ function QuantityPicker({
 
 function SeatPicker({
   rows,
+  tierId,
   backTo,
   selected,
   max,
   onToggle,
 }: {
   rows: SeatRow[]
+  /** The chosen ticket type: only its seats can be picked. */
+  tierId: string
   /** The event's own page — the only thing left to do when there is no map. */
   backTo: string
   selected: number[]
@@ -421,6 +442,7 @@ function SeatPicker({
     )
   }
 
+  const typedMap = mapHasTypes(rows)
   return (
     <div>
       <div className="house overflow-hidden rounded-2xl p-5 sm:p-7">
@@ -428,9 +450,9 @@ function SeatPicker({
           <svg viewBox="0 0 400 34" className="w-full max-w-md" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="stageg" x1="0" x2="1">
-                <stop offset="0" stopColor="#1ba770" stopOpacity="0" />
-                <stop offset=".5" stopColor="#1ba770" />
-                <stop offset="1" stopColor="#1ba770" stopOpacity="0" />
+                <stop offset="0" stopColor="#00c066" stopOpacity="0" />
+                <stop offset=".5" stopColor="#00c066" />
+                <stop offset="1" stopColor="#00c066" stopOpacity="0" />
               </linearGradient>
             </defs>
             <path d="M8 30 Q200 2 392 30" fill="none" stroke="url(#stageg)" strokeWidth="2.5" strokeLinecap="round" />
@@ -444,44 +466,34 @@ function SeatPicker({
           {rows.map((row) => (
             <div key={row.label} className="flex items-center gap-1.5 sm:gap-2">
               <span className="rowlab">{row.label}</span>
-              {row.seats.map((seat) => (
-                <button
-                  key={seat.id}
-                  type="button"
-                  disabled={!seat.available}
-                  aria-pressed={selected.includes(seat.id)}
-                  aria-label={`Seat ${row.label}${seat.label}`}
-                  className={cn(
-                    'seat',
-                    !seat.available
-                      ? 'seat-booked'
-                      : selected.includes(seat.id)
-                        ? 'seat-sel'
-                        : 'seat-avail',
-                  )}
-                  onClick={() => onToggle(seat.id)}
-                >
-                  {seat.label}
-                </button>
-              ))}
+              {row.seats.map((seat) => {
+                const state = seatStateOf(seat, tierId, selected, typedMap)
+                return (
+                  <button
+                    key={seat.id}
+                    type="button"
+                    disabled={!canPick(state)}
+                    aria-pressed={state === 'selected'}
+                    aria-label={`Row ${row.label}, seat ${seat.label}${state === 'other' ? `, ${SEAT_LEGEND.other}` : ''}`}
+                    className={cn('seat', SEAT_CLASS[state])}
+                    onClick={() => onToggle(seat.id)}
+                  >
+                    {seat.label}
+                  </button>
+                )
+              })}
               <span className="rowlab">{row.label}</span>
             </div>
           ))}
         </div>
 
         <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-white/10 pt-5 text-[12px] text-white/60">
-          <span className="inline-flex items-center gap-2">
-            <span className="seat seat-sel !h-4 !w-4 !rounded-[4px]" />
-            Selected
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="seat seat-avail !h-4 !w-4 !rounded-[4px]" />
-            Available
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="seat seat-booked !h-4 !w-4 !rounded-[4px]" />
-            Booked
-          </span>
+          {seatLegendOf(rows, tierId).map((state) => (
+            <span key={state} className="inline-flex items-center gap-2">
+              <span className={cn('seat !h-4 !w-4 !rounded-[4px]', SEAT_CLASS[state])} />
+              {SEAT_LEGEND[state]}
+            </span>
+          ))}
         </div>
       </div>
       <p className="mt-2 text-center text-[12px] text-muted">
@@ -577,19 +589,17 @@ function payLabel(input: {
     : `Pay ${total}`.trim()
 }
 
-const METHODS = [
-  { method: 'Card' as const, icon: 'hgi-credit-card', title: 'Card', sub: 'Visa · Mastercard' },
-  { method: 'PromptPay' as const, icon: 'hgi-qr-code-01', title: 'PromptPay', sub: 'Thai QR · banking app' },
-]
-
 function PaymentMethods({
+  offered,
   method,
   onChange,
   discountCode,
   onDiscountCode,
 }: {
-  method: 'Card' | 'PromptPay'
-  onChange: (next: 'Card' | 'PromptPay') => void
+  /** Only what the workspace switched on (US-SET-09). */
+  offered: readonly PayMethod[]
+  method: PayMethod
+  onChange: (next: PayMethod) => void
   discountCode: string
   onDiscountCode: (next: string) => void
 }) {
@@ -598,7 +608,7 @@ function PaymentMethods({
   return (
     <div className="card p-4 sm:p-5">
       <div className="grid grid-cols-2 gap-3">
-        {METHODS.map((option) => {
+        {PORTAL_CHECKOUT_PAGE_METHODS.filter((option) => offered.includes(option.method)).map((option) => {
           const on = method === option.method
           return (
             <button
@@ -809,9 +819,6 @@ interface OverlayHead {
   /** Amber while the money is outstanding: not done, not wrong. */
   tone: string
 }
-
-/** Not done, not wrong — the money or the organizer is still to come. */
-const WAITING_TONE = 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
 
 function headOf(order: PlacedOrder, payment: PaymentStep | null): OverlayHead {
   if (payment?.state === 'failed') {

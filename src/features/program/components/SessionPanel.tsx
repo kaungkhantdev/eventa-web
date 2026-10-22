@@ -1,9 +1,10 @@
-import { useEffect } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, Hint, Input, Label, Panel, Select, Textarea } from '@/components/ui'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import type { AgendaDay, SessionDraft, SessionType } from '../program.types'
+import { SESSION_PANEL_FORM_ID } from '@/lib/constants/program.constants'
 
 /**
  * Add or edit a session (US-PROG-01/02).
@@ -26,7 +27,6 @@ interface SessionPanelProps {
   onDelete?: () => void
 }
 
-const FORM_ID = 'session-form'
 const TYPES: SessionType[] = ['Keynote', 'Talk', 'Workshop', 'Panel', 'Break']
 
 export function SessionPanel({
@@ -40,16 +40,17 @@ export function SessionPanel({
 }: SessionPanelProps) {
   const fetcher = useFetcher<ActionResult>()
   const saving = fetcher.state !== 'idle'
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
+  // Once per save: the panel stays mounted, and the fetcher's last `ok` would
+  // otherwise close the next session's panel as it opened.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Session saved.')
+      onClose()
+    },
+  })
   // The one refusal an organizer can wave through, rather than a rejection.
   const clash = Boolean(error && /clash|already/i.test(error))
-
-  useEffect(() => {
-    if (!saved || !open) return
-    toast.success('Session saved.')
-    onClose()
-  }, [saved, open, onClose])
 
   return (
     <Panel
@@ -67,15 +68,17 @@ export function SessionPanel({
               Cancel
             </Button>
           )}
-          <Button variant="primary" className="flex-1" type="submit" form={FORM_ID} disabled={saving}>
+          <Button variant="primary" className="flex-1" type="submit" form={SESSION_PANEL_FORM_ID} disabled={saving}>
             {saving ? 'Saving…' : 'Save session'}
           </Button>
         </>
       }
     >
+      {/* Rebuilt per opening, so a second New session does not open on the
+          last one's title and times. */}
       <fetcher.Form
-        id={FORM_ID}
-        key={editing?.id ?? 'new'}
+        id={SESSION_PANEL_FORM_ID}
+        key={opening}
         method="post"
         className="space-y-4"
       >

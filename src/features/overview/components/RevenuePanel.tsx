@@ -3,6 +3,7 @@ import { AreaChart, Icon, PanelEmptyPreview, Segmented } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { hasRevenue } from '../overview.presentation'
 import type { RevenueChart, RevenueRange } from '../overview.types'
+import { NOTHING_SOLD, NO_REVENUE } from '@/lib/constants/overview.constants'
 
 /**
  * The revenue trend with its Week / Month / Year toggle (US-DASH-09).
@@ -12,9 +13,6 @@ import type { RevenueChart, RevenueRange } from '../overview.types'
  * the one that knows what "last week" earned. Navigating rather than reloading
  * keeps the rest of the screen mounted.
  */
-
-const NO_REVENUE = 'No revenue in this period.'
-const NOTHING_SOLD = 'Paid registrations show up here as soon as the first one clears.'
 
 const RANGES: { value: RevenueRange; label: string }[] = [
   { value: 'week', label: 'Week' },

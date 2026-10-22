@@ -1,4 +1,5 @@
 import type { PaymentStatusWire } from './eventDetail.mapper'
+import { PAYMENT_PILL_FALLBACK } from '@/lib/constants/events.constants'
 
 /**
  * The event workspace's own visual vocabulary.
@@ -30,12 +31,6 @@ export const PAYMENT_PILL: Record<PaymentLabel, string> = {
   Refunded: 'bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300',
   Failed: 'bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-300',
 }
-
-/**
- * For a word this build has never been taught. Kept, but no value the API can
- * send reaches it any more.
- */
-export const PAYMENT_PILL_FALLBACK = 'bg-canvas text-muted'
 
 /**
  * The row carries its status as a plain string, so the narrowing happens here:

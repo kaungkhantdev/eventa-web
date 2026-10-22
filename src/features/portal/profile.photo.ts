@@ -1,12 +1,5 @@
-import {
-  JPG_PNG_IMAGE_TYPES,
-  UPLOAD_MAX_MIB,
-  acceptAttribute,
-  imageRefusal,
-  type ChosenImage,
-  type ImageRefusal,
-  type JpgPngImageType,
-} from '@/lib/imageUploads'
+import { UPLOAD_MAX_MIB, imageRefusal, type ChosenImage, type ImageRefusal } from '@/lib/imageUploads'
+import { ACCEPTED_PHOTO_TYPES, NAME_OF } from '@/lib/constants/portal.constants'
 
 /**
  * Is this file worth asking the API for an upload URL for? (US-DISC-11,
@@ -21,28 +14,6 @@ import {
  * WORDING: the card promises "JPG or PNG · Max 5MB", so a refusal has to speak
  * in those terms and not in the shared module's.
  */
-
-/**
- * A strict subset of the API's allow-list on purpose. The server also takes
- * WebP, but this card says "JPG or PNG", so offering a third type would make
- * the copy wrong. Nothing here accepts a type the server would refuse.
- */
-export const ACCEPTED_PHOTO_TYPES = JPG_PNG_IMAGE_TYPES
-
-/** For the file input's `accept`, so the picker offers what we will take. */
-export const PHOTO_ACCEPT_ATTRIBUTE = acceptAttribute(ACCEPTED_PHOTO_TYPES)
-
-/**
- * What this card calls each type on screen — "JPG", where the settings logo
- * card says "JPEG". Per-feature copy, which is why it is not shared.
- *
- * Exhaustive over the allow-list it names, so widening that list upstream
- * fails to compile here rather than leaving a type unnamed in a sentence.
- */
-const NAME_OF: Readonly<Record<JpgPngImageType, string>> = {
-  'image/jpeg': 'JPG',
-  'image/png': 'PNG',
-}
 
 /** "JPG or PNG" — the guidance and the allow-list come from one source. */
 const ACCEPTED_NAMES = ACCEPTED_PHOTO_TYPES.map((type) => NAME_OF[type]).join(' or ')

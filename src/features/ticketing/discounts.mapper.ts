@@ -2,13 +2,9 @@ import type { BadgeTone } from '@/components/ui'
 import { baht, bangkokDate, num } from '@/lib/format'
 import type { DiscountRow, DiscountWire } from './discounts.types'
 import type { DiscountStatus } from './types'
+import { BANGKOK, FULL, RANGE_DASH, SATANG_PER_BAHT } from '@/lib/constants/ticketing.constants'
 
 /** The rules behind the discount codes table (US-TKT-07..10). */
-
-const SATANG_PER_BAHT = 100
-const FULL = 100
-const BANGKOK = 'Asia/Bangkok'
-const RANGE_DASH = ' – '
 
 const STATUS_META: Record<DiscountStatus, { tone: BadgeTone; icon: string; label: string }> = {
   active: { tone: 'green', icon: 'hgi-tick-02', label: 'Active' },

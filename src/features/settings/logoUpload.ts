@@ -1,8 +1,6 @@
 import { putToSignedUrl } from '@/lib/signedUpload'
 import { accountApi } from './settings.routes'
-
-/** Said when storage refuses the bytes — the workspace's own wording. */
-const STORAGE_PUT_FAILED = 'The upload could not be sent to storage.'
+import { STORAGE_PUT_FAILED } from '@/lib/constants/settings.constants'
 
 /**
  * Put a workspace logo in storage and get back the URL now on the organization.

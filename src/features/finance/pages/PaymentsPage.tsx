@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useFetcher, useLoaderData } from 'react-router'
+import { useMemo, useState } from 'react'
+import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Badge,
   Button,
@@ -21,12 +21,16 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
-import type { ActionResult } from '@/app/loaders'
+import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
+import type { Me } from '@/features/auth/types'
+import { refundControl } from '../payments.mapper'
 import { METHODS, type LedgerTab, type PaymentsData, type TabCounts } from '../payments.routes'
 import type { PaymentRow } from '../payments.types'
+import { ALL_EVENTS, ALL_METHODS, MAX_SEARCH_LENGTH } from '@/lib/constants/finance.constants'
 
 /**
  * The payments ledger (US-FIN-01/02). Layout ported from payments.html.
@@ -36,10 +40,6 @@ import type { PaymentRow } from '../payments.types'
  * cannot be used says why.
  */
 
-const ALL_EVENTS = 'All events'
-const ALL_METHODS = 'All methods'
-const MAX_SEARCH_LENGTH = 120
-
 export default function PaymentsPage() {
   const data = useLoaderData() as PaymentsData
   const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
@@ -47,6 +47,7 @@ export default function PaymentsPage() {
   const refund = useDisclosure()
   const [refunding, setRefunding] = useState<PaymentRow | null>(null)
   const [term, setTerm] = useSearchBox(params.get('q') ?? '', (q) => set({ q }, { replace: true }))
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
 
   const firstRun = data.rows.length === 0 && emptyReason === 'first-run'
   // Already loaded for the event filter, so this costs no extra request.
@@ -194,6 +195,7 @@ export default function PaymentsPage() {
                   <PaymentTableRow
                     key={row.id}
                     row={row}
+                    me={me}
                     onRefund={() => {
                       setRefunding(row)
                       refund.onOpen()
@@ -244,7 +246,16 @@ function tabItems(counts: TabCounts): PillTabItem<LedgerTab>[] {
   ]
 }
 
-function PaymentTableRow({ row, onRefund }: { row: PaymentRow; onRefund: () => void }) {
+function PaymentTableRow({
+  row,
+  me,
+  onRefund,
+}: {
+  row: PaymentRow
+  me: Me | null
+  onRefund: () => void
+}) {
+  const refund = refundControl(row, me)
   return (
     <tr>
       <td className="tnum font-medium text-ink">{row.txn}</td>
@@ -276,10 +287,10 @@ function PaymentTableRow({ row, onRefund }: { row: PaymentRow; onRefund: () => v
           type="button"
           className="btn-icon"
           onClick={onRefund}
-          disabled={!row.canRefund}
-          // The API's own words on the control that cannot be used, so a greyed
-          // button is an explanation rather than a dead end.
-          title={row.canRefund ? 'Refund' : (row.refundBlockedReason ?? 'Not eligible for refund')}
+          disabled={!refund.enabled}
+          // Why a greyed button cannot be used — not an Admin, or the API's own
+          // words — so it is an explanation rather than a dead end.
+          title={refund.title}
         >
           <Icon name="hgi-arrow-turn-backward" size={16} />
         </button>
@@ -305,8 +316,15 @@ function RefundModal({
   target: PaymentRow | null
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
+  // Once per refund: the dialog stays mounted, and the fetcher's last `ok`
+  // would otherwise close the next payment's dialog as it opened.
+  const { refusal: error } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Refund started.')
+      onClose()
+    },
+  })
   // One key per payment: re-opening the dialog for a DIFFERENT payment must
   // not reuse the previous key and be deduped into it. The id is part of the
   // key rather than only a dependency, so what it is scoped to is visible in
@@ -315,12 +333,6 @@ function RefundModal({
     () => `${target?.id ?? 'none'}:${crypto.randomUUID()}`,
     [target?.id],
   )
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Refund started.')
-    onClose()
-  }, [done, open, onClose])
 
   return (
     <>

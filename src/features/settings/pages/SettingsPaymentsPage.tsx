@@ -9,9 +9,11 @@ import {
   Icon,
   Input,
   Label,
+  Modal,
   Select,
   Toggle,
 } from '@/components/ui'
+import { useDisclosure } from '@/lib/useDisclosure'
 import { useFailureToast, useSavedToast } from '@/lib/useSavedToast'
 import { cn } from '@/lib/cn'
 import { useFilters } from '@/lib/useFilters'
@@ -19,6 +21,7 @@ import type { ActionResult } from '@/app/loaders'
 import { SettingsHeader } from '../components/SettingsHeader'
 import type { PaymentsData } from '../settings.routes'
 import type { PaymentMethodRow, PaymentSettingsCard } from '../settings.types'
+import { FALLBACK_LOOK, FIELDS_REFUSED, METHOD_LOOKS, STRIPE_PURPLE } from '@/lib/constants/settings.constants'
 
 /**
  * Payment provider, API keys and checkout preferences (US-SET-08/09/10),
@@ -78,9 +81,6 @@ function TestModeBanner() {
     </div>
   )
 }
-
-/** Stripe's own brand purple, as the kit hard-codes it. */
-const STRIPE_PURPLE = 'bg-[#635BFF]'
 
 /**
  * The gateway: who it is on the left, the keys that make it so on the right.
@@ -152,23 +152,62 @@ function ProviderPanel({ payments }: { payments: PaymentSettingsCard }) {
         <Fact label="Settles in" value={payments.defaultCurrency} />
       </dl>
 
-      {payments.connected && (
-        <IntentAction intent="disconnect" done="Payment account disconnected.">
-          {(busy, run) => (
-            <Button
-              variant="danger"
-              size="sm"
-              type="button"
-              onClick={run}
-              disabled={busy}
-              className="mt-3 w-full"
-            >
-              Disconnect
-            </Button>
-          )}
-        </IntentAction>
-      )}
+      {payments.connected && <DisconnectAction provider={payments.provider} />}
     </div>
+  )
+}
+
+/**
+ * Disconnecting, behind a confirmation (US-SET-08: "when I disconnect and
+ * confirm"). One click used to post at once — deleting the saved keys and
+ * stopping paid checkout with no chance to take it back. Built from the kit's
+ * Modal, which has no markup for this.
+ */
+function DisconnectAction({ provider }: { provider: string }) {
+  const confirm = useDisclosure()
+  return (
+    <IntentAction intent="disconnect" done="Payment account disconnected.">
+      {(busy, run) => (
+        <>
+          <Button
+            variant="danger"
+            size="sm"
+            type="button"
+            onClick={confirm.onOpen}
+            disabled={busy}
+            className="mt-3 w-full"
+          >
+            Disconnect
+          </Button>
+          <Modal
+            open={confirm.open}
+            onClose={confirm.onClose}
+            title={`Disconnect ${provider}?`}
+            footer={
+              <>
+                <Button variant="soft" type="button" onClick={confirm.onClose}>
+                  Keep it connected
+                </Button>
+                <Button
+                  variant="danger"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    confirm.onClose()
+                    run()
+                  }}
+                >
+                  Disconnect
+                </Button>
+              </>
+            }
+          >
+            Paid checkout stops until you reconnect, and your saved keys are removed. Free
+            events keep working, and past orders and payouts are untouched.
+          </Modal>
+        </>
+      )}
+    </IntentAction>
   )
 }
 
@@ -179,6 +218,26 @@ function Fact({ label, value, mono }: { label: string; value: string; mono?: boo
       <dd className={cn('min-w-0 truncate font-semibold text-ink', mono && 'tnum')}>{value}</dd>
     </div>
   )
+}
+
+/**
+ * What the toast says when the keys are refused.
+ *
+ * A refusal must never be quieter than a success — the Save button sits at the
+ * foot of a tall card and the field it is complaining about can be off-screen,
+ * so "nothing happened" is the only reading available without one.
+ *
+ * When the API named the fields, the toast points at them instead of repeating
+ * their sentences: those are already under the boxes, verbatim, which is where
+ * they are worth reading. When it named none, the API's own message IS the
+ * whole explanation, so it is what gets announced.
+ */
+function refusalNote(
+  failed: ActionResult | null,
+  fields: Record<string, string>,
+): string | null {
+  if (!failed) return null
+  return Object.keys(fields).length > 0 ? FIELDS_REFUSED : (failed.error ?? null)
 }
 
 /**
@@ -194,28 +253,6 @@ function Fact({ label, value, mono }: { label: string; value: string; mono?: boo
  * pre-fill it with — the API answers with a masked tail — and a box that looked
  * populated would invite an organizer to "save" a value the browser never held.
  */
-/**
- * What the toast says when the keys are refused.
- *
- * A refusal must never be quieter than a success — the Save button sits at the
- * foot of a tall card and the field it is complaining about can be off-screen,
- * so "nothing happened" is the only reading available without one.
- *
- * When the API named the fields, the toast points at them instead of repeating
- * their sentences: those are already under the boxes, verbatim, which is where
- * they are worth reading. When it named none, the API's own message IS the
- * whole explanation, so it is what gets announced.
- */
-const FIELDS_REFUSED = 'Those keys were not saved — check the fields marked below.'
-
-function refusalNote(
-  failed: ActionResult | null,
-  fields: Record<string, string>,
-): string | null {
-  if (!failed) return null
-  return Object.keys(fields).length > 0 ? FIELDS_REFUSED : (failed.error ?? null)
-}
-
 function KeysPanel({
   payments,
   mode,
@@ -511,44 +548,6 @@ function TestConnectionButton() {
     </IntentAction>
   )
 }
-
-/**
- * How each method looks. The API says which methods exist and whether each is
- * on; everything here is presentation, so it stays a lookup table rather than a
- * branch — a new method Stripe adds needs a row here, not an `if`.
- */
-const METHOD_LOOKS: Record<
-  string,
-  { icon: string; tint: string; blurb?: string; schemes?: string[] }
-> = {
-  Card: {
-    icon: 'hgi-credit-card',
-    tint: 'bg-brand-soft text-brand',
-    schemes: ['VISA', 'MC', 'AMEX', 'JCB'],
-  },
-  PromptPay: {
-    icon: 'hgi-qr-code-01',
-    tint: 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400',
-    blurb: 'Thailand QR bank transfer',
-  },
-  'Apple Pay': {
-    icon: 'hgi-apple',
-    tint: 'bg-line text-ink',
-    blurb: 'One-tap checkout on Apple devices',
-  },
-  'Google Pay': {
-    icon: 'hgi-wallet-01',
-    tint: 'bg-line text-muted',
-    blurb: 'One-tap checkout on Android & Chrome',
-  },
-  'Bank transfer': {
-    icon: 'hgi-bank',
-    tint: 'bg-line text-muted',
-    blurb: 'Pay by direct bank transfer',
-  },
-}
-
-const FALLBACK_LOOK = { icon: 'hgi-wallet-01', tint: 'bg-line text-muted' }
 
 function MethodsCard({ methods }: { methods: PaymentMethodRow[] }) {
   const save = useFetcher<ActionResult>()

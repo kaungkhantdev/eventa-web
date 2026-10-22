@@ -20,6 +20,12 @@ export interface PayoutWire {
   canRetry: boolean
 }
 
+/** `POST /payouts/settings-link` — the provider's page, once connected. */
+export interface PayoutSettingsLinkWire {
+  connected: boolean
+  url: string | null
+}
+
 /**
  * The three headline balances.
  *

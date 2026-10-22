@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Badge,
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -26,6 +27,7 @@ import { TicketPanel } from '../components/TicketPanel'
 import { TicketQrModal } from '../components/TicketQrModal'
 import type { TabCounts, TicketTab, TicketsData } from '../tickets.routes'
 import type { TicketCard, TicketShareWire } from '../tickets.types'
+import { ALL_EVENTS, MAX_SEARCH_LENGTH, SHARE_FAILED } from '@/lib/constants/ticketing.constants'
 
 /**
  * The cross-event ticket inventory (US-TKT-04). Layout ported from tickets.html.
@@ -34,9 +36,6 @@ import type { TicketCard, TicketShareWire } from '../tickets.types'
  * pills, the cards and the paginator describe one answer rather than three
  * views of a list this page re-sliced.
  */
-
-const ALL_EVENTS = 'All events'
-const MAX_SEARCH_LENGTH = 120
 
 export default function TicketsPage() {
   const data = useLoaderData() as TicketsData
@@ -262,8 +261,6 @@ export default function TicketsPage() {
   )
 }
 
-const SHARE_FAILED = "That link couldn't be prepared. Close this and try again."
-
 function tabItems(counts: TabCounts): PillTabItem<TicketTab>[] {
   return [
     { value: 'all', label: 'All', count: counts.all },
@@ -368,14 +365,15 @@ function DeleteTicketModal({
   target: TicketCard | null
 }) {
   const fetcher = useFetcher<ActionResult>()
-  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Ticket type deleted.')
-    onClose()
-  }, [done, open, onClose])
+  // Once per deletion: the dialog stays mounted, and the fetcher's last `ok`
+  // would otherwise close the next tier's dialog as it opened.
+  const { refusal: refused } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Ticket type deleted.')
+      onClose()
+    },
+  })
 
   return (
     <ConfirmDeleteModal

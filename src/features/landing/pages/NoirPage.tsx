@@ -4,31 +4,14 @@ import { Icon,
   VenueMap,
   RichText,
 } from '@/components/ui'
+import { SeatMapBlock } from '@/features/landing/components/SeatMapBlock'
 import type { LandingEvent } from '@/features/landing/types'
+import { NOIR_STYLE } from '@/lib/constants/landing.constants'
 
 /* Port of landing/noir.html — a wide "spotlight split" event page: a cover
    banner, a two-column hero with a sticky register card, then whichever of the
    highlights / about / agenda / speakers / tickets / FAQ sections this event
    actually has. The event is passed in, already mapped from the API. */
-
-const PAGE_STYLE = `
-  html, body { overflow-x: hidden; }
-  summary { list-style: none; }
-  summary::-webkit-details-marker { display: none; }
-  :focus-visible { outline: 2px solid #1ba770; outline-offset: 2px; border-radius: 6px; }
-  @media (prefers-reduced-motion: no-preference) {
-    html { scroll-behavior: smooth; }
-    @keyframes eventa-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-    .reveal { animation: eventa-rise .6s cubic-bezier(.22,.61,.36,1) both; }
-    .reveal.d1 { animation-delay: .06s; }
-    .reveal.d2 { animation-delay: .12s; }
-    .reveal.d3 { animation-delay: .18s; }
-    .reveal.d4 { animation-delay: .24s; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .reveal { animation: none !important; }
-  }
-`
 
 export default function NoirPage({ event }: { event: LandingEvent }) {
   const [params] = useSearchParams()
@@ -92,7 +75,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
 
   return (
     <div className="bg-canvas text-ink font-sans antialiased">
-      <style>{PAGE_STYLE}</style>
+      <style>{NOIR_STYLE}</style>
 
       {/* 1 · Sticky nav */}
       <header className="sticky top-0 z-40 bg-canvas/85 backdrop-blur-md border-b border-line">
@@ -322,7 +305,7 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                         : 'flex flex-col gap-5 rounded-2xl bg-surface p-6'
                     }
                   >
-                    <div className="flex min-h-[24px] items-center justify-between gap-3">
+                    <div className="flex min-h-[24px] flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                       <span
                         className={
                           feat
@@ -334,12 +317,17 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                       </span>
                       {t.note &&
                         (feat ? (
-                          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-medium text-white">
+                          <span className="max-w-full rounded-full bg-white/20 leading-snug px-2 py-0.5 text-[11px] font-medium text-white">
                             {t.note}
                           </span>
                         ) : (
-                          <span className="badge badge-green">{t.note}</span>
+                          <span className="badge badge-green max-w-full whitespace-normal leading-snug">{t.note}</span>
                         ))}
+                      {!isOnline && t.rowsLabel && (
+                        <span className={`basis-full text-[12px] ${feat ? 'text-white/75' : 'text-muted'}`}>
+                          {t.rowsLabel}
+                        </span>
+                      )}
                     </div>
                     <div
                       className={
@@ -381,6 +369,9 @@ export default function NoirPage({ event }: { event: LandingEvent }) {
                 )
               })}
             </div>
+            {!isOnline && ev.seatMap && (
+              <SeatMapBlock seatMap={ev.seatMap} className="mt-4 rounded-2xl bg-surface p-6" />
+            )}
           </section>
         )}
 

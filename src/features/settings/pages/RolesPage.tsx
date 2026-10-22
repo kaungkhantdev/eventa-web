@@ -23,6 +23,7 @@ import type { ActionResult } from '@/app/loaders'
 import { grantedSeed, toPermissionRows } from '../settings.mapper'
 import type { RolesData } from '../settings.routes'
 import type { PermissionOption, PermissionRow, RoleCard } from '../settings.types'
+import { BULLETS_SHOWN, CUSTOM_ROLE_LOOK, FALLBACK_GROUP_ICON, GROUP_ICONS, NEW_PERMISSION_LEGEND, ROLE_LOOKS } from '@/lib/constants/settings.constants'
 
 /**
  * What each role may do (US-ACC-09/10). Ported from roles.html.
@@ -159,16 +160,6 @@ export default function RolesPage() {
     </>
   )
 }
-
-/** The icon the kit puts beside each group heading in the edit panel. */
-const GROUP_ICONS: Record<string, string> = {
-  Events: 'hgi-calendar-03',
-  Registrations: 'hgi-user-add-01',
-  Finance: 'hgi-wallet-01',
-  Settings: 'hgi-settings-01',
-}
-
-const FALLBACK_GROUP_ICON = 'hgi-shield-user'
 
 type PermissionGroups = { name: string; permissions: PermissionOption[] }[]
 
@@ -366,50 +357,6 @@ function RoleForm({
 }
 
 /**
- * What the mark on an undecided row means, said once instead of on every row
- * that carries it.
- *
- * The mark stays on the row because naming WHICH keys are open is the only part
- * an organizer can act on, one switch at a time — not because gaps are rare.
- * They are the common case: 21 of 32 roles have no row for at least one catalog
- * key, and a Staff role is missing 12 of the 15. What makes a count in a banner
- * the wrong shape is that the state is transitional and self-clearing — not one
- * role carries a recorded refusal, and the first save from this panel answers
- * every switch, after which the marks are gone for good. A form with unanswered
- * questions in it is not a fault to announce above itself.
- *
- * Those three numbers are a SNAPSHOT of one database, taken 2026-10-09, and not
- * a property of the product — re-run them before relying on them:
- *
- *     docker exec eventa-postgres-1 psql -U eventa -d eventa -At -c "
- *       SELECT (SELECT count(*) FROM roles),
- *              (SELECT count(*) FROM permissions),
- *              (SELECT count(*) FROM role_permissions WHERE granted = false),
- *              (SELECT count(*) FROM roles r WHERE EXISTS (
- *                 SELECT 1 FROM permissions p WHERE NOT EXISTS (
- *                   SELECT 1 FROM role_permissions rp
- *                    WHERE rp.role_id = r.id AND rp.permission_key = p.key)))"
- *
- * It is a legend rather than a tooltip because a tooltip reaches neither a
- * keyboard nor a screen reader, and this is the only place the difference
- * between an open question and a refusal is written down.
- *
- * The wording stops short of "never offered" — which is what the API's own
- * field is called — because no database can support that claim. Migration
- * `0067_backfill_system_role_grants.sql` in eventa-api records that a revoke
- * used to DELETE the row rather than write a `granted = false` tombstone, so in
- * a workspace older than that convention an absent row is either a question
- * nobody was asked or a refusal a past release erased. Being unable to tell
- * those two apart is the whole reason the automatic backfill was withdrawn, and
- * a legend promising the first reading would hand an organizer exactly the
- * false certainty that backfill acted on.
- */
-const NEW_PERMISSION_LEGEND =
-  'Permissions marked New have no answer on record for this role — either nobody here has been ' +
-  'asked about them yet, or an earlier release deleted the no when somebody turned one off. ' +
-  'Saving answers every switch on this form, so one left off is recorded as a no.'
-
-/**
  * The name the switch answers to.
  *
  * "Off because somebody turned it off" and "off because nothing is recorded"
@@ -476,29 +423,6 @@ function PermissionGroupCard({
     </div>
   )
 }
-
-/**
- * How each built-in role looks, as the kit colours them. Keyed on name because
- * that is what the kit distinguishes; a role somebody created gets the neutral
- * tile rather than borrowing a meaning it does not have.
- */
-const ROLE_LOOKS: Record<string, { icon: string; tint: string }> = {
-  Admin: {
-    icon: 'hgi-shield-key',
-    tint: 'bg-purple-50 text-purple-600 dark:bg-purple-400/15 dark:text-purple-300',
-  },
-  Organizer: { icon: 'hgi-shield-user', tint: 'bg-brand-soft text-brand' },
-  Staff: {
-    icon: 'hgi-user-check-01',
-    tint: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
-  },
-  Attendee: { icon: 'hgi-user-circle', tint: 'bg-line text-muted' },
-}
-
-const CUSTOM_ROLE_LOOK = { icon: 'hgi-shield-user', tint: 'bg-line text-muted' }
-
-/** As many permissions as the kit's card shows before the rest are counted. */
-const BULLETS_SHOWN = 3
 
 function RoleTile({
   role,

@@ -1,6 +1,13 @@
-import { withholdingSatangOf } from './finance.routes'
+import { providerRedirect, withholdingSatangOf } from './finance.routes'
 import { describe, expect, it } from 'vitest'
-import { toBalances, toInvoiceRow, toPayoutRow, toTaxRow } from './finance.mapper'
+import type { Me } from '@/features/auth/types'
+import {
+  offersPayoutManagement,
+  toBalances,
+  toInvoiceRow,
+  toPayoutRow,
+  toTaxRow,
+} from './finance.mapper'
 import type { InvoiceWire, PayoutWire, TaxPeriodWire } from './finance.types'
 
 const BAHT = 100
@@ -208,5 +215,59 @@ describe('withholdingSatangOf', () => {
 
   it('refuses anything that is not a number', () => {
     expect(withholdingSatangOf('about ฿500')).toBeNull()
+  })
+})
+
+/**
+ * US-FIN-05: "Given I am an Admin, when I choose to manage payouts, then I'm
+ * taken securely to the payments provider …" and "Given an Organizer (not an
+ * Admin), when they view Payouts, then bank and payout management is not
+ * available to them." A connected workspace had no way to the provider at all.
+ */
+describe('managing payouts at the provider', () => {
+  const me = (permissions: string[]): Me => ({
+    id: 'u-1',
+    name: 'Pim',
+    email: 'pim@demo.test',
+    persona: 'admin',
+    status: 'Active',
+    twoFactorEnabled: false,
+    organization: {
+      id: 1,
+      name: 'Demo Workspace',
+      slug: 'demo',
+      currency: 'THB',
+      timezone: 'Asia/Bangkok',
+      locale: 'en',
+    },
+    permissions,
+  })
+
+  it('is offered to an Admin once a payout account is connected', () => {
+    expect(offersPayoutManagement(me(['finView', 'finManage']), true)).toBe(true)
+  })
+
+  it('is not offered to an Organizer', () => {
+    expect(offersPayoutManagement(me(['finView']), true)).toBe(false)
+  })
+
+  // Not connected yet: the page guides them to connect first instead.
+  it('is not offered before an account is connected', () => {
+    expect(offersPayoutManagement(me(['finView', 'finManage']), false)).toBe(false)
+  })
+
+  it('is not offered while the session is unknown', () => {
+    expect(offersPayoutManagement(null, true)).toBe(false)
+  })
+
+  it('takes the Admin to the provider’s own page', () => {
+    const url = 'https://dashboard.stripe.com/settings/payouts'
+    const res = providerRedirect({ connected: true, url })
+    expect(res?.status).toBe(302)
+    expect(res?.headers.get('Location')).toBe(url)
+  })
+
+  it('goes nowhere when the provider has no page to send them to', () => {
+    expect(providerRedirect({ connected: false, url: null })).toBeNull()
   })
 })

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  canPick,
   placeInLine,
   prefillsFromProfile,
+  seatLegendOf,
+  seatStateOf,
+  seatsKeptForTier,
+  summaryShown,
   toBuyerDefaults,
   toCheckoutView,
   toPaymentStep,
@@ -16,6 +21,8 @@ import type {
   OrderPlacedWire,
   OrderSummaryWire,
   PaymentIntentWire,
+  SeatOption,
+  SeatRow,
 } from './checkout.types'
 import type { ProfileWire } from './profile.types'
 
@@ -71,6 +78,7 @@ const VIEW: CheckoutViewWire = {
   notes: { seating: 'Seating is first-come, first-served.', delivery: null, approval: null },
   maxPerBooking: 8,
   paymentRequired: true,
+  paymentMethods: ['Card', 'PromptPay'],
 }
 
 const view = (patch: Partial<CheckoutViewWire> = {}) => toCheckoutView({ ...VIEW, ...patch })
@@ -78,6 +86,27 @@ const tier = (patch: Partial<CheckoutTierWire> = {}) =>
   view({ tiers: [{ ...TIER, ...patch }] }).tiers[0]
 
 describe('toCheckoutView', () => {
+  /**
+   * US-SET-09: "Given I disable a method, when new orders are placed, then
+   * that method no longer appears at checkout." The page offered Card and
+   * PromptPay whatever the workspace had switched off.
+   */
+  describe('the ways to pay', () => {
+    it('offers both when the workspace takes both', () => {
+      expect(view().paymentMethods).toEqual(['Card', 'PromptPay'])
+    })
+
+    it('no longer offers a method the workspace switched off', () => {
+      expect(view({ paymentMethods: ['PromptPay'] }).paymentMethods).toEqual(['PromptPay'])
+    })
+
+    // A method this page has no way to take is not offered, whatever arrives.
+    it('ignores a method checkout cannot take', () => {
+      const wire = { ...VIEW, paymentMethods: ['Apple Pay', 'Card'] } as unknown as CheckoutViewWire
+      expect(toCheckoutView(wire).paymentMethods).toEqual(['Card'])
+    })
+  })
+
   it('heads the page with the event', () => {
     expect(view().header).toEqual({
       name: 'Founders Coffee Connect',
@@ -206,9 +235,74 @@ describe('toCheckoutView', () => {
       }).rows
       expect(rows.map((row) => row.label)).toEqual(['A', 'B'])
       expect(rows[0]!.seats).toEqual([
-        { id: 1, label: '1', available: false },
-        { id: 2, label: '2', available: true },
+        { id: 1, label: '1', available: false, ticketTypeId: null },
+        { id: 2, label: '2', available: true, ticketTypeId: null },
       ])
+    })
+
+    // The API names rows 1..N. A string sort put row 10 between 1 and 2.
+    it('orders rows numerically', () => {
+      const rows = seated({
+        seats: ['10', '2', '1'].map((rowLabel, index) => ({
+          id: index,
+          section: null,
+          rowLabel,
+          seatNumber: '1',
+          ticketTypeId: null,
+          available: true,
+        })),
+      }).rows
+      expect(rows.map((row) => row.label)).toEqual(['1', '2', '10'])
+    })
+
+    it('keeps the ticket type each seat sells under', () => {
+      const rows = seated({
+        seats: [
+          { id: 1, section: null, rowLabel: '1', seatNumber: '1', ticketTypeId: 'tier-vip', available: true },
+        ],
+      }).rows
+      expect(rows[0]!.seats[0]!.ticketTypeId).toBe('tier-vip')
+    })
+
+    /*
+     * US-DISC-04, US-EVT-05: a row can be split between ticket types — row 7
+     * seats 1–5 Free, 6–16 Normal. Each seat keeps its own type, so under Free
+     * only seats 1–5 can be picked and under Normal only seats 6–16; the rest
+     * of the row is greyed as another type's.
+     */
+    describe('a row split between ticket types', () => {
+      const row7 = seated({
+        seats: Array.from({ length: 16 }, (_, i) => ({
+          id: 700 + i + 1,
+          section: null,
+          rowLabel: '7',
+          seatNumber: String(i + 1),
+          ticketTypeId: i < 5 ? 'tier-free' : 'tier-normal',
+          available: true,
+        })),
+      }).rows
+      const statesUnder = (tierId: string) => row7[0]!.seats.map((seat) => seatStateOf(seat, tierId, [], true))
+
+      it('keeps each seat’s own type within the row', () => {
+        expect(row7).toHaveLength(1)
+        expect(row7[0]!.seats.map((seat) => seat.ticketTypeId)).toEqual([
+          ...Array(5).fill('tier-free'),
+          ...Array(11).fill('tier-normal'),
+        ])
+      })
+
+      it('offers only seats 1–5 under Free', () => {
+        expect(statesUnder('tier-free')).toEqual([...Array(5).fill('available'), ...Array(11).fill('other')])
+      })
+
+      it('offers only seats 6–16 under Normal', () => {
+        expect(statesUnder('tier-normal')).toEqual([...Array(5).fill('other'), ...Array(11).fill('available')])
+      })
+
+      it('drops the picked seats of the other part of the row when the type changes', () => {
+        expect(seatsKeptForTier([701, 706, 716], row7, 'tier-normal')).toEqual([706, 716])
+        expect(seatsKeptForTier([701, 706, 716], row7, 'tier-free')).toEqual([701])
+      })
     })
 
     // 2, 10, 11 — not 10, 11, 2, which is what a plain string sort gives.
@@ -238,6 +332,124 @@ describe('toCheckoutView', () => {
 
     it('has no rows at all when the event does not seat people', () => {
       expect(view().rows).toEqual([])
+    })
+  })
+
+  /**
+   * US-DISC-04: a seat belongs to one ticket type, so only the chosen type's
+   * seats can be picked. A seat with no type is a map from before seats had
+   * types, and sells under whichever type is chosen — the API's
+   * `CheckoutPolicy.resolveSeats` draws the same line.
+   */
+  describe('seats of the chosen ticket type', () => {
+    const seat = (over: Partial<SeatOption> = {}): SeatOption => ({
+      id: 1,
+      label: '1',
+      available: true,
+      ticketTypeId: 'tier-vip',
+      ...over,
+    })
+    const ROWS: SeatRow[] = [
+      { label: '1', seats: [seat({ id: 1 }), seat({ id: 2 })] },
+      { label: '2', seats: [seat({ id: 3, ticketTypeId: 'tier-ga' })] },
+      { label: '3', seats: [seat({ id: 4, ticketTypeId: null })] },
+    ]
+
+    describe('seatStateOf', () => {
+      it('offers a free seat of the chosen type', () => {
+        expect(seatStateOf(seat(), 'tier-vip', [], true)).toBe('available')
+      })
+
+      it('marks a seat already picked', () => {
+        expect(seatStateOf(seat(), 'tier-vip', [1], true)).toBe('selected')
+      })
+
+      it('shows a taken seat as booked', () => {
+        expect(seatStateOf(seat({ available: false }), 'tier-vip', [], true)).toBe('booked')
+      })
+
+      it('shows a seat of another type as another type’s, taken or not', () => {
+        expect(seatStateOf(seat(), 'tier-ga', [], true)).toBe('other')
+        expect(seatStateOf(seat({ available: false }), 'tier-ga', [], true)).toBe('other')
+      })
+
+      it('offers a seat with no type under any type on a map laid out before rows had types', () => {
+        expect(seatStateOf(seat({ ticketTypeId: null }), 'tier-ga', [], false)).toBe('available')
+      })
+
+      // The API refuses such a seat once any row has a type ("Those seats
+      // aren't on sale"), so the map must not offer it.
+      it('does not offer a seat with no type on a map whose rows have types', () => {
+        expect(seatStateOf(seat({ ticketTypeId: null }), 'tier-ga', [], true)).toBe('other')
+      })
+    })
+
+    describe('canPick', () => {
+      it('lets a buyer pick a free seat or let go of a picked one', () => {
+        expect(canPick('available')).toBe(true)
+        expect(canPick('selected')).toBe(true)
+      })
+
+      it('refuses a booked seat and another type’s seat', () => {
+        expect(canPick('booked')).toBe(false)
+        expect(canPick('other')).toBe(false)
+      })
+    })
+
+    describe('seatsKeptForTier', () => {
+      it('drops picked seats of another type when the type changes', () => {
+        expect(seatsKeptForTier([1, 2], ROWS, 'tier-ga')).toEqual([])
+      })
+
+      it('keeps picked seats of the new type, in the order they were picked', () => {
+        expect(seatsKeptForTier([3, 1], ROWS, 'tier-ga')).toEqual([3])
+      })
+
+      it('drops a picked seat with no type once other rows have types', () => {
+        expect(seatsKeptForTier([4, 1], ROWS, 'tier-ga')).toEqual([])
+      })
+
+      it('keeps a picked seat with no type on a map where no row has a type', () => {
+        const untyped: SeatRow[] = [
+          { label: '1', seats: [seat({ id: 5, ticketTypeId: null }), seat({ id: 6, ticketTypeId: null })] },
+        ]
+        expect(seatsKeptForTier([6, 5], untyped, 'tier-ga')).toEqual([6, 5])
+      })
+
+      it('drops a seat that is no longer on the map', () => {
+        expect(seatsKeptForTier([99], ROWS, 'tier-vip')).toEqual([])
+      })
+    })
+
+    describe('summaryShown', () => {
+      const lines = toSummaryLines(SUMMARY)
+
+      it('shows the last quote while seats are picked', () => {
+        expect(summaryShown(lines, 2)).toBe(lines)
+      })
+
+      it('shows none once a change of type has dropped every picked seat', () => {
+        // No quote is asked for with nothing picked, so the last one would
+        // still price the seats that were dropped.
+        expect(summaryShown(lines, 0)).toBeNull()
+      })
+
+      it('shows none before any quote has come back', () => {
+        expect(summaryShown(null, 2)).toBeNull()
+      })
+    })
+
+    describe('seatLegendOf', () => {
+      it('explains the three everyday states', () => {
+        const legacy: SeatRow[] = [{ label: '1', seats: [seat({ ticketTypeId: null })] }]
+        expect(seatLegendOf(legacy, 'tier-vip')).toEqual(['selected', 'available', 'booked'])
+      })
+
+      it('adds another type’s seats only when the map shows some', () => {
+        expect(seatLegendOf(ROWS, 'tier-vip')).toEqual(['selected', 'available', 'booked', 'other'])
+        const vipOnly: SeatRow[] = [ROWS[0]!]
+        expect(seatLegendOf(vipOnly, 'tier-vip')).toEqual(['selected', 'available', 'booked'])
+      })
     })
   })
 

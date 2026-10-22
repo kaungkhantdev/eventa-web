@@ -1,6 +1,6 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { ApiError } from '@/lib/api'
+import { withoutForbidden } from '@/lib/api'
 import { satang } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
@@ -13,6 +13,7 @@ import type {
   RegistrationWireStatus,
 } from './registrations.types'
 import { eventOptions as allEventOptions, type EventOption } from '@/features/events/eventOptions'
+import { EVENT_OPTIONS, MAX_SEARCH_LENGTH, REG_TABS, TIER_OPTIONS } from '@/lib/constants/attendees.constants'
 
 /**
  * What the registrations queue loads, and what its controls do (US-REG-01..03).
@@ -26,34 +27,6 @@ import { eventOptions as allEventOptions, type EventOption } from '@/features/ev
  * enough on its own — see `tabCountsOf`.
  */
 
-/**
- * The kit's four pills. `all` sends no status, so every bucket is counted.
- *
- * Three statuses deliberately have none: `confirmed`, `rejected` and
- * `expired`. The API could serve a tab for any of them today —
- * `ListRegistrationsDto.status` accepts every `order_status` member — so this
- * is a choice, not a limitation, and it is worth saying why `expired` did not
- * get one along with its count.
- *
- * It cannot be justified on its own merits. `expired` is neither rarer nor
- * more actionable than `rejected`: both are terminal, and `canApprove`,
- * `canReject` and `canOffer` are all false on either, so a pill would open a
- * page of rows with every control disabled. (That alone is not the argument —
- * `cancelled` has a pill and is just as finished.) The point is that the three
- * without one are not distinguishable from each other, so the only
- * non-arbitrary choices are a pill for none of them or for all three, and all
- * three means a six-pill status browser in place of a four-pill work queue.
- * That is a change to the kit's design, which is the visual contract this app
- * ports rather than something to redecide while closing a count gap.
- *
- * What that costs is real and worth stating rather than glossing: expired
- * rows are findable only by looking under All, narrowed by event or search.
- * `tabOf` falls back to `all` for a tab it does not know, so not even a
- * hand-typed `?tab=expired` reaches them. If reconciliation turns out to need
- * them separately, the count is already published and a pill is one line
- * here, one in `TAB_STATUS` and one in `TAB_LABEL`.
- */
-export const REG_TABS = ['all', 'pending', 'waitlist', 'cancelled'] as const
 export type RegTab = (typeof REG_TABS)[number]
 
 /** A pill, as the API spells the status it filters by. */
@@ -62,15 +35,6 @@ const TAB_STATUS: Record<Exclude<RegTab, 'all'>, RegistrationWireStatus> = {
   waitlist: 'waitlisted',
   cancelled: 'cancelled',
 }
-
-/** `@MaxLength(120)` on the DTO — past it the API answers 400, not a table. */
-const MAX_SEARCH = 120
-
-/** How many events the filter offers; the API's own maximum for one page. */
-const EVENT_OPTIONS = 100
-
-/** How many tiers the "Add registration" panel can choose between. */
-const TIER_OPTIONS = 100
 
 export function tabOf(params: URLSearchParams): RegTab {
   return enumParam(params, 'tab', REG_TABS, 'all')
@@ -96,7 +60,7 @@ export function listQueryOf(params: URLSearchParams): ListRegistrationsQuery {
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
     status: statusOfTab(tabOf(params)),
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 }
 
@@ -162,8 +126,8 @@ const NO_COUNTS: RegistrationCounts = {
 /**
  * The workspace's events, for the filter's options.
  *
- * The queue needs `regView` but `GET /events` needs `evCreate`, so Staff can
- * legitimately work this page without being allowed to list events. That 403 is
+ * The queue needs `regView` but `GET /events` needs `evCreate` or `regCheckin`,
+ * so a view-only member can work this page without being allowed to list events. That 403 is
  * an answer about a *filter*, not about the queue — it costs them the dropdown,
  * and must not take the registrations down with it. Any other failure still
  * propagates to the route's error element.
@@ -187,16 +151,6 @@ function toTierOption(tier: TierWire): TierOption {
     eventId: tier.eventId,
     name: tier.name,
     label: `${tier.name} · ${satang(tier.isFree ? 0 : tier.priceSatang)}`,
-  }
-}
-
-/** Run an auxiliary fetch, treating "you may not" as "you get no options". */
-async function withoutForbidden<T>(load: () => Promise<T[]>): Promise<T[]> {
-  try {
-    return await load()
-  } catch (cause) {
-    if (cause instanceof ApiError && cause.isForbidden) return []
-    throw cause
   }
 }
 

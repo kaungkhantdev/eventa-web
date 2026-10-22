@@ -2,6 +2,7 @@ import type { BadgeTone } from '@/components/ui'
 import { bangkokTime, initials } from '@/lib/format'
 import { CHANNEL_BADGE, type ChannelBadge } from './channel-badges'
 import type { DeliveryStatus, DeliveryWire } from './deliveries.types'
+import { KIND_LABEL } from '@/lib/constants/engagement.constants'
 
 /**
  * One line of the delivery log (US-MSG-06).
@@ -42,24 +43,6 @@ const STATUS: Record<
 > = {
   sent: { label: 'Sent', tone: 'blue', icon: 'hgi-mail-send-01' },
   failed: { label: 'Failed', tone: 'red', icon: 'hgi-alert-circle' },
-}
-
-/**
- * Names this app knows, because a slug is not a sentence. Anything else is made
- * readable rather than shown raw — `kind` is free text from the worker, so a
- * new message type will appear here before this list does.
- */
-const KIND_LABEL: Record<string, string> = {
-  'registration-confirmation': 'Registration confirmation',
-  'cancellation-notice': 'Cancellation notice',
-  'payment-receipt': 'Payment receipt',
-  'event-reminder': 'Event reminder',
-  'waitlist-offer': 'Waitlist offer',
-  // Sent under the offer's own switch, logged apart so it is not read as one.
-  'waitlist-offer-expired': 'Waitlist offer expired',
-  'post-event-thankyou': 'Post-event thank-you',
-  announcement: 'Announcement',
-  'refund-notice': 'Refund notice',
 }
 
 export function kindLabel(kind: string): string {

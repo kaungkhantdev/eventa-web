@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { SEARCH_DEBOUNCE_MS } from '@/lib/useFilters'
 import type { AttendanceRow } from '../door.types'
+import { DEFAULT_SIZE, MANUAL_LOOKUP_LABEL, PAGE_SIZES } from '@/lib/constants/checkin-tool.constants'
 
 /**
  * The kit's "Can't scan? Find attendee manually" fallback (US-REG-13).
@@ -17,10 +18,6 @@ import type { AttendanceRow } from '../door.types'
  * until somebody actually types: the station sits idle most of the evening,
  * and a search on every keystroke of an empty box is a request for nothing.
  */
-
-/** The kit's page-size choices, verbatim. */
-const PAGE_SIZES = [10, 20, 30, 50] as const
-const DEFAULT_SIZE = 10
 
 export function ManualSearch({ eventId }: { eventId: string }) {
   const [open, setOpen] = useState(false)
@@ -58,9 +55,7 @@ export function ManualSearch({ eventId }: { eventId: string }) {
         aria-expanded={open}
         className="flex w-full items-center justify-between text-left"
       >
-        <span className="text-[13px] font-semibold text-ink">
-          Can’t scan? Find attendee manually
-        </span>
+        <span className="text-[13px] font-semibold text-ink">{MANUAL_LOOKUP_LABEL}</span>
         <Icon
           name="hgi-arrow-down-01"
           size={16}

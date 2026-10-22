@@ -1,11 +1,5 @@
 import { MASKED, bahtCompact, bangkokTime, initials, num, satang } from '@/lib/format'
-import {
-  DELTA_ICON,
-  DELTA_TONE,
-  PAYMENT_STATUS,
-  TIER_COLORS,
-  URGENCY,
-} from './overview.presentation'
+import { PAYMENT_STATUS } from './overview.presentation'
 import type {
   ChangeWire,
   Delta,
@@ -23,11 +17,9 @@ import type {
   TierRow,
   TierSliceWire,
 } from './overview.types'
+import { DELTA_ICON, DELTA_TONE, HEADROOM, LAST_FEW, ONE_BOOKING, PER_THOUSAND, SATANG_PER_BAHT, TIER_COLORS, URGENCY } from '@/lib/constants/overview.constants'
 
 /** The rules behind the analytics dashboard (US-DASH-08..12). */
-
-const SATANG_PER_BAHT = 100
-const PER_THOUSAND = 1000
 
 /**
  * The five headline cards (US-DASH-08).
@@ -134,9 +126,6 @@ function pointLabel(point: RevenuePointWire, range: RevenueRange): string {
   })
 }
 
-/** Space above the tallest point, so the peak is not drawn on the ceiling. */
-const HEADROOM = 1.15
-
 /**
  * A top-of-axis a person would draw a gridline on — 60, not 59.8.
  *
@@ -160,15 +149,6 @@ export function toTierRows(mix: readonly TierSliceWire[]): TierRow[] {
     color: TIER_COLORS[i % TIER_COLORS.length],
   }))
 }
-
-/**
- * How many seats one booking can take — `maxPerOrder` on the API.
- *
- * At or below it, a single order can clear the tier, which is what makes a low
- * count urgent rather than merely low (US-DASH-11).
- */
-const ONE_BOOKING = 8
-const LAST_FEW = 3
 
 export function toSellingFastRow(tier: SellingFastWire): SellingFastRow {
   return {

@@ -12,16 +12,16 @@ import type {
   InvoiceStatus,
   InvoiceWire,
   PayoutRow,
+  PayoutSettingsLinkWire,
   PayoutStatus,
   PayoutWire,
   TaxRow,
   VatLedgerWire,
 } from './finance.types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import { INVOICE_TABS, MAX_SEARCH_LENGTH, PAYOUT_TABS, SATANG_PER_BAHT, YEARS_BACK } from '@/lib/constants/finance.constants'
 
 /** Payouts, invoices and VAT periods (US-FIN-03..12). */
-
-const MAX_SEARCH = 120
 
 function withPage(current: string, page: number): string {
   const url = new URL(current)
@@ -31,15 +31,14 @@ function withPage(current: string, page: number): string {
 
 /* ── payouts ──────────────────────────────────────────────────────────── */
 
-export const PAYOUT_TABS = ['all', 'scheduled', 'processing', 'paid', 'failed'] as const
 export type PayoutTab = (typeof PAYOUT_TABS)[number]
 
 const payoutsApi = {
   list: (query: Query) => api.list<PayoutWire>('/payouts', { query }),
   balances: () => api.get<BalancesWire>('/payouts/balances'),
   retry: (reference: string) => api.post<void>(`/payouts/${reference}/retry`),
-  /** A one-time provider URL for connecting or changing the bank account. */
-  settingsLink: () => api.post<{ connected: boolean; url: string | null }>('/payouts/settings-link'),
+  /** The provider's page for changing the bank account, schedule and tax forms. */
+  settingsLink: () => api.post<PayoutSettingsLinkWire>('/payouts/settings-link'),
 }
 
 export interface PayoutsData {
@@ -77,18 +76,28 @@ async function loadPayouts({ request }: LoaderArgs): Promise<PayoutsData> {
 /**
  * Retrying a failed payout, or opening the provider's settings.
  *
- * The settings link is one-time and comes from the provider, so it is fetched
- * on demand rather than held in loader data where it could go stale in a tab
- * left open.
+ * The settings link comes from the API, so it is fetched on demand rather than
+ * held in loader data — and only when an Admin asks, since the API refuses it
+ * to anyone else.
  */
 async function runPayoutsAction({ request }: LoaderArgs): Promise<unknown> {
   const form = await request.formData()
   if (String(form.get('intent')) === 'connect') {
     const link = await payoutsApi.settingsLink()
-    return { url: link.url }
+    return providerRedirect(link) ?? { url: null }
   }
   await payoutsApi.retry(String(form.get('reference') ?? ''))
   return null
+}
+
+/**
+ * Off to the provider, where bank details, the payout schedule and tax forms
+ * are managed (US-FIN-05). A redirect to another origin is a full-page
+ * navigation, so the Admin leaves the console for the provider's own page.
+ * Null when the provider has no page to send them to yet.
+ */
+export function providerRedirect(link: PayoutSettingsLinkWire): Response | null {
+  return link.url ? redirect(link.url) : null
 }
 
 export const payoutsRoute = {
@@ -98,7 +107,6 @@ export const payoutsRoute = {
 
 /* ── invoices ─────────────────────────────────────────────────────────── */
 
-export const INVOICE_TABS = ['all', 'issued', 'paid', 'overdue', 'void'] as const
 export type InvoiceTab = (typeof INVOICE_TABS)[number]
 
 const invoicesApi = {
@@ -131,7 +139,7 @@ async function loadInvoices({ request }: LoaderArgs): Promise<InvoicesData> {
     limit: isPageSize(limit) ? limit : DEFAULT_PAGE_SIZE,
     status: tab === 'all' ? undefined : (tab as InvoiceStatus),
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 
   const [list, events] = await Promise.all([invoicesApi.list(query), eventOptions()])
@@ -207,9 +215,6 @@ export interface TaxesData {
   }
 }
 
-/** How many years back the picker goes. VAT records are kept for five. */
-const YEARS_BACK = 5
-
 /**
  * Which tax year is on screen.
  *
@@ -239,8 +244,6 @@ async function loadTaxes({ request }: LoaderArgs): Promise<TaxesData> {
     },
   }
 }
-
-const SATANG_PER_BAHT = 100
 
 /** The headline figures are always disclosed here, so plain baht will do. */
 function money(satang: number): string {

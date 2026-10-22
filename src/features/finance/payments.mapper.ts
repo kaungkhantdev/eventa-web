@@ -1,6 +1,9 @@
 import type { BadgeTone } from '@/components/ui'
+import { can } from '@/features/auth/permissions'
+import type { Me } from '@/features/auth/types'
 import { bangkokDate, bangkokTime, initials, satang } from '@/lib/format'
 import type { LedgerEntryWire, LedgerStatus, PaymentMethod, PaymentRow } from './payments.types'
+import { ADMIN_ONLY, NOT_ELIGIBLE, REFUND_PERMISSION } from '@/lib/constants/finance.constants'
 
 /** The rules behind the payments ledger (US-FIN-01/02). */
 
@@ -46,4 +49,22 @@ export function toPaymentRow(wire: LedgerEntryWire): PaymentRow {
     canViewInvoice: wire.canViewInvoice,
     refundBlockedReason: wire.refundBlockedReason,
   }
+}
+
+export interface RefundControl {
+  enabled: boolean
+  /** What the control says — why, when it cannot be used. */
+  title: string
+}
+
+/**
+ * The Refund control on a ledger row (US-FIN-02). Offered only to whoever may
+ * refund, and only for a charge the API says can be — an Organizer sees it
+ * disabled, saying who can. The API refuses with 403 either way; this is the
+ * page not offering what it will refuse.
+ */
+export function refundControl(row: PaymentRow, me: Me | null): RefundControl {
+  if (!can(me, REFUND_PERMISSION)) return { enabled: false, title: ADMIN_ONLY }
+  if (!row.canRefund) return { enabled: false, title: row.refundBlockedReason ?? NOT_ELIGIBLE }
+  return { enabled: true, title: 'Refund' }
 }

@@ -2,11 +2,9 @@ import { PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { RecentRow } from '../overview.types'
 import { SectionHeader } from './PanelChrome'
+import { NONE_YET, NOTHING_IN } from '@/lib/constants/overview.constants'
 
 /** The latest registrations (US-DASH-12). */
-
-const NONE_YET = 'No registrations yet.'
-const NOTHING_IN = 'Every sign-up across your events lands here, newest first.'
 
 export function RecentRegistrationsPanel({ rows }: { rows: RecentRow[] }) {
   return (

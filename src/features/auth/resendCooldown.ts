@@ -1,3 +1,4 @@
+import { KEY_PREFIX, RESEND_COOLDOWN_MS } from '@/lib/constants/auth.constants'
 /**
  * When the "send it again" button is allowed to work again.
  *
@@ -13,11 +14,6 @@
  * The store is a parameter rather than a reach for `window`: these are the
  * rules, and rules are tested, so they must not need a browser to run.
  */
-
-/** Matches the API's VERIFY_RESEND_COOLDOWN_SECONDS default. */
-export const RESEND_COOLDOWN_MS = 60_000
-
-const KEY_PREFIX = 'eventa:resend-until:'
 
 export type CooldownStore = Pick<Storage, 'getItem' | 'setItem'>
 

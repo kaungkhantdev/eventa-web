@@ -27,6 +27,20 @@ export interface ListEventsQuery extends Query {
   sort?: EventSort
 }
 
+/** What `PATCH /events/:id/page` changes (US-PAGE-10); absent keys are left alone. */
+export interface PageSettingsBody {
+  slug?: string
+  accentColor?: string
+}
+
+/** What `PATCH /events/:id/page` answers with. */
+export interface PageSettingsWire {
+  slug: string
+  template: string
+  accentColor: string
+  published: boolean
+}
+
 /** What `POST /events` accepts — and it rejects anything else. */
 export interface CreateEventBody {
   name: string
@@ -56,6 +70,14 @@ export const eventsApi = {
   publish: (id: string, body: { visibility?: string; landingTemplateId?: string; confirmPastStart?: boolean; version?: number }) =>
     api.post<EventWire>(`/events/${id}/publish`, body),
 
+  /**
+   * The page's public address and accent colour. An address already in use is
+   * refused with a 409 asking for another; a colour that is not one is stored
+   * as the brand default.
+   */
+  updatePage: (id: string, body: PageSettingsBody) =>
+    api.patch<PageSettingsWire>(`/events/${id}/page`, body),
+
   unpublish: (id: string, version?: number) =>
     api.post<EventWire>(`/events/${id}/unpublish`, { version }),
 
@@ -77,6 +99,14 @@ export const eventsApi = {
    * and the API's own sentence explains that to the person.
    */
   remove: (id: string, version: number) => api.delete<void>(`/events/${id}`, { body: { version } }),
+
+  /**
+   * Cancel an event that can no longer be deleted (US-EVT-08). The reason is
+   * required and is what attendees are told; `version` is the row on screen,
+   * so a stale view is refused rather than acted on.
+   */
+  cancel: (id: string, body: { reason: string; version?: number }) =>
+    api.post<EventWire>(`/events/${id}/cancel`, body),
 
   /**
    * Copy an event into a fresh draft (US-EVT-01). The API decides what carries

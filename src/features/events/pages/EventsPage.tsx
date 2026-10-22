@@ -20,10 +20,13 @@ import { PAGE_SIZES, type PageWindow } from '@/lib/paging'
 import type { ListEmptyReason } from '@/lib/urlFilters'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
+import { CancelEventModal } from '../components/CancelEventModal'
+import { DeleteEventModal } from '../components/DeleteEventModal'
 import { EventCalendar } from '../components/EventCalendar'
 import { COVER, STATUS_PILL, eventDetailPath as detailPath } from '../events.presentation'
-import { EVENT_SORTS, EVENT_TYPES, type EventsData } from '../events.routes'
+import { EVENT_TYPES, type EventsData } from '../events.routes'
 import type { EventBucket, EventRow } from '../types'
+import { ALL_TYPES, EVENT_SORTS, MAX_EVENT_SEARCH, MENU_ITEM } from '@/lib/constants/events.constants'
 
 /* admin/events.html — the organizer's event list, plus a month calendar.
 
@@ -37,11 +40,6 @@ const SORT_LABEL: Record<(typeof EVENT_SORTS)[number], string> = {
   name: 'Name A–Z',
   date: 'Date',
 }
-
-const ALL_TYPES = 'All types'
-
-/** What the API's `q` accepts; longer and it answers 400 instead of a table. */
-const MAX_SEARCH_LENGTH = 120
 
 export default function EventsPage() {
   const data = useLoaderData() as EventsData
@@ -167,7 +165,7 @@ export default function EventsPage() {
                     onChange={(e) => setTerm(e.target.value)}
                     className="h-10 w-full rounded-lg bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-muted focus:outline-none focus:ring-4 focus:ring-brand/15"
                     placeholder="Search events…"
-                    maxLength={MAX_SEARCH_LENGTH}
+                    maxLength={MAX_EVENT_SEARCH}
                     aria-label="Search events"
                   />
                 </div>
@@ -328,6 +326,24 @@ function EventsTable({
   empty: ReactNode
 }) {
   const menu = useRowMenu()
+  // Delete in the menu only asks; the dialog is what deletes (US-EVT-08). It
+  // lives here rather than in the menu, which closes on any click outside it.
+  const [subject, setSubject] = useState<{ row: EventRow | null; attempt: number }>({
+    row: null,
+    attempt: 0,
+  })
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const askDelete = (row: EventRow) => {
+    menu.close()
+    setSubject((prev) => ({ row, attempt: prev.attempt + 1 }))
+    setDeleteOpen(true)
+  }
+  // The API refused the delete and said to cancel instead (US-EVT-08).
+  const cancelInstead = () => {
+    setDeleteOpen(false)
+    setCancelOpen(true)
+  }
 
   return (
     <section className="card mt-3 scroll-mt-4 p-4">
@@ -366,8 +382,19 @@ function EventsTable({
           position={menu.position}
           menuRef={menu.ref}
           onClose={menu.close}
+          onDelete={askDelete}
         />
       )}
+
+      <DeleteEventModal
+        dialog={{ ...subject, open: deleteOpen }}
+        onClose={() => setDeleteOpen(false)}
+        onCancelInstead={cancelInstead}
+      />
+      <CancelEventModal
+        dialog={{ ...subject, open: cancelOpen }}
+        onClose={() => setCancelOpen(false)}
+      />
     </section>
   )
 }
@@ -420,9 +447,6 @@ function useRowMenu() {
   }
 }
 
-const MENU_ITEM =
-  'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium text-ink transition hover:bg-line'
-
 function RowMenu({
   row,
   canDuplicate,
@@ -430,6 +454,7 @@ function RowMenu({
   position,
   menuRef,
   onClose,
+  onDelete,
 }: {
   row: EventRow
   canDuplicate: boolean
@@ -437,13 +462,15 @@ function RowMenu({
   position: { left: number; top: number }
   menuRef: React.RefObject<HTMLDivElement | null>
   onClose: () => void
+  /** Ask to delete — the confirmation dialog, not this menu, does it. */
+  onDelete: (row: EventRow) => void
 }) {
   const fetcher = useFetcher<ActionResult>()
   const refusal = fetcher.data?.error
   const busy = fetcher.state !== 'idle'
 
-  // The row is gone once the delete lands, so the popover pointing at it goes
-  // too. A refusal keeps it open, with the reason under the button.
+  // The copy is made once the duplicate lands, so the popover goes. A refusal
+  // keeps it open, with the reason under the button.
   useEffect(() => {
     if (fetcher.state === 'idle' && fetcher.data?.ok) onClose()
   }, [fetcher.state, fetcher.data, onClose])
@@ -475,26 +502,18 @@ function RowMenu({
       {canDelete && (
         <>
           <div className="my-1 h-px bg-line" />
-          <fetcher.Form method="post">
-            <input type="hidden" name="id" value={row.id} />
-            <input type="hidden" name="version" value={row.version} />
-            <button
-              type="submit"
-              disabled={busy}
-              className={cn(
-                MENU_ITEM,
-                'text-red-500 hover:bg-red-50 disabled:opacity-60 dark:hover:bg-red-500/15',
-              )}
-            >
-              <Icon name="hgi-delete-02" size={15} />
-              {busy ? 'Deleting…' : 'Delete'}
-            </button>
-          </fetcher.Form>
+          <button
+            type="button"
+            onClick={() => onDelete(row)}
+            className={cn(MENU_ITEM, 'text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15')}
+          >
+            <Icon name="hgi-delete-02" size={15} />
+            Delete
+          </button>
         </>
       )}
       {/* The API decides what may be done and writes the refusal for the person
-          reading it — a published event has to be cancelled so that attendees
-          are refunded and told. Shown verbatim. */}
+          reading it. Shown verbatim. */}
       {refusal && (
         <p role="alert" className="px-2.5 py-2 text-[12px] leading-snug text-red-500">
           {refusal}

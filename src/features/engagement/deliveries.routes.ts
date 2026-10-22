@@ -4,13 +4,10 @@ import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/li
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { kindLabel, toDeliveryRow, type DeliveryRow } from './deliveries.mapper'
 import type { DeliveryWire } from './deliveries.types'
+import { DELIVERY_TABS, MAX_SEARCH } from '@/lib/constants/engagement.constants'
 
 /** The delivery log (US-MSG-06). */
 
-const MAX_SEARCH = 120
-
-/** 'all' is the absence of a filter, not a value the API understands. */
-export const DELIVERY_TABS = ['all', 'failed'] as const
 export type DeliveryTab = (typeof DELIVERY_TABS)[number]
 
 const deliveriesApi = {

@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { Icon } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { scannerUnavailableMessage } from '../cameraFallback'
 import type { QrCamera } from '../useQrCamera'
 
 /**
@@ -47,7 +48,7 @@ export function CameraStage({ camera, busy }: { camera: QrCamera; busy: boolean 
             <div className="qr-ghost absolute inset-8 grid place-items-center">
               <Icon name="hgi-qr-code-01" size={120} />
             </div>
-            <div className="scan-line absolute inset-x-3 top-2 h-[3px] rounded bg-brand shadow-[0_0_14px_2px_rgba(27,167,112,.7)]" />
+            <div className="scan-line absolute inset-x-3 top-2 h-[3px] rounded bg-brand shadow-[0_0_14px_2px_rgba(0,192,102,.7)]" />
           </div>
           <p className="cam-hint mt-6 max-w-[260px] text-center text-[13px] font-medium">
             <Hint camera={camera} busy={busy} />
@@ -124,9 +125,7 @@ export function CameraStage({ camera, busy }: { camera: QrCamera; busy: boolean 
 
 /** What the viewport says it is doing, in the kit's own words where they fit. */
 function Hint({ camera, busy }: { camera: QrCamera; busy: boolean }) {
-  if (!camera.supported) {
-    return <>This browser cannot use the camera — key the code in below instead</>
-  }
+  if (!camera.supported) return <>{scannerUnavailableMessage(window.isSecureContext)}</>
   if (busy) return <>Checking that ticket…</>
   if (camera.live) return <>Hold the ticket’s QR code inside the frame</>
   return (

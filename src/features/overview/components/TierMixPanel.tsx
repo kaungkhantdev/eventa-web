@@ -2,6 +2,7 @@ import { DonutChart, PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { num } from '@/lib/format'
 import type { TierRow } from '../overview.types'
+import { NOTHING_TO_SPLIT, NO_REGISTRATIONS } from '@/lib/constants/overview.constants'
 
 /**
  * How registrations split across ticket types (US-DASH-10).
@@ -10,9 +11,6 @@ import type { TierRow } from '../overview.types'
  * and takes the whole row when the reader has no finance access and the trend
  * is not rendered at all.
  */
-
-const NO_REGISTRATIONS = 'No registrations yet.'
-const NOTHING_TO_SPLIT = 'Once tickets sell, the split by type shows here.'
 
 interface TierMixPanelProps {
   tiers: TierRow[]

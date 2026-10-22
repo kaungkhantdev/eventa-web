@@ -1,6 +1,7 @@
 import type { Persona } from '@/lib/persona'
 import type { ResetLinkCheck } from './api'
 import { accountLabelFor, signInPathFor } from './personas'
+import { HEADING } from '@/lib/constants/auth.constants'
 
 /**
  * What the reset page says about a usable link (US-ACC-04), from the API's
@@ -14,8 +15,6 @@ export interface ResetLinkView {
   /** The one sign-in this account uses — where the page sends them after. */
   signIn: { to: string; label: string }
 }
-
-const HEADING = 'Set a new password'
 
 export function toResetLinkView(link: ResetLinkCheck): ResetLinkView {
   const workspace = workspaceOf(link)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Link, useFetcher, useLoaderData, useOutletContext } from 'react-router'
 import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
@@ -7,48 +7,59 @@ import type { ActionResult } from '@/app/loaders'
 import { NotificationBell, SignedInChip, Toggle, VenueMap } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { mapLinkFor } from '@/lib/mapLink'
-import { publishGaps, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
+import { swatchClassOf } from '@/lib/seatSwatches'
+import { toast } from '@/lib/toast'
+import { categoryIdOf, publishGaps, seatRowsApply, type EventFormValues, type TicketDraft } from '../eventForm.mapper'
 import type { EventFormData } from '../eventForm.routes'
 import { EVENT_TYPES } from '../events.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
 import { eventDetailPath } from '../events.presentation'
 import type { EventType } from '../types'
+import { NO_SEATS_TO_ASSIGN, STEPS, assignSeatsViewOf, finalLabel, headerSaveLabel, landingPreviewHref, openPreviewTab, saveIntentOf, seatMapDeferredOn, stepProgress, summaryCapacity, type Highlight, type StepKey } from '../eventForm.presentation'
 import {
-  HL_ICONS,
-  LETTERS,
-  STEPS,
-  WAITLIST_HINT,
-  finalLabel,
-  headerSaveLabel,
-  landingPreviewHref,
-  summaryCapacity,
-  type Highlight,
-} from '../eventForm.presentation'
+  paintChoiceOf,
+  paintOptionsOf,
+  quantityColumnOf,
+  seatAriaLabel,
+  seatLegend,
+  seatRowCount,
+  seatSwatchesOf,
+  seatTicketTypesFor,
+  seatsPerRowCount,
+  storedQuantityOf,
+  ticketTypeChoices,
+  typeOfChoice,
+  withRowType,
+  withSeatType,
+  type QuantityColumn,
+  type SeatLegendEntry,
+} from '../eventSeating.mapper'
 import { CoverImageField } from '../components/CoverImageField'
+import { PaintPicker } from '../components/PaintPicker'
+import { RowTicketTypes } from '../components/RowTicketTypes'
+import { DESC_MAX, HL_ICONS, PAGE_ACCENT_MAX, PAGE_SLUG_MAX, PAINTABLE_SEAT, POPUP_BLOCKED_HINT, SAVING_TICKET_TYPES, SCOPED_CSS, SEAT_MAP_DEFERRED_NOTE, SEAT_TYPES_REQUIREMENT, WAITLIST_HINT } from '@/lib/constants/events.constants'
+import { SEAT_SET_QUANTITY } from '@/lib/constants/ticketing.constants'
 
 /* ---------- Create-event wizard — admin/event-form.html ----------
-   A five-step flow (Basics · Date & location · Seating · Tickets · Review)
-   with a clickable step rail, live progress, a reserved-seating seat-map
-   preview, ticket/highlight repeaters, toggles and a live summary panel. */
+   Basics · Date & location · Seating · Tickets · Assign seats · Review &
+   publish — the same six steps for every event (`STEPS`). A clickable step
+   rail, live progress, a reserved-seating seat-map preview, ticket/highlight
+   repeaters, toggles and a live summary panel. */
 
 type LocMode = 'inperson' | 'online'
 type Seating = 'ga' | 'reserved'
 type LandingTpl = (typeof LANDING_TEMPLATES)[number]['id']
 
 /**
- * The cap the counter shows, in CHARACTERS THE ORGANIZER TYPED — not markup.
- * The API allows 10,000 characters of sanitised HTML, so this leaves roughly
- * double the typed length as headroom for tags. Counting the markup instead
- * would make the number jump when someone bolded a word.
+ * The API's publish requirements, in its own words — see events.service.ts.
+ * The last is reserved seating's (US-EVT-05), listed only for such an event.
  */
-const DESC_MAX = 5000
-
-/** The API's publish requirements, in its own words — see events.service.ts. */
 const PUBLISH_REQUIREMENTS = [
   'a title',
   'a description',
   'a venue or an online link',
   'at least one ticket type',
+  SEAT_TYPES_REQUIREMENT,
 ] as const
 
 /** How each reads once it is satisfied. */
@@ -57,6 +68,17 @@ const REQUIREMENT_MET: Record<(typeof PUBLISH_REQUIREMENTS)[number], string> = {
   'a description': 'Description added',
   'a venue or an online link': 'Location added',
   'at least one ticket type': 'At least one ticket type',
+  [SEAT_TYPES_REQUIREMENT]: 'Every seat has a ticket type',
+}
+
+/**
+ * The ticket list's column spans, header and rows alike. With no Quantity
+ * column (an in-person reserved event, US-EVT-05) name and price take its width.
+ */
+const TICKET_SPANS: Record<QuantityColumn, { name: string; price: string }> = {
+  none: { name: 'sm:col-span-7', price: 'sm:col-span-4' },
+  typed: { name: 'sm:col-span-5', price: 'sm:col-span-3' },
+  readOnly: { name: 'sm:col-span-5', price: 'sm:col-span-3' },
 }
 
 /** A stored status → the word the console uses. */
@@ -64,66 +86,142 @@ function statusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
-/* Scoped CSS ported verbatim from the source page's inline <style> blocks. */
-const SCOPED_CSS = `
-.efhouse{background:radial-gradient(120% 90% at 50% -10%, #17201c 0%, #0c110f 60%)}
-.efseat{height:16px;width:16px;flex:none;border-radius:5px 5px 2px 2px;background:rgba(255,255,255,.16)}
-.efseat-sel{background:#1ba770;box-shadow:0 0 0 2px rgba(27,167,112,.3)}
-.efseat-booked{background:rgba(255,255,255,.05)}
-.efrowlab{color:rgba(255,255,255,.5);font-size:10px;font-weight:600;width:14px;text-align:center;flex:none}
-#desc-editor-wrap{ border:1px solid rgb(var(--hair)); border-radius:10px; background:rgb(var(--surface)); transition:box-shadow .15s ease; }
-#desc-editor-wrap:focus-within{ box-shadow:0 0 0 4px rgb(27 167 112 / .15); }
-#desc-editor-wrap .ql-toolbar.ql-snow{ border:0; border-bottom:1px solid rgb(var(--line)); border-radius:10px 10px 0 0; padding:7px 8px; }
-#desc-editor-wrap .ql-container.ql-snow{ border:0; border-radius:0 0 10px 10px; font-family:inherit; font-size:13px; }
-#desc-editor-wrap .ql-editor{ min-height:118px; padding:12px; line-height:1.6; color:rgb(var(--ink)); }
-#desc-editor-wrap .ql-editor.ql-blank::before{ left:12px; right:12px; color:rgb(var(--muted)); font-style:normal; }
-#desc-editor-wrap .ql-snow .ql-stroke{ stroke:rgb(var(--muted)); }
-#desc-editor-wrap .ql-snow .ql-fill{ fill:rgb(var(--muted)); }
-#desc-editor-wrap .ql-snow .ql-picker{ color:rgb(var(--ink)); }
-#desc-editor-wrap .ql-snow.ql-toolbar button:hover .ql-stroke,
-#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-stroke,
-#desc-editor-wrap .ql-snow .ql-toolbar .ql-picker-label:hover .ql-stroke{ stroke:#1ba770; }
-#desc-editor-wrap .ql-snow.ql-toolbar button:hover .ql-fill,
-#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active .ql-fill{ fill:#1ba770; }
-#desc-editor-wrap .ql-snow.ql-toolbar button:hover,
-#desc-editor-wrap .ql-snow.ql-toolbar button.ql-active,
-#desc-editor-wrap .ql-snow .ql-picker-label:hover,
-#desc-editor-wrap .ql-snow .ql-picker-item:hover,
-#desc-editor-wrap .ql-snow .ql-picker-item.ql-selected{ color:#1ba770; }
-#desc-editor-wrap .ql-snow .ql-picker-options{ background:rgb(var(--surface)); border-color:rgb(var(--hair))!important; border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.14); }
-#desc-editor-wrap .ql-snow .ql-tooltip{ background:rgb(var(--surface)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); box-shadow:0 8px 24px rgba(0,0,0,.16); border-radius:8px; }
-#desc-editor-wrap .ql-snow .ql-tooltip input[type=text]{ background:rgb(var(--canvas)); border-color:rgb(var(--hair)); color:rgb(var(--ink)); border-radius:6px; }
-`
+/* ---------- Reserved-seating live preview ----------
+   Rows are numbered as the API numbers them, and each seat takes its ticket
+   type's colour (US-EVT-05); a seat with no type keeps the plain seat. The
+   kit's decorative selected/booked seats are gone: here a colour means a type.
+   A room wider than the panel scrolls sideways inside it, never the page. */
 
-/* ---------- Reserved-seating live preview ---------- */
-function SeatPreview({ rows, cols }: { rows: number; cols: number }) {
-  const r = Math.max(1, Math.min(26, rows || 0))
-  const c = Math.max(1, Math.min(40, cols || 0))
-  const selRow = Math.floor((r - 1) / 2)
-  const isSel = (rr: number, cc: number) => rr === selRow && cc >= 3 && cc <= Math.min(5, c)
-  const isBooked = (rr: number, cc: number) =>
-    (rr === 0 && (cc === 2 || cc === c - 1)) ||
-    (rr === r - 1 && cc === 4) ||
-    (rr === selRow - 1 && cc === c - 2)
+/** What makes the preview a map to paint (Assign seats): each seat a button. */
+interface SeatPainter {
+  /** A seat button's name, `Row 7, seat 3: Free`. Indexes are 0-based. */
+  labelOf: (row: number, seat: number) => string
+  /** Give this seat the picked paint type. */
+  onPaint: (row: number, seat: number) => void
+}
 
-  const rowEls = []
-  for (let rr = 0; rr < r; rr++) {
-    const seats = []
-    for (let cc = 1; cc <= c; cc++) {
-      const cls = isBooked(rr, cc) ? 'efseat efseat-booked' : isSel(rr, cc) ? 'efseat efseat-sel' : 'efseat'
-      seats.push(<span key={`s${cc}`} className={cls} />)
-      if (c > 8 && cc === Math.ceil(c / 2))
-        seats.push(<span key={`g${cc}`} className="inline-block w-2 shrink-0" />)
-    }
-    rowEls.push(
-      <div key={rr} className="flex items-center gap-1">
-        <span className="efrowlab">{LETTERS[rr]}</span>
-        {seats}
-        <span className="efrowlab">{LETTERS[rr]}</span>
-      </div>,
-    )
+function SeatPreview({
+  swatches,
+  painter,
+}: {
+  /** Each seat's colour, `[row][seat]`; null for none. */
+  swatches: readonly (readonly (number | null)[])[]
+  painter?: SeatPainter
+}) {
+  // A drag paints every seat it enters while the button is held; a ref, since
+  // whether a drag is on never changes what is drawn.
+  const paintingRef = useRef(false)
+  const stop = () => {
+    paintingRef.current = false
   }
-  return <div className="flex flex-col items-center gap-1.5 overflow-x-auto">{rowEls}</div>
+  return (
+    <div className="overflow-x-auto" onPointerUp={stop} onPointerLeave={stop} onPointerCancel={stop}>
+      <div className="mx-auto flex w-max select-none flex-col items-center gap-1.5">
+        {swatches.map((row, r) => (
+          <div key={r} className="flex items-center gap-1">
+            <span className="efrowlab">{r + 1}</span>
+            {row.map((swatch, c) => (
+              <SeatCell
+                key={c}
+                row={r}
+                seat={c}
+                swatch={swatch}
+                aisleAfter={row.length > 8 && c + 1 === Math.ceil(row.length / 2)}
+                painter={painter}
+                paintingRef={paintingRef}
+              />
+            ))}
+            <span className="efrowlab">{r + 1}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** One seat — a plain seat to look at, or a button to paint — and the aisle after it, if any. */
+function SeatCell({
+  row,
+  seat,
+  swatch,
+  aisleAfter,
+  painter,
+  paintingRef,
+}: {
+  row: number
+  seat: number
+  swatch: number | null
+  aisleAfter: boolean
+  painter?: SeatPainter
+  paintingRef: RefObject<boolean>
+}) {
+  const cls = cn('efseat', swatchClassOf(swatch))
+  return (
+    <>
+      {painter ? (
+        <button
+          type="button"
+          className={cn(cls, PAINTABLE_SEAT)}
+          aria-label={painter.labelOf(row, seat)}
+          aria-pressed={false}
+          onPointerDown={(e) => {
+            // A touch may be the start of a sideways scroll; a tap still paints, by click.
+            if (e.pointerType === 'touch' || e.button !== 0) return
+            paintingRef.current = true
+            painter.onPaint(row, seat)
+          }}
+          onPointerEnter={() => {
+            if (paintingRef.current) painter.onPaint(row, seat)
+          }}
+          onClick={() => painter.onPaint(row, seat)}
+        />
+      ) : (
+        <span className={cls} />
+      )}
+      {aisleAfter && <span className="inline-block w-2 shrink-0" />}
+    </>
+  )
+}
+
+/* The stage, the seats in their types' colours and the key — the same
+   picture on Seating, where the grid is laid out, and on Assign seats, where
+   its seats are given types by painting them (`painter`). */
+function SeatMapPreview({
+  swatches,
+  legend,
+  painter,
+}: {
+  swatches: readonly (readonly (number | null)[])[]
+  legend: readonly SeatLegendEntry[]
+  painter?: SeatPainter
+}) {
+  return (
+    <div className="efhouse mt-2 overflow-hidden rounded-2xl p-5">
+      <div className="mb-4 flex flex-col items-center">
+        <svg viewBox="0 0 400 28" className="w-full max-w-sm" preserveAspectRatio="none" aria-hidden="true">
+          <path
+            d="M8 24 Q200 2 392 24"
+            fill="none"
+            stroke="rgba(0,192,102,.7)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
+          Stage
+        </span>
+      </div>
+      <SeatPreview swatches={swatches} painter={painter} />
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/10 pt-4 text-[11px] text-white/55">
+        {legend.map((entry) => (
+          <span key={entry.ticketTypeId ?? 'none'} className="inline-flex items-center gap-1.5">
+            <span className={cn('efseat !h-3.5 !w-3.5', swatchClassOf(entry.swatch))} />
+            {entry.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 /** An emptied editor still holds one empty paragraph; that is not a description. */
@@ -219,11 +317,11 @@ function DescriptionEditor({
 export default function EventFormPage() {
   const ctx = useOutletContext<AdminOutletContext | null>()
 
-  const { values: initial, template } = useLoaderData() as EventFormData
+  const { values: initial, template, categories } = useLoaderData() as EventFormData
   const fetcher = useFetcher<ActionResult>()
   const saving = fetcher.state !== 'idle'
 
-  const [cur, setCur] = useState(0)
+  const [at, setAt] = useState(0)
   const [loc, setLoc] = useState<LocMode>(initial.isOnline ? 'online' : 'inperson')
   const [seating, setSeating] = useState<Seating>(initial.seatingMode)
   const [rows, setRows] = useState(initial.seatRows || '7')
@@ -231,6 +329,7 @@ export default function EventFormPage() {
   const [title, setTitle] = useState(initial.name)
   const [description, setDescription] = useState(initial.description)
   const [type, setType] = useState<EventType>(initial.type)
+  const [categoryId, setCategoryId] = useState<number | null>(initial.categoryId)
   const [startDate, setStartDate] = useState(initial.startDate)
   const [startTime, setStartTime] = useState(initial.startTime)
   const [endDate, setEndDate] = useState(initial.endDate)
@@ -250,6 +349,18 @@ export default function EventFormPage() {
   const mapLink = mapLinkFor({ venueName: venue, address, city: initial.city })
   const [landingTpl, setLandingTpl] = useState<LandingTpl>(template)
   const [visibility, setVisibility] = useState('public')
+  // The page's address and colour (US-PAGE-10). Re-seeded when a save changes
+  // what is stored, so the boxes show what the API kept — a tidied address, or
+  // the default colour standing in for one it could not use.
+  const [pageSlug, setPageSlug] = useState(initial.slug)
+  const [accent, setAccent] = useState(initial.accentColor)
+  const savedPage = `${initial.slug}\n${initial.accentColor}`
+  const [seenPage, setSeenPage] = useState(savedPage)
+  if (savedPage !== seenPage) {
+    setSeenPage(savedPage)
+    setPageSlug(initial.slug)
+    setAccent(initial.accentColor)
+  }
 
   // Rows start as whatever the API has stored; a row with no id has not been
   // saved yet, which is also what the publish gate checks.
@@ -265,6 +376,30 @@ export default function EventFormPage() {
     setTickets(initial.tickets.map((t) => ({ ...t })))
   }
 
+  // Each seat's ticket type (US-EVT-05), re-seeded the same way: only when a
+  // save changes what the API stored, never while seats are being painted.
+  // Held at whatever size it was last given, so a seat survives the map being
+  // shrunk and grown again before a save; `seatTicketTypes` is the grid on screen.
+  const [seatTypes, setSeatTypes] = useState(initial.seatTicketTypes)
+  const savedSeatTypes = JSON.stringify(initial.seatTicketTypes)
+  const [seenSeatTypes, setSeenSeatTypes] = useState(savedSeatTypes)
+  if (savedSeatTypes !== seenSeatTypes) {
+    setSeenSeatTypes(savedSeatTypes)
+    setSeatTypes(initial.seatTicketTypes)
+  }
+  const typeChoices = ticketTypeChoices(tickets)
+  const seatsInRow = seatsPerRowCount(cols)
+  const seatTicketTypes = seatTicketTypesFor(seatTypes, seatRowCount(rows), seatsInRow, typeChoices)
+  const pickRowType = (row: number, ticketTypeId: string | null) =>
+    setSeatTypes((prev) => withRowType(prev, row, seatsInRow, ticketTypeId))
+  // The paint picker: null until the organizer picks, which reads as the first type.
+  const [paintPick, setPaintPick] = useState<string | null>(null)
+  const paint = paintChoiceOf(paintPick, typeChoices)
+  const seatPainter: SeatPainter = {
+    labelOf: (row, seat) => seatAriaLabel(row, seat, seatTicketTypes[row]?.[seat] ?? null, typeChoices),
+    onPaint: (row, seat) => setSeatTypes((prev) => withSeatType(prev, row, seat, typeOfChoice(paint))),
+  }
+
   const online = loc === 'online'
 
   /** Everything the action needs, gathered from the fields on screen. */
@@ -273,6 +408,7 @@ export default function EventFormPage() {
     name: title,
     description,
     type,
+    categoryId,
     startDate,
     startTime,
     endDate,
@@ -288,19 +424,32 @@ export default function EventFormPage() {
     requiresApproval: approval,
     seatRows: rows,
     seatsPerRow: cols,
+    seatTicketTypes,
     coverImage,
     highlights: highlights.map((h) => ({ text: h.label, icon: h.icon })),
     tickets,
   })
 
+  /** `values` is what the API stored; `slug` and `accentColor` what is typed. */
   const submit = (fields: Record<string, string> = {}) =>
-    fetcher.submit({ values: JSON.stringify(collect()), ...fields }, { method: 'post' })
+    fetcher.submit(
+      { values: JSON.stringify(collect()), slug: pageSlug, accentColor: accent, ...fields },
+      { method: 'post' },
+    )
 
   /** What the API still needs before it will publish this one. */
-  const gaps = publishGaps(collect())
+  const current = collect()
+  const gaps = publishGaps(current)
+  const requirements = PUBLISH_REQUIREMENTS.filter(
+    (requirement) => requirement !== SEAT_TYPES_REQUIREMENT || seatRowsApply(current),
+  )
   const isDraft = initial.status === null || initial.status === 'draft'
-  const pct = Math.round(((cur + 1) / STEPS.length) * 100)
-  const last = cur === STEPS.length - 1
+  const step = STEPS[at]
+  // Seating's save leaves a published map's new, untyped seats to Assign seats
+  // (US-EVT-05): the step says so, and so does the header Save's toast.
+  const seatMapDeferred = seatMapDeferredOn(step.key, current)
+  const pct = stepProgress(at)
+  const last = at === STEPS.length - 1
   // An event that already exists is being edited, whatever the wizard is
   // called. Saying "Create event" over someone's published conference is the
   // kind of small lie that makes people doubt whether Save did anything.
@@ -308,6 +457,12 @@ export default function EventFormPage() {
   const rowsNum = Number(rows) || 0
   const colsNum = Number(cols) || 0
   const seatTotal = rowsNum * colsNum
+  const seatRowsOn = seatRowsApply(current)
+  const quantityColumn = quantityColumnOf(current)
+  const ticketSpans = TICKET_SPANS[quantityColumn]
+  const assignSeatsView = assignSeatsViewOf(current, typeChoices.length, saving)
+  const seatSwatches = seatSwatchesOf(seatTicketTypes, typeChoices)
+  const legend = seatLegend(seatTicketTypes, typeChoices)
 
   /**
    * `POST /events` needs a name, a type and a start — and the start is asked
@@ -331,9 +486,7 @@ export default function EventFormPage() {
       if (canCreate) submit({ intent: 'create', ...extra })
       return
     }
-    if (cur === 2) submit({ intent: 'seating', ...extra })
-    else if (cur === 3) submit({ intent: 'tickets', ...extra })
-    else submit({ intent: 'save', ...extra })
+    submit({ intent: saveIntentOf(step.key, current), ...extra })
   }
 
   /**
@@ -344,7 +497,7 @@ export default function EventFormPage() {
    * looked like it would save. Same write; it now says what it does and says
    * when it is done.
    */
-  const saveHere = () => saveStep({ notify: 'on' })
+  const saveHere = () => saveStep({ notify: 'on', ...(seatMapDeferred && { seatMapDeferred: 'on' }) })
 
   const publish = () =>
     submit({ intent: 'publish', visibility, template: landingTpl, confirmPastStart: 'on' })
@@ -358,9 +511,10 @@ export default function EventFormPage() {
   const saveAndFinish = () => submit({ intent: 'save', notify: 'on', finish: 'on' })
 
   const goTo = (i: number) => {
-    setCur(Math.max(0, Math.min(STEPS.length - 1, i)))
+    setAt(i)
     document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })
   }
+  const goToStep = (key: StepKey) => goTo(STEPS.findIndex((s) => s.key === key))
 
   const summarySeating = online
     ? 'Online'
@@ -394,8 +548,8 @@ export default function EventFormPage() {
     setHighlights((prev) => prev.map((h, j) => (j === i ? { ...h, [field]: value } : h)))
 
   /**
-   * Recomputed as they type, so the draft branch previews what is in the boxes
-   * now rather than what was there when the page loaded.
+   * Recomputed as they type, so the preview shows what is in the boxes now
+   * rather than what was there when the page loaded — saved or not.
    */
   const previewHref = landingPreviewHref(
     landingTpl,
@@ -404,19 +558,14 @@ export default function EventFormPage() {
       : null,
     { title, venue, online, highlights },
   )
-  /**
-   * A live event previews its real published page, so what is on screen but not
-   * yet saved will not appear there — said plainly rather than left to surprise
-   * somebody who just typed a new title.
-   */
-  const previewsSaved = previewHref.includes('event=')
-  const previewTitle = previewsSaved
-    ? 'Opens the live public page — unsaved changes are not shown'
-    : 'Opens a preview of this draft in a new tab'
 
   /* A new tab, not a navigation: the wizard holds the open step's edits in
      component state, so leaving the page would discard them. */
-  const previewLanding = () => window.open(previewHref, '_blank', 'noopener')
+  const previewLanding = () => {
+    if (!openPreviewTab(previewHref, (url, target) => window.open(url, target))) {
+      toast.error(POPUP_BLOCKED_HINT)
+    }
+  }
 
   return (
     <>
@@ -443,7 +592,7 @@ export default function EventFormPage() {
             type="button"
             onClick={previewLanding}
             className="btn btn-soft"
-            title={previewTitle}
+            title="Opens a preview of this event in a new tab"
           >
             <i className="hgi-stroke hgi-arrow-up-right-01 text-[16px]" />
             <span className="hidden sm:inline">Preview</span>
@@ -513,11 +662,11 @@ export default function EventFormPage() {
           </div>
           <div className="card mt-4 space-y-1 p-2.5">
             {STEPS.map((s, i) => {
-              const done = i < cur
-              const active = i === cur
+              const done = i < at
+              const active = i === at
               return (
                 <button
-                  key={i}
+                  key={s.key}
                   type="button"
                   onClick={() => goTo(i)}
                   className={cn(
@@ -555,8 +704,10 @@ export default function EventFormPage() {
 
         {/* ============ STEP CONTENT ============ */}
         <div className="min-w-0">
-          {/* ===== STEP 0 · DETAILS ===== */}
-          <section className={cn('space-y-3', cur !== 0 && 'hidden')}>
+          {/* Every step stays mounted and only the open one shows: the
+              description editor is imperative and would lose its text. */}
+          {/* ===== BASICS ===== */}
+          <section className={cn('space-y-3', step.key !== 'basics' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Basics</h2>
               <p className="mt-1 text-[13px] text-muted">Tell attendees what your event is about.</p>
@@ -595,6 +746,28 @@ export default function EventFormPage() {
                       ))}
                     </select>
                   </div>
+                  {/* Absent for someone who may not list the workspace's
+                      categories; their event keeps whatever it has. */}
+                  {categories && (
+                    <div>
+                      <label className="label" htmlFor="event-category">
+                        Category
+                      </label>
+                      <select
+                        id="event-category"
+                        className="select"
+                        value={categoryId ?? ''}
+                        onChange={(e) => setCategoryId(categoryIdOf(e.target.value))}
+                      >
+                        <option value="">No category</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
             </section>
@@ -661,8 +834,8 @@ export default function EventFormPage() {
             </section>
           </section>
 
-          {/* ===== STEP 1 · DATE & LOCATION ===== */}
-          <section className={cn('space-y-3', cur !== 1 && 'hidden')}>
+          {/* ===== DATE & LOCATION ===== */}
+          <section className={cn('space-y-3', step.key !== 'when' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Date &amp; location</h2>
               <p className="mt-1 text-[13px] text-muted">When and where your event happens.</p>
@@ -809,8 +982,8 @@ export default function EventFormPage() {
             </section>
           </section>
 
-          {/* ===== STEP 2 · SEATING ===== */}
-          <section className={cn('space-y-3', cur !== 2 && 'hidden')}>
+          {/* ===== SEATING ===== */}
+          <section className={cn('space-y-3', step.key !== 'seating' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Seating</h2>
               <p className="mt-1 text-[13px] text-muted">
@@ -914,59 +1087,34 @@ export default function EventFormPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
                     Preview — what attendees see
                   </p>
-                  <div className="efhouse mt-2 overflow-hidden rounded-2xl p-5">
-                    <div className="mb-4 flex flex-col items-center">
-                      <svg
-                        viewBox="0 0 400 28"
-                        className="w-full max-w-sm"
-                        preserveAspectRatio="none"
+                  <SeatMapPreview swatches={seatSwatches} legend={legend} />
+                  <p className="hint mt-2">After Tickets, give the seats ticket types in Assign seats.</p>
+                  {seatMapDeferred && (
+                    <p role="status" className="mt-1 flex items-start gap-1.5 text-[12px] text-ink">
+                      <i
                         aria-hidden="true"
-                      >
-                        <path
-                          d="M8 24 Q200 2 392 24"
-                          fill="none"
-                          stroke="rgba(27,167,112,.7)"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                        />
-                      </svg>
-                      <span className="mt-1.5 text-[11px] font-semibold uppercase tracking-[0.3em] text-white/40">
-                        Stage
-                      </span>
-                    </div>
-                    <SeatPreview rows={rowsNum} cols={colsNum} />
-                    <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-white/10 pt-4 text-[11px] text-white/55">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="efseat efseat-sel !h-3.5 !w-3.5" />
-                        Selected
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="efseat !h-3.5 !w-3.5" />
-                        Available
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="efseat efseat-booked !h-3.5 !w-3.5" />
-                        Booked
-                      </span>
-                    </div>
-                  </div>
-                  <p className="hint mt-2">The same green seat picker runs on the attendee ticket page.</p>
+                        className="hgi-stroke hgi-alert-circle mt-px text-[14px] text-amber-500 dark:text-amber-300"
+                      />
+                      {SEAT_MAP_DEFERRED_NOTE}
+                    </p>
+                  )}
+                  <p className="hint mt-1">The same green seat picker runs on the attendee ticket page.</p>
                 </div>
               </div>
-              <p
-                className={cn(
-                  'mt-3 inline-flex items-center gap-1.5 text-[12px] text-muted',
-                  !online && 'hidden',
-                )}
-              >
-                <i className="hgi-stroke hgi-video-01 text-[14px]" />
-                Online event — no seating. A join link is emailed after registration.
-              </p>
+              {/* Rendered only when online, not hidden with `hidden`: that and
+                  `inline-flex` both set display, and `inline-flex` won, so
+                  every in-person event was told it had no seating. */}
+              {online && (
+                <p className="mt-3 inline-flex items-center gap-1.5 text-[12px] text-muted">
+                  <i className="hgi-stroke hgi-video-01 text-[14px]" />
+                  Online event — no seating. A join link is emailed after registration.
+                </p>
+              )}
             </section>
           </section>
 
-          {/* ===== STEP 3 · TICKETS ===== */}
-          <section className={cn('space-y-3', cur !== 3 && 'hidden')}>
+          {/* ===== TICKETS ===== */}
+          <section className={cn('space-y-3', step.key !== 'tickets' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Tickets &amp; registration</h2>
               <p className="mt-1 text-[13px] text-muted">
@@ -981,35 +1129,49 @@ export default function EventFormPage() {
                 <span className="text-[11px] text-muted">Add one or more</span>
               </div>
               <div className="mt-3 hidden gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted sm:grid sm:grid-cols-12">
-                <div className="sm:col-span-5">Ticket name</div>
-                <div className="sm:col-span-3">Price (฿)</div>
-                <div className="sm:col-span-3">Quantity</div>
+                <div className={ticketSpans.name}>Ticket name</div>
+                <div className={ticketSpans.price}>Price (฿)</div>
+                {quantityColumn !== 'none' && <div className="sm:col-span-3">Quantity</div>}
                 <div className="sm:col-span-1" />
               </div>
               <div className="mt-2 space-y-2">
                 {tickets.map((t, i) => (
                   <div key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-12 sm:items-center">
                     <input
-                      className="input sm:col-span-5"
+                      className={cn('input', ticketSpans.name)}
                       type="text"
                       placeholder="Ticket name"
                       value={t.name}
                       onChange={(e) => setTicketField(i, 'name', e.target.value)}
                     />
                     <input
-                      className="input tnum sm:col-span-3"
+                      className={cn('input tnum', ticketSpans.price)}
                       type="number"
                       placeholder="Price"
                       value={t.price}
                       onChange={(e) => setTicketField(i, 'price', e.target.value)}
                     />
-                    <input
-                      className="input tnum sm:col-span-3"
-                      type="number"
-                      placeholder="Quantity"
-                      value={t.quantity}
-                      onChange={(e) => setTicketField(i, 'quantity', e.target.value)}
-                    />
+                    {quantityColumn === 'typed' && (
+                      <input
+                        className="input tnum sm:col-span-3"
+                        type="number"
+                        placeholder="Quantity"
+                        value={t.quantity}
+                        onChange={(e) => setTicketField(i, 'quantity', e.target.value)}
+                      />
+                    )}
+                    {quantityColumn === 'readOnly' && (
+                      <div className="sm:col-span-3">
+                        <input
+                          className="input tnum bg-canvas text-muted"
+                          type="number"
+                          value={storedQuantityOf(initial.tickets, t.id)}
+                          readOnly
+                          aria-label="Quantity"
+                        />
+                        <p className="hint">{SEAT_SET_QUANTITY}</p>
+                      </div>
+                    )}
                     <button
                       type="button"
                       className="btn-icon col-span-2 justify-self-end sm:col-span-1 sm:justify-self-center"
@@ -1021,6 +1183,12 @@ export default function EventFormPage() {
                   </div>
                 ))}
               </div>
+              {seatRowsOn && (
+                <p className="hint mt-2">
+                  Each type's quantity is the seats it holds — give seats a type in the next
+                  step, Assign seats.
+                </p>
+              )}
               <button type="button" className="btn btn-soft btn-sm mt-3" onClick={addTicket}>
                 <i className="hgi-stroke hgi-add-01 text-[14px]" />
                 Add ticket type
@@ -1079,8 +1247,78 @@ export default function EventFormPage() {
             </section>
           </section>
 
-          {/* ===== STEP 4 · REVIEW & PUBLISH ===== */}
-          <section className={cn('space-y-3', cur !== 4 && 'hidden')}>
+          {/* ===== ASSIGN SEATS — every event; only an in-person reserved one
+               has seats to assign (US-EVT-02, US-EVT-05) ===== */}
+          <section className={cn('space-y-3', step.key !== 'seats' && 'hidden')}>
+            <div>
+              <h2 className="text-[20px] font-bold tracking-tight">Assign seats</h2>
+              {seatRowsOn && (
+                <p className="mt-1 text-[13px] text-muted">
+                  Give each seat a ticket type — a whole row from its dropdown, or just the seats
+                  you click. A type's quantity is the seats it holds.
+                </p>
+              )}
+            </div>
+
+            <section className="card p-4">
+              {assignSeatsView === 'online' && (
+                <p className="inline-flex items-center gap-1.5 text-[13px] text-muted">
+                  <i className="hgi-stroke hgi-video-01 text-[14px]" />
+                  {NO_SEATS_TO_ASSIGN.online}
+                </p>
+              )}
+              {assignSeatsView === 'ga' && (
+                <div>
+                  <p className="text-[13px] text-muted">{NO_SEATS_TO_ASSIGN.ga}</p>
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm mt-3"
+                    onClick={() => goToStep('seating')}
+                  >
+                    <i className="hgi-stroke hgi-arrow-left-01 text-[14px]" />
+                    Go to Seating
+                  </button>
+                </div>
+              )}
+              {/* A seat can only be given a type the API has stored. */}
+              {assignSeatsView === 'saving' && (
+                <p role="status" className="text-[13px] text-muted">
+                  {SAVING_TICKET_TYPES}
+                </p>
+              )}
+              {assignSeatsView === 'empty' && (
+                <div>
+                  <p className="text-[13px] text-muted">
+                    Add your ticket types in the Tickets step first, then give the seats one here.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm mt-3"
+                    onClick={() => goToStep('tickets')}
+                  >
+                    <i className="hgi-stroke hgi-arrow-left-01 text-[14px]" />
+                    Go to Tickets
+                  </button>
+                </div>
+              )}
+              {assignSeatsView === 'rows' && (
+                <>
+                  <RowTicketTypes rows={seatTicketTypes} choices={typeChoices} onPick={pickRowType} />
+                  <div className="mt-3">
+                    <PaintPicker options={paintOptionsOf(typeChoices)} value={paint} onPick={setPaintPick} />
+                    <SeatMapPreview swatches={seatSwatches} legend={legend} painter={seatPainter} />
+                    <p className="hint mt-2">
+                      Pick a ticket type, then click or drag across seats to give just those seats
+                      that type.
+                    </p>
+                  </div>
+                </>
+              )}
+            </section>
+          </section>
+
+          {/* ===== REVIEW & PUBLISH ===== */}
+          <section className={cn('space-y-3', step.key !== 'review' && 'hidden')}>
             <div>
               <h2 className="text-[20px] font-bold tracking-tight">Review &amp; publish</h2>
               <p className="mt-1 text-[13px] text-muted">
@@ -1213,6 +1451,40 @@ export default function EventFormPage() {
                   </select>
                 </div>
               </div>
+              {/* The page exists once the event does — and so does its address. */}
+              {initial.id && (
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label" htmlFor="page-slug">
+                      Public address
+                    </label>
+                    <input
+                      id="page-slug"
+                      className="input"
+                      type="text"
+                      maxLength={PAGE_SLUG_MAX}
+                      value={pageSlug}
+                      onChange={(e) => setPageSlug(e.target.value)}
+                    />
+                    <p className="hint mt-1">The link you share: /e/{pageSlug.trim() || '…'}</p>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="page-accent">
+                      Accent colour
+                    </label>
+                    <input
+                      id="page-accent"
+                      className="input"
+                      type="text"
+                      maxLength={PAGE_ACCENT_MAX}
+                      placeholder="#2563EB"
+                      value={accent}
+                      onChange={(e) => setAccent(e.target.value)}
+                    />
+                    <p className="hint mt-1">A hex colour; anything else uses the default.</p>
+                  </div>
+                </div>
+              )}
               <p className="hint mt-2">
                 Public events are listed on the Eventa discovery page. You can edit details anytime
                 before it goes live.
@@ -1221,10 +1493,10 @@ export default function EventFormPage() {
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
                   Publish checklist
                 </p>
-                {/* The same four rules the API applies, so the checklist and
-                    the Publish button agree with the server before it is asked. */}
+                {/* The same rules the API applies, so the checklist and the
+                    Publish button agree with the server before it is asked. */}
                 <ul className="mt-2.5 space-y-2">
-                  {PUBLISH_REQUIREMENTS.map((requirement) => {
+                  {requirements.map((requirement) => {
                     const missing = gaps.includes(requirement)
                     return (
                       <li
@@ -1255,8 +1527,8 @@ export default function EventFormPage() {
           <div className="mt-4 flex items-center justify-between gap-3">
             <button
               type="button"
-              onClick={() => cur > 0 && goTo(cur - 1)}
-              className={cn('btn btn-soft', cur === 0 && 'pointer-events-none opacity-40')}
+              onClick={() => at > 0 && goTo(at - 1)}
+              className={cn('btn btn-soft', at === 0 && 'pointer-events-none opacity-40')}
             >
               <i className="hgi-stroke hgi-arrow-left-01 text-[15px]" />
               Back
@@ -1264,7 +1536,7 @@ export default function EventFormPage() {
             <button
               type="button"
               disabled={
-                saving || (last ? isDraft && gaps.length > 0 : cur === 1 && !canCreate)
+                saving || (last ? isDraft && gaps.length > 0 : step.key === 'when' && !canCreate)
               }
               title={last && isDraft && gaps.length ? `Still needs ${gaps.join(', ')}` : undefined}
               onClick={() => {
@@ -1281,7 +1553,7 @@ export default function EventFormPage() {
                   else saveAndFinish()
                 } else {
                   saveStep()
-                  goTo(cur + 1)
+                  goTo(at + 1)
                 }
               }}
               className="btn btn-primary min-w-[132px] justify-center disabled:opacity-60"
@@ -1306,7 +1578,7 @@ export default function EventFormPage() {
           <div className="sticky top-4 space-y-3">
             <div className="rounded-2xl bg-neutral-900 p-4 text-white">
               <p className="flex items-center gap-2 text-[13px] font-bold">💡 Tips</p>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-white/75">{STEPS[cur].tip}</p>
+              <p className="mt-2 text-[12.5px] leading-relaxed text-white/75">{step.tip}</p>
             </div>
             <div className="card p-4">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">Summary</p>

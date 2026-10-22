@@ -9,6 +9,7 @@ import type {
   TwoFactorWire,
   UpcomingPaidOrderWire,
 } from './security.types'
+import { DELETE_CONFIRMATION, NEVER_SET_UP, UNFINISHED } from '@/lib/constants/portal.constants'
 
 /**
  * The Security card's and the danger zone's rules (US-DISC-12 criteria 4–5,
@@ -27,11 +28,6 @@ import type {
  */
 
 /* ------------------------------- two-factor ------------------------------ */
-
-/** The kit's own subtitle, kept for the one state it actually describes. */
-const NEVER_SET_UP = 'Extra security at sign-in'
-/** An enrolment that was started and abandoned — a seed with nothing behind it. */
-const UNFINISHED = 'Setup was started but never finished'
 
 export function toTwoFactorCard(wire: TwoFactorWire): TwoFactorCard {
   return {
@@ -71,14 +67,6 @@ export function countOtherDevices(wires: readonly LoginSessionWire[]): number {
 }
 
 /* ----------------------------- the danger zone --------------------------- */
-
-/**
- * The exact phrase the danger zone makes somebody type.
- *
- * `DELETE_CONFIRMATION` in eventa-api's `DeleteAccountDto`, which checks it
- * again with `@Equals` — this is the gate, not the check.
- */
-export const DELETE_CONFIRMATION = 'DELETE'
 
 export function toDeletionWarning(wire: DeletionWarningWire): DeletionWarning {
   return {

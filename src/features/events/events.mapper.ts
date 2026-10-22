@@ -73,6 +73,7 @@ export function toUpcomingCard(item: UpcomingEventWire): UpcomingCard {
     registrations: registrationsOf(item.sold, item.capacity),
     sold: item.sold,
     fillPercent: item.fillPercent,
+    cover: item.coverImage ?? null,
     icon,
     tone,
   }

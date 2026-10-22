@@ -4,8 +4,10 @@ import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/li
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { programApi } from '@/features/program/program.api'
 import { sessionTypeOf } from '@/features/program/program.mapper'
+import { removalConfirmed } from '@/features/program/program.routes'
 import { ticketingApi } from '@/features/ticketing/ticketing.api'
 import { eventDetailApi } from './eventDetail.api'
+import { quantityFromSeatsOf } from './eventSeating.mapper'
 import {
   toAttendeeRow,
   toEventHeader,
@@ -22,6 +24,7 @@ import {
   type SpeakerCard,
   type TicketRow,
 } from './eventDetail.mapper'
+import { EVENT_TABS, REGISTRATION_FILTERS, SPEAKER_LIMIT } from '@/lib/constants/events.constants'
 
 /**
  * The event workspace (US-EVT-14).
@@ -32,22 +35,9 @@ import {
  * to show one would make every visit pay for five it does not use.
  */
 
-export const EVENT_TABS = [
-  'overview',
-  'registrations',
-  'attendees',
-  'speakers',
-  'agenda',
-  'tickets',
-] as const
 export type EventTab = (typeof EVENT_TABS)[number]
 
-/** The API's own payment-status filters for the registrations tab. */
-export const REGISTRATION_FILTERS = ['all', 'paid', 'pending', 'refunded'] as const
 export type RegistrationFilter = (typeof REGISTRATION_FILTERS)[number]
-
-/** How many speakers the tab shows before it would need paging of its own. */
-const SPEAKER_LIMIT = 100
 
 export function tabOf(params: URLSearchParams): EventTab {
   return enumParam(params, 'tab', EVENT_TABS, 'overview')
@@ -76,7 +66,12 @@ export type TabData =
   | { tab: 'attendees'; attendees: AttendeeRow[]; window: PageWindow }
   | { tab: 'speakers'; speakers: SpeakerCard[] }
   | { tab: 'agenda'; days: AgendaDay[] }
-  | { tab: 'tickets'; tickets: TicketRow[] }
+  | {
+      tab: 'tickets'
+      tickets: TicketRow[]
+      /** The seat map sets each tier's quantity, so a new one is not typed (US-EVT-05). */
+      quantityFromSeats: boolean
+    }
 
 export type EventDetailData = EventShell & TabData
 
@@ -142,7 +137,8 @@ async function loadTab(
   }
 
   if (tab === 'tickets') {
-    return { tab, tickets: (await ticketingApi.forEvent(id)).map(toTicketRow) }
+    const tickets = await ticketingApi.forEvent(id)
+    return { tab, tickets: tickets.map(toTicketRow), quantityFromSeats: quantityFromSeatsOf(tickets) }
   }
 
   return { tab: 'overview' }
@@ -171,7 +167,7 @@ async function runEventDetailAction({ request }: LoaderArgs): Promise<void> {
   }
 
   if (form.get('intent') === 'remove-session') {
-    await programApi.removeSession(id, String(form.get('sessionId') ?? ''))
+    await programApi.removeSession(id, String(form.get('sessionId') ?? ''), removalConfirmed(form))
     return
   }
 

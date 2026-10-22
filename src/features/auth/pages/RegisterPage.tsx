@@ -4,13 +4,9 @@ import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
 import { SocialAuth } from '@/features/auth/components/SocialAuth'
-import {
-  MIN_PASSWORD_LENGTH,
-  STRENGTH_COLORS,
-  STRENGTH_TEXTS,
-  scorePassword,
-} from '@/features/auth/passwordStrength'
+import { scorePassword } from '@/features/auth/passwordStrength'
 import { useSignUp } from '@/features/auth/useSignUp'
+import { MIN_PASSWORD_LENGTH, STRENGTH_COLORS, STRENGTH_TEXTS } from '@/lib/constants/auth.constants'
 
 /**
  * Organizer sign-up — a workspace and its first owner (US-ACC-01).
@@ -173,7 +169,7 @@ export default function RegisterPage() {
             </IconButton>
           </div>
           {confirm && (
-            <p className="hint" style={{ color: cpwMatch ? '#1ba770' : '#ef4444' }}>
+            <p className="hint" style={{ color: cpwMatch ? '#00c066' : '#ef4444' }}>
               {cpwMatch ? 'Passwords match' : 'Passwords do not match'}
             </p>
           )}

@@ -1,16 +1,14 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useFetcher, useLoaderData } from 'react-router'
 import { cn } from '@/lib/cn'
 import { Icon, IconButton } from '@/components/ui'
 import { AuthLayout } from '@/features/auth/components/AuthLayout'
-import {
-  MIN_PASSWORD_LENGTH,
-  STRENGTH_COLORS,
-  STRENGTH_TEXTS,
-  scorePassword,
-} from '@/features/auth/passwordStrength'
-import { handoffOf } from '@/features/auth/signupHandoff'
+import { scorePassword } from '@/features/auth/passwordStrength'
 import { useSignUp } from '@/features/auth/useSignUp'
+import { ClaimExists, ClaimForm, ClaimInvalid } from '../components/BookingClaim'
+import { registerScreenOf } from '../portalRegister.mapper'
+import type { ClaimRefusal, PortalRegisterData } from '../portalRegister.types'
+import { MIN_PASSWORD_LENGTH, STRENGTH_COLORS, STRENGTH_TEXTS } from '@/lib/constants/auth.constants'
 
 /* Attendee sign-up — the portal's own, separate from the organizer sign-up at
    /auth/register, exactly as the two logins are separate. It creates a
@@ -22,42 +20,39 @@ import { useSignUp } from '@/features/auth/useSignUp'
    No workspace field: an attendee has one platform-wide realm, and naming a
    workspace is refused with a 422 rather than ignored.
 
-   A buyer arriving from their own order brings their name and email with them,
-   carried in the router's history state rather than the query string — both are
-   personal data, and a URL ends up in server logs, browser history and
-   `Referer` headers.
+   Two modes (US-DISC-15). Opened directly, the email is empty and editable and
+   the account is confirmed by email before it can be used. Opened from the
+   one-time link emailed to a booking's address (`?claim=`), the link is that
+   proof: the name and email are the booking's, shown fixed, only a password is
+   asked for, and the person is signed in to My Events. Which one — and which
+   screen of the second — is `registerScreenOf`'s call; the claim screens live
+   in `BookingClaim`.
 
    No Google or Apple button, for the same reason the portal sign-in has none:
    `POST /auth/social/attendee` needs an orgSlug the portal cannot name, and the
    account it would create lands in the wrong organization (open API defect).
    They come back when that is fixed. */
 export default function PortalRegisterPage() {
+  const data = useLoaderData() as PortalRegisterData
+  const claim = useFetcher<ClaimRefusal>()
+  const screen = registerScreenOf(data, claim.data)
+
+  if (screen.kind === 'claim') return <ClaimForm screen={screen} claim={claim} />
+  if (screen.kind === 'exists') return <ClaimExists screen={screen} />
+  if (screen.kind === 'invalid') return <ClaimInvalid screen={screen} />
+  return <DirectSignUp />
+}
+
+/** The ordinary sign-up, submitted by `useSignUp` and confirmed by email. */
+function DirectSignUp() {
   const [showPw, setShowPw] = useState(false)
   const [showCpw, setShowCpw] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const { pending, error, submit } = useSignUp('attendee')
-  const handoff = handoffOf(useLocation().state)
 
   const score = scorePassword(password)
   const cpwMatch = confirm === password
-
-  /**
-   * Arrived from an order, so the address is not a free field.
-   *
-   * Tickets are found by matching `orders.buyer_email` to the account's email
-   * on every read — there is no claim step that could repair a mismatch later.
-   * Signing up as someone else therefore creates a real, working, permanently
-   * empty account, and the person would have no way to tell what went wrong.
-   *
-   * `readOnly` rather than `disabled`: a disabled field is omitted from the
-   * submitted FormData entirely, which would post an empty email. This one is
-   * still submitted, still selectable, still readable by a screen reader.
-   * Somebody who genuinely wants a different address can sign up from
-   * /portal/register directly, where nothing is carried in and nothing is
-   * fixed.
-   */
-  const fromOrder = handoff.email !== ''
 
   return (
     <AuthLayout
@@ -95,7 +90,6 @@ export default function PortalRegisterPage() {
             placeholder="Jordan Lee"
             className="input"
             required
-            defaultValue={handoff.name}
           />
         </div>
 
@@ -109,17 +103,9 @@ export default function PortalRegisterPage() {
             type="email"
             autoComplete="email"
             placeholder="you@example.com"
-            className={cn('input', fromOrder && 'cursor-not-allowed bg-canvas text-muted')}
+            className="input"
             required
-            defaultValue={handoff.email}
-            readOnly={fromOrder}
-            aria-describedby={fromOrder ? 'email-fixed' : undefined}
           />
-          {fromOrder && (
-            <p id="email-fixed" className="hint">
-              Your tickets are matched to this address, so your account has to use it.
-            </p>
-          )}
         </div>
 
         <div>
@@ -192,7 +178,7 @@ export default function PortalRegisterPage() {
             </IconButton>
           </div>
           {confirm && (
-            <p className="hint" style={{ color: cpwMatch ? '#1ba770' : '#ef4444' }}>
+            <p className="hint" style={{ color: cpwMatch ? '#00c066' : '#ef4444' }}>
               {cpwMatch ? 'Passwords match' : 'Passwords do not match'}
             </p>
           )}

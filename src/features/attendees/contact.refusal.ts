@@ -1,5 +1,6 @@
 import type { ActionResult } from '@/app/loaders'
-import { CONTACT_FIELDS, type ContactField } from './directory.types'
+import { type ContactField } from './directory.types'
+import { CONTACT_FIELDS } from '@/lib/constants/attendees.constants'
 
 /**
  * Where a refused contact save is shown (US-REG-08).

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { Button, Input, Label, Panel, Textarea } from '@/components/ui'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import type { ActionResult } from '@/app/loaders'
 import type { SpeakerCard } from '../program.types'
+import { SPEAKER_PANEL_FORM_ID } from '@/lib/constants/program.constants'
 
 /** Add or edit a speaker (US-PROG-04). */
 
@@ -16,23 +17,18 @@ interface SpeakerPanelProps {
   eventName: string
 }
 
-const FORM_ID = 'speaker-form'
-
 export function SpeakerPanel({ open, onClose, editing, eventId, eventName }: SpeakerPanelProps) {
   const fetcher = useFetcher<ActionResult>()
   const saving = fetcher.state !== 'idle'
-  const error = fetcher.data?.ok === false ? fetcher.data.error : null
-  const saved = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!saved || !open) return
-    toast.success('Speaker saved.')
-    onClose()
-  }, [saved, open, onClose])
-
-  // Remount the form when the subject changes, so the defaults are re-read.
-  const [subject, setSubject] = useState(editing?.id ?? null)
-  if (open && subject !== (editing?.id ?? null)) setSubject(editing?.id ?? null)
+  // Once per save: the panel stays mounted, and the fetcher's last `ok` would
+  // otherwise close the next speaker's panel as it opened.
+  const { refusal: error, opening } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Speaker saved.')
+      onClose()
+    },
+  })
 
   return (
     <Panel
@@ -45,16 +41,23 @@ export function SpeakerPanel({ open, onClose, editing, eventId, eventName }: Spe
           <Button variant="soft" className="flex-1" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button variant="primary" className="flex-1" type="submit" form={FORM_ID} disabled={saving}>
+          <Button variant="primary" className="flex-1" type="submit" form={SPEAKER_PANEL_FORM_ID} disabled={saving}>
             {saving ? 'Saving…' : 'Save speaker'}
           </Button>
         </>
       }
     >
-      <fetcher.Form id={FORM_ID} key={subject ?? 'new'} method="post" className="space-y-4">
+      {/* Rebuilt per opening, so the defaults are re-read: keyed on the speaker
+          alone, a second Add speaker opened on the last one's name and bio. */}
+      <fetcher.Form id={SPEAKER_PANEL_FORM_ID} key={opening} method="post" className="space-y-4">
         <input type="hidden" name="intent" value={editing ? 'update' : 'create'} />
         <input type="hidden" name="eventId" value={eventId} />
-        {editing && <input type="hidden" name="speakerId" value={editing.id} />}
+        {editing && (
+          <>
+            <input type="hidden" name="speakerId" value={editing.id} />
+            <input type="hidden" name="version" value={editing.version} />
+          </>
+        )}
 
         {error && (
           <p

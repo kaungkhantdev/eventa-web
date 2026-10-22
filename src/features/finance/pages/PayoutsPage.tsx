@@ -1,6 +1,7 @@
-import { useFetcher, useLoaderData } from 'react-router'
+import { useFetcher, useLoaderData, useRouteLoaderData } from 'react-router'
 import {
   Badge,
+  Button,
   ButtonLink,
   Card,
   DataTable,
@@ -18,9 +19,12 @@ import {
 import { cn } from '@/lib/cn'
 import { useFilters } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
-import type { ActionResult } from '@/app/loaders'
+import { ADMIN_ROUTE_ID, type ActionResult } from '@/app/loaders'
+import type { Me } from '@/features/auth/types'
+import { offersPayoutManagement } from '../finance.mapper'
 import type { PayoutTab, PayoutsData } from '../finance.routes'
 import type { PayoutRow } from '../finance.types'
+import { PAYOUT_SETTINGS } from '@/lib/constants/finance.constants'
 
 /**
  * Payouts to the organizer's bank (US-FIN-03..05). Ported from payouts.html.
@@ -38,28 +42,22 @@ const TABS: PillTabItem<PayoutTab>[] = [
   { value: 'failed', label: 'Failed' },
 ]
 
-/**
- * Where connecting a payout account actually happens.
- *
- * Not a `POST /payouts/settings-link` from here, which is what this page used
- * to offer: for an unconnected workspace that endpoint answers
- * `{connected:false, url:null}` — there is no provider URL to follow in exactly
- * the case the button is shown — and `pageAction` returns `{ok:true}` for
- * anything that is not a `Response`, so the link would never reach the page
- * even when the provider had one. A plain link, as in the kit (payouts.html).
- */
-const PAYOUT_SETTINGS = '/admin/settings-payments'
-
 export default function PayoutsPage() {
   const data = useLoaderData() as PayoutsData
   const { params, set, clear, emptyReason } = useFilters({ total: data.window.total })
   const filtering = useIsFiltering()
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
 
   const header = (
     <PageHeader
       title="Payouts"
       subtitle="Money on its way to your bank account."
-      actions={<HeaderUser />}
+      actions={
+        <>
+          {offersPayoutManagement(me, data.balances.connected) && <ManagePayouts />}
+          <HeaderUser />
+        </>
+      }
     />
   )
 
@@ -189,6 +187,24 @@ export default function PayoutsPage() {
 
       <PageFooter />
     </>
+  )
+}
+
+/**
+ * The way to the provider, where an Admin changes the bank account, the payout
+ * schedule and tax forms (US-FIN-05). The action answers with a redirect to
+ * the provider's own page, which the router follows as a full-page navigation.
+ */
+function ManagePayouts() {
+  const open = useFetcher<ActionResult>()
+  return (
+    <open.Form method="post">
+      <input type="hidden" name="intent" value="connect" />
+      <Button type="submit" variant="soft" disabled={open.state !== 'idle'}>
+        <Icon name="hgi-bank" size={16} />
+        <span className="hidden sm:inline">Manage payouts</span>
+      </Button>
+    </open.Form>
   )
 }
 

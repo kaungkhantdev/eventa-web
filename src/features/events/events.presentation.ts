@@ -1,4 +1,5 @@
 import type { EventStatus, EventType, Tone } from './types'
+import { CANCEL_INSTEAD } from '@/lib/constants/events.constants'
 
 /**
  * The kit's visual vocabulary for events — which icon and colour a type wears,
@@ -136,23 +137,6 @@ export const UP_TONE: Record<Tone, { bg: string; grad: string; solid: string; ba
   },
 }
 
-export const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-] as const
-
-export const WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
-
 /** Whether the browser took the link — the three things a copy button can say. */
 export type CopyState = 'idle' | 'copied' | 'failed'
 
@@ -180,3 +164,19 @@ export function copyLabel(state: CopyState): string {
 export function eventDetailPath(id: string): string {
   return `/admin/event-detail?id=${encodeURIComponent(id)}`
 }
+
+/* ------------------------------ cancelling -------------------------------- */
+
+/**
+ * Whether a refused delete should offer Cancel (US-EVT-08). Only the refusal
+ * that says so: a stale view, say, is no reason to cancel somebody's event.
+ */
+export function offersCancel(refusal: string | null): boolean {
+  return refusal !== null && CANCEL_INSTEAD.test(refusal)
+}
+
+/** A cancellation needs a reason — it is what the attendees are told. */
+export function cancelReasonGiven(reason: string): boolean {
+  return reason.trim().length > 0
+}
+

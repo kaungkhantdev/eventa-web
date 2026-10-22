@@ -1,15 +1,11 @@
 import { ApiError, NetworkError, messageOf } from '@/lib/api'
 import { authApi } from './api'
+import { ACCEPT_INVITE_INCOMPLETE_LINK, PASSWORDS_DIFFER } from '@/lib/constants/auth.constants'
 
 /** What the page shows after a submission. */
 export type AcceptInviteResult =
   | { ok: true; email: string }
   | { ok: false; error: string }
-
-const INCOMPLETE_LINK =
-  'This invitation link is incomplete. Open the link from your email again, or ask an admin to re-send it.'
-
-const PASSWORDS_DIFFER = 'Those passwords do not match.'
 
 /** The token the emailed link carries, or null when it is not there. */
 export function tokenOf(request: Request): string | null {
@@ -29,7 +25,7 @@ export async function submitAcceptInvite(
   accept = authApi.acceptInvite,
 ): Promise<AcceptInviteResult> {
   const token = tokenOf(request)
-  if (!token) return { ok: false, error: INCOMPLETE_LINK }
+  if (!token) return { ok: false, error: ACCEPT_INVITE_INCOMPLETE_LINK }
 
   const form = await request.formData()
   const password = String(form.get('password') ?? '')

@@ -10,12 +10,16 @@ import {
   toTrendLabels,
   toIncomeRow,
   toRegistrationRow,
+  toPayoutRow,
+  toPayoutTiles,
 } from './insights.mapper'
 import type {
   AttendanceRowWire,
   ChangeWire,
   DiscountRowWire,
   EventPerformanceRowWire,
+  PayoutRowWire,
+  PayoutsReportWire,
 } from './insights.types'
 
 /**
@@ -379,5 +383,89 @@ describe('earnedSomething', () => {
     // be zero here. Deciding from those would print "No revenue in this period"
     // next to a tile reading ฿0.40.
     expect(earnedSomething(40)).toBe(true)
+  })
+})
+
+describe('payouts (US-RPT-07)', () => {
+  const payout = (over: Partial<PayoutRowWire> = {}): PayoutRowWire => ({
+    reference: 'PO-2043',
+    // 03:00 on the 15th in Bangkok, still the 14th in UTC.
+    at: '2026-07-14T20:00:00.000Z',
+    bankAccount: '•••• 6042',
+    events: [{ eventId: 'e-1', eventName: 'Tech Summit 2026' }],
+    amountSatang: 34_200_000,
+    status: 'paid',
+    ...over,
+  })
+
+  it('reads a payout as its reference, Bangkok day, bank, events, amount and status', () => {
+    expect(toPayoutRow(payout())).toEqual({
+      reference: 'PO-2043',
+      date: 'Jul 15, 2026',
+      bank: '•••• 6042',
+      covered: 'Tech Summit 2026',
+      amount: '฿342,000',
+      status: { label: 'Paid', tone: 'green' },
+    })
+  })
+
+  // The kit's own wording: one event is named, several are counted.
+  it('counts the events when a payout covers several', () => {
+    const events = ['A', 'B', 'C'].map((name, i) => ({ eventId: `e-${i}`, eventName: name }))
+    expect(toPayoutRow(payout({ events })).covered).toBe('3 events')
+  })
+
+  it('shows a dash, not a blank, for a payout that covers no event', () => {
+    expect(toPayoutRow(payout({ events: [] })).covered).toBe('—')
+  })
+
+  it('labels each status in the story’s words, in the kit’s colours', () => {
+    const badge = (status: PayoutRowWire['status']) => toPayoutRow(payout({ status })).status
+    expect(badge('paid')).toEqual({ label: 'Paid', tone: 'green' })
+    expect(badge('in_transit')).toEqual({ label: 'In transit', tone: 'blue' })
+    expect(badge('pending')).toEqual({ label: 'Pending', tone: 'amber' })
+  })
+
+  // Masking is the API's job; the page must not "improve" what it was sent.
+  it('shows the bank exactly as the API masked it', () => {
+    expect(toPayoutRow(payout({ bankAccount: '•••• 7890' })).bank).toBe('•••• 7890')
+  })
+
+  describe('the tiles', () => {
+    const totals = (over: Partial<PayoutsReportWire['totals']> = {}) => ({
+      payouts: 3,
+      paidOutSatang: 30_000_000,
+      inTransitSatang: 20_000_000,
+      pendingSatang: 10_000_000,
+      averageSatang: 20_000_000,
+      ...over,
+    })
+
+    it('reads paid out, pending, in transit and the average in baht', () => {
+      expect(toPayoutTiles(totals())).toEqual({
+        paidOut: '฿300,000',
+        pending: '฿100,000',
+        inTransit: '฿200,000',
+        average: '฿200,000',
+      })
+    })
+
+    // US-RPT-02: zeroed figures, not an error — but no payouts has no average,
+    // and ฿0 would read as a payout of nothing.
+    it('zeroes the totals and shows no average when nothing matched', () => {
+      const empty = totals({
+        payouts: 0,
+        paidOutSatang: 0,
+        inTransitSatang: 0,
+        pendingSatang: 0,
+        averageSatang: null,
+      })
+      expect(toPayoutTiles(empty)).toEqual({
+        paidOut: '฿0',
+        pending: '฿0',
+        inTransit: '฿0',
+        average: '—',
+      })
+    })
   })
 })

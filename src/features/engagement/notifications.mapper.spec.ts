@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { relativeTime, toNotification } from './notifications.mapper'
-import type { FeedItemWire } from './notifications.types'
+import { relativeTime, toNotification, toNotificationPreview } from './notifications.mapper'
+import type { FeedItemWire, NotificationFeedWire } from './notifications.types'
 
 /**
  * The feed's view model.
@@ -111,5 +111,59 @@ describe('relativeTime', () => {
     // 00:30 on the 16th in Bangkok is still the 15th in UTC. Counting in UTC
     // would call this morning's item "Yesterday".
     expect(ago('2026-07-15T17:30:00.000Z')).toBe('17 hr ago')
+  })
+})
+
+describe('toNotificationPreview', () => {
+  const feed = (over: Partial<NotificationFeedWire> = {}): NotificationFeedWire => ({
+    counts: { all: 0, unread: 0 },
+    groups: [],
+    readAt: null,
+    ...over,
+  })
+
+  const fourAcrossThreeGroups = feed({
+    counts: { all: 4, unread: 2 },
+    groups: [
+      { bucket: 'today', recent: true, items: [item({ id: 'a' }), item({ id: 'b' })] },
+      { bucket: 'yesterday', recent: true, items: [item({ id: 'c' })] },
+      { bucket: 'earlier', recent: false, items: [item({ id: 'd' })] },
+    ],
+  })
+
+  const idsOf = (wire: NotificationFeedWire, size: number) =>
+    toNotificationPreview(wire, NOW, size).items.map((view) => view.id)
+
+  it('takes the newest items in the order the API sent them', () => {
+    expect(idsOf(fourAcrossThreeGroups, 3)).toEqual(['a', 'b', 'c'])
+  })
+
+  // The bell is "what happened lately", not the page's expanded groups: an
+  // older group the page folds away is still the next-newest thing.
+  it('reaches into older groups when the recent ones run out', () => {
+    expect(idsOf(fourAcrossThreeGroups, 4)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('shows everything when there is less than a preview’s worth', () => {
+    expect(idsOf(fourAcrossThreeGroups, 10)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  // The badge counts the whole feed, so it must not shrink to the rows that
+  // happen to fit in the dropdown.
+  it('reads the unread count from the API, not from the rows it shows', () => {
+    const wire = feed({
+      counts: { all: 9, unread: 7 },
+      groups: [{ bucket: 'today', recent: true, items: [item({ unread: true })] }],
+    })
+    expect(toNotificationPreview(wire, NOW, 1).unread).toBe(7)
+  })
+
+  it('maps each row exactly as the feed page does', () => {
+    const [view] = toNotificationPreview(fourAcrossThreeGroups, NOW, 1).items
+    expect(view).toEqual(toNotification(item({ id: 'a' }), NOW))
+  })
+
+  it('is empty, not broken, when there is no activity at all', () => {
+    expect(toNotificationPreview(feed(), NOW, 5)).toEqual({ unread: 0, items: [] })
   })
 })

@@ -1,15 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import {
-  bahtOf,
-  publishGaps,
-  satangOf,
-  toCreateBody,
-  toEventFormValues,
-  toUpdateBody,
-  type EventFormValues,
-} from './eventForm.mapper'
+import { bahtOf, categoryIdOf, publishGaps, seatRowsApply, satangOf, toCreateBody, toEventFormValues, toTicketBody, toUpdateBody, type EventFormValues, type TicketDraft } from './eventForm.mapper'
 import type { EventWire } from './types'
 import type { TicketWire } from '@/features/ticketing/ticketing.api'
+import { SEAT_TYPES_REQUIREMENT } from '@/lib/constants/events.constants'
 
 const event = (over: Partial<EventWire> = {}): EventWire => ({
   id: 'evt-1',
@@ -45,6 +38,7 @@ const ticket = (over: Partial<TicketWire> = {}): TicketWire => ({
   salesStartAt: null,
   salesEndAt: null,
   version: 1,
+  quantityFromSeats: false,
   ...over,
 })
 
@@ -141,6 +135,12 @@ describe('hydrating the wizard from an event being edited', () => {
 
   it('has no address when the event has none', () => {
     expect(toEventFormValues(event({ venueAddress: null }), [], []).venueAddress).toBe('')
+  })
+
+  // The publish step shows the page's colour so it can be changed (US-PAGE-10).
+  it('reads the page’s accent colour back, and none as blank', () => {
+    expect(toEventFormValues(event({ accentColor: '#00C066' }), [], []).accentColor).toBe('#00C066')
+    expect(toEventFormValues(event({ accentColor: null }), [], []).accentColor).toBe('')
   })
 
   it('starts empty for a brand-new event', () => {
@@ -307,6 +307,43 @@ describe('what PATCH /events/:id may carry', () => {
   })
 })
 
+/**
+ * The event's category (US-EVT-03, US-EVT-11). No screen could set or clear
+ * it, so a category in use could never be emptied and deleted: the refusal
+ * says to move its events to another category, and nothing let anyone do so.
+ */
+describe('the category', () => {
+  it('reads the category back, and none as none', () => {
+    expect(toEventFormValues(event({ categoryId: 4 }), [], []).categoryId).toBe(4)
+    expect(toEventFormValues(event({ categoryId: null }), [], []).categoryId).toBeNull()
+    expect(toEventFormValues(null, [], []).categoryId).toBeNull()
+  })
+
+  it('sends the category chosen, or null to clear it', () => {
+    // null, not omission: the API leaves an absent key alone, so "No
+    // category" would otherwise save as "unchanged".
+    const base = toEventFormValues(event({ categoryId: 4 }), [], [])
+    expect(toUpdateBody({ ...base, categoryId: 7 }).categoryId).toBe(7)
+    expect(toUpdateBody({ ...base, categoryId: null }).categoryId).toBeNull()
+  })
+
+  it('creates the draft in the category already picked on step one', () => {
+    const fresh = {
+      ...toEventFormValues(null, [], []),
+      name: 'Tech Summit 2026',
+      startDate: '2026-07-18',
+      startTime: '09:00',
+    }
+    expect(toCreateBody({ ...fresh, categoryId: 7 }).categoryId).toBe(7)
+    expect(toCreateBody(fresh)).not.toHaveProperty('categoryId')
+  })
+
+  it('reads the picker: an id, or the "No category" option as none', () => {
+    expect(categoryIdOf('7')).toBe(7)
+    expect(categoryIdOf('')).toBeNull()
+  })
+})
+
 describe('whether the event may be published yet', () => {
   it('is ready when it has a title, a description, a place and a ticket', () => {
     expect(publishGaps(toEventFormValues(event(), [ticket()], []))).toEqual([])
@@ -345,5 +382,94 @@ describe('whether the event may be published yet', () => {
   it('reports every gap at once, so the checklist is complete', () => {
     const v = toEventFormValues(event({ description: null, venueName: null }), [], [])
     expect(publishGaps(v)).toHaveLength(3)
+  })
+
+  /**
+   * US-EVT-05: a reserved event publishes only once every seat has a ticket
+   * type — a row split between types counts, a seat left out does not. A map
+   * from before seats had types counts as untyped too.
+   */
+  describe('seats', () => {
+    const reserved = (seatTicketTypes: (string | null)[][], over: Partial<EventFormValues> = {}) => ({
+      ...toEventFormValues(event(), [ticket()], []),
+      seatingMode: 'reserved' as const,
+      seatTicketTypes,
+      ...over,
+    })
+
+    it('lists a seat with no ticket type, even in a row whose other seats have one', () => {
+      expect(publishGaps(reserved([['tkt-1', 'tkt-1'], ['tkt-1', null]]))).toEqual([SEAT_TYPES_REQUIREMENT])
+    })
+
+    it('lists a map none of whose seats has a type yet', () => {
+      expect(publishGaps(reserved([[null, null]]))).toContain(SEAT_TYPES_REQUIREMENT)
+    })
+
+    it('is satisfied once every seat has a type, however a row is split', () => {
+      expect(publishGaps(reserved([['tkt-1', 'tkt-2'], ['tkt-2', 'tkt-2']]))).toEqual([])
+    })
+
+    it('is worded per seat', () => {
+      expect(SEAT_TYPES_REQUIREMENT).toBe('a ticket type for every seat')
+    })
+
+    it('does not apply to general admission or an online event', () => {
+      expect(publishGaps(reserved([[null]], { seatingMode: 'ga' }))).toEqual([])
+      expect(publishGaps(reserved([[null]], { isOnline: true }))).toEqual([])
+    })
+
+    it('says when the checklist should list it at all', () => {
+      expect(seatRowsApply(reserved([]))).toBe(true)
+      expect(seatRowsApply(reserved([], { seatingMode: 'ga' }))).toBe(false)
+      expect(seatRowsApply(reserved([], { isOnline: true }))).toBe(false)
+    })
+  })
+})
+
+describe('what a ticket row is saved with', () => {
+  const row = (over: Partial<TicketDraft> = {}): TicketDraft => ({
+    id: 'tkt-1',
+    name: ' VIP ',
+    price: '3500',
+    quantity: '40',
+    isFree: false,
+    ...over,
+  })
+  const general = { seatingMode: 'ga', isOnline: false, quantityFromSeats: false } as const
+  const reserved = { ...general, seatingMode: 'reserved' } as const
+
+  it('sends the name, the price in satang and the quantity typed', () => {
+    expect(toTicketBody(row(), general)).toEqual({
+      name: 'VIP',
+      isFree: false,
+      priceSatang: 350_000,
+      total: 40,
+    })
+  })
+
+  it('leaves a blank quantity out rather than sending 0, which means unlimited', () => {
+    expect(toTicketBody(row({ quantity: '' }), general).total).toBeUndefined()
+  })
+
+  it('sends no price for a free tier', () => {
+    expect(toTicketBody(row({ isFree: true }), general).priceSatang).toBeUndefined()
+  })
+
+  // US-EVT-05: the seat map sets the quantity, and the API refuses a different one.
+  it('sends no quantity when the API says the seat map sets it', () => {
+    expect(toTicketBody(row(), { ...general, quantityFromSeats: true })).not.toHaveProperty('total')
+  })
+
+  /*
+   * US-EVT-05: on a reserved, in-person event a type's quantity is the seats it
+   * holds, never typed — even before any seat has a type, when the API does
+   * not say so yet.
+   */
+  it('sends no quantity for an in-person reserved event', () => {
+    expect(toTicketBody(row(), reserved)).not.toHaveProperty('total')
+  })
+
+  it('sends the typed quantity for an online event, which has no seat map', () => {
+    expect(toTicketBody(row(), { ...reserved, isOnline: true }).total).toBe(40)
   })
 })

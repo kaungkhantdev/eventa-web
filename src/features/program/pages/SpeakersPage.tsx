@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useFetcher, useLoaderData } from 'react-router'
 import {
   Button,
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { toast } from '@/lib/toast'
+import { useSaveSettled } from '@/lib/useSaveSettled'
 import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
@@ -20,8 +21,10 @@ import type { ActionResult } from '@/app/loaders'
 import { ConfirmDeleteModal } from '@/features/ticketing/components/ConfirmDeleteModal'
 import { EventChooser } from '../components/EventChooser'
 import { SpeakerPanel } from '../components/SpeakerPanel'
+import { speakerRemovalWarning } from '../program.presentation'
 import type { SpeakersData } from '../program.routes'
 import type { SpeakerCard } from '../program.types'
+import { MAX_SEARCH_LENGTH } from '@/lib/constants/program.constants'
 
 /**
  * The speaker directory (US-PROG-04..07). Layout ported from speakers.html.
@@ -31,8 +34,6 @@ import type { SpeakerCard } from '../program.types'
  */
 
 type ViewMode = 'grid' | 'list'
-
-const MAX_SEARCH_LENGTH = 120
 
 export default function SpeakersPage() {
   const data = useLoaderData() as SpeakersData
@@ -331,10 +332,11 @@ function SpeakerTile({ card, list, onEdit, onDelete }: SpeakerTileProps) {
 }
 
 /**
- * Removing a speaker.
+ * Removing a speaker (US-PROG-11).
  *
- * The API refuses while they are still booked into sessions and says so — that
- * sentence replaces the warning, because the fix is to unbook them first.
+ * Their sessions stay and simply stop listing them, so the warning says so
+ * first, and only the Remove here posts the confirmation the API requires. Any
+ * refusal the API still answers with replaces the warning, verbatim.
  */
 function DeleteSpeakerModal({
   open,
@@ -347,27 +349,33 @@ function DeleteSpeakerModal({
   target: SpeakerCard | null
   eventId: string
 }) {
-  const fetcher = useFetcher<ActionResult>()
-  const refused = fetcher.data?.ok === false ? fetcher.data.error : null
-  const done = fetcher.state === 'idle' && fetcher.data?.ok === true
-
-  useEffect(() => {
-    if (!done || !open) return
-    toast.success('Speaker removed.')
-    onClose()
-  }, [done, open, onClose])
+  // Keyed by speaker, so one speaker's answer is never shown on another's. The
+  // key holds while the SAME speaker's dialog is closed and opened again, so
+  // the refusal comes from what was answered since it opened: read off the
+  // fetcher, the last refusal greeted a dialog in which nothing had been sent.
+  const fetcher = useFetcher<ActionResult>({ key: `remove-speaker-${target?.id ?? ''}` })
+  const { refusal: refused } = useSaveSettled(fetcher, {
+    open,
+    onSaved: () => {
+      toast.success('Speaker removed.')
+      onClose()
+    },
+  })
 
   return (
     <ConfirmDeleteModal
       open={open}
       onClose={onClose}
       title="Remove speaker?"
-      message={refused ?? `This removes ${target?.name ?? 'the speaker'} from the event.`}
+      message={refused ?? speakerRemovalWarning(target?.name ?? 'this speaker')}
       tone={refused ? 'error' : 'default'}
       confirmLabel={fetcher.state === 'idle' ? 'Remove' : 'Removing…'}
       onConfirm={() =>
         target &&
-        fetcher.submit({ intent: 'delete', eventId, speakerId: target.id }, { method: 'post' })
+        fetcher.submit(
+          { intent: 'delete', eventId, speakerId: target.id, confirm: 'true' },
+          { method: 'post' },
+        )
       }
     />
   )

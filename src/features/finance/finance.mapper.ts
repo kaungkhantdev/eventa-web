@@ -1,4 +1,6 @@
 import type { BadgeTone } from '@/components/ui'
+import { can } from '@/features/auth/permissions'
+import type { Me } from '@/features/auth/types'
 import { MASKED, baht, bangkokDate } from '@/lib/format'
 import type {
   BalancesWire,
@@ -12,10 +14,9 @@ import type {
   TaxRow,
   TaxStatus,
 } from './finance.types'
+import { PAYOUT_MANAGEMENT, SATANG_PER_BAHT } from '@/lib/constants/finance.constants'
 
 /** The rules behind payouts, invoices and VAT (US-FIN-03..12). */
-
-const SATANG_PER_BAHT = 100
 
 /**
  * Money that moved, or a figure being withheld.
@@ -80,6 +81,16 @@ export function toBalances(wire: BalancesWire): Balances {
     paidOut: amount(wire.paidOutSatang),
     connected: wire.payoutsConnected,
   }
+}
+
+/**
+ * Whether to offer "Manage payouts" — the way to the provider, where bank
+ * details, the payout schedule and tax forms live (US-FIN-05). Only to an
+ * Admin, and only once there is an account to manage: before that the page
+ * guides them to connect one instead.
+ */
+export function offersPayoutManagement(me: Me | null, connected: boolean): boolean {
+  return connected && can(me, PAYOUT_MANAGEMENT)
 }
 
 /* ── invoices ─────────────────────────────────────────────────────────── */

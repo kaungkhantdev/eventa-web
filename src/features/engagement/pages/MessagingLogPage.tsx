@@ -1,4 +1,7 @@
-import { useLoaderData } from 'react-router'
+import { useLoaderData, useRouteLoaderData } from 'react-router'
+import { ADMIN_ROUTE_ID } from '@/app/loaders'
+import { can } from '@/features/auth/permissions'
+import type { Me } from '@/features/auth/types'
 import {
   Badge,
   Card,
@@ -35,6 +38,9 @@ import type { DeliveriesData, DeliveryTab } from '../deliveries.routes'
  * address, a full mailbox — and firing the same message at the same address
  * would look like an action while changing nothing. The failure reason is shown
  * instead, because that is what tells you where to go and fix it.
+ *
+ * **Export only for `regExport`** (US-MSG-07): the file is attendee contact
+ * data in bulk. Hiding the button tidies the page; the API's 403 is the control.
  */
 
 const TABS: PillTabItem<DeliveryTab>[] = [
@@ -44,6 +50,7 @@ const TABS: PillTabItem<DeliveryTab>[] = [
 
 export default function MessagingLogPage() {
   const data = useLoaderData() as DeliveriesData
+  const me = (useRouteLoaderData(ADMIN_ROUTE_ID) as { me: Me } | undefined)?.me ?? null
   const { params, set, clear, emptyReason } = useFilters({
     total: data.window.total,
     ignore: ['tab'],
@@ -59,11 +66,13 @@ export default function MessagingLogPage() {
         subtitle="Every email and text sent to your attendees, and what became of it."
         actions={
           <>
-            <DownloadButton
-              path="/message-deliveries/export.csv"
-              query={data.exportQuery}
-              filename="eventa-delivery-log.csv"
-            />
+            {can(me, 'regExport') && (
+              <DownloadButton
+                path="/message-deliveries/export.csv"
+                query={data.exportQuery}
+                filename="eventa-delivery-log.csv"
+              />
+            )}
             <HeaderUser />
           </>
         }

@@ -1,14 +1,11 @@
 import type { BadgeTone } from '@/components/ui'
 import { bangkokDayKey, baht, num } from '@/lib/format'
 import { hashIndex } from '@/lib/palette'
-import type { TicketCard, TicketDraft, TicketWire } from './tickets.types'
+import type { SeatSetWire, TicketCard, TicketDraft, TicketWire } from './tickets.types'
 import type { TicketStatus } from './types'
+import { FREE, FULL, ICON_TINTS, SATANG_PER_BAHT } from '@/lib/constants/ticketing.constants'
 
 /** The rules behind the ticket inventory (US-TKT-03/04). */
-
-const SATANG_PER_BAHT = 100
-const FULL = 100
-const FREE = 'Free'
 
 /** Badge tone, icon and wording per status — the kit's own map. */
 const STATUS_META: Record<TicketStatus, { tone: BadgeTone; icon: string; label: string }> = {
@@ -17,19 +14,6 @@ const STATUS_META: Record<TicketStatus, { tone: BadgeTone; icon: string; label: 
   paused: { tone: 'gray', icon: 'hgi-time-quarter-pass', label: 'Paused' },
   soldout: { tone: 'amber', icon: 'hgi-alert-circle', label: 'Sold out' },
 }
-
-/**
- * The kit hand-tinted each card's icon square. Real inventory has whatever the
- * workspace sells, so the tint comes from the tier's own id — stable, so a card
- * does not change colour when the list is refiltered.
- */
-const ICON_TINTS: readonly string[] = [
-  'bg-amber-50 text-amber-500 dark:bg-amber-400/15 dark:text-amber-300',
-  'bg-brand-soft text-brand',
-  'bg-red-50 text-red-500 dark:bg-red-500/15 dark:text-red-300',
-  'bg-blue-50 text-blue-500 dark:bg-blue-500/15 dark:text-blue-300',
-  'bg-purple-50 text-purple-500 dark:bg-purple-500/15 dark:text-purple-300',
-]
 
 export function toTicketCard(wire: TicketWire): TicketCard {
   const meta = STATUS_META[wire.status]
@@ -44,8 +28,8 @@ export function toTicketCard(wire: TicketWire): TicketCard {
     statusLabel: meta.label,
     statusTone: meta.tone,
     statusIcon: meta.icon,
-    soldLabel: soldLabel(wire.sold, wire.total),
-    percent: sharePercent(wire.sold, wire.total),
+    soldLabel: soldLabel(wire.sold, wire.total, wire.quantityFromSeats),
+    percent: sharePercent(wire.sold, wire.total, wire.quantityFromSeats),
     iconTint: ICON_TINTS[hashIndex(wire.id, ICON_TINTS.length)],
     edit: toTicketDraft(wire),
   }
@@ -74,11 +58,31 @@ function toTicketDraft(wire: TicketWire): TicketDraft {
     total: wire.total,
     maxPerOrder: wire.maxPerOrder,
     version: wire.version,
+    quantityFromSeats: wire.quantityFromSeats,
     salesStartDay: dayOrBlank(wire.salesStartAt),
     salesEndDay: dayOrBlank(wire.salesEndAt),
     salesStartAt: wire.salesStartAt ?? '',
     salesEndAt: wire.salesEndAt ?? '',
   }
+}
+
+/**
+ * The quantity the ticket panel shows read-only, or null when it is typed
+ * (US-EVT-05, US-TKT-02). A tier being edited says for itself whether the seat
+ * map sets it; a new tier takes its event's answer, and starts at 0 there
+ * because it has no rows yet.
+ */
+export function readOnlyQuantityOf(
+  editing: TicketDraft | null,
+  newTierSeatSet: boolean,
+): number | null {
+  if (editing) return editing.quantityFromSeats ? editing.total : null
+  return newTierSeatSet ? 0 : null
+}
+
+/** The seat-map lookup's answer, only if it is about the event now chosen. */
+export function seatSetFor(eventId: string, answer: SeatSetWire | undefined): boolean {
+  return Boolean(eventId) && answer?.eventId === eventId && answer.quantityFromSeats
 }
 
 /**
@@ -95,12 +99,20 @@ function dayOrBlank(instant: string | null): string {
  * Both readings print the same two characters, so the difference has to be made
  * here: an unlimited tier reports what it has sold and no share, because there
  * is no denominator to take a share of.
+ *
+ * Except where the seat map sets the quantity (US-EVT-05): there `0` is the
+ * seats a type holds, and a type with no seats has none to sell.
  */
-function soldLabel(sold: number, total: number): string {
-  return total === 0 ? `${num(sold)} sold` : `${num(sold)} / ${num(total)} sold`
+function soldLabel(sold: number, total: number, fromSeats: boolean): string {
+  return unlimited(total, fromSeats) ? `${num(sold)} sold` : `${num(sold)} / ${num(total)} sold`
 }
 
-function sharePercent(sold: number, total: number): number | null {
-  if (total === 0) return null
+function sharePercent(sold: number, total: number, fromSeats: boolean): number | null {
+  if (unlimited(total, fromSeats)) return null
+  if (total === 0) return 0
   return Math.min(FULL, Math.round((sold / total) * FULL))
+}
+
+function unlimited(total: number, fromSeats: boolean): boolean {
+  return total === 0 && !fromSeats
 }

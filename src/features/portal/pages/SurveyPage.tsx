@@ -9,6 +9,7 @@ import type {
   PortalSurveyData,
   SurveyQuestionView,
 } from '../survey.routes'
+import { NPS_ENDS, RATING_LABELS } from '@/lib/constants/portal.constants'
 
 /**
  * The survey an attendee is asked after an event (US-MSG-08), ported from
@@ -29,20 +30,6 @@ import type {
  * same account, because a rating anyone holding the link could move is not
  * worth collecting.
  */
-
-const RATING_LABELS: Record<number, string> = {
-  1: 'Poor',
-  2: 'Fair',
-  3: 'Good',
-  4: 'Great',
-  5: 'Excellent',
-}
-
-/** What the ends of the 0–10 scale mean, for whoever cannot see the anchors. */
-const NPS_ENDS: Record<number, string> = {
-  0: '0 — not at all likely',
-  10: '10 — extremely likely',
-}
 
 export default function SurveyPage() {
   const data = useLoaderData() as PortalSurveyData

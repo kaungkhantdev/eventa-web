@@ -79,13 +79,39 @@ export interface PublicFaqWire {
   answer: string
 }
 
+/**
+ * A reserved event's seat rows and the ticket type each seat sells (US-EVT-05:
+ * a row's seats may be split between types). Nothing about any seat's sale is
+ * published.
+ */
+export interface PublicSeatMapWire {
+  seatsPerRow: number
+  /** Front to back, by row number; labels are `"1"`, `"2"`, … */
+  rows: {
+    label: string
+    /** The `tickets[].id` every seat of the row shares, or null when they differ or have none. */
+    ticketTypeId: string | null
+    /** Each seat's `tickets[].id` in seat-number order, seat 1 first; null for a seat with none. */
+    seatTicketTypes: (string | null)[]
+  }[]
+}
+
 export interface PublicPageWire {
   event: PublicEventWire
   highlights: PublicHighlightWire[]
   agenda: PublicSessionWire[]
   speakers: PublicSpeakerWire[]
+  /**
+   * Expected in the order the organizer created them — the wizard's order —
+   * because the seat map colours each type by its place here (`swatchOf`).
+   */
   tickets: PublicTicketWire[]
   faqs: PublicFaqWire[]
+  /**
+   * Null unless the event is in person, reserved, and gives at least one seat
+   * a ticket type — general admission, online and untyped maps send none.
+   */
+  seatMap: PublicSeatMapWire | null
   registration: { open: boolean; reason: string | null }
   sections: { agenda: string; speakers: string }
   share: {

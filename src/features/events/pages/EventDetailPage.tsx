@@ -31,15 +31,12 @@ import {
   type TicketRow,
 } from '../eventDetail.mapper'
 import { paymentPill } from '../eventDetail.presentation'
-import {
-  EVENT_TABS,
-  REGISTRATION_FILTERS,
-  type EventDetailData,
-  type EventTab,
-  type RegistrationFilter,
-} from '../eventDetail.routes'
+import { type EventDetailData, type EventTab, type RegistrationFilter } from '../eventDetail.routes'
 import { LANDING_TEMPLATES } from '../landingTemplates'
 import { STATUS_PILL, copyLabel, type CopyState } from '../events.presentation'
+import { RemoveSessionModal } from '@/features/program/components/RemoveSessionModal'
+import { COPIED_MS, EVENT_TABS, REGISTRATION_FILTERS, REMOVE_SESSION_FIELDS, SESSION_TYPES } from '@/lib/constants/events.constants'
+import { SEAT_SET_QUANTITY } from '@/lib/constants/ticketing.constants'
 
 /* ---------- Event detail — admin/event-detail.html ----------
    Pill tabs switch between Overview, Registrations (filter + paging),
@@ -66,9 +63,6 @@ const FILTER_LABEL: Record<RegistrationFilter, string> = {
   refunded: 'Refunded',
 }
 
-/** Long enough to read, short enough to try again. */
-const COPIED_MS = 1500
-
 /** tone → avatar chip classes (light + dark). */
 const TONE: Record<AvatarTone, string> = {
   brand: 'bg-brand-soft text-brand-dark dark:text-brand',
@@ -86,8 +80,6 @@ const SESSION_TONE: Record<string, AvatarTone> = {
   Panel: 'amber',
   Break: 'brand',
 }
-
-const SESSION_TYPES = ['Keynote', 'Talk', 'Workshop', 'Panel', 'Break']
 
 /** Close on Escape while `open`. */
 function useEsc(open: boolean, onClose: () => void) {
@@ -134,6 +126,10 @@ export default function EventDetailPage() {
   const [sessionOpen, setSessionOpen] = useState(false)
   const [ticketOpen, setTicketOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  // The session awaiting the organizer's confirmation; nothing is removed
+  // until they confirm (US-PROG-04).
+  const [removingSession, setRemovingSession] = useState<string | null>(null)
+  const stopRemovingSession = () => setRemovingSession(null)
 
   const { header, overview } = data
   const publicUrl = overview.publicUrl
@@ -264,9 +260,7 @@ export default function EventDetailPage() {
         onTab={goTab}
         onAddSession={() => setSessionOpen(true)}
         onAddTicket={() => setTicketOpen(true)}
-        onRemoveSession={(sessionId) =>
-          fetcher.submit({ intent: 'remove-session', sessionId }, { method: 'post' })
-        }
+        onRemoveSession={setRemovingSession}
       />
 
       <p className="mt-4 text-center text-[11px] text-muted/70">
@@ -278,9 +272,15 @@ export default function EventDetailPage() {
         onClose={() => setSessionOpen(false)}
         onAdd={(values) => fetcher.submit({ intent: 'add-session', ...values }, { method: 'post' })}
       />
+      <RemoveSessionModal
+        sessionId={removingSession}
+        onClose={stopRemovingSession}
+        fields={REMOVE_SESSION_FIELDS}
+      />
       <TicketPanel
         open={ticketOpen}
         onClose={() => setTicketOpen(false)}
+        quantityFromSeats={data.tab === 'tickets' && data.quantityFromSeats}
         onAdd={(values) => fetcher.submit({ intent: 'add-ticket', ...values }, { method: 'post' })}
       />
       <ShareModal
@@ -1188,7 +1188,6 @@ function TicketsPanel({ tickets, onAdd }: { tickets: TicketRow[]; onAdd: () => v
   )
 }
 
-
 /* ---------- Add session slide-over ---------- */
 function SessionPanel({
   open,
@@ -1326,10 +1325,13 @@ function SessionPanel({
 function TicketPanel({
   open,
   onClose,
+  quantityFromSeats,
   onAdd,
 }: {
   open: boolean
   onClose: () => void
+  /** The seat map sets the quantity (US-EVT-05): a new tier starts with no seats. */
+  quantityFromSeats: boolean
   onAdd: (values: Record<string, string>) => void
 }) {
   useEsc(open, onClose)
@@ -1343,7 +1345,7 @@ function TicketPanel({
     onAdd({
       name: name.trim(),
       price,
-      total: qty,
+      ...(quantityFromSeats ? {} : { total: qty }),
       // A free tier is priced differently by the API, not priced at zero.
       ...(isFree ? { isFree: 'on' } : {}),
     })
@@ -1391,15 +1393,28 @@ function TicketPanel({
             </div>
             <div>
               <label className="label">Quantity</label>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                className="input"
-                placeholder="200"
-                value={qty}
-                onChange={(e) => setQty(e.target.value)}
-              />
+              {quantityFromSeats ? (
+                <>
+                  <input
+                    type="number"
+                    className="input bg-canvas text-muted"
+                    value={0}
+                    readOnly
+                    aria-label="Quantity"
+                  />
+                  <p className="hint">{SEAT_SET_QUANTITY}</p>
+                </>
+              ) : (
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  className="input"
+                  placeholder="200"
+                  value={qty}
+                  onChange={(e) => setQty(e.target.value)}
+                />
+              )}
             </div>
           </div>
           <div>
@@ -1552,7 +1567,7 @@ function posterSVG(event: ShareEvent): string {
   const headline = title.length > 22 ? title.slice(0, 21) + '…' : title
   return (
     '<svg viewBox="0 0 440 540" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:auto" font-family="Inter, system-ui, sans-serif">' +
-    '<defs><linearGradient id="pbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1aa873"/><stop offset="1" stop-color="#128455"/></linearGradient>' +
+    '<defs><linearGradient id="pbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00c066"/><stop offset="1" stop-color="#008e4b"/></linearGradient>' +
     '<clipPath id="pcl"><rect x="0" y="0" width="440" height="540" rx="22"/></clipPath></defs>' +
     '<g clip-path="url(#pcl)">' +
     '<rect x="0" y="0" width="440" height="540" fill="url(#pbg)"/>' +
@@ -1573,10 +1588,10 @@ function posterSVG(event: ShareEvent): string {
     '<text x="142" y="338" font-size="12" font-weight="500" fill="#6f8078">' +
     escapeXml(event.where) +
     '</text>' +
-    '<text x="142" y="387" font-size="11" font-weight="800" letter-spacing="0.5" fill="#128455">SCAN TO REGISTER</text>' +
-    '<rect x="28" y="404" width="384" height="46" rx="23" fill="#128455"/>' +
+    '<text x="142" y="387" font-size="11" font-weight="800" letter-spacing="0.5" fill="#008e4b">SCAN TO REGISTER</text>' +
+    '<rect x="28" y="404" width="384" height="46" rx="23" fill="#008e4b"/>' +
     '<text x="220" y="433" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">Register on Eventa</text>' +
-    '<rect x="28" y="482" width="30" height="30" rx="9" fill="#128455"/>' +
+    '<rect x="28" y="482" width="30" height="30" rx="9" fill="#008e4b"/>' +
     flame(34, 487, 18, '#ffffff') +
     '<text x="66" y="503" font-size="15.5" font-weight="800" fill="#14342a">Eventa</text>' +
     '<text x="412" y="503" text-anchor="end" font-size="11" font-weight="500" fill="#6f8078">' +

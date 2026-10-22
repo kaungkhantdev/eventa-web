@@ -22,10 +22,14 @@ import type { ListEmptyReason } from '@/lib/urlFilters'
  * and are further back, so a ghost of rows in the place they are not would say
  * exactly the wrong thing.
  *
- * Shared by all six report tables: the distinction is the same on every one of
- * them, and a bare "No X for this selection" — which is what the static kit had
- * and what these pages were ported with — is the dead card this exists to
- * replace.
+ * Shared by all seven report tables: the distinction is the same on every one
+ * of them, and a bare "No X for this selection" with no way out — which is what
+ * the static kit had and what these pages were ported with — is the dead card
+ * this exists to replace.
+ *
+ * `headline` is for a story that words its filtered case itself: US-RPT-07
+ * requires "No payouts for this selection". The words change; the way out
+ * ("Clear filters") does not, so the card is still not a dead end.
  */
 export function ReportEmptyRow({
   colSpan,
@@ -33,6 +37,7 @@ export function ReportEmptyRow({
   reason,
   onClear,
   children,
+  headline,
 }: {
   colSpan: number
   /** Plural, in the page's own words: "events", "registrations". */
@@ -41,6 +46,8 @@ export function ReportEmptyRow({
   onClear: () => void
   /** The page's own sentence for the filtered case, naming its own filters. */
   children?: ReactNode
+  /** The filtered case's headline, where a story words it; else "No {noun} match." */
+  headline?: string
 }) {
   return (
     <tr>
@@ -56,7 +63,7 @@ export function ReportEmptyRow({
             }
             action={{ label: 'Clear filters', onClick: onClear, icon: 'hgi-refresh' }}
           >
-            {`No ${noun} match.`}
+            {headline ?? `No ${noun} match.`}
           </PanelEmptyPreview>
         ) : (
           <PanelEmptyPreview

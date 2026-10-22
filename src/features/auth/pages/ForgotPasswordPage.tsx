@@ -11,12 +11,9 @@ import {
   personaOfSearch,
   signInPathFor,
 } from '@/features/auth/personas'
-import {
-  RESEND_COOLDOWN_MS,
-  secondsRemaining,
-  startCooldown,
-} from '@/features/auth/resendCooldown'
+import { secondsRemaining, startCooldown } from '@/features/auth/resendCooldown'
 import { messageOf } from '@/lib/api'
+import { RESEND_COOLDOWN_MS } from '@/lib/constants/auth.constants'
 
 export default function ForgotPasswordPage() {
   const [params] = useSearchParams()

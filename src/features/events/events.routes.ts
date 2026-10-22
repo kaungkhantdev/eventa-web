@@ -1,6 +1,6 @@
 import { redirect } from 'react-router'
 import { pageAction, pageData, queryOf, type LoaderArgs } from '@/app/loaders'
-import { bangkokMonthKey } from '@/lib/format'
+import { bangkokDate, bangkokMonthKey } from '@/lib/format'
 import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/lib/paging'
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { categoriesApi, type CategoryInput } from './categories.api'
@@ -21,7 +21,7 @@ import type {
   UpcomingCard,
 } from './types'
 import { STATUS_LABEL } from './eventDetail.mapper'
-import { bangkokDate } from '@/lib/format'
+import { CATEGORIES_LIMIT, CATEGORY_SORTS, CATEGORY_VIEWS, EVENT_BUCKETS, EVENT_SORTS, EVENT_VIEWS, MAX_CATEGORY_SEARCH, MAX_EVENT_SEARCH, PREVIEW_EVENTS, UNCONFIRMED_DELETE, UPCOMING_LIMIT } from '@/lib/constants/events.constants'
 
 /**
  * What the events screens load, and what their controls do.
@@ -36,27 +36,11 @@ import { bangkokDate } from '@/lib/format'
 /** Every event type the API knows, in the kit's order — the filter's options. */
 export const EVENT_TYPES = Object.keys(TYPE_META) as EventType[]
 
-export const EVENT_VIEWS = ['overview', 'calendar'] as const
 export type EventView = (typeof EVENT_VIEWS)[number]
-
-/** The orderings offered, spelled as the API spells them. */
-export const EVENT_SORTS = ['registrations', 'name', 'date'] as const
-export const EVENT_BUCKETS = ['active', 'completed'] as const
 
 const DEFAULT_SORT: EventSort = 'registrations'
 const DEFAULT_BUCKET: EventBucket = 'active'
 const DEFAULT_VIEW: EventView = 'overview'
-
-/** How many cards the upcoming grid asks for — four rows of the widest layout. */
-const UPCOMING_LIMIT = 12
-
-/**
- * The longest search each endpoint's DTO accepts (`@MaxLength`). Past it the API
- * answers 400 — and a loader that throws takes the whole screen down with it, so
- * a pasted URL in the search box is truncated here rather than rejected there.
- */
-const MAX_EVENT_SEARCH = 120
-const MAX_CATEGORY_SEARCH = 80
 
 /** The `q` to send, or nothing at all when the box is empty. */
 export function searchOf(params: URLSearchParams, max: number): string | undefined {
@@ -138,17 +122,50 @@ function withPage(current: string, page: number): string {
 }
 
 /**
- * What the row menu can do: duplicate an event, or delete a draft. Anything
- * else the API refuses, and says why.
+ * A delete the organizer confirmed, or null when the form does not say they
+ * did. Only the confirmation dialog posts `confirm` (US-EVT-08).
+ */
+export function confirmedDeleteOf(form: FormData): { id: string; version: number } | null {
+  if (!deleteConfirmed(form)) return null
+  return { id: String(form.get('id') ?? ''), version: Number(form.get('version')) }
+}
+
+/** Only a confirmation dialog posts `confirm`. */
+function deleteConfirmed(form: FormData): boolean {
+  return form.get('confirm') === 'true'
+}
+
+/** A cancellation, as `POST /events/:id/cancel` wants it (US-EVT-08). */
+export function cancelInputOf(form: FormData): { id: string; reason: string; version?: number } {
+  const version = Number(form.get('version'))
+  return {
+    id: String(form.get('id') ?? ''),
+    reason: String(form.get('reason') ?? '').trim(),
+    version: Number.isInteger(version) && version > 0 ? version : undefined,
+  }
+}
+
+/**
+ * What the list can do: duplicate an event, delete a draft once that is
+ * confirmed, or cancel an event that cannot be deleted. Anything else the API
+ * refuses, and says why.
  */
 async function runEventsAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
-  const id = String(form.get('id') ?? '')
-  if (form.get('intent') === 'duplicate') {
-    await eventsApi.duplicate(id)
+  const intent = form.get('intent')
+  if (intent === 'duplicate') {
+    await eventsApi.duplicate(String(form.get('id') ?? ''))
     return
   }
-  await eventsApi.remove(id, Number(form.get('version')))
+  if (intent === 'cancel') {
+    const { id, ...body } = cancelInputOf(form)
+    await eventsApi.cancel(id, body)
+    return
+  }
+  const deletion = intent === 'delete' ? confirmedDeleteOf(form) : null
+  // A delete nobody confirmed must not be the way a bug shows itself.
+  if (!deletion) throw new Error(UNCONFIRMED_DELETE)
+  await eventsApi.remove(deletion.id, deletion.version)
 }
 
 export const eventsRoute = {
@@ -170,9 +187,6 @@ export const upcomingRoute = {
 }
 
 /* ----------------------------- landing pages ----------------------------- */
-
-/** How many of the workspace's events the "Preview with" switcher offers. */
-const PREVIEW_EVENTS = 3
 
 export interface LandingPagesData {
   /** The events a template can be previewed against — the newest few. */
@@ -213,17 +227,8 @@ export const landingPagesRoute = {
 
 /* ------------------------------- categories ------------------------------ */
 
-/**
- * The categories screen is not paged — it asks for the whole set in one go, up
- * to the API's own maximum. That is what lets it sort by event count in the
- * browser without the count on screen disagreeing with the cards below it.
- */
-export const CATEGORIES_LIMIT = 100
-
-export const CATEGORY_SORTS = ['name', 'count-desc', 'count-asc'] as const
 export type CategorySort = (typeof CATEGORY_SORTS)[number]
 
-export const CATEGORY_VIEWS = ['grid', 'list'] as const
 export type CategoryView = (typeof CATEGORY_VIEWS)[number]
 
 export function categorySortOf(params: URLSearchParams): CategorySort {
@@ -283,6 +288,14 @@ export function categoryInputOf(form: FormData): CategoryInput {
   }
 }
 
+/**
+ * The category the organizer confirmed deleting, or null when the form does
+ * not say they did (US-EVT-11).
+ */
+export function categoryDeletionOf(form: FormData): number | null {
+  return deleteConfirmed(form) ? Number(form.get('id')) : null
+}
+
 /** Create, rename or remove a category. */
 async function runCategoriesAction({ request }: LoaderArgs): Promise<void> {
   const form = await request.formData()
@@ -290,7 +303,9 @@ async function runCategoriesAction({ request }: LoaderArgs): Promise<void> {
   const id = Number(form.get('id'))
 
   if (intent === 'delete') {
-    await categoriesApi.remove(id)
+    const deletion = categoryDeletionOf(form)
+    if (deletion === null) throw new Error(UNCONFIRMED_DELETE)
+    await categoriesApi.remove(deletion)
     return
   }
 

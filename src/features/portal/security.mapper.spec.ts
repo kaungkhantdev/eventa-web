@@ -1,20 +1,13 @@
 import { recoveryCodesText } from '@/lib/recoveryCodes'
 import { describe, expect, it } from 'vitest'
-import {
-  DELETE_CONFIRMATION,
-  countOtherDevices,
-  isDeleteConfirmed,
-  passwordsMismatch,
-  toDeleteBody,
-  toDeletionWarning,
-  toTwoFactorCard,
-} from './security.mapper'
+import { countOtherDevices, isDeleteConfirmed, passwordsMismatch, toDeleteBody, toDeletionWarning, toTwoFactorCard } from './security.mapper'
 import type {
   DeletionWarningWire,
   LoginSessionWire,
   TwoFactorWire,
   UpcomingPaidOrderWire,
 } from './security.types'
+import { DELETE_CONFIRMATION } from '@/lib/constants/portal.constants'
 
 /**
  * The Security card's and the danger zone's rules (US-DISC-12 criteria 4–5,

@@ -1042,6 +1042,39 @@ export function SettingsPaymentsSkeleton() {
   )
 }
 
+/** Integrations: one provider card — tile and badge, blurb, facts, a button. */
+export function SettingsIntegrationsSkeleton() {
+  return (
+    <>
+      <SkelPageHeader actions={0} eyebrow />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        <section className="card p-4">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
+            <div className="space-y-2">
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-4 w-20 rounded-full" />
+            </div>
+          </div>
+          <div className="mt-3 space-y-1.5">
+            <Skeleton className="h-2.5 w-full" />
+            <Skeleton className="h-2.5 w-4/5" />
+          </div>
+          <div className="mt-3 space-y-2 border-t border-hair pt-3">
+            {Array.from({ length: 2 }, (_, i) => (
+              <div key={i} className="flex items-center justify-between gap-3">
+                <Skeleton className="h-2.5 w-16" />
+                <Skeleton className="h-2.5 w-32" />
+              </div>
+            ))}
+          </div>
+          <Skeleton className="mt-3 h-8 w-full" />
+        </section>
+      </div>
+    </>
+  )
+}
+
 /** Roles: a search + create row above four permission cards. */
 export function RolesSkeleton() {
   return (

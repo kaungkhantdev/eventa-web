@@ -5,9 +5,12 @@ import { DEFAULT_PAGE_SIZE, isPageSize, pageWindow, type PageWindow } from '@/li
 import { enumParam, intParam } from '@/lib/urlFilters'
 import { ticketsApi, type ListTicketsQuery, type TicketInput } from './tickets.api'
 import { toTicketCard } from './tickets.mapper'
-import type { TicketCard, TicketCountsWire, TicketShareWire } from './tickets.types'
+import { ticketingApi } from './ticketing.api'
+import type { SeatSetWire, TicketCard, TicketCountsWire, TicketShareWire } from './tickets.types'
 import type { TicketStatus } from './types'
 import { eventOptions, type EventOption } from '@/features/events/eventOptions'
+import { quantityFromSeatsOf } from '@/features/events/eventSeating.mapper'
+import { MAX_SEARCH_LENGTH, SATANG_PER_BAHT, TICKET_TABS } from '@/lib/constants/ticketing.constants'
 
 /**
  * The cross-event ticket inventory (US-TKT-01..06).
@@ -17,11 +20,7 @@ import { eventOptions, type EventOption } from '@/features/events/eventOptions'
  * one request and cannot disagree.
  */
 
-export const TICKET_TABS = ['all', 'onsale', 'scheduled', 'paused', 'soldout'] as const
 export type TicketTab = (typeof TICKET_TABS)[number]
-
-/** `@MaxLength(120)` on the DTO — past it the API answers 400, not a list. */
-const MAX_SEARCH = 120
 
 export function tabOf(params: URLSearchParams): TicketTab {
   return enumParam(params, 'tab', TICKET_TABS, 'all')
@@ -37,7 +36,7 @@ export function listQueryOf(params: URLSearchParams): ListTicketsQuery {
     // All sends no status, so every bucket is listed.
     status: tab === 'all' ? undefined : (tab as TicketStatus),
     eventId: params.get('eventId') ?? undefined,
-    search: search ? search.slice(0, MAX_SEARCH) : undefined,
+    search: search ? search.slice(0, MAX_SEARCH_LENGTH) : undefined,
   }
 }
 
@@ -73,8 +72,6 @@ export function ticketInputOf(form: FormData): TicketInput {
     version: Number.isInteger(version) && version > 0 ? version : undefined,
   }
 }
-
-const SATANG_PER_BAHT = 100
 
 /**
  * Baht typed into the price box → the integer satang the wire carries.
@@ -219,6 +216,20 @@ export const ticketShareRoute = {
   loader: pageData(async ({ request }: LoaderArgs): Promise<TicketShareWire> => {
     const params = queryOf(request)
     return ticketsApi.share(params.get('eventId') ?? '', params.get('ticketId') ?? '')
+  }),
+}
+
+/**
+ * Whether one event's seat map sets its tiers' quantities (US-EVT-05), asked
+ * when the "New ticket type" panel chooses it, so the panel can show the
+ * quantity read-only instead of a box the API would ignore. The API marks
+ * every tier of such an event, so its tiers answer for it.
+ */
+export const ticketSeatSetRoute = {
+  loader: pageData(async ({ request }: LoaderArgs): Promise<SeatSetWire> => {
+    const eventId = queryOf(request).get('eventId') ?? ''
+    const tickets = await ticketingApi.forEvent(eventId)
+    return { eventId, quantityFromSeats: quantityFromSeatsOf(tickets) }
   }),
 }
 

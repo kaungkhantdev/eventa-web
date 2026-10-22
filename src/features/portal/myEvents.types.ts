@@ -25,9 +25,39 @@ export interface MyRegistrationWire {
   coverImage: string | null
   ticketTypeName: string | null
   ticketCount: number
+  /**
+   * The order's tickets, in admission order. Each one opens at
+   * `GET /me/tickets/{ticketId}`, which is the only place its QR token lives.
+   */
+  ticketIds: string[]
   /** "in 3 days", or null once it has passed. */
   countdown: string | null
   attended: boolean
+}
+
+/** `GET /me/tickets/{ticketId}` — one ticket's pass, verbatim. */
+export interface TicketPassWire {
+  id: string
+  /** The order's reference, which the pass prints as the ticket's. */
+  reference: string
+  /** What the door scans — the bearer credential the QR encodes. */
+  qrToken: string
+  status: string
+  /** False once refunded, voided or transferred. */
+  valid: boolean
+  holderName: string | null
+  ticketLabel: string | null
+  /** "2 of 3" — this ticket's place among the order's admissions. */
+  admissionNumber: string
+  eventName: string
+  eventSlug: string
+  startAt: string
+  timezone: string
+  venueName: string | null
+  venueAddress: string | null
+  city: string | null
+  isOnline: boolean
+  seat: { section: string | null; row: string | null; number: string | null } | null
 }
 
 export interface MyEventsWire {
@@ -38,7 +68,10 @@ export interface MyEventsWire {
 
 export interface TransactionWire {
   paymentId: string
+  /** The order's own reference. */
   reference: string
+  /** The tax invoice the organizer issued for the order; null when none was. */
+  invoiceNumber: string | null
   eventName: string
   method: string
   status: string
@@ -76,15 +109,48 @@ export interface MyEventRow {
   /** The tier bought, or `—` when the tier has since been deleted. */
   ticket: string
   ticketCount: number
+  /** What the Ticket button opens, one pass per id. */
+  ticketIds: string[]
   /** "in 3 days" — the API's phrase, empty once the event has passed. */
   countdown: string
   attended: boolean
   image: string | null
 }
 
-export interface TransactionRow {
+/** One ticket, as the ticket modal shows it (US-DISC-07). */
+export interface TicketPass {
   id: string
   reference: string
+  /** "1 of 2". */
+  admission: string
+  valid: boolean
+  /**
+   * The QR as an image, encoding the ticket's own token. `null` for a ticket
+   * that no longer admits — or a token too long to draw — rather than a
+   * picture the door would refuse.
+   */
+  qr: string | null
+  /**
+   * The printable pass the API rendered, as a `data:` URL the preview shows
+   * and the download link saves. `null` when the API refused to print it.
+   */
+  printable: string | null
+  /** The API's own reason there is no download, in its words. */
+  printRefusal: string | null
+  /** What the download is saved as. */
+  filename: string
+}
+
+/** One entry in the modal's switcher between an order's tickets. */
+export interface TicketChoice {
+  value: string
+  label: string
+}
+
+export interface TransactionRow {
+  id: string
+  /** The invoice number when one was issued, else the order reference. */
+  number: string
   event: string
   method: string
   status: string

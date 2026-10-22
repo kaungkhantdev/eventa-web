@@ -1,7 +1,9 @@
 import { api, session } from '@/lib/api'
 import type { Persona } from '@/lib/persona'
 import { personaOfSession } from './personas'
+import type { BookingClaimInput } from './signUpInput'
 import type { Credentials, LoginResult, Me, WorkspaceOption } from './types'
+import { FROM_BOOKING } from '@/lib/constants/auth.constants'
 
 /**
  * A confirmed account, and where it signs in.
@@ -27,6 +29,31 @@ export interface VerifiedEmail {
 export interface ResetLinkCheck {
   persona: Persona
   workspaceName: string | null
+}
+
+/** `GET /auth/register/from-booking/:orderId` — which account offer to make. */
+export interface BookingAccount {
+  /** An attendee account already uses the booking's email: offer sign-in only. */
+  accountExists: boolean
+}
+
+/** `POST /auth/register/from-booking/:orderId/link` — where the claim link went. */
+export interface BookingClaimLink {
+  /** The booking's own address — the only inbox the link is ever sent to. */
+  sentTo: string
+}
+
+/**
+ * `POST /auth/register/from-booking/claim/inspect` — whose claim link this is,
+ * asked when it is opened and WITHOUT spending it.
+ */
+export interface BookingClaim {
+  /** The buyer's name, from the order. */
+  name: string
+  /** The address the link was sent to, from the token the API signed. */
+  email: string
+  /** Already claimed, or an account already used this address. */
+  accountExists: boolean
 }
 
 /** What the API actually returns — flattened into `LoginResult` below. */
@@ -186,14 +213,71 @@ export const authApi = {
   },
 
   /**
+   * Keeping a booking's tickets in an account (US-DISC-15): whether the
+   * booking's address already has one, so the order page offers sign-in
+   * rather than a duplicate. By the order's id — never its human-readable
+   * reference, which is printed on the ticket and easy to guess.
+   */
+  bookingAccount(orderId: string): Promise<BookingAccount> {
+    return api.get<BookingAccount>(`${FROM_BOOKING}/${encodeURIComponent(orderId)}`, {
+      anonymous: true,
+    })
+  },
+
+  /**
+   * Email the booking's address a one-time link to choose a password.
+   *
+   * No body: the API reads the address off the order, so nothing this page
+   * holds can point the link at another inbox. Being able to open the order
+   * page proves nothing about who reads that inbox — its id is shown to
+   * whoever booked — which is why the account is made from the link, not
+   * from here. A throttle or an existing account is refused in the API's own
+   * words.
+   */
+  requestBookingClaimLink(orderId: string): Promise<BookingClaimLink> {
+    return api.post<BookingClaimLink>(
+      `${FROM_BOOKING}/${encodeURIComponent(orderId)}/link`,
+      undefined,
+      { anonymous: true },
+    )
+  },
+
+  /**
+   * Whose claim link this is — asked when it is opened, without spending it.
+   * The token goes in the body, never a URL: a URL is what the API's access
+   * log records. An invalid, expired or used link is a 400 written for the
+   * person holding it.
+   */
+  inspectBookingClaim(token: string): Promise<BookingClaim> {
+    return api.post<BookingClaim>(`${FROM_BOOKING}/claim/inspect`, { token }, { anonymous: true })
+  },
+
+  /**
+   * Choose the password and create the account the link proves. Unlike
+   * `register`, a session results — the link reached the inbox, which is the
+   * proof a confirmation email would have asked for — and it begins in
+   * `establish`, the one place every sign-in begins.
+   */
+  async claimBookingAccount(input: BookingClaimInput): Promise<LoginResult> {
+    const raw = await api.post<RawLogin>(`${FROM_BOOKING}/claim`, input, { anonymous: true })
+    return establish(raw)
+  },
+
+  /**
    * Sign out. The local session is cleared even if the call fails: the person
    * asked to be signed out of THIS browser, and a network problem must not
    * leave them looking at a console they thought they had left. The refresh
    * token is revoked server-side when the request does land.
+   *
+   * It never rejects: both callers navigate to sign-in once it resolves, and a
+   * failure here (offline, or a refresh token already revoked or expired) used
+   * to strand the person on the page they had just signed out of (US-ACC-10).
    */
   async logout(): Promise<void> {
     try {
       await api.post('/auth/logout')
+    } catch {
+      // Signed out of this browser regardless — see above.
     } finally {
       session.end()
     }

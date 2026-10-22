@@ -1,6 +1,7 @@
 import type { BadgeTone } from '@/components/ui'
 import { bangkokDate, bangkokLocalInput, bangkokTime, num } from '@/lib/format'
 import type { AnnouncementStatus, AnnouncementWire } from './announcements.types'
+import { GONE } from '@/lib/constants/engagement.constants'
 
 /**
  * One announcement, as a row (US-MSG-04/05) — sent, still to go, or called off.
@@ -10,9 +11,6 @@ import type { AnnouncementStatus, AnnouncementWire } from './announcements.types
  * them recipients would claim a delivery this app has no way to know about —
  * that is US-MSG-06, and it needs a per-recipient record that does not exist.
  */
-
-/** An event can be deleted after a broadcast; the broadcast still happened. */
-const GONE = 'Deleted event'
 
 export interface AnnouncementBadge {
   tone: BadgeTone

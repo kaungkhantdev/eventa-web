@@ -3,6 +3,7 @@ import { Icon, PanelEmptyPreview } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import type { AlertRow } from '../overview.types'
 import { SectionHeader } from './PanelChrome'
+import { NOTHING_WRONG } from '@/lib/constants/overview.constants'
 
 /**
  * What needs acting on (US-DASH-06).
@@ -12,9 +13,6 @@ import { SectionHeader } from './PanelChrome'
  * appears — an alert about money is simply absent for someone without finance
  * access, rather than shown and refused.
  */
-const NOTHING_WRONG =
-  "We'll flag failed payments, cancellations and check-in problems here."
-
 export function AlertsPanel({ alerts, emptyMessage }: { alerts: AlertRow[]; emptyMessage: string }) {
   return (
     <section className="rounded-2xl bg-surface p-4 xl:col-span-1">

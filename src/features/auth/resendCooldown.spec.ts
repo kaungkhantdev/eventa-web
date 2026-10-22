@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import {
-  RESEND_COOLDOWN_MS,
-  type CooldownStore,
-  secondsRemaining,
-  startCooldown,
-} from './resendCooldown'
+import { type CooldownStore, secondsRemaining, startCooldown } from './resendCooldown'
+import { RESEND_COOLDOWN_MS } from '@/lib/constants/auth.constants'
 
 const EMAIL = 'owner@acme.co.th'
 const NOW = 1_700_000_000_000

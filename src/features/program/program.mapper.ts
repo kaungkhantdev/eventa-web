@@ -9,16 +9,9 @@ import type {
   SpeakerTone,
   SpeakerWire,
 } from './program.types'
+import { FIRST_HOUR, HOUR_HEIGHT, LAST_HOUR, MINUTES_PER_HOUR, MIN_BLOCK_HEIGHT, MS_PER_DAY } from '@/lib/constants/program.constants'
 
 /** The rules behind the agenda and speakers screens (US-PROG-01..07). */
-
-/** The calendar's first hour, and how tall an hour is — the kit's geometry. */
-export const FIRST_HOUR = 9
-export const LAST_HOUR = 16
-export const HOUR_HEIGHT = 64
-
-const MINUTES_PER_HOUR = 60
-const MS_PER_DAY = 86_400_000
 
 const TONES: readonly SpeakerTone[] = ['green', 'blue', 'purple', 'amber', 'red', 'pink']
 
@@ -50,6 +43,7 @@ export function toSpeakerCard(wire: SpeakerWire): SpeakerCard {
     // An unrated speaker has no rating — not a rating of zero. `0.0` beside a
     // name is a claim about their audience that nobody made.
     rating: wire.rating || MASKED,
+    version: wire.version,
   }
 }
 
@@ -61,26 +55,27 @@ export function toSpeakerCard(wire: SpeakerWire): SpeakerCard {
  * move a 09:00 session by the reader's distance from the venue.
  */
 export function toAgendaBlock(wire: SessionWire): AgendaBlock {
-  const start = minutesOf(wire.startTime)
-  const end = minutesOf(wire.endTime)
-  const top = Math.max(0, offsetOf(start))
+  const top = Math.max(0, offsetOf(minutesOf(wire.startTime)))
+  // No end time is a session with no length to draw: it gets the shortest
+  // block rather than one made up from a guessed duration.
+  const bottom = wire.endTime === null ? top : offsetOf(minutesOf(wire.endTime))
   return {
     id: wire.id,
     day: wire.day,
     title: wire.title,
     type: wire.type,
-    time: `${clock(wire.startTime)} – ${clock(wire.endTime)}`,
+    time: spanOf(wire),
     who: presenter(wire),
     color: wire.color,
     top,
     // A session starting before the calendar does is clipped at the top rather
     // than drawn off it, so what is left still reads as a block.
-    height: Math.max(offsetOf(end) - top, HOUR_HEIGHT / 4),
+    height: Math.max(bottom - top, MIN_BLOCK_HEIGHT),
     edit: {
       id: wire.id,
       day: wire.day,
       startTime: clock(wire.startTime),
-      endTime: clock(wire.endTime),
+      endTime: wire.endTime === null ? '' : clock(wire.endTime),
       title: wire.title,
       type: wire.type,
       room: wire.room,
@@ -89,6 +84,12 @@ export function toAgendaBlock(wire: SessionWire): AgendaBlock {
       version: wire.version,
     },
   }
+}
+
+/** `09:30 – 10:30`, or just `09:30` for a session with no end. */
+function spanOf(wire: SessionWire): string {
+  const start = clock(wire.startTime)
+  return wire.endTime === null ? start : `${start} – ${clock(wire.endTime)}`
 }
 
 /** The speakers, or — for a break, which has none — the room it occupies. */

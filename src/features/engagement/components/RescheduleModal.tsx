@@ -6,8 +6,7 @@ import { toast } from '@/lib/toast'
 import type { AnnouncementRow } from '../announcements.mapper'
 import { unattachedError } from '../refusal'
 import type { RowDialog } from '../useRowDialog'
-
-const FORM_ID = 'reschedule-announcement'
+import { FORM_ID } from '@/lib/constants/engagement.constants'
 
 /**
  * Moving a scheduled announcement to another time (US-MSG-05).

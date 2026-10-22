@@ -2,15 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { ApiError, NetworkError } from '@/lib/api'
 import type { ResetLinkCheck } from './api'
 import { toResetLinkView } from './resetPassword.mapper'
-import {
-  INCOMPLETE_LINK,
-  PASSWORDS_DIFFER,
-  loadResetLink,
-  screenOf,
-  shouldRecheckLink,
-  submitNewPassword,
-  type ResetLinkData,
-} from './resetPassword.routes'
+import { loadResetLink, screenOf, shouldRecheckLink, submitNewPassword, type ResetLinkData } from './resetPassword.routes'
+import { PASSWORDS_DIFFER, RESET_PASSWORD_INCOMPLETE_LINK as INCOMPLETE_LINK } from '@/lib/constants/auth.constants'
 
 /**
  * The page at the end of the reset email's link (US-ACC-04).

@@ -1,12 +1,13 @@
 import { panel, type Panel } from '@/app/panels'
 import { queryOf, type ActionResult, type LoaderArgs } from '@/app/loaders'
-import { ApiError, NetworkError, messageOf, session } from '@/lib/api'
+import { ApiError, NetworkError, session } from '@/lib/api'
 import { pageWindow, type PageWindow } from '@/lib/paging'
 import { intParam } from '@/lib/urlFilters'
 import { discoverApi } from './discover.api'
 import { toDiscoverCard } from './discover.mapper'
 import { savedEvents } from './savedEvents'
 import type { DiscoverCard } from './discover.types'
+import { DISCOVER_PAGE_SIZE, SAVE_FAILED, UNSAVE_FAILED } from '@/lib/constants/portal.constants'
 
 /**
  * What's on (US-DISC-01/02/03).
@@ -16,9 +17,6 @@ import type { DiscoverCard } from './discover.types'
  * page meant to be shareable. A session is read only to decide *where* the
  * shortlist lives.
  */
-
-/** A grid row is three cards wide, so the page comes in whole rows. */
-export const DISCOVER_PAGE_SIZE = 12
 
 export interface DiscoverData {
   cards: DiscoverCard[]
@@ -46,8 +44,24 @@ export function discoverQueryOf(params: URLSearchParams) {
 /** An attendee's shortlist lives on their account; anyone else's is local. */
 async function savedIdsFor(isSignedIn: boolean): Promise<string[]> {
   if (!isSignedIn) return savedEvents.ids()
-  const shortlist = await panel(discoverApi.saved())
-  return shortlist.ok ? shortlist.data.items.map((row) => row.id) : []
+  const shortlist = await panel(everySavedId())
+  return shortlist.ok ? shortlist.data : []
+}
+
+/**
+ * Every id on the account's shortlist, not just its first page.
+ *
+ * A card's heart is filled by finding its id here, so a save that fell off the
+ * first page read as never made: the API's default page is the twelve newest,
+ * and an older save showed an empty heart on return or on another device.
+ */
+async function everySavedId(): Promise<string[]> {
+  const ids: string[] = []
+  for (let page = 1; ; page += 1) {
+    const { items, meta } = await discoverApi.saved(page)
+    ids.push(...items.map((row) => row.id))
+    if (page >= meta.totalPages) return ids
+  }
 }
 
 export const discoverRoute = {
@@ -91,7 +105,7 @@ export const discoverRoute = {
       return { ok: true }
     } catch (cause) {
       if (cause instanceof ApiError || cause instanceof NetworkError) {
-        return { ok: false, error: messageOf(cause) }
+        return { ok: false, error: save ? SAVE_FAILED : UNSAVE_FAILED }
       }
       throw cause
     }

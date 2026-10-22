@@ -1,6 +1,7 @@
 import { api, meProfileApi } from '@/lib/api'
 import { putToSignedUrl, type IssuedUpload } from '@/lib/signedUpload'
 import type { PhotoWire } from './profile.types'
+import { STORAGE_PUT_FAILED } from '@/lib/constants/portal.constants'
 
 /**
  * Every call the portal's Profile tab makes, and nothing else (US-DISC-11).
@@ -10,8 +11,6 @@ import type { PhotoWire } from './profile.types'
  * profile routes from `settings.routes.ts` — `/me/profile` is the signed-in
  * person's own record whatever persona they are using.
  */
-
-const STORAGE_PUT_FAILED = 'The photo could not be sent to storage.'
 
 export const profileApi = {
   // The three `/me/profile` calls are shared with the organizer console's

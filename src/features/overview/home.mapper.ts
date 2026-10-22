@@ -1,5 +1,5 @@
 import { bangkokTime, initials, num } from '@/lib/format'
-import { ALERT_LOOK, SHARE_COLORS, avatarTint, cardLook, meetingTint } from './overview.presentation'
+import { ALERT_LOOK, avatarTint, cardLook, meetingTint } from './overview.presentation'
 import type {
   ActiveEventWire,
   AlertRow,
@@ -15,13 +15,9 @@ import type {
   UpcomingCard,
   UpcomingEventWire,
 } from './overview.types'
+import { CONSOLE, SEPARATOR, SHARE_COLORS, TODAY, WHOLE_RING } from '@/lib/constants/overview.constants'
 
 /** The rules behind the home screen (US-DASH-01..07). */
-
-/** Where this app mounts the modules the API's alert links name. */
-const CONSOLE = '/admin'
-
-const SEPARATOR = ' · '
 
 export function toRegistrationRow(wire: FeedItemWire): RegistrationRow {
   return {
@@ -83,8 +79,6 @@ export function toUpcomingCard(wire: UpcomingEventWire): UpcomingCard {
   }
 }
 
-const TODAY = 'Today'
-
 /**
  * A countdown never runs backwards on this panel: the list is "upcoming", so
  * anything at or past its start reads as happening today rather than "-1 days
@@ -94,8 +88,6 @@ function daysLabel(daysLeft: number): string {
   if (daysLeft <= 0) return TODAY
   return daysLeft === 1 ? '1 day left' : `${daysLeft} days left`
 }
-
-const WHOLE_RING = 100
 
 /**
  * Each active event's share of the sign-ups across them (US-DASH-05).

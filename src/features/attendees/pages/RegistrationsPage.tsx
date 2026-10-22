@@ -30,15 +30,9 @@ import { useDisclosure } from '@/lib/useDisclosure'
 import { useFilters, useSearchBox } from '@/lib/useFilters'
 import { useIsFiltering } from '@/lib/usePendingPath'
 import { STATUS_BADGE } from '../registrations.presentation'
-import {
-  REG_TABS,
-  type EventOption,
-  type RegTab,
-  type RegistrationsData,
-  type TabCounts,
-  type TierOption,
-} from '../registrations.routes'
+import { type EventOption, type RegTab, type RegistrationsData, type TabCounts, type TierOption } from '../registrations.routes'
 import type { Registration } from '../registrations.types'
+import { ALL_EVENTS, MAX_SEARCH_LENGTH, REG_TABS } from '@/lib/constants/attendees.constants'
 
 /* admin/registrations.html — the organizer's approval queue (US-REG-01..03).
 
@@ -52,11 +46,6 @@ import type { Registration } from '../registrations.types'
    filter, which `GET /registrations` does not offer (narrowing one page of a
    server-paged list would print counts that contradict the rows), and the
    panel's Notes field, which has nowhere to be stored. */
-
-const ALL_EVENTS = 'All events'
-
-/** What the API's `search` accepts; longer and it answers 400 (`@MaxLength`). */
-const MAX_SEARCH_LENGTH = 120
 
 const TAB_LABEL: Record<RegTab, string> = {
   all: 'All',

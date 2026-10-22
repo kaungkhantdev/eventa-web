@@ -30,6 +30,7 @@ import {
   ReportSubPageSkeleton,
   ReportsOverviewSkeleton,
   RolesSkeleton,
+  SettingsIntegrationsSkeleton,
   SettingsNotificationsSkeleton,
   SettingsPaymentsSkeleton,
   SettingsProfileSkeleton,
@@ -184,6 +185,7 @@ const ADMIN: Record<string, () => ReactNode> = {
   'settings-notifications': () => <SettingsNotificationsSkeleton />,
   'settings-organization': () => <SettingsProfileSkeleton fields={5} />,
   'settings-payments': () => <SettingsPaymentsSkeleton />,
+  'settings-integrations': () => <SettingsIntegrationsSkeleton />,
   users: () => (
     <ListPageSkeleton tabs={4} selects={['sm:w-52']} cols={5} minWidth="min-w-[820px]" />
   ),
@@ -200,6 +202,8 @@ const PUBLIC: Record<string, () => ReactNode> = {
   // No form to stand in for — the loader is confirming the account, and what
   // follows is a short verdict and one button.
   '/verify-email': () => <AuthSkeleton fields={0} social={0} divider={false} />,
+  // Likewise for an email change: the loader confirms the new address.
+  '/confirm-email': () => <AuthSkeleton fields={0} social={0} divider={false} />,
   // The loader is checking the link; a usable one — the common case — opens
   // on the new password and its confirmation.
   '/reset-password': () => <AuthSkeleton fields={2} social={0} divider={false} />,

@@ -1,4 +1,5 @@
 import type { Panel } from '@/app/panels'
+import { ATTENDEE_NOTIFICATION_CATEGORIES, NOTIFICATION_ROW } from '@/lib/constants/portal.constants'
 /**
  * The attendee's own settings — `/me/notification-preferences` and the three
  * display fields that ride on `/me/profile` (US-DISC-12).
@@ -6,17 +7,6 @@ import type { Panel } from '@/app/panels'
  * Wire shapes mirror eventa-api field for field; nothing outside the mapper
  * reads them.
  */
-
-/**
- * The topics an attendee token is given, from the API's own list
- * (`ATTENDEE_CATEGORIES` in `notification-preferences.service.ts`).
- *
- * The other seven members of `notification_kind` belong to the organizer and
- * are refused for this persona, which is why only these two are named here.
- * Order confirmations and receipts are in NEITHER list on purpose: they are
- * transactional, and nothing in this file can switch them off (criterion 2).
- */
-export const ATTENDEE_NOTIFICATION_CATEGORIES = ['reminder', 'marketing'] as const
 
 export type AttendeeNotificationCategory = (typeof ATTENDEE_NOTIFICATION_CATEGORIES)[number]
 
@@ -36,19 +26,6 @@ export interface NotificationPreferencePatch {
 }
 
 /* ------------------------------ view models ------------------------------ */
-
-/**
- * Which row of the Notifications card a submission came from.
- *
- * A row is not a category: two of them write to `reminder` over different
- * channels, so the row id is what the form carries and the mapper is what
- * turns it into a category and a patch.
- */
-export const NOTIFICATION_ROW = {
-  reminders: 'reminders',
-  sms: 'sms',
-  marketing: 'marketing',
-} as const
 
 export type NotificationRowId = (typeof NOTIFICATION_ROW)[keyof typeof NOTIFICATION_ROW]
 

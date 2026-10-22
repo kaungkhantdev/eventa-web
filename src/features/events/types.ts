@@ -76,6 +76,13 @@ export interface EventWire {
   /** The public page's design — null until one has been chosen. */
   landingTemplateId?: string | null
   /**
+   * The workspace category it is filed under, or null for none. Optional: only
+   * the full event response is relied on to carry it.
+   */
+  categoryId?: number | null
+  /** The public page's accent colour, or null until one is set (US-PAGE-10). */
+  accentColor?: string | null
+  /**
    * `public` | `unlisted` | `private` (`EventResponseDto.visibility`). Only a
    * `public` event is served by slug, so this decides whether a real public
    * page exists to link to. Optional: the calendar's slimmer payload omits it.
@@ -111,6 +118,8 @@ export interface UpcomingEventWire {
   sold: number
   capacity: number
   fillPercent: number
+  /** The event's cover photo, or null when it has none. */
+  coverImage: string | null
 }
 
 /** `CalendarResponseDto` — one Bangkok month of events. */
@@ -157,6 +166,17 @@ export interface EventRow {
   version: number
 }
 
+/**
+ * A dialog about one row of the events list — deleting it, or cancelling it
+ * instead. The row is kept after closing so the dialog still reads correctly
+ * as it fades out; `attempt` counts openings, so each starts afresh.
+ */
+export interface EventDialog {
+  row: EventRow | null
+  open: boolean
+  attempt: number
+}
+
 /** A card in the upcoming grid. */
 export interface UpcomingCard {
   id: string
@@ -166,6 +186,8 @@ export interface UpcomingCard {
   registrations: string
   sold: number
   fillPercent: number
+  /** The event's own cover photo; null leaves the type's gradient showing. */
+  cover: string | null
   icon: string
   tone: Tone
 }
